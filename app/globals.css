@@ -1,26 +1,343 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
+
+/* ---------------------------------------------------------------------------
+   Calm focus — see design-notes.md
+   Warm paper / deep ink base, muted teal primary, and amber reserved
+   EXCLUSIVELY for "the clock is moving". Nothing else in the app is amber.
+--------------------------------------------------------------------------- */
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* The running-timer colour. Reserved for work on the clock. */
+  --color-running: var(--running);
+  --color-running-foreground: var(--running-foreground);
+  --color-running-muted: var(--running-muted);
+
+  /* Recovery. A peer of --running, not a tint of it — rest gets its own
+     colour rather than diluting the "work is moving" signal. */
+  --color-rest: var(--rest);
+  --color-rest-foreground: var(--rest-foreground);
+  --color-rest-muted: var(--rest-muted);
+  --color-rest-track: var(--rest-track);
+
+  /* Timer arc surfaces */
+  --color-arc-track: var(--arc-track);
+  --color-arc-tick: var(--arc-tick);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --font-sans: var(--font-karla);
+  --font-display: var(--font-newsreader);
+  --font-mono: var(--font-jetbrains);
+  --font-heading: var(--font-newsreader);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* A deliberate type scale rather than the bare text-sm/base/lg staircase. */
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 1rem;
+  --text-micro--letter-spacing: 0.06em;
+  --text-label: 0.8125rem;
+  --text-label--line-height: 1.25rem;
+  --text-body: 0.9375rem;
+  --text-body--line-height: 1.55rem;
+  --text-title: 1.0625rem;
+  --text-title--line-height: 1.5rem;
+  --text-heading: 1.5rem;
+  --text-heading--line-height: 1.9rem;
+  --text-heading--letter-spacing: -0.015em;
+  --text-display: 2.25rem;
+  --text-display--line-height: 2.5rem;
+  --text-display--letter-spacing: -0.02em;
+
+  /* Motion budget.
+     Three named animations, all under 400ms, none of them looping except
+     `breathe` — which is attached to exactly one element. The rule this app
+     follows is that motion either confirms something you just did or shows
+     something arriving; nothing moves to be decorative. On a screen built for
+     people who are easily pulled off task, ambient movement is a cost. */
+  --animate-breathe: breathe 5s ease-in-out infinite;
+  --animate-rise: rise 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-pop: pop 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  @keyframes breathe {
+    0%,
+    100% {
+      opacity: 0.55;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+
+  /* Content arriving. Small distance on purpose — 6px reads as "settling",
+     20px reads as "flying in". */
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* The one bit of overshoot in the app, spent on ticking something off. That
+     moment is the entire reward loop of a task list; everywhere else, easing
+     that overshoots reads as noise. */
+  @keyframes pop {
+    0% {
+      transform: scale(1);
+    }
+    45% {
+      transform: scale(1.22);
+    }
+    100% {
+      transform: scale(1);
+    }
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+:root {
+  --radius: 0.625rem;
+
+  --background: #faf7f2;
+  --foreground: #1c1a17;
+
+  --card: #fffdfa;
+  --card-foreground: #1c1a17;
+  --popover: #fffdfa;
+  --popover-foreground: #1c1a17;
+
+  --primary: #2f6f6a;
+  --primary-foreground: #f6fbfa;
+  --secondary: #efeae1;
+  --secondary-foreground: #3b3630;
+  --muted: #f1ece3;
+  --muted-foreground: #8a8378;
+  --accent: #e4edeb;
+  --accent-foreground: #24564f;
+  --destructive: #b85c4a;
+
+  --border: #e4ded2;
+  --input: #ded7c9;
+  --ring: #2f6f6a;
+
+  --running: #c97b27;
+  --running-foreground: #fffaf3;
+  --running-muted: #f3e3cd;
+
+  /* Cool and low-chroma, so recovery reads as a different kind of time at a
+     glance rather than as "the timer, but a bit different". */
+  --rest: #5a7f8c;
+  --rest-foreground: #f7fafb;
+  --rest-muted: #dfe8eb;
+  --rest-track: #e6ebed;
+
+  --arc-track: #e9e2d6;
+  --arc-tick: #c8bfae;
+
+  --chart-1: #2f6f6a;
+  --chart-2: #c97b27;
+  --chart-3: #6f8f7a;
+  --chart-4: #a8896b;
+  --chart-5: #b85c4a;
+
+  --sidebar: #f5f1ea;
+  --sidebar-foreground: #3b3630;
+  --sidebar-primary: #2f6f6a;
+  --sidebar-primary-foreground: #f6fbfa;
+  --sidebar-accent: #e4edeb;
+  --sidebar-accent-foreground: #24564f;
+  --sidebar-border: #e4ded2;
+  --sidebar-ring: #2f6f6a;
+}
+
+.dark {
+  --background: #14120f;
+  --foreground: #ece6dc;
+
+  --card: #1c1a16;
+  --card-foreground: #ece6dc;
+  --popover: #1c1a16;
+  --popover-foreground: #ece6dc;
+
+  --primary: #6fb3ab;
+  --primary-foreground: #10201e;
+  --secondary: #262320;
+  --secondary-foreground: #ded7cb;
+  --muted: #242019;
+  --muted-foreground: #9d9488;
+  --accent: #23322f;
+  --accent-foreground: #a6d5ce;
+  --destructive: #d4796a;
+
+  --border: #2c2823;
+  --input: #35302a;
+  --ring: #6fb3ab;
+
+  --running: #e0a050;
+  --running-foreground: #1c1408;
+  --running-muted: #3a2c17;
+
+  --rest: #7fa6b3;
+  --rest-foreground: #0f1a1e;
+  --rest-muted: #1e2b30;
+  --rest-track: #232c30;
+
+  --arc-track: #2b2721;
+  --arc-tick: #4a443b;
+
+  --chart-1: #6fb3ab;
+  --chart-2: #e0a050;
+  --chart-3: #8fae98;
+  --chart-4: #c2a184;
+  --chart-5: #d4796a;
+
+  --sidebar: #1a1814;
+  --sidebar-foreground: #ded7cb;
+  --sidebar-primary: #6fb3ab;
+  --sidebar-primary-foreground: #10201e;
+  --sidebar-accent: #23322f;
+  --sidebar-accent-foreground: #a6d5ce;
+  --sidebar-border: #2c2823;
+  --sidebar-ring: #6fb3ab;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    @apply font-sans;
+    /* Next 16 no longer overrides smooth scrolling on navigation without this. */
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-display;
+    font-weight: 500;
+  }
+
+  /* Every number in this app is a timer, a count, or a duration. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+}
+
+@layer utilities {
+  /**
+   * Stagger children of a list as they arrive.
+   *
+   * Capped at eight: past that the last row waits long enough that the page
+   * feels slow rather than alive, and a task list is regularly longer than
+   * eight rows. Everything after the cap simply arrives with the eighth.
+   */
+  .stagger > * {
+    animation: var(--animate-rise);
+    animation-delay: calc(var(--stagger-step, 40ms) * 8);
+  }
+
+  .stagger > *:nth-child(1) {
+    animation-delay: 0ms;
+  }
+  .stagger > *:nth-child(2) {
+    animation-delay: calc(var(--stagger-step, 40ms) * 1);
+  }
+  .stagger > *:nth-child(3) {
+    animation-delay: calc(var(--stagger-step, 40ms) * 2);
+  }
+  .stagger > *:nth-child(4) {
+    animation-delay: calc(var(--stagger-step, 40ms) * 3);
+  }
+  .stagger > *:nth-child(5) {
+    animation-delay: calc(var(--stagger-step, 40ms) * 4);
+  }
+  .stagger > *:nth-child(6) {
+    animation-delay: calc(var(--stagger-step, 40ms) * 5);
+  }
+  .stagger > *:nth-child(7) {
+    animation-delay: calc(var(--stagger-step, 40ms) * 6);
+  }
+  .stagger > *:nth-child(8) {
+    animation-delay: calc(var(--stagger-step, 40ms) * 7);
+  }
+}
+
+/**
+ * One global opt-out rather than `motion-reduce:` on every animated element.
+ *
+ * A per-element variant is a rule you have to remember on every new component,
+ * and the failure mode is silent: it works fine for everyone who didn't ask
+ * for less motion. This can't be forgotten.
+ */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

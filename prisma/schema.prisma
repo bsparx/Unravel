@@ -1,0 +1,577 @@
+// Prisma 7: the generator is `prisma-client` (not `prisma-client-js`) and
+// `output` is mandatory. Import PrismaClient from the output path, never from
+// "@prisma/client".
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+// Prisma 7: no `url` here. The connection string lives in /prisma.config.ts,
+// and at runtime Neon is reached through the PrismaNeon driver adapter.
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------- enums
+
+enum TaskType {
+  TODO
+  HABIT
+}
+
+enum Priority {
+  P1 // now
+  P2
+  P3
+  P4 // default, no flag
+}
+
+enum RecurrenceKind {
+  DAILY // daysOfWeek = [0..6]
+  SPECIFIC_DAYS // user-picked subset
+}
+
+enum OccurrenceStatus {
+  PENDING
+  DONE
+  SKIPPED
+}
+
+/// POMODORO / BASIC / FLOW are three *shapes a work session can take*.
+/// RECOVERY is not a fourth shape — it is the peer of all three, the other
+/// half of the cycle. One enum, one model, one log: that is what makes "equal
+/// weight" true in the data and not only in the styling.
+enum TimerMode {
+  POMODORO
+  BASIC
+  FLOW
+  RECOVERY
+}
+
+enum SessionStatus {
+  RUNNING
+  PAUSED
+  COMPLETED // ended deliberately, or ran to its natural end
+  ABANDONED // never ended cleanly; reaped lazily by the loader
+}
+
+enum SessionEndReason {
+  TARGET_REACHED
+  USER_STOPPED
+  TASK_COMPLETED
+  ABANDONED
+}
+
+enum IntervalKind {
+  FOCUS
+  SHORT_BREAK
+  LONG_BREAK
+  /// Deliberately not reusing SHORT_BREAK: a break is a gap *inside* work,
+  /// whereas recovery *is* the session. Reusing it would leave every
+  /// `kind: FOCUS` query correct and every break-counting query silently wrong.
+  RECOVERY
+}
+
+enum CaptureStatus {
+  RAW // in the inbox, awaiting triage
+  PROMOTED // became a Task
+  DISMISSED // deliberately let go — kept, because deleting hides the pattern
+}
+
+/// What a habit's quota is counted in.
+///
+/// MINUTES is credited automatically from logged timer sessions, so "meditate
+/// for 2 minutes" needs no bookkeeping at all — you just run the timer. COUNT
+/// is anything the clock can't see: pages, reps, glasses of water.
+enum HabitUnit {
+  MINUTES
+  COUNT
+}
+
+/// How far into a day's quota you got.
+///
+/// Stored on the occurrence rather than recomputed at read time, because the
+/// quota itself can change: raising your minimum from 1 page to 10 must not
+/// retroactively break a streak you actually earned. Same reasoning as
+/// FocusSession snapshotting the user's timer settings.
+enum QuotaTier {
+  NONE
+  MINIMUM
+  OPTIMAL
+}
+
+enum JournalKind {
+  WORRY
+  GRATITUDE
+}
+
+/// What a block of time on the calendar is *for*. Deliberately only three:
+/// more kinds would turn planning the day into a taxonomy exercise.
+enum BlockKind {
+  WORK
+  RECOVERY
+  /// Deliberately unfilled. The slot you leave empty so the day has give in it
+  /// — planning back-to-back is the single most reliable way to plan a day you
+  /// then abandon by 11am.
+  BUFFER
+}
+
+// ---------------------------------------------------------------- identity
+
+model User {
+  id       String  @id @default(cuid())
+  clerkId  String  @unique // subject from `await auth()`
+  email    String?
+  name     String?
+  imageUrl String?
+
+  /// IANA zone. Every calendar day in this schema is bucketed in this zone,
+  /// server-side, once. Changing it does not rewrite history.
+  timezone  String @default("UTC")
+  /// 0 = Sunday .. 6 = Saturday
+  weekStart Int    @default(1)
+
+  // Timer defaults. Inlined rather than a 1-1 Settings model because they are
+  // always read together with the user.
+  pomodoroSeconds    Int     @default(1500)
+  shortBreakSeconds  Int     @default(300)
+  longBreakSeconds   Int     @default(900)
+  longBreakEvery     Int     @default(4)
+  autoStartBreaks    Boolean @default(false)
+  autoStartNextFocus Boolean @default(false)
+  soundEnabled       Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projects    Project[]
+  tasks       Task[]
+  occurrences TaskOccurrence[]
+  sessions    FocusSession[]
+  captures    Capture[]
+  dayLogs     DayLog[]
+  journal     JournalEntry[]
+  steps       TaskStep[]
+  blocks      TimeBlock[]
+}
+
+// ---------------------------------------------------------------- lists
+
+model Project {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name       String
+  /// Palette token name, resolved to a CSS variable in the UI.
+  color      String    @default("teal")
+  /// Fractional indexing, so a drag-reorder writes one row.
+  sortOrder  Float     @default(0)
+  archivedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tasks Task[]
+
+  @@unique([userId, name])
+  @@index([userId, archivedAt, sortOrder])
+}
+
+// ---------------------------------------------------------------- tasks
+
+/// One model for both todos and habits. Title, notes, project, priority,
+/// estimate and the entire timer/logging surface are identical between them,
+/// so a single model keeps FocusSession.taskId non-polymorphic. Habit-only
+/// fields live in the 1-1 HabitRecurrence side table.
+model Task {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  type      TaskType
+  title     String
+  notes     String?
+  priority  Priority @default(P4)
+  sortOrder Float    @default(0)
+
+  /// TODO only. A local calendar date, stored as UTC-midnight DATE.
+  dueDate DateTime? @db.Date
+
+  /// "I want to spend 20 minutes on this" -> 1200. Prefills the timer.
+  estimatedSeconds Int?
+  /// Which timer mode this task opens with.
+  defaultMode      TimerMode @default(POMODORO)
+  /// Preferred pomodoro split. null => derived from the estimate.
+  plannedIntervals Int?
+
+  /// TODO only: terminal completion. Habits are never "completed", only archived.
+  completedAt DateTime?
+  archivedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  recurrence  HabitRecurrence?
+  occurrences TaskOccurrence[]
+  sessions    FocusSession[]
+  steps       TaskStep[]
+
+  // Named relations: Task now has several nullable FKs pointing at it from
+  // different models, so Prisma can't disambiguate them positionally.
+  promotedFrom     Capture[]   @relation("CapturePromotion")
+  dayLogSelections DayLog[]    @relation("DayLogSelection")
+  blocks           TimeBlock[] @relation("TaskBlocks")
+
+  @@index([userId, type, completedAt, archivedAt, dueDate])
+  @@index([userId, projectId, sortOrder])
+}
+
+/// One line of "and then what". Ordered, tickable, optional.
+///
+/// The step at `position: 0` is treated specially by every surface that renders
+/// these: it is the one the UI asks you to make embarrassingly small, and the
+/// one it puts in front of you instead of the task title when you're deciding
+/// whether to start. Starting is the expensive part; the rest of the list is
+/// only there so the first line doesn't have to carry the whole task.
+model TaskStep {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  title    String
+  /// 0-based, dense. Deliberately NOT `@@unique([taskId, position])`: a
+  /// reorder would then need a two-phase write to dodge the constraint, and
+  /// the editor rewrites the whole list in one transaction anyway.
+  position Int
+
+  /// Steps carry their own estimate so "make the first one tiny" is a number
+  /// you can actually see, not just an instruction.
+  estimatedSeconds Int?
+  completedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([taskId, position])
+  @@index([userId, completedAt])
+}
+
+/// 1-1 with a Task of type HABIT. Absent for todos.
+model HabitRecurrence {
+  taskId String @id
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  kind       RecurrenceKind @default(DAILY)
+  /// 0 = Sunday .. 6 = Saturday, evaluated in User.timezone. DAILY => [0..6].
+  daysOfWeek Int[]
+
+  /// The atomic-habit quotas.
+  ///
+  /// `minimumQuota` is the whole mechanism: it is the amount that counts as
+  /// having done the habit, and the only thing the streak cares about. It is
+  /// meant to be embarrassingly small — one page, two minutes — because a
+  /// streak you can keep on your worst day is the one that survives.
+  ///
+  /// `optimalQuota` is what you'd do on a good day. It is deliberately NOT
+  /// what the streak measures; making the good day the bar is how streaks
+  /// break. Null means you never set one.
+  unit         HabitUnit @default(MINUTES)
+  minimumQuota Int       @default(1)
+  optimalQuota Int?
+  /// The habit is inert outside this window. startDate also anchors streaks.
+  startDate    DateTime  @db.Date
+  endDate      DateTime? @db.Date
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// SPARSE. One row per (task, local calendar day) that the user actually
+/// touched — never pre-generated for future days. Absence means "not done".
+///
+/// Used for BOTH task types: for a HABIT it is the daily instance; for a TODO
+/// it is "the day I worked on this". That uniformity is what lets every stats
+/// query read one pair of tables.
+model TaskOccurrence {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  /// Local calendar date in User.timezone, stored as UTC-midnight DATE.
+  date        DateTime         @db.Date
+  status      OccurrenceStatus @default(PENDING)
+  completedAt DateTime?
+  note        String?
+
+  /// Habits only; stays 0/NONE for todos.
+  ///
+  /// `progress` is in the habit's own unit. `tier` is derived from it against
+  /// the quotas *at the time*, and is what every statistic reads — which is
+  /// also why doing the minimum and then carrying on to the optimal counts
+  /// once, as OPTIMAL: the tier is a function of the day's total, not a log of
+  /// what happened in what order.
+  progress Int       @default(0)
+  tier     QuotaTier @default(NONE)
+
+  /// Roll-up of this day's FocusSession.elapsedSeconds, maintained by
+  /// endSession(). Lets the day list render without an aggregate query.
+  loggedSeconds Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions FocusSession[]
+
+  @@unique([taskId, date])
+  @@index([userId, date, status])
+  /// The habit statistics read: one habit across a date range, bucketed by tier.
+  @@index([userId, taskId, date])
+}
+
+// ---------------------------------------------------------------- time logging
+
+model FocusSession {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Nullable: an untethered timer run with no task attached is allowed.
+  taskId       String?
+  task         Task?           @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  occurrenceId String?
+  occurrence   TaskOccurrence? @relation(fields: [occurrenceId], references: [id], onDelete: SetNull)
+
+  /// Client-generated UUID. Makes startSession idempotent under retries,
+  /// double submits and React StrictMode double-effects. A duplicated session
+  /// would silently corrupt every aggregate on /stats.
+  clientKey String @unique
+
+  mode             TimerMode
+  /// The configured goal. POMODORO: intervals * focusSeconds. FLOW: a soft goal.
+  targetSeconds    Int
+  plannedIntervals Int       @default(1)
+
+  /// Snapshot of the user's settings at start, so changing them later does not
+  /// rewrite history.
+  focusSeconds      Int
+  shortBreakSeconds Int
+  longBreakSeconds  Int
+
+  status    SessionStatus @default(RUNNING)
+  startedAt DateTime      @default(now())
+  endedAt   DateTime?
+
+  /// Authoritative clock state, so a reload can rehydrate a live timer:
+  ///   live elapsed = accumulatedSeconds + (now - runningSince)
+  /// The server recomputes from these on every write; client-reported elapsed
+  /// is only ever a capped cross-check.
+  accumulatedSeconds Int       @default(0)
+  runningSince       DateTime?
+  /// Last heartbeat, used to reap sessions the browser never closed.
+  lastBeatAt         DateTime  @default(now())
+
+  /// Final active focus time, excluding pauses and breaks. Written on end.
+  elapsedSeconds  Int       @default(0)
+  /// FLOW (and any overrun): seconds past targetSeconds. A SUBSET of
+  /// elapsedSeconds, so time-spent sums never double count.
+  overtimeSeconds Int       @default(0)
+  /// The moment the arc hit zero.
+  reachedTargetAt DateTime?
+  pausedCount     Int       @default(0)
+
+  /// Did the user tick the task done from the timer screen?
+  completedTask Boolean           @default(false)
+  endReason     SessionEndReason?
+
+  /// Local calendar date in User.timezone. Denormalized because Prisma groupBy
+  /// cannot bucket a timestamp by day — this one column is what makes the whole
+  /// stats view groupBy/aggregate instead of $queryRaw.
+  localDate DateTime @db.Date
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  intervals SessionInterval[]
+
+  @@index([userId, localDate])
+  @@index([userId, status, lastBeatAt])
+  @@index([taskId, startedAt])
+  @@index([occurrenceId])
+}
+
+/// One row per focus/break segment, created lazily as each begins.
+model SessionInterval {
+  id        String       @id @default(cuid())
+  sessionId String
+  session   FocusSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  /// 0-based order within the session.
+  index         Int
+  kind          IntervalKind @default(FOCUS)
+  targetSeconds Int
+
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  accumulatedSeconds Int       @default(0)
+  runningSince       DateTime?
+
+  elapsedSeconds  Int     @default(0)
+  overtimeSeconds Int     @default(0)
+  /// Reached its target, as opposed to being skipped.
+  completed       Boolean @default(false)
+
+  @@unique([sessionId, index])
+  @@index([sessionId])
+}
+
+// ---------------------------------------------------------------- capture
+
+/// A thought, verbatim, at the moment it occurred.
+///
+/// Zero fields beyond the text — because every field is a decision, and a
+/// decision is a reason not to capture at all. Triage happens later and
+/// somewhere else (/inbox), deliberately.
+model Capture {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  body   String
+  status CaptureStatus @default(RAW)
+
+  /// Set when triage turns this into a task. SetNull rather than Cascade: the
+  /// record that the thought existed should outlive the task it became.
+  promotedTaskId String?
+  promotedTask   Task?   @relation("CapturePromotion", fields: [promotedTaskId], references: [id], onDelete: SetNull)
+
+  /// Local calendar date in User.timezone — the same pre-bucketing as
+  /// FocusSession.localDate, so "what do I dump, and when" stays a groupBy.
+  localDate DateTime @db.Date
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // No @@unique anywhere, deliberately. Two identical dumps are two separate
+  // thoughts, and a constraint violation is the one failure mode that would
+  // make capture cost something.
+  @@index([userId, status, createdAt])
+  @@index([userId, localDate])
+}
+
+// ---------------------------------------------------------------- the day
+
+/// One row per user per local day — the shared anchor between the morning
+/// (what is today's one thing) and the evening (how the day was closed).
+///
+/// Created lazily, like TaskOccurrence: a day nobody opened has no row, and
+/// absence means "nothing chosen", not "chose nothing".
+model DayLog {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  date DateTime @db.Date
+
+  /// The one thing. Always a real Task, even when typed fresh in the morning
+  /// pass — that is what makes it clickable straight into the timer.
+  selectedTaskId String?
+  selectedTask   Task?     @relation("DayLogSelection", fields: [selectedTaskId], references: [id], onDelete: SetNull)
+  selectedAt     DateTime?
+
+  /// Stamped by the last step of /close. Its presence is what "today is
+  /// finished" means.
+  closedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// "One day, one thing" is the feature. It also makes every write a single
+  /// upsert with no read-modify-write race.
+  @@unique([userId, date])
+}
+
+// ---------------------------------------------------------------- calendar
+
+/// A claim on a piece of the day.
+///
+/// Stored as (local date + minute offsets) rather than two timestamps, for the
+/// same reason every other day in this schema is a `@db.Date`: the day is
+/// resolved once, in `User.timezone`, and never re-bucketed. It also makes
+/// every overlap, gap and "does this fit" question integer arithmetic on
+/// minutes, which is testable without a clock — see lib/time-blocks.ts.
+///
+/// A block is a plan, and a FocusSession is what happened. They are separate on
+/// purpose: reconciling them is the whole value ("you blocked 3h and spent 40
+/// minutes"), and that comparison is impossible if planning writes to the log.
+model TimeBlock {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Nullable: blocking "lunch" or "gym" is a legitimate use, and a block with
+  /// no task is not a broken block. SetNull rather than Cascade — deleting a
+  /// task shouldn't silently punch a hole in a day you already planned.
+  taskId String?
+  task   Task?   @relation("TaskBlocks", fields: [taskId], references: [id], onDelete: SetNull)
+
+  /// Snapshotted from the task at create time, so renaming or deleting the task
+  /// leaves the calendar readable.
+  title String
+  notes String?
+
+  /// Local calendar date in User.timezone, as a UTC-midnight DATE.
+  date        DateTime @db.Date
+  /// Minutes from local midnight. start is inclusive, end exclusive, so
+  /// adjacent blocks touching at 10:00 do not read as overlapping.
+  /// 0..1440 — 1440 is a legal end (midnight) but never a legal start.
+  startMinute Int
+  endMinute   Int
+
+  kind BlockKind @default(WORK)
+
+  /// Ticked off from the calendar. Distinct from Task.completedAt: finishing
+  /// the 9am block on a task is not finishing the task.
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Serves both "one day's blocks in order" and the week fetch (a date range
+  /// scan), which are the only two reads.
+  @@index([userId, date, startMinute])
+  @@index([taskId, date])
+}
+
+/// Journal, not inbox.
+///
+/// A worry written down at 22:00 is not a task and must never be offered as
+/// one. Separate model rather than a Capture variant, because a shared table
+/// would eventually leak into triage, search or promotion by way of one
+/// forgotten `where` clause.
+model JournalEntry {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  date DateTime    @db.Date
+  kind JournalKind
+  body String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Lets each close step be a blind upsert — this constraint is exactly what
+  /// makes "walk back a step and edit it" overwrite rather than append.
+  /// Caps you at one worry and one gratitude per day; to allow a running log,
+  /// drop this and switch the actions from upsert to create.
+  @@unique([userId, date, kind])
+  @@index([userId, date])
+}

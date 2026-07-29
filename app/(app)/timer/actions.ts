@@ -1,0 +1,535 @@
+"use server";
+
+import { randomUUID } from "node:crypto";
+
+import { revalidatePath } from "next/cache";
+
+import { requireUser } from "@/lib/auth";
+import { prisma } from "@/lib/db";
+import { todayLocal } from "@/lib/dates";
+import type { FocusSession } from "@/lib/generated/prisma/client";
+import {
+  creditLoggedTime,
+  getHabitQuota,
+  toggleHabitDone,
+} from "@/lib/habit-progress";
+import { addLoggedSeconds, ensureOccurrence } from "@/lib/occurrences";
+import {
+  buildIntervalPlan,
+  clampIntervals,
+  clampTarget,
+  type TimerMode,
+} from "@/lib/timer-math";
+
+/**
+ * Server-side session lifecycle.
+ *
+ * **The server is the authority on duration.** Every write recomputes elapsed
+ * time from the row's own `runningSince`; a value reported by the client is
+ * only ever used as a cross-check, never written straight through. A skewed
+ * clock or a hostile POST therefore can't inflate anything on /stats.
+ */
+
+type StartInput = {
+  clientKey: string;
+  taskId?: string | null;
+  mode: TimerMode;
+  targetSeconds: number;
+  intervals: number;
+};
+
+export type SessionSnapshot = {
+  id: string;
+  status: "RUNNING" | "PAUSED" | "COMPLETED" | "ABANDONED";
+  accumulatedSeconds: number;
+  runningSince: number | null;
+  intervalIndex: number;
+  elapsedSeconds: number;
+  overtimeSeconds: number;
+  reachedTarget: boolean;
+};
+
+function snapshot(session: FocusSession, intervalIndex: number): SessionSnapshot {
+  return {
+    id: session.id,
+    status: session.status as SessionSnapshot["status"],
+    accumulatedSeconds: session.accumulatedSeconds,
+    runningSince: session.runningSince?.getTime() ?? null,
+    intervalIndex,
+    elapsedSeconds: session.elapsedSeconds,
+    overtimeSeconds: session.overtimeSeconds,
+    reachedTarget: session.reachedTargetAt !== null,
+  };
+}
+
+/** Active seconds the row has accrued as of `now`, computed server-side. */
+function serverElapsed(session: FocusSession, now: Date): number {
+  const live = session.runningSince
+    ? Math.max(0, (now.getTime() - session.runningSince.getTime()) / 1000)
+    : 0;
+  return Math.floor(session.accumulatedSeconds + live);
+}
+
+export async function startSession(
+  input: StartInput,
+): Promise<SessionSnapshot | null> {
+  const user = await requireUser();
+
+  const mode = input.mode;
+  // Recovery has no target. `clampTarget` would floor it at 60s, which would
+  // then read back as a goal that doesn't exist.
+  const targetSeconds =
+    mode === "RECOVERY" ? 0 : clampTarget(input.targetSeconds);
+  const intervals = mode === "POMODORO" ? clampIntervals(input.intervals) : 1;
+
+  // Idempotent: a retry, a double submit, or a StrictMode double-effect all
+  // resolve to the same row rather than two sessions.
+  const existing = await prisma.focusSession.findUnique({
+    where: { clientKey: input.clientKey },
+  });
+
+  if (existing) {
+    if (existing.userId !== user.id) return null;
+    return snapshot(existing, 0);
+  }
+
+  const task = input.taskId
+    ? await prisma.task.findFirst({
+        where: { id: input.taskId, userId: user.id },
+        select: { id: true },
+      })
+    : null;
+
+  const localDate = todayLocal(user.timezone);
+  const occurrence = task
+    ? await ensureOccurrence(user.id, task.id, localDate)
+    : null;
+
+  const plan = buildIntervalPlan({
+    mode,
+    targetSeconds,
+    intervals,
+    focusSeconds: user.pomodoroSeconds,
+    shortBreakSeconds: user.shortBreakSeconds,
+    longBreakSeconds: user.longBreakSeconds,
+    longBreakEvery: user.longBreakEvery,
+  });
+
+  const now = new Date();
+
+  const session = await prisma.focusSession.create({
+    data: {
+      userId: user.id,
+      taskId: task?.id ?? null,
+      occurrenceId: occurrence?.id ?? null,
+      clientKey: input.clientKey,
+      mode,
+      targetSeconds,
+      plannedIntervals: intervals,
+      focusSeconds: user.pomodoroSeconds,
+      shortBreakSeconds: user.shortBreakSeconds,
+      longBreakSeconds: user.longBreakSeconds,
+      status: "RUNNING",
+      startedAt: now,
+      runningSince: now,
+      lastBeatAt: now,
+      localDate,
+      intervals: {
+        create: {
+          index: 0,
+          kind: plan[0].kind,
+          targetSeconds: plan[0].targetSeconds,
+          startedAt: now,
+          runningSince: now,
+        },
+      },
+    },
+  });
+
+  return snapshot(session, 0);
+}
+
+export async function pauseSession(
+  sessionId: string,
+): Promise<SessionSnapshot | null> {
+  const user = await requireUser();
+  const session = await load(user.id, sessionId);
+  if (!session || session.status !== "RUNNING") {
+    return session ? snapshot(session, currentIndex(session)) : null;
+  }
+
+  const now = new Date();
+  const accumulated = serverElapsed(session, now);
+
+  const [updated] = await prisma.$transaction([
+    prisma.focusSession.update({
+      where: { id: session.id },
+      data: {
+        status: "PAUSED",
+        accumulatedSeconds: accumulated,
+        runningSince: null,
+        lastBeatAt: now,
+        pausedCount: { increment: 1 },
+      },
+    }),
+    ...closeOpenIntervalOps(session, now, false),
+  ]);
+
+  return snapshot(updated, currentIndex(session));
+}
+
+export async function resumeSession(
+  sessionId: string,
+): Promise<SessionSnapshot | null> {
+  const user = await requireUser();
+  const session = await load(user.id, sessionId);
+  if (!session || session.status !== "PAUSED") {
+    return session ? snapshot(session, currentIndex(session)) : null;
+  }
+
+  const now = new Date();
+
+  const updated = await prisma.focusSession.update({
+    where: { id: session.id },
+    data: { status: "RUNNING", runningSince: now, lastBeatAt: now },
+  });
+
+  await prisma.sessionInterval.updateMany({
+    where: { sessionId: session.id, endedAt: null },
+    data: { runningSince: now },
+  });
+
+  return snapshot(updated, currentIndex(session));
+}
+
+/**
+ * Called once a minute while running. Cheap, and it means a browser crash or a
+ * closed laptop loses at most 60 seconds of logged time.
+ */
+export async function heartbeat(
+  sessionId: string,
+): Promise<SessionSnapshot | null> {
+  const user = await requireUser();
+  const session = await load(user.id, sessionId);
+  if (!session || session.status !== "RUNNING") return null;
+
+  const now = new Date();
+  const accumulated = serverElapsed(session, now);
+
+  const updated = await prisma.focusSession.update({
+    where: { id: session.id },
+    data: {
+      accumulatedSeconds: accumulated,
+      runningSince: now,
+      lastBeatAt: now,
+      // Stamp the moment the arc hit zero, once. A recovery session has a
+      // target of 0, so without the mode guard `accumulated >= 0` would be
+      // true on the very first beat and stamp a goal that never existed.
+      ...(session.mode !== "RECOVERY" &&
+      session.reachedTargetAt === null &&
+      accumulated >= session.targetSeconds
+        ? { reachedTargetAt: now }
+        : {}),
+    },
+  });
+
+  return snapshot(updated, currentIndex(session));
+}
+
+/** Close the current interval and open the next one in the plan. */
+export async function advanceInterval(
+  sessionId: string,
+  nextIndex: number,
+  completed: boolean,
+): Promise<SessionSnapshot | null> {
+  const user = await requireUser();
+  const session = await load(user.id, sessionId);
+  if (!session) return null;
+  if (session.status === "COMPLETED" || session.status === "ABANDONED") {
+    return snapshot(session, currentIndex(session));
+  }
+
+  const plan = buildIntervalPlan({
+    mode: session.mode,
+    targetSeconds: session.targetSeconds,
+    intervals: session.plannedIntervals,
+    focusSeconds: session.focusSeconds,
+    shortBreakSeconds: session.shortBreakSeconds,
+    longBreakSeconds: session.longBreakSeconds,
+    longBreakEvery: user.longBreakEvery,
+  });
+
+  if (nextIndex < 0 || nextIndex >= plan.length) {
+    return snapshot(session, currentIndex(session));
+  }
+
+  const now = new Date();
+  const shouldRun = session.status === "RUNNING";
+
+  await prisma.$transaction([
+    ...closeOpenIntervalOps(session, now, completed),
+    prisma.sessionInterval.upsert({
+      where: { sessionId_index: { sessionId: session.id, index: nextIndex } },
+      create: {
+        sessionId: session.id,
+        index: nextIndex,
+        kind: plan[nextIndex].kind,
+        targetSeconds: plan[nextIndex].targetSeconds,
+        startedAt: now,
+        runningSince: shouldRun ? now : null,
+      },
+      update: { runningSince: shouldRun ? now : null },
+    }),
+  ]);
+
+  const updated = await load(user.id, sessionId);
+  return updated ? snapshot(updated, nextIndex) : null;
+}
+
+export async function endSession(
+  sessionId: string,
+  options: { completedTask?: boolean; reason?: "TARGET_REACHED" | "USER_STOPPED" } = {},
+): Promise<SessionSnapshot | null> {
+  const user = await requireUser();
+  const session = await load(user.id, sessionId);
+  if (!session) return null;
+
+  if (session.status === "COMPLETED") {
+    return snapshot(session, currentIndex(session));
+  }
+
+  const now = new Date();
+  const elapsed = serverElapsed(session, now);
+  // Recovery has no target to overrun. Without this guard every second of
+  // rest is logged as overtime, and /stats' "time past your goal" becomes a
+  // measure of how much you rested — the exact opposite of the point.
+  const overtime =
+    session.mode === "RECOVERY"
+      ? 0
+      : Math.max(0, elapsed - session.targetSeconds);
+  const completedTask = options.completedTask === true;
+
+  const updated = await prisma.focusSession.update({
+    where: { id: session.id },
+    data: {
+      status: "COMPLETED",
+      endedAt: now,
+      lastBeatAt: now,
+      runningSince: null,
+      accumulatedSeconds: elapsed,
+      elapsedSeconds: elapsed,
+      overtimeSeconds: overtime,
+      completedTask,
+      endReason: completedTask
+        ? "TASK_COMPLETED"
+        : (options.reason ?? "USER_STOPPED"),
+      ...(session.mode !== "RECOVERY" &&
+      session.reachedTargetAt === null &&
+      elapsed >= session.targetSeconds
+        ? { reachedTargetAt: now }
+        : {}),
+    },
+  });
+
+  await prisma.sessionInterval.updateMany({
+    where: { sessionId: session.id, endedAt: null },
+    data: { endedAt: now, runningSince: null },
+  });
+
+  if (session.occurrenceId) {
+    await addLoggedSeconds(session.occurrenceId, elapsed);
+
+    // A MINUTES habit fills its own quota from the clock — the entire point of
+    // "meditate for two minutes" is that running the timer IS the bookkeeping.
+    // Credited against the day's total logged time rather than this session's
+    // minutes, so a retried endSession can't book the same time twice.
+    if (session.taskId) {
+      const occurrence = await prisma.taskOccurrence.findUnique({
+        where: { id: session.occurrenceId },
+        select: { loggedSeconds: true, date: true },
+      });
+
+      if (occurrence) {
+        await creditLoggedTime(
+          user.id,
+          session.taskId,
+          occurrence.date,
+          occurrence.loggedSeconds,
+        );
+      }
+    }
+  }
+
+  if (completedTask && session.taskId) {
+    await completeTaskFromTimer(user.id, session.taskId, session.occurrenceId);
+  }
+
+  revalidatePath("/");
+  revalidatePath("/day");
+  revalidatePath("/tasks");
+  revalidatePath("/habits");
+  revalidatePath("/habits/stats");
+  revalidatePath("/stats");
+
+  return snapshot(updated, currentIndex(session));
+}
+
+/**
+ * Start recovery from the server, without going through the client reducer.
+ *
+ * The close ritual's hand-off needs this: at that moment there is no provider
+ * worth trusting, and the entire point of the hand-off is that you don't press
+ * anything else. The redirect lands on /timer, whose layout hydrates the row
+ * this just wrote.
+ *
+ * It ends any live work session first. Otherwise `getActiveSession` would find
+ * two RUNNING rows and pick by `startedAt`. Closing the day *should* close the
+ * day's work session — that's the correct behaviour, not a workaround.
+ */
+export async function startRecoverySession(): Promise<void> {
+  const user = await requireUser();
+
+  const existing = await prisma.focusSession.findFirst({
+    where: { userId: user.id, status: { in: ["RUNNING", "PAUSED"] } },
+    orderBy: { startedAt: "desc" },
+    select: { id: true },
+  });
+
+  if (existing) {
+    await endSession(existing.id, { reason: "USER_STOPPED" });
+  }
+
+  const now = new Date();
+
+  await prisma.focusSession.create({
+    data: {
+      userId: user.id,
+      clientKey: randomUUID(),
+      mode: "RECOVERY",
+      targetSeconds: 0,
+      plannedIntervals: 1,
+      focusSeconds: user.pomodoroSeconds,
+      shortBreakSeconds: user.shortBreakSeconds,
+      longBreakSeconds: user.longBreakSeconds,
+      status: "RUNNING",
+      startedAt: now,
+      runningSince: now,
+      lastBeatAt: now,
+      localDate: todayLocal(user.timezone),
+      intervals: {
+        create: {
+          index: 0,
+          kind: "RECOVERY",
+          targetSeconds: 0,
+          startedAt: now,
+          runningSince: now,
+        },
+      },
+    },
+  });
+
+  revalidatePath("/timer");
+  revalidatePath("/");
+}
+
+/** Throw away a session that was started by mistake. */
+export async function discardSession(sessionId: string): Promise<void> {
+  const user = await requireUser();
+
+  await prisma.focusSession.deleteMany({
+    where: { id: sessionId, userId: user.id },
+  });
+
+  revalidatePath("/timer");
+}
+
+async function completeTaskFromTimer(
+  userId: string,
+  taskId: string,
+  occurrenceId: string | null,
+) {
+  const task = await prisma.task.findFirst({
+    where: { id: taskId, userId },
+    select: { id: true, type: true },
+  });
+  if (!task) return;
+
+  if (task.type === "TODO") {
+    await prisma.task.update({
+      where: { id: task.id },
+      data: { completedAt: new Date() },
+    });
+  }
+
+  if (!occurrenceId) return;
+
+  if (task.type === "HABIT") {
+    // Through the quota, so `progress`, `tier` and `status` stay consistent.
+    // Writing status: DONE directly here would leave the day counting for the
+    // streak while showing tier NONE in every chart.
+    const occurrence = await prisma.taskOccurrence.findUnique({
+      where: { id: occurrenceId },
+      select: { date: true },
+    });
+    const quota = occurrence ? await getHabitQuota(userId, task.id) : null;
+
+    if (occurrence && quota) {
+      await toggleHabitDone(userId, quota, occurrence.date, true);
+      return;
+    }
+  }
+
+  await prisma.taskOccurrence.update({
+    where: { id: occurrenceId },
+    data: { status: "DONE", completedAt: new Date() },
+  });
+}
+
+function load(userId: string, sessionId: string) {
+  return prisma.focusSession.findFirst({
+    where: { id: sessionId, userId },
+    include: { intervals: { orderBy: { index: "asc" } } },
+  });
+}
+
+type LoadedSession = NonNullable<Awaited<ReturnType<typeof load>>>;
+
+function currentIndex(session: LoadedSession): number {
+  const open = session.intervals.find((interval) => interval.endedAt === null);
+  return open?.index ?? Math.max(0, session.intervals.length - 1);
+}
+
+function closeOpenIntervalOps(
+  session: LoadedSession,
+  now: Date,
+  completed: boolean,
+) {
+  const open = session.intervals.find((interval) => interval.endedAt === null);
+  if (!open) return [];
+
+  const live = open.runningSince
+    ? Math.max(0, (now.getTime() - open.runningSince.getTime()) / 1000)
+    : 0;
+  const elapsed = Math.floor(open.accumulatedSeconds + live);
+
+  // A pause closes nothing — it only freezes the clock.
+  const closing = completed || elapsed >= open.targetSeconds;
+
+  return [
+    prisma.sessionInterval.update({
+      where: { id: open.id },
+      data: {
+        accumulatedSeconds: elapsed,
+        runningSince: null,
+        ...(closing
+          ? {
+              endedAt: now,
+              elapsedSeconds: elapsed,
+              overtimeSeconds: Math.max(0, elapsed - open.targetSeconds),
+              completed: elapsed >= open.targetSeconds,
+            }
+          : {}),
+      },
+    }),
+  ];
+}
