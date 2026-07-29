@@ -181,13 +181,40 @@ export async function archiveHabit(formData: FormData): Promise<void> {
   revalidateHabitViews();
 }
 
+/**
+ * Delete a habit and everything it ever touched. The one irreversible action
+ * in the app, and the counterpart to archiving rather than a shortcut for it.
+ *
+ * Sessions and blocks are `SetNull` at the schema level, so a bare
+ * `task.delete()` would leave both behind — orphaned sessions still billing
+ * time on /stats for a habit that no longer exists. "Permanently" has to mean
+ * those go too, so they're taken explicitly, first, while the `taskId` that
+ * identifies them is still there to match on. Steps, recurrence and the whole
+ * occurrence history cascade from the task; `SessionInterval` cascades from
+ * the sessions.
+ *
+ * `DayLog.selectedTaskId` and `Capture.promotedTaskId` stay `SetNull` on
+ * purpose — those rows are a day's record and an inbox note, which are the
+ * user's own writing and not the habit's data to take with it.
+ */
 export async function deleteHabit(formData: FormData): Promise<void> {
   const user = await requireUser();
   const taskId = String(formData.get("taskId") ?? "");
   if (!taskId) return;
 
-  await prisma.task.deleteMany({
-    where: { id: taskId, userId: user.id, type: "HABIT" },
+  await prisma.$transaction(async (tx) => {
+    // Ownership is established once, here, so the child deletes below can
+    // match on `taskId` alone without each becoming its own way to reach
+    // another user's rows by guessing an id.
+    const habit = await tx.task.findFirst({
+      where: { id: taskId, userId: user.id, type: "HABIT" },
+      select: { id: true },
+    });
+    if (!habit) return;
+
+    await tx.focusSession.deleteMany({ where: { taskId: habit.id } });
+    await tx.timeBlock.deleteMany({ where: { taskId: habit.id } });
+    await tx.task.delete({ where: { id: habit.id } });
   });
 
   revalidateHabitViews();

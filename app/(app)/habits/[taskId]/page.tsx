@@ -86,7 +86,7 @@ export default async function EditHabitPage({
           taskId={habit.id}
           label="Delete habit"
           title={`Delete "${habit.title}"?`}
-          description="This also removes its whole history — every tick and every session. Archiving keeps it."
+          description="This also removes its whole history — every tick, every logged session, and any calendar blocks pointing at it. Your stats totals will change. Archiving keeps it."
           redirectTo="/habits"
         />
       </div>

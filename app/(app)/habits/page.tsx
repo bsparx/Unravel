@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Archive, BarChart3, Flame, Pencil, Plus, Repeat, Timer } from "lucide-react";
 
+import { ConfirmDelete } from "@/components/confirm-delete";
 import { EmptyState } from "@/components/empty-state";
 import { QuotaMeter } from "@/components/quota-meter";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,7 @@ import {
 } from "@/lib/recurrence";
 import { buildTimerHref } from "@/lib/timer-url";
 
-import { archiveHabit } from "./actions";
+import { archiveHabit, deleteHabit } from "./actions";
 import { HabitCard } from "./_components/habit-card";
 import { HabitGrid } from "./_components/habit-grid";
 
@@ -172,13 +173,23 @@ export default async function HabitsPage() {
                 className="text-muted-foreground flex items-center justify-between gap-4 text-label"
               >
                 <span className="truncate">{habit.title}</span>
-                <form action={archiveHabit}>
-                  <input type="hidden" name="taskId" value={habit.id} />
-                  <input type="hidden" name="restore" value="true" />
-                  <Button type="submit" variant="ghost" size="sm">
-                    Restore
-                  </Button>
-                </form>
+                <div className="flex shrink-0 items-center gap-1">
+                  <form action={archiveHabit}>
+                    <input type="hidden" name="taskId" value={habit.id} />
+                    <input type="hidden" name="restore" value="true" />
+                    <Button type="submit" variant="ghost" size="sm">
+                      Restore
+                    </Button>
+                  </form>
+                  <ConfirmDelete
+                    action={deleteHabit}
+                    taskId={habit.id}
+                    label="Delete"
+                    size="sm"
+                    title={`Delete "${habit.title}" for good?`}
+                    description="This removes the habit, its full streak and tick history, every session you logged against it, and any calendar blocks pointing at it. Your stats totals will change. Restoring it is no longer an option."
+                  />
+                </div>
               </li>
             ))}
           </ul>
