@@ -165,6 +165,16 @@ export const selectOneThingSchema = z
     { message: "Pick something or type it." },
   );
 
+/**
+ * The one thing, set up in full.
+ *
+ * Everything a todo can carry except the deadline: the day it's the one thing
+ * for *is* the deadline, so asking would be a question with one answer.
+ */
+export const createOneThingSchema = createTodoSchema
+  .omit({ dueDate: true })
+  .extend({ date: isoDate });
+
 export const quickAddSchema = z.object({
   /** The raw single-line input, parsed for "20m", "#project" and "p1". */
   input: z.string().trim().min(1).max(300),

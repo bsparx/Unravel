@@ -80,13 +80,34 @@ export function TaskForm({
   projects,
   submitLabel,
   redirectTo,
+  hidden,
+  showDeadline = true,
+  autoFocusTitle = true,
+  titleLabel,
+  cancelLabel = "Cancel",
+  onSuccess,
+  onCancel,
 }: {
   kind: "TODO" | "HABIT";
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
   values?: TaskFormValues;
   projects: { id: string; name: string }[];
   submitLabel: string;
-  redirectTo: string;
+  /** Where to go on success. Omit when the form is embedded in a page that
+   *  stays put and re-renders itself. */
+  redirectTo?: string;
+  /** Extra fields to submit alongside — e.g. which day this belongs to. */
+  hidden?: Record<string, string>;
+  /**
+   * Todos only. Off where the deadline is implied by context and asking would
+   * be a question with one possible answer.
+   */
+  showDeadline?: boolean;
+  autoFocusTitle?: boolean;
+  titleLabel?: string;
+  cancelLabel?: string;
+  onSuccess?: () => void;
+  onCancel?: () => void;
 }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(action, {
@@ -121,10 +142,14 @@ export function TaskForm({
   useEffect(() => {
     if (state.status === "success") {
       toast.success(state.message ?? "Saved.");
-      router.push(redirectTo);
+      if (redirectTo) router.push(redirectTo);
+      else onSuccess?.();
     } else if (state.status === "error" && !state.fieldErrors) {
       toast.error(state.message);
     }
+    // onSuccess is a fresh closure each render; depending on it would re-fire
+    // the toast on every parent re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, router, redirectTo]);
 
   const error = (field: string) =>
@@ -133,6 +158,10 @@ export function TaskForm({
   return (
     <form action={formAction} className="space-y-8">
       {values.id && <input type="hidden" name="id" value={values.id} />}
+      {hidden &&
+        Object.entries(hidden).map(([name, value]) => (
+          <input key={name} type="hidden" name={name} value={value} />
+        ))}
       {kind === "HABIT" &&
         days.map((day) => (
           <input key={day} type="hidden" name="daysOfWeek[]" value={day} />
@@ -140,7 +169,7 @@ export function TaskForm({
       <input type="hidden" name="defaultMode" value={mode} />
 
       <Field
-        label={kind === "HABIT" ? "Habit" : "Task"}
+        label={titleLabel ?? (kind === "HABIT" ? "Habit" : "Task")}
         htmlFor="title"
         error={error("title")}
       >
@@ -148,7 +177,7 @@ export function TaskForm({
           id="title"
           name="title"
           required
-          autoFocus
+          autoFocus={autoFocusTitle}
           maxLength={200}
           defaultValue={values.title}
           placeholder={
@@ -219,7 +248,7 @@ export function TaskForm({
             optimalError={error("optimalQuota")}
           />
         </Field>
-      ) : (
+      ) : showDeadline ? (
         <Field
           label="Deadline"
           htmlFor="dueDate"
@@ -247,7 +276,7 @@ export function TaskForm({
             ))}
           </div>
         </Field>
-      )}
+      ) : null}
 
       <Field
         label="How long do you think it'll take?"
@@ -362,9 +391,9 @@ export function TaskForm({
         <Button
           type="button"
           variant="ghost"
-          onClick={() => router.push(redirectTo)}
+          onClick={() => (redirectTo ? router.push(redirectTo) : onCancel?.())}
         >
-          Cancel
+          {cancelLabel}
         </Button>
       </div>
     </form>

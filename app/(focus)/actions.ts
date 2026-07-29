@@ -7,8 +7,11 @@ import { prisma } from "@/lib/db";
 import { parseLocalDate, todayLocal } from "@/lib/dates";
 import { setSelectedTask } from "@/lib/day-log";
 import { parseQuickAdd } from "@/lib/quick-parse";
+import { stepCreateRows } from "@/lib/step-sync";
 import {
   type ActionState,
+  createOneThingSchema,
+  fieldErrorsFrom,
   formValues,
   selectOneThingSchema,
 } from "@/lib/validation";
@@ -81,6 +84,73 @@ export async function selectOneThing(
   revalidateFocus();
 
   return { status: "success" };
+}
+
+/**
+ * The one thing, set up in full: steps, an estimate, how the timer should open.
+ *
+ * A separate route in from `selectOneThing` because it's a different act.
+ * That one picks something that already exists; this one is the task form, and
+ * it creates and selects in a single submit so you never land on a "now go find
+ * it in the list" screen.
+ *
+ * No deadline field: the day you're planning is the deadline, and it's set
+ * here rather than asked for.
+ */
+export async function createOneThing(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireUser();
+  const parsed = createOneThingSchema.safeParse(formValues(formData));
+
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: "Some of that didn't look right.",
+      fieldErrors: fieldErrorsFrom(parsed.error),
+    };
+  }
+
+  const input = parsed.data;
+  const date = parseLocalDate(input.date);
+  if (!date) return { status: "error", message: "That date didn't parse." };
+
+  const projectId = input.projectId
+    ? ((
+        await prisma.project.findFirst({
+          where: { id: input.projectId, userId: user.id },
+          select: { id: true },
+        })
+      )?.id ?? null)
+    : null;
+
+  const task = await prisma.task.create({
+    data: {
+      userId: user.id,
+      type: "TODO",
+      title: input.title,
+      notes: input.notes || null,
+      priority: input.priority,
+      projectId,
+      dueDate: date,
+      estimatedSeconds: input.estimateMinutes
+        ? input.estimateMinutes * 60
+        : null,
+      defaultMode: input.defaultMode,
+      plannedIntervals: input.plannedIntervals ?? null,
+      sortOrder: Date.now(),
+      steps: { create: stepCreateRows(user.id, input.steps) },
+    },
+  });
+
+  await setSelectedTask(user.id, date, task.id);
+  revalidateFocus();
+  // The task list and calendar both gained a row.
+  revalidatePath("/tasks");
+  revalidatePath("/calendar");
+
+  return { status: "success", message: "That's the one thing." };
 }
 
 /** Change your mind. The task itself is untouched. */

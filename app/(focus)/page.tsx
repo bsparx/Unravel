@@ -8,6 +8,7 @@ import { formatFullDate, toISODate, todayLocal } from "@/lib/dates";
 import { getDayLog } from "@/lib/day-log";
 import { prisma } from "@/lib/db";
 import { formatMinutes } from "@/lib/dates";
+import { getProjects } from "@/lib/tasks";
 
 import {
   MorningPass,
@@ -40,6 +41,7 @@ export default async function HomePage() {
         <MorningPass
           options={await candidateOptions(user)}
           dateISO={dateISO}
+          projects={await getProjects(user)}
         />
       )}
 
