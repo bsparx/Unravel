@@ -5,7 +5,7 @@ re-derive (or drift from) the ones already made.
 
 ## The brief
 
-**Toasty Clock** — a productivity app for people with ADHD. The audience is
+**Unravel** — a productivity app for people with ADHD. The audience is
 someone who has thirteen things they mean to do, no felt sense of how long any
 of them take, and who loses the thread the moment a screen gets busy.
 

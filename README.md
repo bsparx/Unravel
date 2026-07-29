@@ -1,4 +1,4 @@
-# Toasty Clock
+# Unravel
 
 A productivity app for people with ADHD. One place to put everything in your
 head, one thing to do next, a timer that treats rest as the other half of the
@@ -141,4 +141,3 @@ wall-clock deltas (`accumulated + (now - runningSince)`). A background tab
 throttled to 1Hz, or a laptop asleep for an hour, cannot drift the number. The
 server recomputes duration from its own `runningSince` on every write, so a
 client with a skewed clock can't inflate anything on `/stats`.
-# Unravel

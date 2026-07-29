@@ -16,7 +16,7 @@ export function Landing() {
         <div className="mb-8 flex items-center gap-2">
           <span className="bg-primary size-2.5 rounded-full" />
           <span className="font-display text-title tracking-tight">
-            Toasty Clock
+            Unravel
           </span>
         </div>
 

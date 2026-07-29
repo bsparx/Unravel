@@ -69,7 +69,7 @@ export function AppShell({
         >
           <span className="bg-primary size-2.5 rounded-full" />
           <span className="font-display text-title tracking-tight">
-            Toasty Clock
+            Unravel
           </span>
         </Link>
 

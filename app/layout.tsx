@@ -10,8 +10,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "Toasty Clock",
-    template: "%s · Toasty Clock",
+    default: "Unravel",
+    template: "%s · Unravel",
   },
   description:
     "A calm place to keep your todos and habits, and a visual timer that shows you where the time actually went.",
