@@ -2,7 +2,7 @@
 
 import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { Check, GripHorizontal, Play } from "lucide-react";
+import { Check, CornerDownRight, GripHorizontal, Play, X } from "lucide-react";
 
 import {
   clampSpan,
@@ -25,7 +25,7 @@ import { buildTimerHref } from "@/lib/timer-url";
 import { toWorkMode } from "@/lib/timer-math";
 import { cn } from "@/lib/utils";
 
-import { moveBlock, toggleBlockDone } from "../actions";
+import { deleteBlock, moveBlock, toggleBlockDone } from "../actions";
 
 /**
  * Vertical scale. One pixel per minute makes an hour 60px — tall enough that a
@@ -37,6 +37,17 @@ const MINUTE_PX = 1;
 const COMPACT_MINUTES = 45;
 
 export type GridDay = { dateISO: string; label: string; weekday: string; isToday: boolean };
+
+/** What the optimistic layer can do to the day before the server answers. */
+type BlockPatch =
+  | {
+      kind: "move";
+      id: string;
+      dateISO: string;
+      startMinute: number;
+      endMinute: number;
+    }
+  | { kind: "remove"; id: string };
 
 export function CalendarGrid({
   days,
@@ -63,16 +74,38 @@ export function CalendarGrid({
   // The optimistic layer is what makes dragging feel like moving an object
   // rather than submitting a form. The server is authoritative; this just
   // stops the block snapping back for one round trip.
-  const [shown, applyMove] = useOptimistic(
-    blocks,
-    (
-      current,
-      move: { id: string; dateISO: string; startMinute: number; endMinute: number },
-    ) =>
-      current.map((block) =>
-        block.id === move.id ? { ...block, ...move } : block,
-      ),
-  );
+  const [shown, applyPatch] = useOptimistic(blocks, (current, patch: BlockPatch) => {
+    if (patch.kind === "remove") {
+      return current.filter((block) => block.id !== patch.id);
+    }
+
+    return current.map((block) => {
+      if (block.id === patch.id) {
+        return {
+          ...block,
+          dateISO: patch.dateISO,
+          startMinute: patch.startMinute,
+          endMinute: patch.endMinute,
+        };
+      }
+
+      // A cue keeps its place at the front of the block it cues. `moveBlock`
+      // does the same on the server; doing it here too is what stops the cue
+      // visibly lagging a frame behind the thing it's glued to.
+      if (block.cueForId === patch.id) {
+        const length = spanMinutes(block);
+        const end = patch.startMinute;
+        return {
+          ...block,
+          dateISO: patch.dateISO,
+          startMinute: Math.max(0, end - length),
+          endMinute: end,
+        };
+      }
+
+      return block;
+    });
+  });
 
   const [drag, setDrag] = useState<{
     id: string;
@@ -97,10 +130,9 @@ export function CalendarGrid({
 
   const commit = (next: NonNullable<typeof drag>) => {
     const span = clampSpan(next.startMinute, next.endMinute);
-    const payload = { id: next.id, dateISO: next.dateISO, ...span };
 
     startTransition(async () => {
-      applyMove(payload);
+      applyPatch({ kind: "move", id: next.id, dateISO: next.dateISO, ...span });
       const formData = new FormData();
       formData.set("id", next.id);
       formData.set("date", next.dateISO);
@@ -116,6 +148,19 @@ export function CalendarGrid({
       formData.set("id", block.id);
       formData.set("done", String(block.completedAt === null));
       await toggleBlockDone(formData);
+    });
+  };
+
+  /**
+   * "Not today." Drops the cue block for this one day only — the habit stays put
+   * and its definition is untouched, so tomorrow's plan still brings the cue.
+   */
+  const dropCue = (block: CalendarBlock) => {
+    startTransition(async () => {
+      applyPatch({ kind: "remove", id: block.id });
+      const formData = new FormData();
+      formData.set("id", block.id);
+      await deleteBlock(formData);
     });
   };
 
@@ -180,6 +225,7 @@ export function CalendarGrid({
               onCreate={onCreate}
               onEdit={onEdit}
               onToggleDone={toggleDone}
+              onDropCue={dropCue}
               onDropItem={onDropItem}
             />
           ))}
@@ -215,6 +261,7 @@ function DayColumn({
   onCreate,
   onEdit,
   onToggleDone,
+  onDropCue,
   onDropItem,
 }: {
   day: GridDay;
@@ -246,6 +293,7 @@ function DayColumn({
   onCreate: (dateISO: string, startMinute: number) => void;
   onEdit: (block: CalendarBlock) => void;
   onToggleDone: (block: CalendarBlock) => void;
+  onDropCue: (block: CalendarBlock) => void;
   onDropItem: (item: PlanDragItem, dateISO: string, startMinute: number) => void;
 }) {
   const columnRef = useRef<HTMLDivElement>(null);
@@ -420,6 +468,7 @@ function DayColumn({
           dragging={drag?.id === block.id}
           onPointerDown={(event, mode) => beginDrag(event, block, mode)}
           onToggleDone={() => onToggleDone(block)}
+          onDropCue={() => onDropCue(block)}
         />
       ))}
     </div>
@@ -472,6 +521,7 @@ function BlockChip({
   dragging,
   onPointerDown,
   onToggleDone,
+  onDropCue,
 }: {
   block: CalendarBlock;
   column: number;
@@ -479,10 +529,13 @@ function BlockChip({
   dragging: boolean;
   onPointerDown: (event: React.PointerEvent, mode: "move" | "resize") => void;
   onToggleDone: () => void;
+  onDropCue: () => void;
 }) {
   const minutes = spanMinutes(block);
   const compact = minutes < COMPACT_MINUTES;
   const done = block.completedAt !== null;
+  /** This block is the cue in front of another one. */
+  const isCue = block.cueForId !== null;
 
   const width = `calc(${100 / columns}% - 4px)`;
   const left = `calc(${(column * 100) / columns}% + 2px)`;
@@ -494,6 +547,12 @@ function BlockChip({
         "transition-shadow duration-150 hover:shadow-sm",
         KIND_STYLES[block.kind],
         done && "opacity-55",
+        // A cue is quieter than what it triggers, and only rounded at the top,
+        // so the pair reads as one object with a seam rather than two blocks
+        // that happen to touch. It is still a real block underneath — the styling
+        // says "part of that", not "not really here".
+        isCue &&
+          "rounded-b-none border-b-transparent border-dashed bg-transparent",
         dragging && "z-30 cursor-grabbing shadow-md",
         !dragging && "cursor-grab",
       )}
@@ -505,80 +564,119 @@ function BlockChip({
       }}
       onPointerDown={(event) => onPointerDown(event, "move")}
     >
-      <div className={cn("flex min-w-0 items-start gap-1.5", compact && "items-center")}>
-        <button
-          type="button"
-          aria-label={done ? `Untick ${block.title}` : `Tick off ${block.title}`}
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(event) => {
-            event.stopPropagation();
-            onToggleDone();
-          }}
-          className={cn(
-            "mt-0.5 grid size-3.5 shrink-0 place-items-center rounded-full border transition-colors",
-            done
-              ? "border-primary bg-primary text-primary-foreground"
-              : "border-current/40 hover:border-current",
-          )}
-        >
-          {/* Hidden until ticked or hovered. A check drawn faintly inside every
-              block makes a freshly planned day read as one you already did. */}
-          <Check
-            className={cn(
-              "size-2.5 transition-opacity",
-              done ? "opacity-100" : "opacity-0 group-hover:opacity-45",
-            )}
-            strokeWidth={3}
+      {isCue ? (
+        <div className="flex min-w-0 items-center gap-1.5">
+          <CornerDownRight
+            className="text-muted-foreground size-3 shrink-0"
             aria-hidden
           />
-        </button>
-
-        <p
+          <p className="text-muted-foreground min-w-0 flex-1 truncate text-micro leading-4 normal-case tracking-normal">
+            {block.title}
+          </p>
+          <button
+            type="button"
+            aria-label={`Skip ${block.title} today`}
+            title="Not today"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              onDropCue();
+            }}
+            className="text-muted-foreground hover:text-destructive shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+          >
+            <X className="size-3" aria-hidden />
+          </button>
+        </div>
+      ) : (
+        <div
           className={cn(
-            "min-w-0 flex-1 text-label leading-4 font-medium",
-            // A tall block has the room for two lines, and "Write…" in a
-            // 90-minute box is throwing away the space that makes a week view
-            // readable at a glance.
-            compact ? "truncate" : "line-clamp-2",
-            done && "line-through",
+            "flex min-w-0 items-start gap-1.5",
+            compact && "items-center",
           )}
         >
-          {block.title}
-        </p>
-
-        {block.task && !done && (
-          <Link
-            href={buildTimerHref({
-              id: block.task.id,
-              estimatedSeconds: minutes * 60,
-              defaultMode: toWorkMode(block.task.defaultMode),
-              plannedIntervals: block.task.plannedIntervals,
-            })}
-            aria-label={`Start a timer for ${block.title}`}
+          <button
+            type="button"
+            aria-label={
+              done ? `Untick ${block.title}` : `Tick off ${block.title}`
+            }
             onPointerDown={(event) => event.stopPropagation()}
-            className="text-muted-foreground hover:text-primary shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleDone();
+            }}
+            className={cn(
+              "mt-0.5 grid size-3.5 shrink-0 place-items-center rounded-full border transition-colors",
+              done
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-current/40 hover:border-current",
+            )}
           >
-            <Play className="size-3" aria-hidden />
-          </Link>
-        )}
-      </div>
+            {/* Hidden until ticked or hovered. A check drawn faintly inside every
+                block makes a freshly planned day read as one you already did. */}
+            <Check
+              className={cn(
+                "size-2.5 transition-opacity",
+                done ? "opacity-100" : "opacity-0 group-hover:opacity-45",
+              )}
+              strokeWidth={3}
+              aria-hidden
+            />
+          </button>
 
-      {!compact && (
+          <p
+            className={cn(
+              "min-w-0 flex-1 text-label leading-4 font-medium",
+              // A tall block has the room for two lines, and "Write…" in a
+              // 90-minute box is throwing away the space that makes a week view
+              // readable at a glance.
+              compact ? "truncate" : "line-clamp-2",
+              done && "line-through",
+            )}
+          >
+            {block.title}
+          </p>
+
+          {block.task && !done && (
+            <Link
+              href={buildTimerHref({
+                id: block.task.id,
+                estimatedSeconds: minutes * 60,
+                defaultMode: toWorkMode(block.task.defaultMode),
+                plannedIntervals: block.task.plannedIntervals,
+              })}
+              aria-label={`Start a timer for ${block.title}`}
+              onPointerDown={(event) => event.stopPropagation()}
+              className="text-muted-foreground hover:text-primary shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+            >
+              <Play className="size-3" aria-hidden />
+            </Link>
+          )}
+        </div>
+      )}
+
+      {!compact && !isCue && (
         <p className="text-muted-foreground mt-0.5 text-micro tabular-nums">
           {formatMinuteOfDay(block.startMinute)} · {formatSpanLength(block)}
         </p>
       )}
 
       {/* Resize handle. Only appears on hover, so it never competes with the
-          block's own content for a 20px-tall block. */}
-      <button
-        type="button"
-        aria-label={`Change the length of ${block.title}`}
-        onPointerDown={(event) => onPointerDown(event, "resize")}
-        className="absolute inset-x-0 bottom-0 flex h-2 cursor-ns-resize items-center justify-center opacity-0 transition-opacity group-hover:opacity-60 focus-visible:opacity-100"
-      >
-        <GripHorizontal className="size-3" aria-hidden />
-      </button>
+          block's own content for a 20px-tall block.
+
+          Not offered on a cue: its bottom edge is the habit's top edge, and
+          dragging it would either overlap what it cues or open a gap — both of
+          which break the adjacency that makes it a cue. Change the length on the
+          habit instead. */}
+      {!isCue && (
+        <button
+          type="button"
+          aria-label={`Change the length of ${block.title}`}
+          onPointerDown={(event) => onPointerDown(event, "resize")}
+          className="absolute inset-x-0 bottom-0 flex h-2 cursor-ns-resize items-center justify-center opacity-0 transition-opacity group-hover:opacity-60 focus-visible:opacity-100"
+        >
+          <GripHorizontal className="size-3" aria-hidden />
+        </button>
+      )}
     </div>
   );
 }

@@ -62,6 +62,16 @@ import {
   spanOfLength,
 } from "@/lib/block-math";
 import {
+  anchorTitleOf,
+  chainOf,
+  cueEdges,
+  cueLengthMinutes,
+  cueSpanFor,
+  describeCue,
+  describeStack,
+  wouldCycle,
+} from "@/lib/habit-cue";
+import {
   meetsMinimum,
   minimumMarkerRatio,
   minutesFromSeconds,
@@ -721,6 +731,120 @@ check("a malformed time is rejected rather than coerced to midnight", () => {
   assert.equal(parseMinuteOfDay("25:00"), null);
   assert.equal(parseMinuteOfDay("9:5"), null);
   assert.equal(parseMinuteOfDay(""), null);
+});
+
+console.log("\nhabit stacking — cues and chains");
+
+const cue = (
+  anchorTaskId: string | null,
+  anchorLabel: string | null,
+  anchorMinutes = 5,
+) => ({ anchorTaskId, anchorLabel, anchorMinutes });
+
+check("a cue block ends exactly where the habit it cues begins", () => {
+  // LOAD-BEARING. Adjacency IS habit stacking — a cue with a gap after it is
+  // just an unrelated block, and one that overlaps has eaten the habit's time.
+  const habit = span(480, 540);
+  const placed = cueSpanFor(habit, 5)!;
+  assert.equal(placed.endMinute, habit.startMinute);
+  assert.equal(placed.startMinute, 475);
+  assert.equal(overlaps(placed, habit), false);
+});
+
+check("a cue up against midnight is shortened, never pushed past it", () => {
+  // The alternative is moving the habit to make room, which silently rewrites
+  // the time you chose.
+  const placed = cueSpanFor(span(3, 60), 30)!;
+  assert.equal(placed.startMinute, 0);
+  assert.equal(placed.endMinute, 3, "abuts, even at 3 minutes long");
+
+  assert.equal(cueSpanFor(span(0, 60), 15), null, "nothing comes before 00:00");
+});
+
+check("a habit anchor's own estimate beats the fallback minutes", () => {
+  // Two answers to "how long does the workout take" is one too many, and the
+  // habit's own estimate is the one every other surface already shows.
+  assert.equal(cueLengthMinutes(cue("workout", null, 5), 45 * 60), 45);
+  assert.equal(cueLengthMinutes(cue("workout", null, 5), null), 5);
+  // A label anchor has no estimate to borrow, whatever gets passed.
+  assert.equal(cueLengthMinutes(cue(null, "tea", 7), 45 * 60), 7);
+  assert.equal(
+    cueLengthMinutes(cue(null, "tea", 1), null),
+    MIN_BLOCK_MINUTES,
+    "and never shorter than the shortest block",
+  );
+});
+
+check("the anchor's title comes from whichever kind of anchor it is", () => {
+  assert.equal(anchorTitleOf(cue("workout", null), "Workout"), "Workout");
+  assert.equal(anchorTitleOf(cue(null, "drinking tea"), undefined), "drinking tea");
+  assert.equal(
+    anchorTitleOf(cue("workout", null), undefined),
+    null,
+    "a habit anchor with no title in hand resolves to nothing, not to ''",
+  );
+  assert.equal(anchorTitleOf(cue(null, "   ")), null, "whitespace is not a cue");
+});
+
+check("the recipe reads as a sentence, because that's the technique", () => {
+  assert.equal(
+    describeStack("drinking tea", "Meditation"),
+    "After drinking tea, I will Meditation.",
+  );
+  assert.equal(describeCue("drinking tea"), "After drinking tea");
+  assert.equal(describeCue(null), null, "no anchor, no sentence");
+});
+
+check("stacking a habit on itself is a cycle", () => {
+  assert.equal(wouldCycle("a", "a", new Map()), true);
+});
+
+check("a cycle is caught however far down the chain it closes", () => {
+  // LOAD-BEARING. The chain is walked by following each habit's own anchor, so a
+  // loop anywhere in it hangs every surface that renders the stack.
+  const edges = cueEdges([
+    { taskId: "meditation", anchorTaskId: "tea-habit" },
+    { taskId: "journal", anchorTaskId: "meditation" },
+  ]);
+
+  assert.equal(wouldCycle("tea-habit", "journal", edges), true, "3-cycle");
+  assert.equal(wouldCycle("tea-habit", "meditation", edges), true, "2-cycle");
+  assert.equal(
+    wouldCycle("stretching", "journal", edges),
+    false,
+    "extending the chain is fine",
+  );
+});
+
+check("label anchors never take part in a cycle", () => {
+  // They're leaves: nothing can be stacked on a thing that isn't a habit.
+  const edges = cueEdges([{ taskId: "meditation", anchorTaskId: null }]);
+  assert.equal(edges.size, 0);
+  assert.equal(wouldCycle("meditation", "journal", edges), false);
+});
+
+check("the chain comes back earliest first, and stops at the root", () => {
+  const edges = cueEdges([
+    { taskId: "meditation", anchorTaskId: "tea-habit" },
+    { taskId: "journal", anchorTaskId: "meditation" },
+  ]);
+
+  assert.deepEqual(chainOf("journal", edges), [
+    "tea-habit",
+    "meditation",
+    "journal",
+  ]);
+  assert.deepEqual(chainOf("tea-habit", edges), ["tea-habit"], "a root is itself");
+});
+
+check("walking a corrupt chain terminates instead of hanging the render", () => {
+  // wouldCycle should mean this can never be stored, but a walk that could spin
+  // forever on bad data is not worth the two lines it saves.
+  const looped = new Map([
+    ["a", "b"],
+    ["b", "a"],
+  ]);
+  assert.deepEqual(chainOf("a", looped), ["b", "a"]);
 });
 
 console.log("\nsteps — the way in");

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { EVERY_DAY, parseLocalDate, todayLocal } from "@/lib/dates";
+import { cueEdges, wouldCycle } from "@/lib/habit-cue";
 import {
   getHabitQuota,
   setHabitProgress,
@@ -33,6 +34,93 @@ function revalidateHabitViews() {
 const isEveryDay = (days: number[]) =>
   EVERY_DAY.every((day) => days.includes(day));
 
+/** What gets written to `HabitCue`, or null for "no cue". */
+type CueWrite = {
+  anchorTaskId: string | null;
+  anchorLabel: string | null;
+  anchorMinutes: number;
+};
+
+type CueInput = {
+  cueMode: "none" | "habit" | "label";
+  cueTaskId?: string;
+  cueLabel?: string;
+  cueMinutes: number;
+};
+
+/**
+ * Turn the form's cue fields into a row, or refuse.
+ *
+ * Ownership and the cycle check live together because they are the same
+ * question asked twice: is this anchor a thing this user may legally point at.
+ * A foreign or vanished id resolves to "no cue" rather than an error — the same
+ * posture as `resolveProjectId` — but a cycle is reported, because it is a
+ * coherent request with a genuinely wrong answer, and dropping it silently
+ * would look like the save didn't take.
+ *
+ * `habitId` is null on create: a habit that doesn't exist yet has nothing
+ * pointing at it, so no chain can lead back to it and the edge query is skipped.
+ */
+async function resolveCue(
+  userId: string,
+  habitId: string | null,
+  input: CueInput,
+): Promise<
+  { ok: true; cue: CueWrite | null } | { ok: false; state: ActionState }
+> {
+  if (input.cueMode === "none") return { ok: true, cue: null };
+
+  if (input.cueMode === "label") {
+    return {
+      ok: true,
+      cue: {
+        anchorTaskId: null,
+        anchorLabel: input.cueLabel ?? null,
+        anchorMinutes: input.cueMinutes,
+      },
+    };
+  }
+
+  const anchor = input.cueTaskId
+    ? await prisma.task.findFirst({
+        where: { id: input.cueTaskId, userId, type: "HABIT" },
+        select: { id: true },
+      })
+    : null;
+
+  if (!anchor) return { ok: true, cue: null };
+
+  if (habitId) {
+    const rows = await prisma.habitCue.findMany({
+      where: { task: { userId }, anchorTaskId: { not: null } },
+      select: { taskId: true, anchorTaskId: true },
+    });
+
+    if (wouldCycle(habitId, anchor.id, cueEdges(rows))) {
+      return {
+        ok: false,
+        state: {
+          status: "error",
+          message: "That would stack the habit on itself.",
+          fieldErrors: {
+            cueTaskId:
+              "This habit already comes before that one, somewhere down the chain.",
+          },
+        },
+      };
+    }
+  }
+
+  return {
+    ok: true,
+    cue: {
+      anchorTaskId: anchor.id,
+      anchorLabel: null,
+      anchorMinutes: input.cueMinutes,
+    },
+  };
+}
+
 export async function createHabit(
   _previous: ActionState,
   formData: FormData,
@@ -50,6 +138,9 @@ export async function createHabit(
 
   const input = parsed.data;
   const today = todayLocal(user.timezone);
+
+  const cue = await resolveCue(user.id, null, input);
+  if (!cue.ok) return cue.state;
 
   await prisma.task.create({
     data: {
@@ -79,6 +170,7 @@ export async function createHabit(
           optimalQuota: input.optimalQuota ?? null,
         },
       },
+      cue: cue.cue ? { create: cue.cue } : undefined,
     },
   });
 
@@ -105,12 +197,19 @@ export async function updateHabit(
 
   const owned = await prisma.task.findFirst({
     where: { id: input.id, userId: user.id, type: "HABIT" },
-    select: { id: true, recurrence: { select: { startDate: true } } },
+    select: {
+      id: true,
+      recurrence: { select: { startDate: true } },
+      cue: { select: { taskId: true } },
+    },
   });
 
   if (!owned) {
     return { status: "error", message: "That habit no longer exists." };
   }
+
+  const cue = await resolveCue(user.id, owned.id, input);
+  if (!cue.ok) return cue.state;
 
   const today = todayLocal(user.timezone);
   // Keep the original startDate unless the form changed it — it anchors the
@@ -153,6 +252,13 @@ export async function updateHabit(
           },
         },
       },
+      // `delete: true` throws on an absent 1-1, so clearing the cue is only
+      // asked for when there is one to clear.
+      cue: cue.cue
+        ? { upsert: { create: cue.cue, update: cue.cue } }
+        : owned.cue
+          ? { delete: true }
+          : undefined,
     },
   });
 
@@ -192,6 +298,11 @@ export async function archiveHabit(formData: FormData): Promise<void> {
  * identifies them is still there to match on. Steps, recurrence and the whole
  * occurrence history cascade from the task; `SessionInterval` cascades from
  * the sessions.
+ *
+ * `HabitCue` cascades from both of its FKs, so this habit's own cue goes and so
+ * does any cue that named it as an anchor — a habit stacked on one that no
+ * longer exists has lost its trigger, and a dangling row would render as
+ * "After " with nothing after it.
  *
  * `DayLog.selectedTaskId` and `Capture.promotedTaskId` stay `SetNull` on
  * purpose — those rows are a day's record and an inbox note, which are the

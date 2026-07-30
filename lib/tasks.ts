@@ -16,6 +16,7 @@ import type {
   TimerMode,
   User,
 } from "@/lib/generated/prisma/client";
+import { anchorTitleOf } from "@/lib/habit-cue";
 import type { HabitUnit, Quota, QuotaTier } from "@/lib/quota";
 import { isDueOn, type RecurrenceRule } from "@/lib/recurrence";
 import type { StepLike } from "@/lib/steps";
@@ -44,7 +45,53 @@ export type TodayItem = TaskSummary & {
   /** Negative = overdue by N days. Null for habits and undated todos. */
   daysUntilDue: number | null;
   recurrenceDays: number[] | null;
+  /** Habits only: the thing this one is stacked on. */
+  cue: CueSummary | null;
 };
+
+/**
+ * A habit's cue, with the anchor's title already resolved whichever kind it is —
+ * so no surface has to know that a habit anchor's name lives on another row
+ * while a label anchor's name lives on this one.
+ */
+export type CueSummary = {
+  anchorTaskId: string | null;
+  anchorLabel: string | null;
+  anchorMinutes: number;
+  anchorTitle: string | null;
+};
+
+/**
+ * Joined rather than resolved in memory against the habits already fetched: an
+ * anchor can be archived, and an archived habit is still a perfectly good cue —
+ * "after my morning walk" doesn't stop being a trigger because you stopped
+ * counting the walks.
+ */
+const cueSelect = {
+  select: {
+    anchorTaskId: true,
+    anchorLabel: true,
+    anchorMinutes: true,
+    anchorTask: { select: { title: true } },
+  },
+} as const;
+
+type CueRow = {
+  anchorTaskId: string | null;
+  anchorLabel: string | null;
+  anchorMinutes: number;
+  anchorTask: { title: string } | null;
+};
+
+const toCue = (row: CueRow | null): CueSummary | null =>
+  row
+    ? {
+        anchorTaskId: row.anchorTaskId,
+        anchorLabel: row.anchorLabel,
+        anchorMinutes: row.anchorMinutes,
+        anchorTitle: anchorTitleOf(row, row.anchorTask?.title),
+      }
+    : null;
 
 const taskSelect = {
   id: true,
@@ -103,7 +150,7 @@ export async function getTodayView(user: User): Promise<TodayView> {
   const [habitTasks, todoTasks, occurrences] = await Promise.all([
     prisma.task.findMany({
       where: { userId: user.id, type: "HABIT", archivedAt: null },
-      select: { ...taskSelect, recurrence: true },
+      select: { ...taskSelect, recurrence: true, cue: cueSelect },
     }),
     prisma.task.findMany({
       where: {
@@ -143,6 +190,7 @@ export async function getTodayView(user: User): Promise<TodayView> {
         done: occurrence?.status === "DONE",
         daysUntilDue: null,
         recurrenceDays: task.recurrence?.daysOfWeek ?? null,
+        cue: toCue(task.cue),
       };
     });
 
@@ -159,6 +207,7 @@ export async function getTodayView(user: User): Promise<TodayView> {
           )
         : null,
       recurrenceDays: null,
+      cue: null,
     };
   });
 
@@ -216,6 +265,8 @@ export type HabitWithHistory = TaskSummary & {
   /** Progress on `today`, in the habit's own unit. */
   todayProgress: number;
   archivedAt: Date | null;
+  /** The thing this habit is stacked on, if any. */
+  cue: CueSummary | null;
 };
 
 export async function getHabits(
@@ -228,7 +279,12 @@ export async function getHabits(
   const [habits, occurrences] = await Promise.all([
     prisma.task.findMany({
       where: { userId: user.id, type: "HABIT" },
-      select: { ...taskSelect, archivedAt: true, recurrence: true },
+      select: {
+        ...taskSelect,
+        archivedAt: true,
+        recurrence: true,
+        cue: cueSelect,
+      },
       orderBy: [{ archivedAt: "asc" }, { sortOrder: "asc" }],
     }),
     prisma.taskOccurrence.findMany({
@@ -281,6 +337,7 @@ export async function getHabits(
         optimal: habit.recurrence!.optimalQuota,
       },
       todayProgress: todayProgress.get(habit.id) ?? 0,
+      cue: toCue(habit.cue),
     }));
 }
 
@@ -322,8 +379,32 @@ export async function getTask(user: User, taskId: string) {
     include: {
       project: { select: { id: true, name: true, color: true } },
       recurrence: true,
+      cue: true,
       steps: { orderBy: { position: "asc" } },
     },
+  });
+}
+
+/**
+ * The habits a habit can be stacked on.
+ *
+ * Archived habits are excluded: offering one as a new anchor would be offering a
+ * trigger that has already stopped happening. `exceptId` drops the habit being
+ * edited, so the form can't propose the most obvious cycle.
+ */
+export async function getAnchorHabits(
+  user: User,
+  exceptId?: string,
+): Promise<{ id: string; title: string }[]> {
+  return prisma.task.findMany({
+    where: {
+      userId: user.id,
+      type: "HABIT",
+      archivedAt: null,
+      ...(exceptId ? { id: { not: exceptId } } : {}),
+    },
+    orderBy: { sortOrder: "asc" },
+    select: { id: true, title: true },
   });
 }
 

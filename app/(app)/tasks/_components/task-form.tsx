@@ -28,6 +28,7 @@ import {
 import type { ActionState } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 
+import { HabitCueFields, type CueMode } from "./habit-cue-fields";
 import { QuotaFields } from "./quota-fields";
 import { StepsEditor, type StepDraft } from "./steps-editor";
 
@@ -50,6 +51,10 @@ export type TaskFormValues = {
   unit?: "MINUTES" | "COUNT";
   minimumQuota?: number;
   optimalQuota?: number | null;
+  cueMode?: CueMode;
+  cueTaskId?: string | null;
+  cueLabel?: string | null;
+  cueMinutes?: number;
 };
 
 const PRIORITIES: { value: "P1" | "P2" | "P3" | "P4"; label: string }[] = [
@@ -78,6 +83,7 @@ export function TaskForm({
   action,
   values = {},
   projects,
+  habits = [],
   submitLabel,
   redirectTo,
   hidden,
@@ -92,6 +98,11 @@ export function TaskForm({
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
   values?: TaskFormValues;
   projects: { id: string; name: string }[];
+  /**
+   * Habits only: the candidate anchors for habit stacking. The habit being
+   * edited must already be filtered out by the caller.
+   */
+  habits?: { id: string; title: string }[];
   submitLabel: string;
   /** Where to go on success. Omit when the form is embedded in a page that
    *  stays put and re-renders itself. */
@@ -116,6 +127,10 @@ export function TaskForm({
 
   const [days, setDays] = useState<number[]>(values.daysOfWeek ?? EVERY_DAY);
   const [mode, setMode] = useState<WorkMode>(values.defaultMode ?? "POMODORO");
+  // Mirrored, not controlled: the title input keeps its defaultValue and this
+  // only exists so the stacking preview can read "…, I will read for a bit."
+  // back as you type it.
+  const [title, setTitle] = useState(values.title ?? "");
 
   // The deadline input stays uncontrolled — the presets just write into it.
   // Controlling it would mean re-rendering the whole form on every keystroke in
@@ -180,6 +195,7 @@ export function TaskForm({
           autoFocus={autoFocusTitle}
           maxLength={200}
           defaultValue={values.title}
+          onChange={(event) => setTitle(event.target.value)}
           placeholder={
             kind === "HABIT" ? "Read for a bit" : "Email the landlord"
           }
@@ -232,6 +248,24 @@ export function TaskForm({
               </span>
             </div>
           </div>
+        </Field>
+      ) : null}
+
+      {kind === "HABIT" ? (
+        <Field
+          label="What comes right before it?"
+          hint="A habit sticks best when it's bolted to something that already happens without you deciding. Name that thing, and this one rides on it."
+        >
+          <HabitCueFields
+            habits={habits}
+            habitTitle={title}
+            defaultMode={values.cueMode}
+            defaultTaskId={values.cueTaskId}
+            defaultLabel={values.cueLabel}
+            defaultMinutes={values.cueMinutes}
+            taskIdError={error("cueTaskId")}
+            labelError={error("cueLabel")}
+          />
         </Field>
       ) : null}
 

@@ -12,6 +12,7 @@ import { prisma } from "@/lib/db";
 import { addDays, toISODate } from "@/lib/dates";
 import type { BlockKind, User } from "@/lib/generated/prisma/client";
 import { claimedMinutes, type Span } from "@/lib/block-math";
+import { anchorTitleOf } from "@/lib/habit-cue";
 import { isDueOn } from "@/lib/recurrence";
 
 export type CalendarBlock = {
@@ -23,6 +24,14 @@ export type CalendarBlock = {
   endMinute: number;
   kind: BlockKind;
   completedAt: Date | null;
+  /**
+   * Set when this block is the cue sitting immediately before another one. The
+   * grid renders it as part of that block rather than as a peer, and it is the
+   * only block with an "drop it for today" affordance.
+   */
+  cueForId: string | null;
+  /** This block has a cue in front of it — so moving it has to move two things. */
+  hasCue: boolean;
   task: {
     id: string;
     title: string;
@@ -42,6 +51,8 @@ const blockSelect = {
   endMinute: true,
   kind: true,
   completedAt: true,
+  cueForId: true,
+  cue: { select: { id: true } },
   task: {
     select: {
       id: true,
@@ -63,6 +74,8 @@ type BlockRow = {
   endMinute: number;
   kind: BlockKind;
   completedAt: Date | null;
+  cueForId: string | null;
+  cue: { id: string } | null;
   task: CalendarBlock["task"];
 };
 
@@ -75,6 +88,8 @@ const toCalendarBlock = (row: BlockRow): CalendarBlock => ({
   endMinute: row.endMinute,
   kind: row.kind,
   completedAt: row.completedAt,
+  cueForId: row.cueForId,
+  hasCue: row.cue !== null,
   task: row.task,
 });
 
@@ -157,6 +172,12 @@ export type SchedulableItem = {
   priority: "P1" | "P2" | "P3" | "P4" | null;
   project: { name: string } | null;
   firstStep: string | null;
+  /**
+   * The anchor's name, when this habit is stacked on something. Carried so the
+   * panel can warn that dropping this in brings a second block with it —
+   * scheduling one thing and getting two is only a good surprise once.
+   */
+  cueTitle: string | null;
 };
 
 /**
@@ -232,6 +253,13 @@ export async function getSchedulableItems(
         recurrence: {
           select: { daysOfWeek: true, startDate: true, endDate: true },
         },
+        cue: {
+          select: {
+            anchorTaskId: true,
+            anchorLabel: true,
+            anchorTask: { select: { title: true } },
+          },
+        },
       },
     }),
     // No row at all means "not done" — occurrences only exist for days that
@@ -264,6 +292,9 @@ export async function getSchedulableItems(
       priority: null,
       project: habit.project,
       firstStep: null,
+      cueTitle: habit.cue
+        ? anchorTitleOf(habit.cue, habit.cue.anchorTask?.title)
+        : null,
     }));
 
   const openTodos: SchedulableItem[] = todos.map((task) => ({
@@ -275,6 +306,7 @@ export async function getSchedulableItems(
     priority: task.priority,
     project: task.project,
     firstStep: task.steps[0]?.title ?? null,
+    cueTitle: null,
   }));
 
   return [...dueHabits, ...openTodos].slice(0, limit);

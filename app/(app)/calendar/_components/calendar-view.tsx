@@ -26,7 +26,8 @@ export function CalendarView({
   blocks: CalendarBlock[];
   todayISO: string;
   timeZone: string;
-  tasks: { id: string; title: string }[];
+  /** `cueTitle` is set for a habit that brings a precursor block with it. */
+  tasks: { id: string; title: string; cueTitle: string | null }[];
 }) {
   const [draft, setDraft] = useState<BlockDraft | null>(null);
   const nowMinute = useNowMinute(timeZone);
@@ -48,7 +49,11 @@ export function CalendarView({
             // make the drag a lie.
             const result = await scheduleTask(idleState, formData);
             if (result.status === "error") toast.error(result.message);
-            else toast.success(`${item.title} — blocked out.`);
+            // The server's own message, because it's the only side that knows
+            // whether a cue came along — and getting two blocks from one drop
+            // needs saying.
+            else if (result.status === "success")
+              toast.success(result.message ?? `${item.title} — blocked out.`);
           });
         }}
         days={days}
@@ -64,6 +69,7 @@ export function CalendarView({
             notes: "",
             taskId: null,
             kind: "WORK",
+            hasCue: false,
           });
         }}
         onEdit={(block: CalendarBlock) =>
@@ -76,6 +82,7 @@ export function CalendarView({
             notes: block.notes ?? "",
             taskId: block.task?.id ?? null,
             kind: block.kind,
+            hasCue: block.hasCue,
           })
         }
       />

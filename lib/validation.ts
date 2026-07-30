@@ -119,6 +119,16 @@ export const createHabitSchema = createTodoSchema
     unit: z.enum(["MINUTES", "COUNT"]).default("MINUTES"),
     minimumQuota: quotaValue.default(1),
     optimalQuota: emptyToUndefined(quotaValue),
+
+    /**
+     * Habit stacking. `cueMode` discriminates rather than "whichever field came
+     * back non-empty": the form can leave a stale label behind when you switch
+     * to a habit anchor, and guessing from the payload would resurrect it.
+     */
+    cueMode: z.enum(["none", "habit", "label"]).default("none"),
+    cueTaskId: emptyToUndefined(cuid),
+    cueLabel: emptyToUndefined(z.string().trim().min(1).max(120)),
+    cueMinutes: z.coerce.number().int().min(1).max(240).default(5),
   })
   .refine(
     (value) =>
@@ -131,7 +141,17 @@ export const createHabitSchema = createTodoSchema
       message: "A good day has to be more than the minimum.",
       path: ["optimalQuota"],
     },
-  );
+  )
+  .refine((value) => value.cueMode !== "habit" || Boolean(value.cueTaskId), {
+    message: "Pick the habit this one comes after.",
+    path: ["cueTaskId"],
+  })
+  .refine((value) => value.cueMode !== "label" || Boolean(value.cueLabel), {
+    // An empty cue is the one failure mode that makes stacking useless: "after
+    // something" is exactly the vagueness the technique exists to remove.
+    message: "Name the thing that comes right before it.",
+    path: ["cueLabel"],
+  });
 
 export const updateTodoSchema = createTodoSchema.extend({ id: cuid });
 export const updateHabitSchema = createHabitSchema.extend({ id: cuid });
@@ -212,6 +232,19 @@ export const toggleStepSchema = z.object({
 
 const minuteOfDay = z.coerce.number().int().min(0).max(MINUTES_PER_DAY);
 
+/**
+ * "Bring the habit's cue along" — defaults to yes, and absence means yes.
+ *
+ * Not `z.coerce.boolean()`: `Boolean("false")` is `true`, so a checkbox that
+ * posts its state as a string would be permanently on. An explicit two-value
+ * enum is the only shape where "the user unticked it" survives the wire, and
+ * defaulting to true means a caller that predates cues still gets one.
+ */
+const includeCue = z
+  .enum(["true", "false"])
+  .default("true")
+  .transform((value) => value === "true");
+
 const blockShape = {
   title: z.string().trim().min(1, "Give the block a name.").max(200),
   notes: emptyToUndefined(notes),
@@ -220,6 +253,7 @@ const blockShape = {
   startMinute: minuteOfDay,
   endMinute: minuteOfDay,
   kind: z.enum(["WORK", "RECOVERY", "BUFFER"]).default("WORK"),
+  includeCue,
 };
 
 /**
@@ -259,6 +293,7 @@ export const scheduleTaskSchema = z.object({
   /** Omitted means "find the first free slot big enough". */
   startMinute: emptyToUndefined(minuteOfDay),
   minutes: emptyToUndefined(z.coerce.number().int().min(MIN_BLOCK_MINUTES).max(MINUTES_PER_DAY)),
+  includeCue,
 });
 
 export const deleteBlockSchema = z.object({ id: cuid });

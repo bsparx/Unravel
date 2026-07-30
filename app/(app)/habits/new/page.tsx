@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 import { requireUser } from "@/lib/auth";
-import { getProjects } from "@/lib/tasks";
+import { getAnchorHabits, getProjects } from "@/lib/tasks";
 import { TaskForm } from "@/app/(app)/tasks/_components/task-form";
 
 import { createHabit } from "../actions";
@@ -11,7 +11,10 @@ export const metadata = { title: "New habit" };
 
 export default async function NewHabitPage() {
   const user = await requireUser();
-  const projects = await getProjects(user);
+  const [projects, habits] = await Promise.all([
+    getProjects(user),
+    getAnchorHabits(user),
+  ]);
 
   return (
     <div className="mx-auto w-full max-w-2xl px-5 py-8 md:px-8 md:py-12">
@@ -33,6 +36,7 @@ export default async function NewHabitPage() {
         kind="HABIT"
         action={createHabit}
         projects={projects}
+        habits={habits}
         submitLabel="Add habit"
         redirectTo="/habits"
       />

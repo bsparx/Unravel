@@ -225,6 +225,11 @@ model Task {
   dayLogSelections DayLog[]    @relation("DayLogSelection")
   blocks           TimeBlock[] @relation("TaskBlocks")
 
+  /// The one thing that precedes this habit. `cuedBy` is the other direction:
+  /// the habits stacked on top of this one.
+  cue    HabitCue?  @relation("HabitCueOwner")
+  cuedBy HabitCue[] @relation("HabitCueAnchor")
+
   @@index([userId, type, completedAt, archivedAt, dueDate])
   @@index([userId, projectId, sortOrder])
 }
@@ -289,6 +294,49 @@ model HabitRecurrence {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/// 1-1 with a Task of type HABIT: the one thing that immediately precedes it.
+///
+/// Habit stacking works by bolting a new behaviour onto a cue that already
+/// happens reliably — "after I pour my morning tea, I will meditate". The cue
+/// has to be specific and immediately before, which is why this is one anchor
+/// and not a list of vague contexts.
+///
+/// Exactly one of `anchorTaskId` / `anchorLabel` is set:
+///
+/// - `anchorTaskId` — the anchor is itself a tracked habit. "Web dev after
+///   workout". Both sides have their own quotas and streaks.
+/// - `anchorLabel`  — the anchor is a cue you already do without thinking and
+///   deliberately do NOT track. Drinking tea gets no quota, no streak and no
+///   occurrences, because it was never a goal. It exists only as the label on
+///   the front of the habit it triggers.
+///
+/// One cue per habit, so chains fall out of the model rather than needing their
+/// own: tea -> meditation -> journal is three rows, each naming its own
+/// predecessor. `HabitCue` is where cycles become possible, so every write goes
+/// through `wouldCycle` in `lib/habit-cue.ts`.
+model HabitCue {
+  taskId String @id
+  task   Task   @relation("HabitCueOwner", fields: [taskId], references: [id], onDelete: Cascade)
+
+  /// Cascade rather than SetNull: with both columns null the row would say
+  /// nothing at all, so deleting the anchor habit takes the cue with it.
+  anchorTaskId String?
+  anchorTask   Task?   @relation("HabitCueAnchor", fields: [anchorTaskId], references: [id], onDelete: Cascade)
+
+  anchorLabel String?
+
+  /// How long to reserve for the anchor when the calendar prepends it. For a
+  /// habit anchor this is only a fallback — that habit's own estimate wins.
+  anchorMinutes Int @default(5)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// "Which habits are stacked on this one" — the chain walk, and the cycle
+  /// check's edge map.
+  @@index([anchorTaskId])
 }
 
 /// SPARSE. One row per (task, local calendar day) that the user actually
@@ -540,6 +588,17 @@ model TimeBlock {
   /// Ticked off from the calendar. Distinct from Task.completedAt: finishing
   /// the 9am block on a task is not finishing the task.
   completedAt DateTime?
+
+  /// Set when this block was auto-prepended as another block's precursor — the
+  /// calendar half of `HabitCue`. Keeping the pair joined is what lets dragging
+  /// the habit carry its cue along, and lets "not today" drop just the cue
+  /// without touching the habit's definition.
+  ///
+  /// `@unique` because a block has at most one precursor. Cascade so deleting
+  /// the habit's block takes its cue with it, but never the reverse.
+  cueForId String?    @unique
+  cueFor   TimeBlock? @relation("BlockCue", fields: [cueForId], references: [id], onDelete: Cascade)
+  cue      TimeBlock? @relation("BlockCue")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

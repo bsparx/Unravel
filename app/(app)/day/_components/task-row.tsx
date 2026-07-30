@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   ChevronDown,
   CornerDownRight,
+  Link2,
   Pencil,
   Play,
   Repeat,
@@ -95,6 +96,17 @@ export function TaskRow({
               <span className="inline-flex items-center gap-1">
                 <Repeat className="size-3" aria-hidden />
                 Habit
+              </span>
+            )}
+
+            {item.cue?.anchorTitle && (
+              // Plain text, not a link to the anchor habit: this whole row is
+              // already a link to the timer, and a nested anchor is invalid HTML
+              // before it's a bad idea. The trigger is here to be read at the
+              // moment of ticking, which is when it's most useful.
+              <span className="inline-flex min-w-0 items-center gap-1">
+                <Link2 className="size-3 shrink-0" aria-hidden />
+                <span className="truncate">after {item.cue.anchorTitle}</span>
               </span>
             )}
 

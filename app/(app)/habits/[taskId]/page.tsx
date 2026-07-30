@@ -7,7 +7,7 @@ import { ConfirmDelete } from "@/components/confirm-delete";
 import { requireUser } from "@/lib/auth";
 import { toISODate } from "@/lib/dates";
 import { toWorkMode } from "@/lib/timer-math";
-import { getProjects, getTask } from "@/lib/tasks";
+import { getAnchorHabits, getProjects, getTask } from "@/lib/tasks";
 
 import { deleteHabit, updateHabit } from "../actions";
 
@@ -20,9 +20,10 @@ export default async function EditHabitPage({
   // Next 16: params is a Promise.
   const { taskId } = await params;
 
-  const [habit, projects] = await Promise.all([
+  const [habit, projects, habits] = await Promise.all([
     getTask(user, taskId),
     getProjects(user),
+    getAnchorHabits(user, taskId),
   ]);
 
   if (!habit || habit.type !== "HABIT") notFound();
@@ -43,6 +44,7 @@ export default async function EditHabitPage({
         kind="HABIT"
         action={updateHabit}
         projects={projects}
+        habits={habits}
         submitLabel="Save habit"
         redirectTo="/habits"
         values={{
@@ -73,6 +75,14 @@ export default async function EditHabitPage({
           unit: habit.recurrence?.unit,
           minimumQuota: habit.recurrence?.minimumQuota,
           optimalQuota: habit.recurrence?.optimalQuota ?? null,
+          cueMode: habit.cue
+            ? habit.cue.anchorTaskId
+              ? "habit"
+              : "label"
+            : "none",
+          cueTaskId: habit.cue?.anchorTaskId ?? null,
+          cueLabel: habit.cue?.anchorLabel ?? null,
+          cueMinutes: habit.cue?.anchorMinutes,
         }}
       />
 

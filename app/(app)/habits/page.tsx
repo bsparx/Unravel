@@ -7,6 +7,7 @@ import { QuotaMeter } from "@/components/quota-meter";
 import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth";
 import { addDays, formatMinutes, toISODate, todayLocal } from "@/lib/dates";
+import { chainOf, cueEdges } from "@/lib/habit-cue";
 import { describeQuota } from "@/lib/quota";
 import { getHabits } from "@/lib/tasks";
 import {
@@ -18,6 +19,7 @@ import { buildTimerHref } from "@/lib/timer-url";
 
 import { archiveHabit, deleteHabit } from "./actions";
 import { HabitCard } from "./_components/habit-card";
+import { HabitCueLine, HabitStackTrail } from "./_components/habit-cue-line";
 import { HabitGrid } from "./_components/habit-grid";
 
 export const metadata = { title: "Habits" };
@@ -29,6 +31,31 @@ export default async function HabitsPage() {
 
   const active = habits.filter((habit) => habit.archivedAt === null);
   const archived = habits.filter((habit) => habit.archivedAt !== null);
+
+  // The stack graph, built once from what's already in memory: a habit's cue
+  // names one predecessor, and following those names gives the whole chain.
+  const edges = cueEdges(
+    habits.map((habit) => ({
+      taskId: habit.id,
+      anchorTaskId: habit.cue?.anchorTaskId ?? null,
+    })),
+  );
+  const titleById = new Map(habits.map((habit) => [habit.id, habit.title]));
+
+  /** The stack in front of a habit as display strings, earliest first. */
+  const stackTrail = (habitId: string): string[] => {
+    const ids = chainOf(habitId, edges);
+    const rootCue = habits.find((habit) => habit.id === ids[0])?.cue;
+    // The root's own anchor is a label, not a habit — so it has no id and can
+    // only come from the cue row itself.
+    const rootLabel =
+      rootCue && !rootCue.anchorTaskId ? rootCue.anchorTitle : null;
+
+    return [
+      ...(rootLabel ? [rootLabel] : []),
+      ...ids.map((id) => titleById.get(id) ?? "—"),
+    ];
+  };
 
   return (
     <div className="mx-auto w-full max-w-3xl px-5 py-8 md:px-8 md:py-12">
@@ -86,6 +113,7 @@ export default async function HabitsPage() {
                 key={habit.id}
                 name={habit.title}
                 adherence={adherence}
+                cue={habit.cue ? <HabitCueLine cue={habit.cue} /> : null}
                 title={
                   <Link
                     href={buildTimerHref({
@@ -131,22 +159,25 @@ export default async function HabitsPage() {
                   />
                 }
                 meta={
-                  <p className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-label">
-                    <span>{describeRecurrence(habit.daysOfWeek)}</span>
-                    <span>{describeQuota(habit.quota)}</span>
-                    {habit.estimatedSeconds ? (
-                      <span className="inline-flex items-center gap-1 tabular-nums">
-                        <Timer className="size-3" aria-hidden />
-                        {formatMinutes(habit.estimatedSeconds)}
-                      </span>
-                    ) : null}
-                    {streak.current > 0 && (
-                      <span className="text-running inline-flex items-center gap-1 tabular-nums">
-                        <Flame className="size-3" aria-hidden />
-                        {streak.current} in a row
-                      </span>
-                    )}
-                  </p>
+                  <>
+                    <HabitStackTrail steps={stackTrail(habit.id)} />
+                    <p className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-label">
+                      <span>{describeRecurrence(habit.daysOfWeek)}</span>
+                      <span>{describeQuota(habit.quota)}</span>
+                      {habit.estimatedSeconds ? (
+                        <span className="inline-flex items-center gap-1 tabular-nums">
+                          <Timer className="size-3" aria-hidden />
+                          {formatMinutes(habit.estimatedSeconds)}
+                        </span>
+                      ) : null}
+                      {streak.current > 0 && (
+                        <span className="text-running inline-flex items-center gap-1 tabular-nums">
+                          <Flame className="size-3" aria-hidden />
+                          {streak.current} in a row
+                        </span>
+                      )}
+                    </p>
+                  </>
                 }
               >
                 <HabitGrid

@@ -43,6 +43,8 @@ export type BlockDraft = {
   notes: string;
   taskId: string | null;
   kind: "WORK" | "RECOVERY" | "BUFFER";
+  /** This block already has a cue in front of it, so don't offer to add one. */
+  hasCue: boolean;
 };
 
 const KINDS: { value: BlockDraft["kind"]; label: string; hint: string }[] = [
@@ -68,7 +70,7 @@ export function BlockDialog({
   onClose,
 }: {
   draft: BlockDraft;
-  tasks: { id: string; title: string }[];
+  tasks: { id: string; title: string; cueTitle: string | null }[];
   onClose: () => void;
 }) {
   const editing = Boolean(draft.id);
@@ -80,6 +82,14 @@ export function BlockDialog({
   const [start, setStart] = useState(draft.startMinute);
   const [end, setEnd] = useState(draft.endMinute);
   const [kind, setKind] = useState<BlockDraft["kind"]>(draft.kind);
+  // Controlled, unlike the other Selects here, because the cue offer below has
+  // to react to which task is picked.
+  const [taskId, setTaskId] = useState(draft.taskId ?? "none");
+  const [includeCue, setIncludeCue] = useState(true);
+
+  const cueTitle = draft.hasCue
+    ? null
+    : (tasks.find((task) => task.id === taskId)?.cueTitle ?? null);
 
   useEffect(() => {
     if (state.status === "success") {
@@ -227,7 +237,7 @@ export function BlockDialog({
 
           <div className="space-y-1.5">
             <Label htmlFor="block-task">Against a task</Label>
-            <Select name="taskId" defaultValue={draft.taskId ?? "none"}>
+            <Select name="taskId" value={taskId} onValueChange={setTaskId}>
               <SelectTrigger id="block-task">
                 <SelectValue placeholder="Nothing in particular" />
               </SelectTrigger>
@@ -245,6 +255,34 @@ export function BlockDialog({
               lands against that task.
             </p>
           </div>
+
+          {cueTitle && (
+            <label className="border-primary/40 bg-accent/40 flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2">
+              <input
+                type="checkbox"
+                checked={includeCue}
+                onChange={(event) => setIncludeCue(event.target.checked)}
+                className="accent-primary mt-0.5 size-3.5"
+              />
+              <span className="text-label">
+                Also block{" "}
+                <span className="text-foreground font-medium">{cueTitle}</span>{" "}
+                immediately before it
+                <span className="text-muted-foreground block">
+                  That&apos;s what starts this habit. Untick if today&apos;s
+                  going to be different.
+                </span>
+              </span>
+            </label>
+          )}
+          {/* Always submitted, so unticking is a decision the server hears —
+              an absent checkbox is indistinguishable from a caller that
+              doesn't know about cues, and that one should get the cue. */}
+          <input
+            type="hidden"
+            name="includeCue"
+            value={String(cueTitle ? includeCue : false)}
+          />
 
           <div className="space-y-1.5">
             <Label htmlFor="block-notes">Notes</Label>

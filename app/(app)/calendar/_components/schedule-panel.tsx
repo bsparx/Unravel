@@ -5,6 +5,7 @@ import {
   CalendarPlus,
   CornerDownRight,
   GripVertical,
+  Link2,
   Repeat,
   Timer,
 } from "lucide-react";
@@ -106,6 +107,15 @@ function ScheduleRow({
           )}
           {item.title}
         </p>
+
+        {item.cueTitle && (
+          // Fitting this in fits two things in. Saying so before the click is
+          // the difference between a helpful default and a surprise.
+          <p className="text-muted-foreground mt-0.5 flex items-center gap-1 truncate text-micro">
+            <Link2 className="size-3 shrink-0" aria-hidden />
+            after {item.cueTitle}
+          </p>
+        )}
 
         {item.firstStep && (
           // The first step, not the task, is what tells you whether this is a

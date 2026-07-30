@@ -151,7 +151,11 @@ export default async function CalendarPage({
           blocks={blocks}
           todayISO={toISODate(today)}
           timeZone={user.timezone}
-          tasks={schedulable.map((task) => ({ id: task.id, title: task.title }))}
+          tasks={schedulable.map((task) => ({
+            id: task.id,
+            title: task.title,
+            cueTitle: task.cueTitle,
+          }))}
         />
 
         <aside className="space-y-6">

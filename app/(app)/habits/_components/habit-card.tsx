@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 export function HabitCard({
   title,
   name,
+  cue,
   actions,
   quota,
   meta,
@@ -26,6 +27,12 @@ export function HabitCard({
 }: {
   /** The linked habit title. */
   title: ReactNode;
+  /**
+   * The trigger this habit is stacked on. Sits above the title and is NOT behind
+   * the disclosure, unlike everything else here: a cue you have to expand a card
+   * to read has stopped doing the one job it has.
+   */
+  cue?: ReactNode;
   /** The plain-text title, for the toggle's accessible name. */
   name: string;
   /** Edit and archive controls, pinned to the header. */
@@ -43,7 +50,10 @@ export function HabitCard({
   return (
     <li className="border-border bg-card rounded-lg border px-4 py-3">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">{title}</div>
+        <div className="min-w-0 flex-1">
+          {cue}
+          {title}
+        </div>
 
         <div className="flex shrink-0 items-center gap-1">
           <button

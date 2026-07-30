@@ -77,6 +77,7 @@ export function TaskList({
                       )
                     : null,
                   recurrenceDays: null,
+                  cue: null,
                 }}
                 onToggle={(next) => toggle(task.id, next)}
                 showDueLabel={
