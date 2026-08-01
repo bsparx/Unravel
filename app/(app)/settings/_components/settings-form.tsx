@@ -26,6 +26,7 @@ export type SettingsValues = {
   shortBreakMinutes: number;
   longBreakMinutes: number;
   longBreakEvery: number;
+  returnAlertsEnabled: boolean;
   autoStartBreaks: boolean;
   autoStartNextFocus: boolean;
   soundEnabled: boolean;
@@ -176,6 +177,12 @@ export function SettingsForm({
             label="Buzz partway through a block"
             hint="A short pulse at halfway and again near the end, so you can feel the time passing without looking. Phones only."
             defaultChecked={values.hapticsEnabled}
+          />
+          <CheckboxField
+            id="returnAlertsEnabled"
+            label="Tell me when a break has run over"
+            hint="A browser notification, then a few reminders if it keeps running. The only one that reaches you in another app, which is where a break usually goes."
+            defaultChecked={values.returnAlertsEnabled}
           />
         </div>
       </section>

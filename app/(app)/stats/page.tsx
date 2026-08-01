@@ -4,6 +4,7 @@ import { BarChart3, Flame } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth";
+import { breaksWorthReporting } from "@/lib/break-stats";
 import { formatDuration } from "@/lib/dates";
 import { MODE_LABELS } from "@/lib/timer-math";
 import { cn } from "@/lib/utils";
@@ -257,6 +258,53 @@ export default async function StatsPage({
               />
             </dl>
           </Panel>
+
+          {stats.breaks.count > 0 && (
+            <Panel
+              title="Getting back"
+              subtitle="Breaks are the part of the day that stretches. This is by how much."
+            >
+              <dl className="grid gap-4 sm:grid-cols-3">
+                <Metric
+                  label="Breaks taken"
+                  value={String(stats.breaks.count)}
+                  detail={
+                    stats.breaks.overranCount > 0
+                      ? `${stats.breaks.overranCount} ran over`
+                      : "none ran over"
+                  }
+                />
+                <Metric
+                  label="Time past the break"
+                  value={formatDuration(stats.breaks.overrunSeconds)}
+                  detail="not counted toward any task"
+                />
+                <Metric
+                  label="Taken on purpose"
+                  value={formatDuration(stats.breaks.extendedSeconds)}
+                  detail="five more minutes, chosen"
+                />
+              </dl>
+
+              {/* One sentence, and only when there is genuinely a gap between
+                  what gets chosen and what happens. A permanent line here would
+                  be a stat that exists to make someone feel watched. */}
+              {breaksWorthReporting(stats.breaks) && (
+                <p className="text-muted-foreground mt-4 text-label text-balance">
+                  You pick{" "}
+                  <span className="text-foreground font-medium tabular-nums">
+                    {formatDuration(stats.breaks.medianPlannedSeconds)}
+                  </span>
+                  , and the middle one runs{" "}
+                  <span className="text-foreground font-medium tabular-nums">
+                    {formatDuration(stats.breaks.medianTakenSeconds)}
+                  </span>
+                  . Setting the break to what it actually is tends to work
+                  better than intending the short one again.
+                </p>
+              )}
+            </Panel>
+          )}
         </div>
       )}
     </div>

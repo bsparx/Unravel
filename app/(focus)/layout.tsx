@@ -1,5 +1,7 @@
 import { AuthedProviders } from "@/app/_components/authed-providers";
 import { ensureUser } from "@/lib/auth";
+import { todayLocal } from "@/lib/dates";
+import { getWaterToday } from "@/lib/water-data";
 
 /**
  * No rail, no bottom bar, no banner. The absence is the feature — this is the
@@ -20,5 +22,11 @@ export default async function FocusLayout({
 
   if (!user) return <>{children}</>;
 
-  return <AuthedProviders user={user}>{children}</AuthedProviders>;
+  const water = await getWaterToday(user, todayLocal(user.timezone));
+
+  return (
+    <AuthedProviders user={user} water={water}>
+      {children}
+    </AuthedProviders>
+  );
 }

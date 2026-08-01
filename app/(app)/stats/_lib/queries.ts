@@ -1,6 +1,7 @@
 import "server-only";
 
 import { balanceRatio, describeBalance, recoveryShare } from "@/lib/balance";
+import { summariseBreaks } from "@/lib/break-stats";
 import { prisma } from "@/lib/db";
 import { addDays, startOfWeek, toISODate, todayLocal } from "@/lib/dates";
 import type { TimerMode, User } from "@/lib/generated/prisma/client";
@@ -56,6 +57,7 @@ export async function getStats(user: User, range: StatsRange) {
     completionsByDay,
     sessionTimes,
     intervalCounts,
+    breakIntervals,
   ] = await Promise.all([
     prisma.focusSession.aggregate({
       where: { ...scope, ...workOnly },
@@ -142,7 +144,40 @@ export async function getStats(user: User, range: StatsRange) {
         session: scope,
       },
     }),
+
+    // Breaks, which were unmeasurable until they stopped pausing at their own
+    // boundary. The session's snapshotted settings give what each break was
+    // originally going to be, so a deliberate extension stays separable from an
+    // overrun without another column.
+    prisma.sessionInterval.findMany({
+      where: {
+        kind: { in: ["SHORT_BREAK", "LONG_BREAK"] },
+        endedAt: { not: null },
+        session: scope,
+      },
+      select: {
+        kind: true,
+        targetSeconds: true,
+        elapsedSeconds: true,
+        overtimeSeconds: true,
+        session: {
+          select: { shortBreakSeconds: true, longBreakSeconds: true },
+        },
+      },
+    }),
   ]);
+
+  const breaks = summariseBreaks(
+    breakIntervals.map((interval) => ({
+      plannedSeconds:
+        interval.kind === "LONG_BREAK"
+          ? interval.session.longBreakSeconds
+          : interval.session.shortBreakSeconds,
+      targetSeconds: interval.targetSeconds,
+      elapsedSeconds: interval.elapsedSeconds,
+      overtimeSeconds: interval.overtimeSeconds,
+    })),
+  );
 
   // ---- hydrate task names for the "where did the time go" table ------------
 
@@ -358,6 +393,7 @@ export async function getStats(user: User, range: StatsRange) {
         (day) => day.workSeconds > 0 && day.recoverySeconds === 0,
       ).length,
     },
+    breaks,
     todaySeconds: todayTotals._sum.elapsedSeconds ?? 0,
     todaySessions: todayTotals._count._all,
     weekSeconds: weekTotals._sum.elapsedSeconds ?? 0,

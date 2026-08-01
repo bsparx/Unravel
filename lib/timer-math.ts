@@ -229,6 +229,60 @@ export function adjustedOvertime(
   return Math.max(0, clampLoggedSeconds(loggedSeconds) - targetSeconds);
 }
 
+/** A break is a gap *inside* work. Recovery is not a break — it is the work. */
+export const isBreakKind = (kind: IntervalKind): boolean =>
+  kind === "SHORT_BREAK" || kind === "LONG_BREAK";
+
+/** One interval's resolved duration, however the caller worked it out. */
+export type IntervalSpan = { kind: IntervalKind; seconds: number };
+
+/**
+ * The session's wall clock, minus every break inside it.
+ *
+ * `FocusSession.accumulatedSeconds` runs straight through breaks — only the
+ * *interval* base moves when the plan advances — so the raw wall clock counts
+ * the coffee as work. That figure becomes `elapsedSeconds`, which rolls up into
+ * `TaskOccurrence.loggedSeconds`, habit quota, tier and streaks. So a pomodoro
+ * with three breaks in it has been quietly inflating every number downstream
+ * of it.
+ *
+ * Subtracting the breaks, rather than summing the focus intervals, is
+ * deliberate. A focus interval only gets its `elapsedSeconds` written when it
+ * closes, so summing them would read 0 for the interval that was open at the
+ * moment Stop was pressed — which is every session's last one. Subtraction
+ * needs no such bookkeeping, and on a session with no breaks at all it reduces
+ * to exactly the old behaviour, which is what keeps sessions written before
+ * this existed reading the same as they always did.
+ */
+export function loggedElapsedSeconds(
+  wallClockSeconds: number,
+  intervals: IntervalSpan[],
+): number {
+  const breaks = intervals.reduce(
+    (total, interval) =>
+      isBreakKind(interval.kind)
+        ? total + Math.max(0, Math.round(interval.seconds))
+        : total,
+    0,
+  );
+
+  return Math.max(0, Math.round(wallClockSeconds) - breaks);
+}
+
+/**
+ * How far past its own target one interval has run.
+ *
+ * The `targetSeconds <= 0` guard is the same one every other function here
+ * carries: recovery has no target, so it can never be overrunning.
+ */
+export function intervalOverrunSeconds(
+  intervalElapsedSeconds: number,
+  targetSeconds: number,
+): number {
+  if (targetSeconds <= 0) return 0;
+  return Math.max(0, Math.round(intervalElapsedSeconds) - targetSeconds);
+}
+
 /**
  * Past the target in FLOW mode the arc inverts: a second ring grows outward to
  * show overtime. This returns 0..1 across one further `targetSeconds`, so it

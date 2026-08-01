@@ -185,12 +185,46 @@ desk is exactly when the chime is off.
 | `/inbox` | Flat list, row actions | Triage. Deliberate, unlike capture — which is why it's a page and the dump box isn't. |
 | `/tasks` | Grouped list by project | Filters as quiet segmented control, not tabs-as-chrome. Edit and start-timer are hover-revealed row actions; the row body itself is always the timer. |
 | `/tasks/[id]` | Single column form + log | Create and edit are the same form. Delete is behind one dialog — it takes the session history with it. Every row in the log is correctable in place. |
-| `/calendar` | Two columns: grid + scheduling panel | Week by default, day on request. Blocks are dragged and resized directly; the panel is the only place anything is "assigned" a time by pressing a button. |
+| `/calendar` | Two columns: grid + scheduling panel | Week by default, day on request. Blocks are dragged and resized directly; the panel is the only place anything is "assigned" a time by pressing a button. Gaps between blocks are drawn as transitions, live while you drag — the space between two things is where a plan comes apart, and it was the only thing on this page not rendered. |
+
+The calendar's second pass: **a week you can see the shape of.** The grid was
+information-correct and analytically exhausting — the header asked for
+arithmetic ("2h 30m claimed · longest free stretch 1h 15m") from an audience
+whose felt sense of duration is exactly what the app exists to replace. Three
+changes, all of them re-readings of existing data:
+
+- **Day is the default view** (`?view=` absent → day, anchored on today). The
+  rail's "Plan" link is a bare `/calendar`, and a person arriving there
+  mid-week is planning one day, not seven. Week remains one explicit toggle
+  away, and every link that knows better passes its own `?view=`.
+- **The header reads as one sentence.** "Next up: Draft the intro at 15:00 ·
+  2h 05m open before it." — the app's "make the next action obvious" principle
+  applied to the planning surface, computed server-side (safe: Server
+  Components don't re-render, so there is nothing to hydrate-mismatch).
+- **The week strip row.** Each day header carries a 6px bar of its waking
+  hours, filled by kind with the same vocabulary as `/day`'s PlanStrip — the
+  two are the same glance at different scales. Clay ticks mark switches with
+  no room; the running-blue line marks now (the reservation holds; it is still
+  only ever a clock). The header row *is* the legend, so there is no legend.
+  Strips draw in left-to-right on load (`draw`, 350ms, staggered 40ms/day) —
+  the page's single orchestrated moment, the same narrow licence the timer
+  face holds.
+- The "How to use this" box is gone. Instructions are a debt paid per reader;
+  affordances are paid once. Half-hour targets show a dashed inset outline on
+  hover/focus, the resize handle is already hover-revealed, and the panel's
+  hint line already names the drag. The buffer wisdom ("a day planned wall to
+  wall is a day you abandon by eleven") is still spoken — by the strips, which
+  make a wall-to-wall day unmissable.
+- The scheduling panel groups Habits and Open tasks under quiet labels when
+  both are present, and the section header carries a count ("· 2 left") — a
+  small number of remaining decisions, which is a motivating number for this
+  audience.
 | `/habits` | List + 8-week adherence grid | Grid is a heatmap row per habit; teal ramp, never the running colour. Two weights of teal for done — full for optimal, half for minimum — because collapsing them throws away the whole point of two quotas. Today's quota meter sits above the grid: history below, the one actionable thing above. |
 | `/habits/stats` | Filters, then charts, then a per-habit table | shadcn/recharts. Optimal is the full primary and minimum is the same hue at half strength — a good day is *more of the same thing*, not a different metric. Missed is clay; skipped is neutral grey, because a deliberate "not today" is not a failure. |
-| `/timer` | Full-bleed, centred, minimal chrome | Elevation budget spent here — and since the face is a shader, the "elevation" is a lighting gradient rather than a shadow. The face is the page. One quiet line under the controls carries the day's total for the task, live; correcting it opens today's sessions in place. |
+| `/timer` | Full-bleed, centred, minimal chrome | Elevation budget spent here — and since the face is a shader, the "elevation" is a lighting gradient rather than a shadow. The face is the page. One quiet line under the controls carries the day's total for the task, live; correcting it opens today's sessions in place. A break that runs over takes the controls over entirely — two buttons, clay, counting up — because the moment it catches you is the moment you have the least attention to spend on a menu. |
 | `/close` | One input per screen, vertically centred | Ritual, not a form. No progress bar, no "step 2 of 4", no back/next chrome — just the question and one quiet way out. |
-| `/stats` | Dense, chart-first | Work and recovery get identical panel width, bar height and type scale. The running colour only where the series genuinely is work on the clock. |
+| `/stats` | Dense, chart-first | Work and recovery get identical panel width, bar height and type scale. The running colour only where the series genuinely is work on the clock. "Getting back" reports overruns as a median and only speaks up when there is a real gap between the break you pick and the break you take. |
+| `/water` | One vessel, centred | The day as a column of water — the structural rhyme to the timer's draining ring (time drains, water fills). One tap anywhere on the vessel logs a glass; the count is the only big number and gets the mono display and the app's one overshoot. Edit and reminders sit below in quiet cards. |
 | `/settings` | Single column form | Timezone first — everything date-bucketed depends on it. |
 
 ### Two structural rules
@@ -277,3 +311,104 @@ correction, and the panel says so rather than showing a control that fails.
 **The dump box is never a route.** It's mounted once in a shared layout and
 opens over whatever you're looking at. The moment capture requires a navigation
 you've added a decision point, and the thought is already gone.
+
+**The gap between two things is an object, not an absence.** The app made time
+visible for everything you were *doing* and left the space between untouched —
+which is precisely backwards for this audience. Switching from one task to
+another is work: it takes a length of time, that length is knowable, and a plan
+that allots it nothing fails at the first switch and cascades from there. It
+shows up in two places, and they are the same idea:
+
+- **On `/timer`, a break stays on the clock past its own boundary.** It used to
+  advance to the next focus interval and immediately pause. A paused clock
+  accumulates nothing, so the five minutes that became forty were not merely
+  unannounced — they were *never recorded*, and afterwards there was no evidence
+  they had happened. The app went blind at the exact moment it was needed. Now
+  the break overruns in place: still measured, still visible, counting up in
+  clay, and written to `SessionInterval.overtimeSeconds` when it finally closes.
+- **On `/calendar`, gaps are drawn.** `freeSlots` had always computed them; only
+  a header stat consumed them. `lib/transitions.ts` turns them into objects with
+  a length and a verdict, and a switch with no room in it gets said out loud —
+  at drop time, before the plan is made, not after.
+
+Three things keep it honest:
+
+- **Nothing auto-starts.** The old rule — an unattended break must not quietly
+  become focus time — still holds, and holds harder: the overrun accrues against
+  the *break* and is credited to no task at all. The forcing function is that
+  the number is on screen, not that the app decides for you.
+- **Time taken on purpose is not time that got away.** "5 more minutes" raises
+  the interval's own target, so it lands in `extended`; walking away leaves the
+  target alone, so it lands in `overrun`. On a clock these are identical and
+  they mean opposite things, and the `/stats` panel is worthless if it can't
+  tell them apart.
+- **A transition is derived, never stored.** A `TimeBlock` row would need
+  reconciling on every drag, resize and delete, and would eventually disagree
+  with the blocks around it. A derived value cannot drift. The one exception is
+  a habit-stack cue, which is *built* to abut its habit — flagging that would be
+  the calendar objecting to the only deliberate adjacency in the day.
+
+**Clay now carries a third meaning, and it does not encroach on the running
+colour.** It was destructive actions and a missed habit; it is now also a break
+past its time. The common thread is "this is not going the way it was meant to",
+which is exactly what an overrun is. It matters that it is *neither* `--running`
+nor `--rest`: an overrunning break has stopped being rest and has not become
+work, and borrowing either token would make the one state you need to notice
+look like one of the two you don't.
+
+**Break time was being logged as work, and the fix changes what old numbers
+mean.** `FocusSession.accumulatedSeconds` runs straight through break intervals,
+so the raw wall clock counted the coffee — and that figure became
+`elapsedSeconds`, which rolls up into `TaskOccurrence.loggedSeconds`, habit
+quota, tier and streaks. The schema comment claiming otherwise was simply false.
+`endSession` now subtracts the breaks (`loggedElapsedSeconds`), rather than
+summing the focus intervals, because a focus interval only gets its
+`elapsedSeconds` written when it *closes* and the last one of every session is
+open at the moment Stop is pressed.
+
+Nothing rewrites history: rows written before this keep whatever they have. That
+leaves two eras of data that disagree, which is recorded here deliberately
+rather than left to be rediscovered. Only multi-interval pomodoros were ever
+affected — a session with no breaks reduces to exactly the old arithmetic, which
+is what the second `verify-logic` check pins down.
+
+**A cue survives the gap; a task title doesn't.** `SessionInterval.returnNote`
+is written during the break, while the answer to "what was I doing" is still in
+your head, and handed back at the boundary, in the badge, and as the
+notification body. It lives on the interval rather than the session because a
+later break is a different return to a different place. Prefilled from
+`nextStep()` and skippable in one press — a required field here would be one
+more reason not to take the break.
+
+**Alerts escalate rather than repeat, and permission is asked for late.** One
+notification at the moment a break ends is the worst possible timing: the
+failure is not "I never heard it", it's "I heard it and carried on scrolling".
+So there is a chime and a haptic at the boundary, then notifications at 2, 5, 10
+and 20 minutes, then silence — something that never stops gets muted at the OS
+level, which costs every future alert too. Permission is requested when a break
+first *starts*, never on page load, because a browser gives you exactly one
+prompt and a denial can't be re-asked from the page.
+
+**Water is teal, by reservation.** The running blue is the most load-bearing
+token in the app and it is never borrowed — so the water vessel fills with
+`--primary` teal, the same colour as anything else going well. The feature
+introduces no new hue. Its one structural addition is the pace line: a quiet
+dashed mark on the vessel at "how many you should have had by now", labelled
+with the clock time that belongs to it — the day's schedule drawn as a level.
+
+**The goal being met is the day's end.** Water reminders follow the break
+alerts' posture — permission asked when the feature is first turned on, one
+notification per slot, replace-not-stack — but with a different silence rule.
+A break overrun escalates until it is resolved; water reminders stop the moment
+the goal is met, because a budget that never runs out gets the app muted at the
+OS level. The reminders also stay silent while you're on pace: they exist to
+catch the day that fell behind the line, not to narrate the one that didn't.
+They share the honest limitation of the break alerts too — an Unravel tab has
+to be open, and a closed app is out of reach of anything but a service worker
+this app deliberately doesn't run.
+
+**A glass is an event, not a number.** `WaterGlass` is one row per glass, with
+the minute it was drunk — the count for a day is a groupBy, never a stored
+total. That timestamp is what makes "last glass was 3h ago" and the backdate
+menu truthful, and a backdated glass keeps its claimed time: the record is
+"when did this happen", not "when was the button pressed".

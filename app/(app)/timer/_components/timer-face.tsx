@@ -39,6 +39,8 @@ export type TimerFaceProps = {
   intervalIndex: number;
   intervalBaseMs: number;
   config: TimerConfig;
+  /** A break past its time. The well turns clay rather than staying teal. */
+  overrun?: boolean;
   children?: React.ReactNode;
 };
 
@@ -60,6 +62,7 @@ export function TimerFace({
   intervalIndex,
   intervalBaseMs,
   config,
+  overrun = false,
   children,
 }: TimerFaceProps) {
   const webgl = useSyncExternalStore(
@@ -89,6 +92,7 @@ export function TimerFace({
       intervalIndex={intervalIndex}
       intervalBaseMs={intervalBaseMs}
       config={config}
+      overrun={overrun}
       dual={dualScale(plan)}
       onContextLost={markWebglUnavailable}
     >

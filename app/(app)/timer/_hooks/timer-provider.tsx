@@ -14,6 +14,8 @@ import {
 import {
   buildIntervalPlan,
   endsAutomatically,
+  intervalOverrunSeconds,
+  isBreakKind,
   liveElapsedMs,
   type PlannedInterval,
   type TimerConfig,
@@ -23,12 +25,15 @@ import {
   advanceInterval,
   discardSession,
   endSession,
+  extendCurrentInterval,
   heartbeat,
   pauseSession,
   resumeSession,
+  setReturnNote as setReturnNoteAction,
   startSession,
 } from "../actions";
 import type { HydratedSession } from "../_lib/session-hydrate";
+import { useReturnNotification } from "./use-return-notification";
 
 export type TimerSettings = {
   focusSeconds: number;
@@ -39,6 +44,7 @@ export type TimerSettings = {
   autoStartNextFocus: boolean;
   soundEnabled: boolean;
   hapticsEnabled: boolean;
+  returnAlertsEnabled: boolean;
 };
 
 export type TimerTask = {
@@ -63,6 +69,32 @@ type TimerState = {
   config: TimerConfig;
   task: TimerTask;
   reachedTarget: boolean;
+  /**
+   * `Date.now()` when the current break was announced as overrunning, or null.
+   *
+   * A flag, not a measurement. The overrun *number* is derived from the
+   * interval clock like everything else here; this only records that the chime
+   * has already been spent, so it can't fire four times a second.
+   */
+  overrunSince: number | null;
+  /**
+   * Seconds deliberately added to the current interval by pressing "5 more".
+   *
+   * Kept apart from the plan because the plan is derived from the config, and a
+   * chosen extension is a fact about *this* break rather than a change to how
+   * breaks work. Keeping it separate is also what lets /stats tell an extension
+   * apart from an overrun — they are different events and averaging them
+   * together makes the number meaningless.
+   */
+  intervalExtraSeconds: number;
+  /**
+   * What you were in the middle of when this break started.
+   *
+   * Mirrors `SessionInterval.returnNote`. Held here as well so the break screen
+   * and the badge can show it without a round trip — it is a cue you need at
+   * the moment you look up, not a value worth waiting on.
+   */
+  returnNote: string | null;
 };
 
 type Action =
@@ -72,6 +104,9 @@ type Action =
   | { type: "PAUSE"; at: number }
   | { type: "RESUME"; at: number }
   | { type: "REACH_TARGET" }
+  | { type: "OVERRUN"; at: number }
+  | { type: "EXTEND"; seconds: number }
+  | { type: "SET_RETURN_NOTE"; note: string | null }
   | { type: "ADVANCE"; at: number; nextIndex: number }
   | { type: "END"; at: number }
   | { type: "RESET"; config: TimerConfig; task: TimerTask }
@@ -102,6 +137,9 @@ function reducer(state: TimerState, action: Action): TimerState {
         intervalIndex: 0,
         intervalBaseMs: 0,
         reachedTarget: false,
+        overrunSince: null,
+        intervalExtraSeconds: 0,
+        returnNote: null,
         clientKey: state.phase === "ENDED" ? newClientKey() : state.clientKey,
         sessionId: null,
       };
@@ -125,6 +163,23 @@ function reducer(state: TimerState, action: Action): TimerState {
     case "REACH_TARGET":
       return state.reachedTarget ? state : { ...state, reachedTarget: true };
 
+    case "OVERRUN":
+      return state.overrunSince !== null
+        ? state
+        : { ...state, overrunSince: action.at };
+
+    case "EXTEND":
+      // Taking more time on purpose ends the overrun: you are back inside a
+      // break you chose the length of, not still losing one.
+      return {
+        ...state,
+        intervalExtraSeconds: state.intervalExtraSeconds + action.seconds,
+        overrunSince: null,
+      };
+
+    case "SET_RETURN_NOTE":
+      return { ...state, returnNote: action.note };
+
     case "ADVANCE": {
       const elapsed = liveElapsedMs(
         { accumulatedMs: state.accumulatedMs, runningSince: state.runningSince },
@@ -136,6 +191,10 @@ function reducer(state: TimerState, action: Action): TimerState {
         intervalBaseMs: elapsed,
         accumulatedMs: elapsed,
         runningSince: state.phase === "RUNNING" ? action.at : null,
+        // All three belong to the interval being left behind.
+        overrunSince: null,
+        intervalExtraSeconds: 0,
+        returnNote: null,
       };
     }
 
@@ -159,6 +218,9 @@ function reducer(state: TimerState, action: Action): TimerState {
         config: action.config,
         task: action.task,
         reachedTarget: false,
+        overrunSince: null,
+        intervalExtraSeconds: 0,
+        returnNote: null,
       };
 
     case "HYDRATE":
@@ -176,6 +238,15 @@ type TimerContextValue = {
   elapsedMs: number;
   elapsedSeconds: number;
   intervalElapsedSeconds: number;
+  /** The current interval's target, including anything added by hand. */
+  currentTargetSeconds: number;
+  /** Whether the interval on the clock right now is a break. */
+  onBreak: boolean;
+  /** Seconds this break has run past its time. 0 unless overrunning. */
+  overrunSeconds: number;
+  isOverrunning: boolean;
+  extendInterval: (seconds: number) => void;
+  setReturnNote: (note: string) => void;
   configure: (config: Partial<TimerConfig>, task?: TimerTask) => void;
   reset: (config: TimerConfig, task: TimerTask) => void;
   start: () => void;
@@ -355,10 +426,44 @@ export function TimerProvider({
     else start();
   }, [pause, resume, start, state.phase]);
 
+  /**
+   * Take more break, on purpose.
+   *
+   * The server has to hear about it too: `closeOpenIntervalOps` computes the
+   * interval's overtime against its stored target, so without this the minutes
+   * you deliberately claimed would be logged as minutes you lost.
+   */
+  const extendInterval = useCallback(
+    (seconds: number) => {
+      dispatch({ type: "EXTEND", seconds });
+      if (state.sessionId) void extendCurrentInterval(state.sessionId, seconds);
+    },
+    [state.sessionId],
+  );
+
+  const setReturnNote = useCallback(
+    (note: string) => {
+      const trimmed = note.trim();
+      dispatch({ type: "SET_RETURN_NOTE", note: trimmed === "" ? null : trimmed });
+      if (state.sessionId) void setReturnNoteAction(state.sessionId, note);
+    },
+    [state.sessionId],
+  );
+
   // ---- interval / target boundaries --------------------------------------
 
   const recovery = state.config.mode === "RECOVERY";
   const current = plan[Math.min(state.intervalIndex, plan.length - 1)];
+
+  const onBreak = current !== undefined && isBreakKind(current.kind);
+
+  // What the current interval is actually aiming at, once anything added by
+  // hand is counted. Zero stays zero: recovery has no target and adding to it
+  // would invent one.
+  const currentTargetSeconds =
+    current && current.targetSeconds > 0
+      ? current.targetSeconds + state.intervalExtraSeconds
+      : 0;
 
   // The `!recovery` and `targetSeconds > 0` clauses are not belt-and-braces:
   // recovery's single interval has a target of zero, so without them
@@ -368,8 +473,22 @@ export function TimerProvider({
     isRunning &&
     !recovery &&
     current &&
-    current.targetSeconds > 0 &&
-    intervalElapsedSeconds >= current.targetSeconds;
+    currentTargetSeconds > 0 &&
+    intervalElapsedSeconds >= currentTargetSeconds;
+
+  /**
+   * A break that is past its time and still on the clock.
+   *
+   * Derived, never counted — same rule as every other number here, so a
+   * throttled tab or a sleeping laptop resumes at the truthful value instead of
+   * at wherever a tick loop got to.
+   */
+  const overrunSeconds =
+    onBreak && isRunning
+      ? intervalOverrunSeconds(intervalElapsedSeconds, currentTargetSeconds)
+      : 0;
+
+  const isOverrunning = overrunSeconds > 0;
 
   // Same trap: `elapsedSeconds >= 0` is always true, so an unguarded
   // targetReached would chime at t=0 on a session that had no target.
@@ -382,8 +501,42 @@ export function TimerProvider({
     if (settings.soundEnabled) void chime();
   }, [isRunning, settings.soundEnabled, state.reachedTarget, targetReached]);
 
+  /**
+   * A break running out is the moment this app was previously silent for.
+   *
+   * It used to advance to the next focus interval and immediately pause. A
+   * paused clock accumulates nothing, so the five minutes that became forty
+   * were not merely unannounced — they were never recorded, and afterwards
+   * there was no evidence they had happened.
+   *
+   * Now the break simply stays on the clock and overruns. Nothing auto-starts:
+   * the rule that an unattended break must not quietly become focus time still
+   * holds, and holds harder, because the overrun accrues against the *break*
+   * and is credited to no task at all.
+   */
+  useEffect(() => {
+    if (!intervalDone || !onBreak) return;
+    if (state.overrunSince !== null) return;
+
+    dispatch({ type: "OVERRUN", at: Date.now() });
+
+    // The boundary had no signal of any kind before this: the chime fires once
+    // per session, at the overall target, which a break end never is.
+    if (settings.soundEnabled) void chime();
+    if (settings.hapticsEnabled) navigator.vibrate?.(OVERRUN_PATTERN);
+  }, [
+    intervalDone,
+    onBreak,
+    settings.hapticsEnabled,
+    settings.soundEnabled,
+    state.overrunSince,
+  ]);
+
   useEffect(() => {
     if (!intervalDone) return;
+
+    // Breaks are handled above: they overrun in place rather than advancing.
+    if (onBreak) return;
 
     // FLOW never ends on its own — overrunning the goal is the whole feature.
     // RECOVERY doesn't either, for the opposite reason. One predicate rather
@@ -416,6 +569,7 @@ export function TimerProvider({
     }
   }, [
     intervalDone,
+    onBreak,
     plan,
     settings.autoStartBreaks,
     settings.autoStartNextFocus,
@@ -424,6 +578,17 @@ export function TimerProvider({
     state.sessionId,
   ]);
 
+  // Mounted here rather than on the timer screen on purpose. The provider is in
+  // both route layouts, so this keeps saying something after you have navigated
+  // away — and navigating away is most of what an overrunning break *is*.
+  useReturnNotification({
+    enabled: settings.returnAlertsEnabled,
+    overrunning: isOverrunning,
+    onBreak: onBreak && isRunning,
+    overrunSeconds,
+    returnNote: state.returnNote,
+  });
+
   const value = useMemo<TimerContextValue>(
     () => ({
       state,
@@ -431,6 +596,12 @@ export function TimerProvider({
       elapsedMs,
       elapsedSeconds,
       intervalElapsedSeconds,
+      currentTargetSeconds,
+      onBreak,
+      overrunSeconds,
+      isOverrunning,
+      extendInterval,
+      setReturnNote,
       configure,
       reset,
       start,
@@ -444,14 +615,20 @@ export function TimerProvider({
     }),
     [
       configure,
+      currentTargetSeconds,
       discard,
       elapsedMs,
       elapsedSeconds,
+      extendInterval,
       intervalElapsedSeconds,
+      isOverrunning,
+      onBreak,
+      overrunSeconds,
       pause,
       plan,
       reset,
       resume,
+      setReturnNote,
       settings,
       skipInterval,
       start,
@@ -502,6 +679,9 @@ function initialState({
       config,
       task: null,
       reachedTarget: false,
+      overrunSince: null,
+      intervalExtraSeconds: 0,
+      returnNote: null,
     };
   }
 
@@ -518,8 +698,21 @@ function initialState({
     config: initialSession.config,
     task: initialSession.task,
     reachedTarget: initialSession.reachedTarget,
+    // Null rather than a reconstructed timestamp: this only gates the chime,
+    // and a reload should not replay a boundary you already heard. The overrun
+    // *number* rehydrates for free, because it is derived from the clock.
+    overrunSince: null,
+    intervalExtraSeconds: initialSession.intervalExtraSeconds,
+    returnNote: initialSession.returnNote,
   };
 }
+
+/**
+ * Two firm pulses. Deliberately unlike the 50%/10% nudges in
+ * `use-threshold-haptics`, which are single taps you are meant to be able to
+ * ignore — this one is telling you the break is over.
+ */
+const OVERRUN_PATTERN = [60, 80, 60];
 
 let audioContext: AudioContext | null = null;
 

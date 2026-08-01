@@ -20,6 +20,9 @@ import {
   buildIntervalPlan,
   clampIntervals,
   clampTarget,
+  type IntervalKind,
+  type IntervalSpan,
+  loggedElapsedSeconds,
   type TimerMode,
 } from "@/lib/timer-math";
 
@@ -288,6 +291,86 @@ export async function advanceInterval(
   return updated ? snapshot(updated, nextIndex) : null;
 }
 
+/** Long enough for a real sentence, short enough to stay a cue, not a note. */
+const MAX_RETURN_NOTE = 140;
+
+/**
+ * Record what you were in the middle of, against the break you're on.
+ *
+ * Written during the break rather than at the end of it, because at the end of
+ * it the answer is already gone — that is the entire problem this is for.
+ */
+export async function setReturnNote(
+  sessionId: string,
+  note: string,
+): Promise<void> {
+  const user = await requireUser();
+  const session = await load(user.id, sessionId);
+  if (!session) return;
+  if (session.status === "COMPLETED" || session.status === "ABANDONED") return;
+
+  const open = session.intervals.find((interval) => interval.endedAt === null);
+  if (!open) return;
+
+  const trimmed = note.trim().slice(0, MAX_RETURN_NOTE);
+
+  await prisma.sessionInterval.update({
+    where: { id: open.id },
+    // Empty clears it. "I don't know" is a legitimate answer and should not be
+    // stored as the string you happened to have typed before deleting it.
+    data: { returnNote: trimmed === "" ? null : trimmed },
+  });
+}
+
+/** The most anyone can add to one break in a single press, and in total. */
+const MAX_EXTENSION_SECONDS = 30 * 60;
+const MAX_INTERVAL_TARGET_SECONDS = 4 * 60 * 60;
+
+/**
+ * Give the interval on the clock more time, deliberately.
+ *
+ * This raises the interval's own `targetSeconds`, which is what makes the
+ * distinction stick in the data: `closeOpenIntervalOps` measures overtime
+ * against that target, so time you claimed on purpose is not logged as time
+ * that got away from you. Those two things look identical on a clock and mean
+ * opposite things, and /stats is unusable if it can't tell them apart.
+ */
+export async function extendCurrentInterval(
+  sessionId: string,
+  seconds: number,
+): Promise<SessionSnapshot | null> {
+  const user = await requireUser();
+  const session = await load(user.id, sessionId);
+  if (!session) return null;
+  if (session.status === "COMPLETED" || session.status === "ABANDONED") {
+    return snapshot(session, currentIndex(session));
+  }
+
+  const open = session.intervals.find((interval) => interval.endedAt === null);
+  // Recovery's interval has no target; adding to zero would invent one.
+  if (!open || open.targetSeconds <= 0) {
+    return snapshot(session, currentIndex(session));
+  }
+
+  const extra = Math.min(
+    MAX_EXTENSION_SECONDS,
+    Math.max(0, Math.round(Number.isFinite(seconds) ? seconds : 0)),
+  );
+  if (extra === 0) return snapshot(session, currentIndex(session));
+
+  await prisma.sessionInterval.update({
+    where: { id: open.id },
+    data: {
+      targetSeconds: Math.min(
+        MAX_INTERVAL_TARGET_SECONDS,
+        open.targetSeconds + extra,
+      ),
+    },
+  });
+
+  return snapshot(session, currentIndex(session));
+}
+
 export async function endSession(
   sessionId: string,
   options: { completedTask?: boolean; reason?: "TARGET_REACHED" | "USER_STOPPED" } = {},
@@ -301,7 +384,14 @@ export async function endSession(
   }
 
   const now = new Date();
-  const elapsed = serverElapsed(session, now);
+  const wallClock = serverElapsed(session, now);
+
+  // What actually gets logged is the wall clock minus the breaks. Without this
+  // a pomodoro's break minutes are credited to the task, to habit quota and to
+  // the streak — see `loggedElapsedSeconds` for why it subtracts rather than
+  // sums.
+  const elapsed = loggedElapsedSeconds(wallClock, intervalSpans(session, now));
+
   // Recovery has no target to overrun. Without this guard every second of
   // rest is logged as overtime, and /stats' "time past your goal" becomes a
   // measure of how much you rested — the exact opposite of the point.
@@ -318,7 +408,10 @@ export async function endSession(
       endedAt: now,
       lastBeatAt: now,
       runningSince: null,
-      accumulatedSeconds: elapsed,
+      // Stays the wall clock. It is the rehydration figure, and rewriting it to
+      // the focus-only total would make a reload read as if the breaks never
+      // happened.
+      accumulatedSeconds: wallClock,
       elapsedSeconds: elapsed,
       overtimeSeconds: overtime,
       completedTask,
@@ -333,10 +426,17 @@ export async function endSession(
     },
   });
 
-  await prisma.sessionInterval.updateMany({
-    where: { sessionId: session.id, endedAt: null },
-    data: { endedAt: now, runningSince: null },
-  });
+  // Close the open interval with its real duration rather than only stamping
+  // `endedAt`. Every session ends with one interval still open, so leaving this
+  // to `updateMany` left the last interval of every session reading zero — and
+  // /stats' break figures are read straight off these rows.
+  await prisma.$transaction([
+    ...closeOpenIntervalOps(session, now, true),
+    prisma.sessionInterval.updateMany({
+      where: { sessionId: session.id, endedAt: null },
+      data: { endedAt: now, runningSince: null },
+    }),
+  ]);
 
   if (session.occurrenceId) {
     await addLoggedSeconds(session.occurrenceId, elapsed);
@@ -549,6 +649,33 @@ type LoadedSession = NonNullable<Awaited<ReturnType<typeof load>>>;
 function currentIndex(session: LoadedSession): number {
   const open = session.intervals.find((interval) => interval.endedAt === null);
   return open?.index ?? Math.max(0, session.intervals.length - 1);
+}
+
+/**
+ * Every interval's duration as of `now`, including the one still open.
+ *
+ * A closed interval carries its own `elapsedSeconds`; the open one has to be
+ * resolved from `runningSince` the same way the session is. Feeding both into
+ * one list is what lets `loggedElapsedSeconds` stay a pure function.
+ */
+function intervalSpans(session: LoadedSession, now: Date): IntervalSpan[] {
+  return session.intervals.map((interval) => {
+    if (interval.endedAt !== null) {
+      return {
+        kind: interval.kind as IntervalKind,
+        seconds: interval.elapsedSeconds,
+      };
+    }
+
+    const live = interval.runningSince
+      ? Math.max(0, (now.getTime() - interval.runningSince.getTime()) / 1000)
+      : 0;
+
+    return {
+      kind: interval.kind as IntervalKind,
+      seconds: Math.floor(interval.accumulatedSeconds + live),
+    };
+  });
 }
 
 function closeOpenIntervalOps(

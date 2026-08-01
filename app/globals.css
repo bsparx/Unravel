@@ -103,6 +103,9 @@
   --animate-breathe: breathe 5s ease-in-out infinite;
   --animate-rise: rise 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-pop: pop 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* The calendar's one orchestrated moment: the week's day-strips drawing
+     themselves in, left to right, when the grid arrives. The only consumer. */
+  --animate-draw: draw 350ms cubic-bezier(0.22, 1, 0.36, 1) both;
 
   @keyframes breathe {
     0%,
@@ -139,6 +142,17 @@
     }
     100% {
       transform: scale(1);
+    }
+  }
+
+  /* A strip being drawn across its day: from nothing to its full length,
+     origin at the left edge, so a week's shape appears left to right. */
+  @keyframes draw {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
     }
   }
 }

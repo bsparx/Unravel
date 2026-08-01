@@ -2,7 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/db";
 import type { User } from "@/lib/generated/prisma/client";
-import type { TimerConfig } from "@/lib/timer-math";
+import { buildIntervalPlan, type TimerConfig } from "@/lib/timer-math";
 
 /** A session left RUNNING this long with no heartbeat was never closed. */
 const REAP_AFTER_MS = 12 * 60 * 60 * 1000;
@@ -16,6 +16,10 @@ export type HydratedSession = {
   runningSince: number | null;
   intervalIndex: number;
   intervalBaseSeconds: number;
+  /** Seconds added to the open interval by hand, recovered from its target. */
+  intervalExtraSeconds: number;
+  /** What the open interval says you were in the middle of, if anything. */
+  returnNote: string | null;
   reachedTarget: boolean;
   config: TimerConfig;
   task: { id: string; title: string; type: "TODO" | "HABIT" } | null;
@@ -65,6 +69,26 @@ export async function getActiveSession(
     .filter((interval) => interval.index < (openInterval?.index ?? 0))
     .reduce((sum, interval) => sum + interval.elapsedSeconds, 0);
 
+  const config: TimerConfig = {
+    mode: session.mode,
+    targetSeconds: session.targetSeconds,
+    intervals: session.plannedIntervals,
+    focusSeconds: session.focusSeconds,
+    shortBreakSeconds: session.shortBreakSeconds,
+    longBreakSeconds: session.longBreakSeconds,
+    longBreakEvery: user.longBreakEvery,
+  };
+
+  // A "5 more minutes" is stored by raising the interval's own target, so the
+  // extension is recoverable as the difference from what the plan asked for.
+  // Deriving it beats a column: there is then only one place that decides what
+  // this break is aiming at, and a reload cannot disagree with the clock.
+  const planned = buildIntervalPlan(config)[openInterval?.index ?? 0];
+  const intervalExtraSeconds =
+    openInterval && planned
+      ? Math.max(0, openInterval.targetSeconds - planned.targetSeconds)
+      : 0;
+
   return {
     id: session.id,
     clientKey: session.clientKey,
@@ -73,16 +97,10 @@ export async function getActiveSession(
     runningSince: session.runningSince?.getTime() ?? null,
     intervalIndex: openInterval?.index ?? 0,
     intervalBaseSeconds,
+    intervalExtraSeconds,
+    returnNote: openInterval?.returnNote ?? null,
     reachedTarget: session.reachedTargetAt !== null,
-    config: {
-      mode: session.mode,
-      targetSeconds: session.targetSeconds,
-      intervals: session.plannedIntervals,
-      focusSeconds: session.focusSeconds,
-      shortBreakSeconds: session.shortBreakSeconds,
-      longBreakSeconds: session.longBreakSeconds,
-      longBreakEvery: user.longBreakEvery,
-    },
+    config,
     task: session.task,
   };
 }

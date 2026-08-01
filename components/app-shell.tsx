@@ -6,6 +6,7 @@ import { UserButton } from "@clerk/nextjs";
 import {
   BarChart3,
   CalendarDays,
+  Droplets,
   Inbox,
   ListChecks,
   ListTodo,
@@ -39,6 +40,7 @@ const RAIL_EXTRA = [
   { href: "/inbox", label: "Inbox", icon: Inbox },
   { href: "/tasks", label: "Tasks", icon: ListTodo },
   { href: "/habits", label: "Habits", icon: Repeat },
+  { href: "/water", label: "Water", icon: Droplets },
   { href: "/close", label: "Close the day", icon: Moon },
 ] as const;
 

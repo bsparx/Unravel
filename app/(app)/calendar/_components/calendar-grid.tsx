@@ -23,9 +23,11 @@ import {
 import type { CalendarBlock } from "@/lib/time-blocks";
 import { buildTimerHref } from "@/lib/timer-url";
 import { toWorkMode } from "@/lib/timer-math";
+import { abutsNeighbour, transitionsForDay } from "@/lib/transitions";
 import { cn } from "@/lib/utils";
 
 import { deleteBlock, moveBlock, toggleBlockDone } from "../actions";
+import { TransitionStrip } from "./transition-strip";
 
 /**
  * Vertical scale. One pixel per minute makes an hour 60px — tall enough that a
@@ -35,6 +37,19 @@ import { deleteBlock, moveBlock, toggleBlockDone } from "../actions";
 const MINUTE_PX = 1;
 /** Anything shorter renders its label on one line instead of two. */
 const COMPACT_MINUTES = 45;
+
+/** The stretch of waking hours the header strips cover. Same window as the
+    page's own "how much is left" stat — see WAKING_START/END in page.tsx. */
+const STRIP_FROM = 7 * 60;
+const STRIP_TO = 22 * 60;
+
+/** Same fill vocabulary as `/day`'s PlanStrip — the strips are that glance,
+    held wide enough to show a week. */
+const STRIP_FILL = {
+  WORK: "bg-primary/70",
+  RECOVERY: "bg-rest/70",
+  BUFFER: "bg-muted-foreground/25",
+} as const;
 
 export type GridDay = { dateISO: string; label: string; weekday: string; isToday: boolean };
 
@@ -115,6 +130,11 @@ export function CalendarGrid({
     endMinute: number;
   } | null>(null);
 
+  // The header strips track the optimistic layer too, so a block in motion
+  // is a strip in motion.
+  const blocksFor = (dateISO: string) =>
+    shown.filter((block) => block.dateISO === dateISO);
+
   // Open on the working day, not on midnight. Scrolling past eight empty hours
   // every time you open the calendar is a small tax you'd pay hundreds of times.
   useEffect(() => {
@@ -166,36 +186,54 @@ export function CalendarGrid({
 
   return (
     <div className="border-border bg-card overflow-hidden rounded-xl border">
-      {/* Day headings, outside the scroller so they stay put. */}
+      {/* Day headings, outside the scroller so they stay put. Each one carries
+          a strip of its waking hours — the week's shape read at a glance, and
+          the page's legend. */}
       <div
         className="border-border bg-card/80 grid border-b backdrop-blur"
         style={{ gridTemplateColumns: `3.5rem repeat(${days.length}, minmax(0, 1fr))` }}
       >
         <div aria-hidden />
-        {days.map((day) => (
+        {days.map((day, index) => (
           <div
             key={day.dateISO}
             className={cn(
-              "border-border/60 border-l px-2 py-2 text-center",
+              "border-border/60 border-l px-2 pt-2 pb-1.5 text-center",
               day.isToday && "bg-accent/40",
             )}
           >
             <p
               className={cn(
                 "text-micro font-medium tracking-wider uppercase",
-                day.isToday ? "text-primary" : "text-muted-foreground",
+                day.isToday
+                  ? "text-primary"
+                  : isWeekend(day.dateISO)
+                    ? "text-muted-foreground/70"
+                    : "text-muted-foreground",
               )}
             >
               {day.weekday}
             </p>
-            <p
-              className={cn(
-                "text-title tabular-nums",
-                day.isToday && "text-primary font-medium",
-              )}
-            >
-              {day.label}
+            <p className="mt-0.5 flex justify-center">
+              <span
+                className={cn(
+                  "tabular-nums",
+                  day.isToday
+                    ? "bg-primary text-primary-foreground grid size-7 place-items-center rounded-full text-label font-medium"
+                    : cn(
+                        "text-title",
+                        isWeekend(day.dateISO) && "text-muted-foreground",
+                      ),
+                )}
+              >
+                {dayNumber(day.dateISO)}
+              </span>
             </p>
+            <DayStrip
+              blocks={blocksFor(day.dateISO)}
+              nowMinute={day.dateISO === todayISO ? nowMinute : null}
+              index={index}
+            />
           </div>
         ))}
       </div>
@@ -233,6 +271,122 @@ export function CalendarGrid({
       </div>
     </div>
   );
+}
+
+const dayNumber = (dateISO: string): number =>
+  new Date(`${dateISO}T00:00:00Z`).getUTCDate();
+
+const isWeekend = (dateISO: string): boolean => {
+  const day = new Date(`${dateISO}T00:00:00Z`).getUTCDay();
+  return day === 0 || day === 6;
+};
+
+/**
+ * The day as one thin bar, in the header of its column.
+ *
+ * The same glance as `/day`'s PlanStrip — "is this day already full?" — held
+ * wide enough for a whole week to compare at once. The header row is the
+ * legend: teal is work, slate is recovery, grey is buffer, a clay tick is a
+ * switch with no room in it, and the running-blue line is now.
+ *
+ * Decorative on purpose: the grid underneath carries the real data, so the
+ * strips are aria-hidden.
+ */
+function DayStrip({
+  blocks,
+  nowMinute,
+  index,
+}: {
+  blocks: CalendarBlock[];
+  nowMinute: number | null;
+  /** Position in the week, for the stagger. */
+  index: number;
+}) {
+  const span = STRIP_TO - STRIP_FROM;
+  const position = (minute: number) =>
+    `${((Math.min(Math.max(minute, STRIP_FROM), STRIP_TO) - STRIP_FROM) / span) * 100}%`;
+
+  const switches = transitionsForDay(
+    blocks.map((block) => ({
+      id: block.id,
+      title: block.title,
+      startMinute: block.startMinute,
+      endMinute: block.endMinute,
+      cueForId: block.cueForId,
+      hasCue: block.hasCue,
+    })),
+  ).filter((transition) => transition.kind !== "ok");
+
+  return (
+    <div
+      aria-hidden
+      className="animate-draw relative mx-1 mt-1.5 h-1.5 origin-left"
+      style={{ animationDelay: `${index * 40}ms` }}
+    >
+      <div className="bg-muted/60 absolute inset-0 rounded-full" />
+      {mergedSegments(blocks).map((segment) => (
+        <div
+          key={`${segment.startMinute}-${segment.endMinute}`}
+          className={cn(
+            "absolute inset-y-0 rounded-full",
+            STRIP_FILL[segment.kind],
+          )}
+          style={{
+            left: position(segment.startMinute),
+            width: `calc(${position(segment.endMinute)} - ${position(segment.startMinute)})`,
+          }}
+        />
+      ))}
+      {switches.map((transition) => (
+        <div
+          key={`${transition.startMinute}-${transition.kind}`}
+          className="bg-destructive/80 absolute top-1/2 h-2 w-0.5 -translate-y-1/2 rounded-full"
+          style={{ left: position(transition.startMinute) }}
+        />
+      ))}
+      {nowMinute !== null && nowMinute >= STRIP_FROM && nowMinute <= STRIP_TO && (
+        <div
+          className="bg-running absolute inset-y-0 w-px"
+          style={{ left: position(nowMinute) }}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * The day's busy time as segments, overlaps merged, coloured by the kind of
+ * the block that opens each stretch. A minimap has no room for the difference
+ * between "one 2h block" and "three that touch" — the grid shows that.
+ */
+function mergedSegments(blocks: CalendarBlock[]): {
+  startMinute: number;
+  endMinute: number;
+  kind: CalendarBlock["kind"];
+}[] {
+  const sorted = [...blocks].sort(
+    (a, b) => a.startMinute - b.startMinute || a.endMinute - b.endMinute,
+  );
+  const segments: {
+    startMinute: number;
+    endMinute: number;
+    kind: CalendarBlock["kind"];
+  }[] = [];
+
+  for (const block of sorted) {
+    const last = segments[segments.length - 1];
+    if (last && block.startMinute <= last.endMinute) {
+      last.endMinute = Math.max(last.endMinute, block.endMinute);
+    } else {
+      segments.push({
+        startMinute: block.startMinute,
+        endMinute: block.endMinute,
+        kind: block.kind,
+      });
+    }
+  }
+
+  return segments;
 }
 
 function HourGutter() {
@@ -368,12 +522,27 @@ function DayColumn({
     element.addEventListener("pointercancel", onUp);
   };
 
-  const laid = layoutColumns(
-    blocks.map((block) =>
-      drag && drag.id === block.id
-        ? { ...block, startMinute: drag.startMinute, endMinute: drag.endMinute }
-        : block,
-    ),
+  // The dragged block's live position, so everything downstream describes the
+  // day as it is being arranged rather than as it was a moment ago.
+  const positioned = blocks.map((block) =>
+    drag && drag.id === block.id
+      ? { ...block, startMinute: drag.startMinute, endMinute: drag.endMinute }
+      : block,
+  );
+
+  const laid = layoutColumns(positioned);
+
+  // Recomputed mid-drag on purpose: watching the gap close as you drag is the
+  // point. Told after the fact, you have already made the plan that fails.
+  const transitions = transitionsForDay(
+    positioned.map((block) => ({
+      id: block.id,
+      title: block.title,
+      startMinute: block.startMinute,
+      endMinute: block.endMinute,
+      cueForId: block.cueForId,
+      hasCue: block.hasCue,
+    })),
   );
 
   return (
@@ -425,14 +594,16 @@ function DayColumn({
       ))}
 
       {/* Click targets, one per half hour. A div with an onClick would swallow
-          block clicks; these sit underneath, at z-0. */}
+          block clicks; these sit underneath, at z-0. The dashed inset outline
+          on hover is the affordance — a clickable slot announces itself, so
+          no instructions are needed. */}
       {Array.from({ length: 48 }, (_, half) => (
         <button
           key={half}
           type="button"
           aria-label={`Block out ${formatMinuteOfDay(half * 30)} on ${day.label}`}
           onClick={() => onCreate(day.dateISO, half * 30)}
-          className="hover:bg-primary/5 focus-visible:bg-primary/10 focus-visible:ring-ring absolute inset-x-0 focus-visible:ring-1 focus-visible:outline-none"
+          className="hover:bg-primary/5 focus-visible:bg-primary/10 focus-visible:ring-ring after:border-primary/30 absolute inset-x-0 after:absolute after:inset-x-1 after:inset-y-0.5 after:rounded-md after:border after:border-dashed after:opacity-0 after:transition-opacity hover:after:opacity-100 focus-visible:after:opacity-100 focus-visible:ring-1 focus-visible:outline-none"
           style={{ top: half * 30 * MINUTE_PX, height: 30 * MINUTE_PX }}
         />
       ))}
@@ -451,13 +622,36 @@ function DayColumn({
       {/* Where it would land, at the length it would be. A drop indicator that
           only marks the start minute leaves you guessing whether a 90-minute
           task clears the thing below it — which is the actual question. */}
-      {dropMinute !== null && (
-        <DropPreview
-          startMinute={dropMinute}
-          minutes={activePlanItem()?.minutes ?? 25}
-          title={activePlanItem()?.title ?? ""}
+      {dropMinute !== null &&
+        (() => {
+          const minutes = activePlanItem()?.minutes ?? 25;
+          return (
+            <DropPreview
+              startMinute={dropMinute}
+              minutes={minutes}
+              title={activePlanItem()?.title ?? ""}
+              // Reported before the drop, not after. Told afterwards you have
+              // already made the plan; told now it costs one nudge. It never
+              // refuses the placement — "there is no room for this" is a real
+              // answer here, and a calendar that silently declines is one you
+              // stop trusting.
+              crowded={abutsNeighbour(
+                { startMinute: dropMinute, endMinute: dropMinute + minutes },
+                positioned,
+              )}
+            />
+          );
+        })()}
+
+      {/* Under the blocks in z-order: this describes the space between them and
+          must never sit on top of something you can drag. */}
+      {transitions.map((transition) => (
+        <TransitionStrip
+          key={`${transition.startMinute}-${transition.endMinute}`}
+          transition={transition}
+          minutePx={MINUTE_PX}
         />
-      )}
+      ))}
 
       {laid.map(({ block, column, columns }) => (
         <BlockChip
@@ -479,23 +673,39 @@ function DropPreview({
   startMinute,
   minutes,
   title,
+  crowded,
 }: {
   startMinute: number;
   minutes: number;
   title: string;
+  /** Landing here would leave no room to switch into or out of it. */
+  crowded: boolean;
 }) {
   return (
     <div
-      className="border-primary bg-primary/15 text-foreground pointer-events-none absolute inset-x-0.5 z-30 overflow-hidden rounded-md border border-dashed px-2 py-1"
+      className={cn(
+        "text-foreground pointer-events-none absolute inset-x-0.5 z-30 overflow-hidden rounded-md border border-dashed px-2 py-1",
+        crowded
+          ? "border-destructive bg-destructive/15"
+          : "border-primary bg-primary/15",
+      )}
       style={{
         top: startMinute * MINUTE_PX,
         height: Math.max(18, minutes * MINUTE_PX - 2),
       }}
     >
       <p className="truncate text-label leading-4 font-medium">{title}</p>
-      <p className="text-muted-foreground text-micro tabular-nums">
-        {formatMinuteOfDay(startMinute)} –{" "}
-        {formatMinuteOfDay(startMinute + minutes)}
+      <p
+        className={cn(
+          "text-micro tabular-nums",
+          crowded ? "text-destructive" : "text-muted-foreground",
+        )}
+      >
+        {crowded
+          ? "no room to switch"
+          : `${formatMinuteOfDay(startMinute)} – ${formatMinuteOfDay(
+              startMinute + minutes,
+            )}`}
       </p>
     </div>
   );
@@ -607,7 +817,7 @@ function BlockChip({
             className={cn(
               "mt-0.5 grid size-3.5 shrink-0 place-items-center rounded-full border transition-colors",
               done
-                ? "border-primary bg-primary text-primary-foreground"
+                ? "border-primary bg-primary text-primary-foreground animate-pop"
                 : "border-current/40 hover:border-current",
             )}
           >

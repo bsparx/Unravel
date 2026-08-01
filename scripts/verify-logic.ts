@@ -33,8 +33,11 @@ import {
   dualScale,
   endsAutomatically,
   hasProgressIndicator,
+  intervalOverrunSeconds,
   intervalTickFractions,
+  isBreakKind,
   liveElapsedMs,
+  loggedElapsedSeconds,
   macroProgress,
   MAX_LOGGED_SECONDS,
   microProgress,
@@ -46,6 +49,14 @@ import {
   suggestIntervals,
   WORK_MODES,
 } from "@/lib/timer-math";
+import {
+  abutsNeighbour,
+  tightCount,
+  transitionMinutes,
+  transitionsForDay,
+  type TransitionBlock,
+} from "@/lib/transitions";
+import { breaksWorthReporting, summariseBreaks } from "@/lib/break-stats";
 import { balanceRatio, describeBalance, recoveryShare } from "@/lib/balance";
 import { parseQuickAdd } from "@/lib/quick-parse";
 import {
@@ -1116,6 +1127,241 @@ check("re-crediting never takes back a day someone entered by hand", () => {
   assert.equal(recreditedProgress(10, 2 * 60, 60), 10);
   // Once the clock exceeds the hand-entered floor, the clock wins again.
   assert.equal(recreditedProgress(10, 2 * 60, 30 * 60), 30);
+});
+
+// ---------------------------------------------------------------- transitions
+
+check("break time is not logged as work", () => {
+  // THE regression this guards. A pomodoro of 25m focus, 40m break, 25m focus
+  // has 90 minutes on the wall clock and 50 minutes of work in it.
+  const spans = [
+    { kind: "FOCUS" as const, seconds: 25 * 60 },
+    { kind: "SHORT_BREAK" as const, seconds: 40 * 60 },
+    { kind: "FOCUS" as const, seconds: 25 * 60 },
+  ];
+  assert.equal(loggedElapsedSeconds(90 * 60, spans), 50 * 60);
+
+  // A long break counts the same way; only the label differs.
+  assert.equal(
+    loggedElapsedSeconds(30 * 60, [{ kind: "LONG_BREAK", seconds: 15 * 60 }]),
+    15 * 60,
+  );
+});
+
+check("a session with no breaks logs exactly what it always did", () => {
+  // LOAD-BEARING: this is what keeps every session written before the fix
+  // reading the same as it always has. BASIC, FLOW and single-interval
+  // pomodoros have no break interval, so subtraction is a no-op.
+  assert.equal(loggedElapsedSeconds(1500, [{ kind: "FOCUS", seconds: 1500 }]), 1500);
+  assert.equal(loggedElapsedSeconds(1500, []), 1500);
+  // Recovery is the session, not a break inside one.
+  assert.equal(
+    loggedElapsedSeconds(3600, [{ kind: "RECOVERY", seconds: 3600 }]),
+    3600,
+  );
+  assert.equal(isBreakKind("RECOVERY"), false);
+  assert.equal(isBreakKind("FOCUS"), false);
+  assert.equal(isBreakKind("SHORT_BREAK"), true);
+  assert.equal(isBreakKind("LONG_BREAK"), true);
+});
+
+check("logged time can never go negative", () => {
+  // Breaks are resolved from a different clock than the session, so rounding
+  // can in principle put them over. Clamping here rather than trusting the
+  // arithmetic, because a negative would flow into habit progress.
+  assert.equal(loggedElapsedSeconds(60, [{ kind: "SHORT_BREAK", seconds: 300 }]), 0);
+  assert.equal(loggedElapsedSeconds(0, []), 0);
+  assert.equal(
+    loggedElapsedSeconds(600, [{ kind: "SHORT_BREAK", seconds: -300 }]),
+    600,
+  );
+});
+
+check("an interval knows how far past its own target it has run", () => {
+  assert.equal(intervalOverrunSeconds(300, 300), 0);
+  assert.equal(intervalOverrunSeconds(2400, 300), 2100);
+  assert.equal(intervalOverrunSeconds(120, 300), 0);
+  // Recovery has no target, so it can never be overrunning — the same guard
+  // every other function in timer-math carries.
+  assert.equal(intervalOverrunSeconds(9999, 0), 0);
+  assert.equal(intervalOverrunSeconds(9999, -1), 0);
+});
+
+const block = (
+  id: string,
+  startMinute: number,
+  endMinute: number,
+  extra: Partial<TransitionBlock> = {},
+): TransitionBlock => ({
+  id,
+  title: id,
+  startMinute,
+  endMinute,
+  cueForId: null,
+  hasCue: false,
+  ...extra,
+});
+
+check("a gap between two blocks is a transition with a length", () => {
+  const found = transitionsForDay([
+    block("a", 540, 600),
+    block("b", 612, 672),
+  ]);
+  assert.equal(found.length, 1);
+  assert.equal(found[0].minutes, 12);
+  assert.equal(found[0].kind, "ok");
+  assert.equal(found[0].beforeTitle, "a");
+  assert.equal(found[0].afterTitle, "b");
+});
+
+check("two blocks planned flush together are flagged, not ignored", () => {
+  // LOAD-BEARING: `mergeSpans` coalesces touching blocks, so the zero-minute
+  // switch is invisible to a merged walk — and it is the one most worth
+  // saying something about, because every later overrun cascades from it.
+  const found = transitionsForDay([block("a", 540, 600), block("b", 600, 660)]);
+  assert.equal(found.length, 1);
+  assert.equal(found[0].minutes, 0);
+  assert.equal(found[0].kind, "none");
+});
+
+check("a tight switch is distinguished from a workable one", () => {
+  const tight = transitionsForDay([block("a", 540, 600), block("b", 604, 660)]);
+  assert.equal(tight[0].kind, "tight");
+  // The boundary itself is still tight; one minute past it is not.
+  const edge = transitionsForDay([block("a", 540, 600), block("b", 605, 660)]);
+  assert.equal(edge[0].kind, "tight");
+  const roomy = transitionsForDay([block("a", 540, 600), block("b", 606, 660)]);
+  assert.equal(roomy[0].kind, "ok");
+});
+
+check("free time is not a transition", () => {
+  // Ninety minutes between two things needs no help from the calendar, and
+  // drawing a strip across it would make the day look busier than it is.
+  assert.deepEqual(
+    transitionsForDay([block("a", 540, 600), block("b", 690, 750)]),
+    [],
+  );
+  // Exactly at the ceiling still counts; one minute past it does not.
+  assert.equal(
+    transitionsForDay([block("a", 540, 600), block("b", 630, 690)]).length,
+    1,
+  );
+  assert.equal(
+    transitionsForDay([block("a", 540, 600), block("b", 631, 690)]).length,
+    0,
+  );
+});
+
+check("overlapping blocks produce no phantom transition", () => {
+  // A naive pairwise walk reports a gap between the end of the first and the
+  // start of the second whenever they overlap. There is no gap there at all.
+  assert.deepEqual(
+    transitionsForDay([block("a", 540, 620), block("b", 600, 660)]),
+    [],
+  );
+  // And a real gap after an overlapping pair is still found.
+  const found = transitionsForDay([
+    block("a", 540, 620),
+    block("b", 600, 660),
+    block("c", 670, 700),
+  ]);
+  assert.equal(found.length, 1);
+  assert.equal(found[0].minutes, 10);
+});
+
+check("a habit-stack cue is meant to touch its habit", () => {
+  // `cueSpanFor` builds the pair to abut exactly, because "after I pour my tea,
+  // I will meditate" only works if nothing comes between them. Warning here
+  // would be the calendar objecting to the one deliberate adjacency in the day.
+  assert.deepEqual(
+    transitionsForDay([
+      block("tea", 540, 545, { cueForId: "meditate" }),
+      block("meditate", 545, 560, { hasCue: true }),
+    ]),
+    [],
+  );
+});
+
+check("one block, or none, has nothing to switch between", () => {
+  assert.deepEqual(transitionsForDay([]), []);
+  assert.deepEqual(transitionsForDay([block("a", 540, 600)]), []);
+});
+
+check("the day's switching time and its tight count roll up", () => {
+  const found = transitionsForDay([
+    block("a", 540, 600),
+    block("b", 612, 660), // 12 min — ok
+    block("c", 660, 700), // flush — none
+    block("d", 703, 760), // 3 min — tight
+  ]);
+  assert.equal(transitionMinutes(found), 15);
+  assert.equal(tightCount(found), 2);
+});
+
+check("dropping a block against its neighbour is reported", () => {
+  const day = [block("a", 540, 600), block("b", 700, 760)];
+  assert.equal(abutsNeighbour({ startMinute: 600, endMinute: 660 }, day), true);
+  assert.equal(abutsNeighbour({ startMinute: 603, endMinute: 660 }, day), true);
+  assert.equal(abutsNeighbour({ startMinute: 620, endMinute: 690 }, day), false);
+  // Moving a block must not see itself as the neighbour it is crowding.
+  assert.equal(
+    abutsNeighbour({ startMinute: 540, endMinute: 600 }, day, "a"),
+    false,
+  );
+});
+
+check("a break taken on purpose is not a break that got away", () => {
+  // LOAD-BEARING: these look identical on a clock and mean opposite things.
+  // Pressing "5 more" raises the target, so the extra lands in `extended`;
+  // walking away leaves the target alone, so it lands in `overrun`. Merging
+  // them makes the whole panel meaningless.
+  const summary = summariseBreaks([
+    // Chose five more minutes, then took exactly that.
+    { plannedSeconds: 300, targetSeconds: 600, elapsedSeconds: 600, overtimeSeconds: 0 },
+    // Planned five, disappeared for forty.
+    { plannedSeconds: 300, targetSeconds: 300, elapsedSeconds: 2400, overtimeSeconds: 2100 },
+  ]);
+  assert.equal(summary.extendedSeconds, 300);
+  assert.equal(summary.overrunSeconds, 2100);
+  assert.equal(summary.overranCount, 1);
+  assert.equal(summary.takenSeconds, 3000);
+});
+
+check("the typical break is a median, so one lost afternoon can't define it", () => {
+  const rows = [300, 360, 420, 300, 3 * 3600].map((elapsedSeconds) => ({
+    plannedSeconds: 300,
+    targetSeconds: 300,
+    elapsedSeconds,
+    overtimeSeconds: Math.max(0, elapsedSeconds - 300),
+  }));
+  const summary = summariseBreaks(rows);
+  // The mean here is over half an hour; the median describes the ordinary day.
+  assert.equal(summary.medianTakenSeconds, 360);
+  assert.equal(summary.medianPlannedSeconds, 300);
+});
+
+check("there is no story in a handful of breaks that behaved", () => {
+  assert.equal(summariseBreaks([]).count, 0);
+  assert.equal(breaksWorthReporting(summariseBreaks([])), false);
+
+  const honest = Array.from({ length: 5 }, () => ({
+    plannedSeconds: 300,
+    targetSeconds: 300,
+    elapsedSeconds: 310,
+    overtimeSeconds: 10,
+  }));
+  assert.equal(breaksWorthReporting(summariseBreaks(honest)), false);
+
+  const stretched = Array.from({ length: 5 }, () => ({
+    plannedSeconds: 300,
+    targetSeconds: 300,
+    elapsedSeconds: 1140,
+    overtimeSeconds: 840,
+  }));
+  assert.equal(breaksWorthReporting(summariseBreaks(stretched)), true);
+
+  // Two bad breaks is a Tuesday, not a pattern.
+  assert.equal(breaksWorthReporting(summariseBreaks(stretched.slice(0, 2))), false);
 });
 
 console.log(`\n${passed} checks passed.\n`);

@@ -25,6 +25,7 @@ export async function updateSettings(
     "autoStartNextFocus",
     "soundEnabled",
     "hapticsEnabled",
+    "returnAlertsEnabled",
   ]) {
     values[key] = values[key] === "on" || values[key] === "true";
   }
@@ -70,6 +71,7 @@ export async function updateSettings(
       autoStartNextFocus: input.autoStartNextFocus,
       soundEnabled: input.soundEnabled,
       hapticsEnabled: input.hapticsEnabled,
+      returnAlertsEnabled: input.returnAlertsEnabled,
     },
   });
 

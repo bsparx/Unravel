@@ -43,6 +43,8 @@ export type DecayFieldProps = {
   intervalBaseMs: number;
   config: TimerConfig;
   dual: boolean;
+  /** A break past its time. The live colour goes clay. */
+  overrun: boolean;
   /** Fall back to the SVG arc — the GPU took the context away. */
   onContextLost: () => void;
   children?: React.ReactNode;
@@ -73,6 +75,7 @@ export function DecayField({
   intervalBaseMs,
   config,
   dual,
+  overrun,
   onContextLost,
   children,
 }: DecayFieldProps) {
@@ -98,6 +101,7 @@ export function DecayField({
     intervalBaseMs,
     config,
     dual,
+    overrun,
     colors,
   });
   // Synced in an effect rather than assigned during render, which React 19
@@ -113,6 +117,7 @@ export function DecayField({
       intervalBaseMs,
       config,
       dual,
+      overrun,
       colors,
     };
   });
@@ -208,8 +213,15 @@ export function DecayField({
       // The running blue means work is on the clock. During a break the live
       // colour is teal — the reservation in `design-notes.md` has to survive
       // the move into a shader, where nothing would ever catch it going wrong.
-      const live =
-        interval && interval.kind !== "FOCUS" ? p.colors.rest : p.colors.running;
+      // The running blue is reserved for work on the clock and the teal for a
+      // break; a break that has stopped being a break gets neither, because
+      // wearing either one would make the state you need to notice look like
+      // one of the two you don't.
+      const live = p.overrun
+        ? p.colors.overrun
+        : interval && interval.kind !== "FOCUS"
+          ? p.colors.rest
+          : p.colors.running;
       uniforms.uRun.value.set(...live);
       uniforms.uTrack.value.set(...p.colors.track);
 
@@ -318,7 +330,7 @@ export function DecayField({
   // face has no loop running to pick them up, so redraw explicitly.
   useEffect(() => {
     if (!running) drawRef.current?.();
-  }, [colors, config, dual, intervalIndex, plan, running]);
+  }, [colors, config, dual, intervalIndex, overrun, plan, running]);
 
   return (
     <div className="relative isolate" style={{ width: SIZE, height: SIZE }}>

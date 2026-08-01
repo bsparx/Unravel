@@ -35,6 +35,7 @@ export default async function SettingsPage() {
           shortBreakMinutes: Math.round(user.shortBreakSeconds / 60),
           longBreakMinutes: Math.round(user.longBreakSeconds / 60),
           longBreakEvery: user.longBreakEvery,
+          returnAlertsEnabled: user.returnAlertsEnabled,
           autoStartBreaks: user.autoStartBreaks,
           autoStartNextFocus: user.autoStartNextFocus,
           soundEnabled: user.soundEnabled,

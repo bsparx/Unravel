@@ -6,12 +6,14 @@ import { requireUser } from "@/lib/auth";
 import {
   claimedMinutes,
   formatMinuteLength,
+  formatMinuteOfDay,
   freeSlots,
 } from "@/lib/block-math";
 import {
   addDays,
   formatDate,
   formatFullDate,
+  minuteOfDayLocal,
   parseLocalDate,
   startOfWeek,
   toISODate,
@@ -19,6 +21,7 @@ import {
   WEEKDAYS,
 } from "@/lib/dates";
 import { getBlocks, getSchedulableItems } from "@/lib/time-blocks";
+import { tightCount, transitionsForDay } from "@/lib/transitions";
 import { cn } from "@/lib/utils";
 
 import { CalendarView } from "./_components/calendar-view";
@@ -45,7 +48,10 @@ export default async function CalendarPage({
     return Array.isArray(value) ? value[0] : value;
   };
 
-  const view: View = first("view") === "day" ? "day" : "week";
+  // Day by default: the rail's "Plan" link is a bare /calendar, and a person
+  // arriving here mid-week is planning one day, not seven. Week stays one
+  // explicit toggle away and every other link passes its own ?view=.
+  const view: View = first("view") === "week" ? "week" : "day";
   const today = todayLocal(user.timezone);
   // A malformed date degrades to today rather than 404ing — this is a URL
   // people will hand-edit.
@@ -85,6 +91,72 @@ export default async function CalendarPage({
     0,
   );
 
+  // The day's give. `claimed` says how much is spoken for and `longestFree` how
+  // much room is left to work in; neither says anything about the switches
+  // between, which is where a day with no slack actually comes apart.
+  const switches = transitionsForDay(
+    anchorBlocks.map((block) => ({
+      id: block.id,
+      title: block.title,
+      startMinute: block.startMinute,
+      endMinute: block.endMinute,
+      cueForId: block.cueForId,
+      hasCue: block.hasCue,
+    })),
+  );
+  const tight = tightCount(switches);
+
+  // The day, read as one sentence. Numbers as prose: a felt sense of duration
+  // is exactly what this audience doesn't have, so "Next up: X at 15:00 · 55
+  // minutes open before it" does the arithmetic they'd otherwise have to.
+  const nowMinute = minuteOfDayLocal(user.timezone);
+  const anchorIsToday = anchor.getTime() === today.getTime();
+  const nextUp = anchorIsToday
+    ? anchorBlocks
+        .filter((block) => block.startMinute > nowMinute)
+        .sort((a, b) => a.startMinute - b.startMinute)[0]
+    : undefined;
+
+  const headline = (() => {
+    if (nextUp) {
+      const open = nextUp.startMinute - nowMinute;
+      return (
+        <>
+          Next up:{" "}
+          <span className="text-foreground font-medium">{nextUp.title}</span> at{" "}
+          <span className="tabular-nums">{formatMinuteOfDay(nextUp.startMinute)}</span>
+          {open > 0 && (
+            <>
+              {" · "}
+              <span className="tabular-nums">{formatMinuteLength(open)}</span>{" "}
+              open before it
+            </>
+          )}
+          .
+        </>
+      );
+    }
+    if (anchorIsToday) {
+      return anchorBlocks.length > 0
+        ? "All planned time is behind you."
+        : "Nothing planned yet — click anywhere on today to open a slot.";
+    }
+    if (anchorBlocks.length === 0) return "Nothing planned yet.";
+    return (
+      <>
+        <span className="tabular-nums">{formatMinuteLength(claimed)}</span> planned
+        across {anchorBlocks.length} block{anchorBlocks.length === 1 ? "" : "s"}
+        {longestFree > 0 && (
+          <>
+            {" · longest open stretch "}
+            <span className="tabular-nums">{formatMinuteLength(longestFree)}</span>
+          </>
+        )}
+        .
+      </>
+    );
+  })();
+
   return (
     <div className="mx-auto w-full max-w-6xl px-5 py-8 md:px-8 md:py-12">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
@@ -94,18 +166,22 @@ export default async function CalendarPage({
             {view === "day"
               ? formatFullDate(anchor)
               : `${formatDate(start)} – ${formatDate(addDays(start, 6))}`}
-            {" · "}
-            <span className="tabular-nums">{formatMinuteLength(claimed)}</span>{" "}
-            claimed
-            {longestFree > 0 && (
-              <>
-                {" · longest free stretch "}
-                <span className="tabular-nums">
-                  {formatMinuteLength(longestFree)}
-                </span>
-              </>
-            )}
           </p>
+          <p className="text-muted-foreground mt-0.5 text-label">{headline}</p>
+          {/* Only when there is something to say. A day with room to switch in
+              needs no comment on the fact — the strips on the grid already
+              carry it, and a permanent counter reading "0 tight" would just be
+              one more number to scan past. */}
+          {tight > 0 && (
+            <p className="text-destructive mt-1 text-label">
+              {tight === 1
+                ? "One switch today has no room in it."
+                : `${tight} switches today have no room in them.`}{" "}
+              <span className="text-muted-foreground">
+                Nudge one of the blocks and the gap opens up.
+              </span>
+            </p>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -160,7 +236,15 @@ export default async function CalendarPage({
 
         <aside className="space-y-6">
           <section>
-            <h2 className="font-display text-title">Not on the day yet</h2>
+            <h2 className="font-display text-title">
+              Not on the day yet
+              {schedulable.length > 0 && (
+                <span className="text-muted-foreground font-sans text-label">
+                  {" · "}
+                  <span className="tabular-nums">{schedulable.length}</span> left
+                </span>
+              )}
+            </h2>
             <p className="text-muted-foreground mt-0.5 mb-3 text-label">
               Habits due today and everything still open. Drag one onto the
               grid, or press it in and let it find a gap.
@@ -170,24 +254,6 @@ export default async function CalendarPage({
               dateISO={anchorISO}
               today={today}
             />
-          </section>
-
-          <section className="border-border rounded-lg border border-dashed p-4">
-            <h2 className="text-micro text-muted-foreground font-medium tracking-wider uppercase">
-              How to use this
-            </h2>
-            <ul className="text-muted-foreground mt-2 space-y-1.5 text-label">
-              <li>Click any empty half hour to block it out.</li>
-              <li>
-                Drag anything from the list above onto the grid to put it at
-                that exact time.
-              </li>
-              <li>Drag a block to move it, or its bottom edge to resize.</li>
-              <li>
-                Leave <span className="text-foreground">buffer</span> in. A day
-                planned wall to wall is a day you abandon by eleven.
-              </li>
-            </ul>
           </section>
         </aside>
       </div>

@@ -144,6 +144,28 @@ model User {
   // phone face-down on the desk, which is exactly when someone has the chime
   // turned off.
   hapticsEnabled     Boolean @default(true)
+  /// Browser notifications when a break has run over.
+  ///
+  /// A third switch rather than a mode of `soundEnabled`, because it answers a
+  /// different question. Sound and haptics reach you in the room; this is the
+  /// only one that reaches you in another app, which is where the break that
+  /// runs away is actually spent. Turning the chime off should not turn that
+  /// off too.
+  returnAlertsEnabled Boolean @default(true)
+
+  // Water. The goal is glasses per day, and the defaults follow the classic
+  // 8×8: 8 glasses × 250ml, one every two hours across a waking window. The
+  // science (NASEM) is a range, not a number — 8 is the baseline, the
+  // settings let it move to where the person actually is.
+  waterGoal            Int     @default(8)
+  waterRemindersEnabled Boolean @default(false)
+  /// Minutes from local midnight when the reminder window opens. 480 = 08:00.
+  waterReminderStartMin Int     @default(480)
+  /// 1320 = 22:00. Past this the day is a closed session: no more reminders.
+  waterReminderEndMin   Int     @default(1320)
+  /// Minimum gap between reminders, minutes. Defaults to 120 (one glass per
+  /// two hours fills the day's quota inside the window).
+  waterReminderIntervalMin Int @default(120)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -153,6 +175,7 @@ model User {
   occurrences TaskOccurrence[]
   sessions    FocusSession[]
   captures    Capture[]
+  waterLog    WaterGlass[]
   dayLogs     DayLog[]
   journal     JournalEntry[]
   steps       TaskStep[]
@@ -489,9 +512,28 @@ model SessionInterval {
   runningSince       DateTime?
 
   elapsedSeconds  Int     @default(0)
+  /// Time past `targetSeconds`. On a break this is the overrun — the five
+  /// minutes that became forty — which is only measurable because the break
+  /// now stays on the clock instead of pausing at its own boundary.
+  ///
+  /// Time taken deliberately does NOT land here: "5 more minutes" raises
+  /// `targetSeconds` instead, so a break you extended and a break that got away
+  /// from you stay distinguishable. They look identical on a clock and mean
+  /// opposite things.
   overtimeSeconds Int     @default(0)
   /// Reached its target, as opposed to being skipped.
   completed       Boolean @default(false)
+
+  /// What you were in the middle of when the break started.
+  ///
+  /// The expensive half of a switch is coming back, not going away: by the time
+  /// the break ends the thread is gone, and re-deriving it is what the next
+  /// twenty minutes get spent on. Written while you still know the answer, and
+  /// handed back at the boundary and in the notification.
+  ///
+  /// On the interval rather than the session because a later break is a
+  /// different return to a different place.
+  returnNote String?
 
   @@unique([sessionId, index])
   @@index([sessionId])
@@ -529,6 +571,37 @@ model Capture {
   // make capture cost something.
   @@index([userId, status, createdAt])
   @@index([userId, localDate])
+}
+
+// ---------------------------------------------------------------- hydration
+
+/// One row per glass of water actually logged — SPARSE, exactly like
+/// TaskOccurrence. Absence means "not drunk", the count for a day is a
+/// groupBy rather than a stored total, and nothing is ever pre-generated.
+///
+/// `timeMinute` is what makes the two most useful messages a query instead of
+/// a guess: "last glass was 3h ago" (the reminder) and "you're behind the
+/// pace line" (the vessel marker). A backdated glass keeps its claimed time —
+/// this is a log of when things happened, not a stream of button presses.
+model WaterGlass {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Local calendar day in User.timezone, stored as UTC-midnight DATE — the
+  /// same pre-bucketing every other day in this schema uses.
+  date DateTime @db.Date
+
+  /// Minutes from local midnight, clamped to "now" on write.
+  timeMinute Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // No @@unique anywhere, deliberately: two glasses at the same minute are
+  // two glasses, and a constraint violation is the one failure mode that
+  // would make logging cost something.
+  @@index([userId, date])
 }
 
 // ---------------------------------------------------------------- the day

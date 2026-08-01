@@ -15,6 +15,12 @@ import {
   MAX_LOGGED_SECONDS,
   MAX_TARGET_SECONDS,
 } from "@/lib/timer-math";
+import {
+  MAX_GOAL,
+  MAX_INTERVAL_MIN,
+  MIN_GOAL,
+  MIN_INTERVAL_MIN,
+} from "@/lib/water";
 
 export const cuid = z.string().min(1).max(64);
 
@@ -334,7 +340,48 @@ export const settingsSchema = z.object({
   autoStartNextFocus: z.coerce.boolean().default(false),
   soundEnabled: z.coerce.boolean().default(true),
   hapticsEnabled: z.coerce.boolean().default(true),
+  returnAlertsEnabled: z.coerce.boolean().default(true),
 });
+
+// ---------------------------------------------------------------- water
+
+/**
+ * Logging a glass. `timeMinute` is optional — omitted means "right now", and
+ * the action clamps it to now on the way in so a backdated glass can never be
+ * logged "later today than it is".
+ */
+export const logGlassSchema = z.object({
+  date: isoDate,
+  timeMinute: emptyToUndefined(
+    z.coerce.number().int().min(0).max(MINUTES_PER_DAY),
+  ),
+});
+
+export const removeGlassSchema = z.object({
+  glassId: cuid,
+});
+
+/**
+ * The water settings form. `endMin > startMin` is refused rather than
+ * clamped: a window that runs backwards means "no reminders at all", and that
+ * decision should be made with the checkbox, not by accident.
+ */
+export const waterSettingsSchema = z
+  .object({
+    goal: z.coerce.number().int().min(MIN_GOAL).max(MAX_GOAL),
+    remindersEnabled: z.coerce.boolean().default(false),
+    startMin: minuteOfDay,
+    endMin: minuteOfDay,
+    intervalMin: z.coerce
+      .number()
+      .int()
+      .min(MIN_INTERVAL_MIN)
+      .max(MAX_INTERVAL_MIN),
+  })
+  .refine((value) => value.endMin > value.startMin, {
+    message: "The reminder window has to run forwards.",
+    path: ["endMin"],
+  });
 
 // ---------------------------------------------------------------- action result
 

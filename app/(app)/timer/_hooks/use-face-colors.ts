@@ -17,6 +17,8 @@ export type FaceColors = {
   running: Rgb;
   /** Teal. The live colour during a break. */
   rest: Rgb;
+  /** Clay. A break that is past its time and still running. */
+  overrun: Rgb;
   /** The spent groove. */
   track: Rgb;
 };
@@ -31,6 +33,7 @@ export type FaceColors = {
 const FALLBACK: FaceColors = {
   running: [0.231, 0.435, 0.690],
   rest: [0.184, 0.435, 0.416],
+  overrun: [0.722, 0.361, 0.290],
   track: [0.914, 0.886, 0.839],
 };
 
@@ -80,6 +83,7 @@ function readColors(): FaceColors {
   return {
     running: read("--running", FALLBACK.running),
     rest: read("--primary", FALLBACK.rest),
+    overrun: read("--destructive", FALLBACK.overrun),
     track: read("--arc-track", FALLBACK.track),
   };
 }

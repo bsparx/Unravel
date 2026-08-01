@@ -3,7 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Pause, Play, Repeat, RotateCcw, SkipForward, Square } from "lucide-react";
+import {
+  Check,
+  Pause,
+  Play,
+  Repeat,
+  RotateCcw,
+  SkipForward,
+  Square,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { StepList } from "@/components/step-list";
@@ -26,7 +34,9 @@ import { useTimer, type TimerTask } from "../_hooks/timer-provider";
 import { useThresholdHaptics } from "../_hooks/use-threshold-haptics";
 import { useWakeLock } from "../_hooks/use-wake-lock";
 import { ModeSwitcher } from "./mode-switcher";
+import { OverrunPanel } from "./overrun-panel";
 import { RecoveryFace } from "./recovery-face";
+import { ReturnNote } from "./return-note";
 import { TimerFace } from "./timer-face";
 import { TodayLog } from "./today-log";
 
@@ -58,6 +68,12 @@ export function TimerScreen({
     plan,
     elapsedSeconds,
     intervalElapsedSeconds,
+    currentTargetSeconds,
+    onBreak,
+    overrunSeconds,
+    isOverrunning,
+    extendInterval,
+    setReturnNote,
     configure,
     reset,
     toggle,
@@ -91,7 +107,7 @@ export function TimerScreen({
     intervalElapsedSeconds,
   });
   const recovery = state.config.mode === "RECOVERY";
-  const isBreak = !recovery && currentInterval?.kind !== "FOCUS";
+  const isBreak = !recovery && onBreak;
   const isFlow = state.config.mode === "FLOW";
   const isOvertime = !recovery && elapsedSeconds > state.config.targetSeconds;
   const running = state.phase === "RUNNING";
@@ -101,11 +117,15 @@ export function TimerScreen({
   // During a pomodoro break, count that break down — showing total focus
   // remaining while you're resting is just wrong. Everything else (recovery
   // counting up, flow's overrun, a plain countdown) is one shared rule.
-  const readout =
-    isBreak && currentInterval
-      ? formatClock(
-          Math.max(0, currentInterval.targetSeconds - intervalElapsedSeconds),
-        )
+  //
+  // Once a break is past its time the countdown has nothing left to say, so it
+  // turns around and counts up instead. That number is the whole point of the
+  // state: a break with no number on it is exactly the break that becomes forty
+  // minutes.
+  const readout = isOverrunning
+    ? `+${formatClock(overrunSeconds)}`
+    : isBreak && currentInterval
+      ? formatClock(Math.max(0, currentTargetSeconds - intervalElapsedSeconds))
       : formatClock(
           readoutSeconds(
             state.config.mode,
@@ -127,12 +147,17 @@ export function TimerScreen({
         return;
       }
       event.preventDefault();
+
+      // Not during an overrun. Pausing there would freeze the clock on a break
+      // that has already run over, which is precisely how the overrun used to
+      // become invisible — the two buttons are the only ways out on purpose.
+      if (isOverrunning) return;
       toggle();
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [toggle]);
+  }, [isOverrunning, toggle]);
 
   // A finished session is committed to the day's roll-up by `endSession`, and
   // this page's copy of that roll-up is server-rendered — so without a refetch
@@ -162,8 +187,7 @@ export function TimerScreen({
 
   // Same guard, same reason: a day's total for the wrong task is a wrong
   // number presented as a fact, which is worse than not showing one.
-  const ownTask =
-    state.task && initialTask && state.task.id === initialTask.id;
+  const ownTask = state.task && initialTask && state.task.id === initialTask.id;
   const dayLog = ownTask ? todayLog : null;
 
   const focusBlocks = plan.filter((interval) => interval.kind === "FOCUS");
@@ -235,11 +259,17 @@ export function TimerScreen({
             <p
               className={cn(
                 "font-mono text-5xl tabular-nums transition-colors",
-                running
-                  ? recovery
-                    ? "text-rest"
-                    : "text-running"
-                  : "text-foreground",
+                // Clay, not the running blue and not rest: this is neither work
+                // on the clock nor rest any more. Reusing either colour would
+                // make the one state you need to notice look like the two you
+                // don't.
+                isOverrunning
+                  ? "text-destructive"
+                  : running
+                    ? recovery
+                      ? "text-rest"
+                      : "text-running"
+                    : "text-foreground",
               )}
               role="timer"
               aria-live="off"
@@ -247,7 +277,14 @@ export function TimerScreen({
               {readout}
             </p>
 
-            <p className="text-muted-foreground mt-1 text-label">
+            <p
+              className={cn(
+                "mt-1 text-label",
+                isOverrunning
+                  ? "text-destructive font-medium"
+                  : "text-muted-foreground",
+              )}
+            >
               {recovery
                 ? idle
                   ? "For as long as you like"
@@ -256,13 +293,15 @@ export function TimerScreen({
                     : "Paused"
                 : idle
                   ? "Ready when you are"
-                  : isFlow && isOvertime
-                    ? "Past your goal"
-                    : isBreak
-                      ? INTERVAL_LABELS[currentInterval.kind]
-                      : focusBlocks.length > 1
-                        ? `Focus ${focusIndex} of ${focusBlocks.length}`
-                        : MODE_LABELS[state.config.mode]}
+                  : isOverrunning
+                    ? "Break's over"
+                    : isFlow && isOvertime
+                      ? "Past your goal"
+                      : isBreak
+                        ? INTERVAL_LABELS[currentInterval.kind]
+                        : focusBlocks.length > 1
+                          ? `Focus ${focusIndex} of ${focusBlocks.length}`
+                          : MODE_LABELS[state.config.mode]}
             </p>
           </div>
         );
@@ -285,6 +324,7 @@ export function TimerScreen({
             intervalIndex={state.intervalIndex}
             intervalBaseMs={state.intervalBaseMs}
             config={state.config}
+            overrun={isOverrunning}
           >
             {face}
           </TimerFace>
@@ -297,54 +337,84 @@ export function TimerScreen({
         {running ? "Timer running" : idle ? "Timer ready" : "Timer paused"}
       </p>
 
-      <div className="mt-8 flex items-center gap-2">
-        <Button
-          size="lg"
-          onClick={toggle}
-          className={cn(
-            "min-w-36",
-            running &&
-              (recovery
-                ? "bg-rest text-rest-foreground hover:bg-rest/90"
-                : "bg-running text-running-foreground hover:bg-running/90"),
-          )}
-        >
-          {running ? (
-            <>
-              <Pause className="size-4" aria-hidden />
-              Pause
-            </>
-          ) : (
-            <>
-              <Play className="size-4" aria-hidden />
-              {idle ? (recovery ? "Start recovery" : "Start focus") : "Resume"}
-            </>
-          )}
-        </Button>
+      {/* The overrun takes the controls over entirely rather than adding to
+          them. Leaving Pause and Skip alongside would put four choices in front
+          of someone who has just been pulled back from somewhere else, and the
+          two that matter would be the easiest to miss. */}
+      {isOverrunning ? (
+        <OverrunPanel
+          returnLabel={
+            state.returnNote ?? upNext?.title ?? state.task?.title ?? null
+          }
+          onBack={skipInterval}
+          onExtend={extendInterval}
+        />
+      ) : (
+        <div className="mt-8 flex items-center gap-2">
+          <Button
+            size="lg"
+            onClick={toggle}
+            className={cn(
+              "min-w-36",
+              running &&
+                (recovery
+                  ? "bg-rest text-rest-foreground hover:bg-rest/90"
+                  : "bg-running text-running-foreground hover:bg-running/90"),
+            )}
+          >
+            {running ? (
+              <>
+                <Pause className="size-4" aria-hidden />
+                Pause
+              </>
+            ) : (
+              <>
+                <Play className="size-4" aria-hidden />
+                {idle
+                  ? recovery
+                    ? "Start recovery"
+                    : "Start focus"
+                  : "Resume"}
+              </>
+            )}
+          </Button>
 
-        {!idle && (
-          <>
-            {plan.length > 1 && (
+          {!idle && (
+            <>
+              {plan.length > 1 && (
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={skipInterval}
+                  aria-label="Skip to the next block"
+                >
+                  <SkipForward className="size-4" aria-hidden />
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="lg"
-                onClick={skipInterval}
-                aria-label="Skip to the next block"
+                onClick={() => void stop()}
+                aria-label="Stop and log this session"
               >
-                <SkipForward className="size-4" aria-hidden />
+                <Square className="size-4" aria-hidden />
               </Button>
-            )}
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={() => void stop()}
-              aria-label="Stop and log this session"
-            >
-              <Square className="size-4" aria-hidden />
-            </Button>
-          </>
-        )}
-      </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Only while the break is still a break. Once it has run over, the
+          answer is what the overrun panel is already holding up — asking for it
+          again at that point is asking someone to compose a sentence when what
+          they need is one button. */}
+      {isBreak && !isOverrunning && !idle && (
+        <ReturnNote
+          value={state.returnNote}
+          placeholder={upNext?.title ?? state.task?.title ?? null}
+          onCommit={setReturnNote}
+        />
+      )}
 
       {dayLog && !recovery && (
         <TodayLog
@@ -484,7 +554,9 @@ function SessionSummary({
       </p>
 
       {task && !recovery && (
-        <p className="font-display mt-3 text-title text-balance">{task.title}</p>
+        <p className="font-display mt-3 text-title text-balance">
+          {task.title}
+        </p>
       )}
 
       {/* The one moment the number is worth questioning: it is on screen, it

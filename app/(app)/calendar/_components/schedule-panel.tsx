@@ -46,17 +46,37 @@ export function SchedulePanel({
     );
   }
 
+  // Habits and todos under their own quiet labels, only when both are
+  // present — one group needs no heading, and a heading per group is chrome.
+  const groups: { label: string; items: SchedulableItem[] }[] = [];
+  const habits = items.filter((item) => item.kind === "habit");
+  const todos = items.filter((item) => item.kind === "task");
+  if (habits.length > 0) groups.push({ label: "Habits", items: habits });
+  if (todos.length > 0) groups.push({ label: "Open tasks", items: todos });
+
   return (
-    <ul className="space-y-1">
-      {items.map((item) => (
-        <ScheduleRow
-          key={item.id}
-          item={item}
-          dateISO={dateISO}
-          today={today}
-        />
+    <div className="space-y-3">
+      {groups.map((group) => (
+        <div key={group.label}>
+          {groups.length > 1 && (
+            <p className="text-micro text-muted-foreground mb-1 ml-1 font-medium tracking-wider uppercase">
+              {group.label}
+              <span className="tabular-nums"> · {group.items.length}</span>
+            </p>
+          )}
+          <ul className="space-y-1">
+            {group.items.map((item) => (
+              <ScheduleRow
+                key={item.id}
+                item={item}
+                dateISO={dateISO}
+                today={today}
+              />
+            ))}
+          </ul>
+        </div>
       ))}
-    </ul>
+    </div>
   );
 }
 

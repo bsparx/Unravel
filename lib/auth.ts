@@ -28,8 +28,10 @@ export async function requireUser(): Promise<User> {
 async function createLocalUser(clerkId: string): Promise<User> {
   const clerkUser = await currentUser();
 
-  return prisma.user.create({
-    data: {
+  return prisma.user.upsert({
+    where: { clerkId },
+    update: {},
+    create: {
       clerkId,
       email: clerkUser?.primaryEmailAddress?.emailAddress ?? null,
       name:

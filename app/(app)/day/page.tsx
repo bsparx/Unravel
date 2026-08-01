@@ -11,6 +11,7 @@ import {
 } from "@/lib/dates";
 import { getTodayView } from "@/lib/tasks";
 import { getBlocks } from "@/lib/time-blocks";
+import { getWaterToday } from "@/lib/water-data";
 
 import { DayList } from "./_components/day-list";
 import { PlanStrip } from "./_components/plan-strip";
@@ -21,6 +22,7 @@ export default async function TodayPage() {
   const user = await requireUser();
   const view = await getTodayView(user);
   const blocks = await getBlocks(user, view.date, 1);
+  const water = await getWaterToday(user, view.date);
   const todayISO = toISODate(view.date);
 
   const upNext =
@@ -85,7 +87,12 @@ export default async function TodayPage() {
         </Link>
       )}
 
-      <DayList view={view} todayISO={todayISO} />
+      <DayList
+        view={view}
+        todayISO={todayISO}
+        water={water}
+        timezone={user.timezone}
+      />
 
       <div className="border-border mt-10 flex flex-wrap justify-center gap-2 border-t pt-6">
         <Button asChild variant="ghost" size="sm">

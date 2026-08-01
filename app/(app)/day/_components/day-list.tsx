@@ -6,15 +6,21 @@ import { EmptyState } from "@/components/empty-state";
 import { toggleOccurrence, toggleTodo } from "@/app/(app)/tasks/actions";
 import { formatRelativeDate } from "@/lib/dates";
 import type { TodayItem, TodayView } from "@/lib/tasks";
+import type { WaterToday } from "@/lib/water-data";
 
 import { TaskRow } from "./task-row";
+import { WaterRow } from "./water-row";
 
 export function DayList({
   view,
   todayISO,
+  water,
+  timezone,
 }: {
   view: TodayView;
   todayISO: string;
+  water: WaterToday;
+  timezone: string;
 }) {
   const toggle = async (item: TodayItem, next: boolean) => {
     const formData = new FormData();
@@ -47,16 +53,37 @@ export function DayList({
 
   if (!hasAnything && view.completedToday.length === 0) {
     return (
-      <EmptyState
-        icon={Inbox}
-        title="Nothing on today"
-        description="Add the first thing that's on your mind above. One line is enough — you can add a time estimate later."
-      />
+      <div className="space-y-8">
+        <section>
+          <h2 className="text-micro text-muted-foreground mb-1 font-sans font-medium tracking-wider uppercase">
+            Water
+          </h2>
+          <ul>
+            <WaterRow today={water} timezone={timezone} />
+          </ul>
+        </section>
+        <EmptyState
+          icon={Inbox}
+          title="Nothing on today"
+          description="Add the first thing that's on your mind above. One line is enough — you can add a time estimate later."
+        />
+      </div>
     );
   }
 
   return (
     <div className="space-y-8">
+      {/* Water is a daily act whether or not anything else is on today, so it
+          sits above the empty state as well as above every section. */}
+      <section>
+        <h2 className="text-micro text-muted-foreground mb-1 font-sans font-medium tracking-wider uppercase">
+          Water
+        </h2>
+        <ul>
+          <WaterRow today={water} timezone={timezone} />
+        </ul>
+      </section>
+
       {sections
         .filter((section) => section.items.length > 0)
         .map((section) => (
