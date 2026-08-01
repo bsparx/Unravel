@@ -1,6 +1,15 @@
 "use client";
 
-import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useOptimistic,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { Check, CornerDownRight, GripHorizontal, Play, X } from "lucide-react";
 
@@ -51,6 +60,62 @@ const STRIP_FILL = {
   BUFFER: "bg-muted-foreground/25",
 } as const;
 
+/**
+ * Minutes since local midnight, in the user's timezone.
+ *
+ * Null on the first render on purpose: the server has no "now" it can agree
+ * with the client about to the minute, and rendering a line at a
+ * server-computed position would be a guaranteed hydration mismatch on the one
+ * element that moves. It appears a frame later instead.
+ *
+ * The provider holds the grid as a stable child, so the 30-second tick
+ * re-renders only itself — and the markers that subscribe through context —
+ * instead of the whole grid.
+ */
+const NowContext = createContext<number | null>(null);
+
+export function NowProvider({
+  timeZone,
+  children,
+}: {
+  timeZone: string;
+  children: ReactNode;
+}) {
+  const [minute, setMinute] = useState<number | null>(null);
+
+  useEffect(() => {
+    const read = () => {
+      const parts = new Intl.DateTimeFormat("en-GB", {
+        timeZone,
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      }).formatToParts(new Date());
+
+      const value = (type: string) =>
+        Number(parts.find((part) => part.type === type)?.value ?? 0);
+
+      setMinute(value("hour") * 60 + value("minute"));
+    };
+
+    read();
+    const timer = setInterval(read, 30_000);
+    return () => clearInterval(timer);
+  }, [timeZone]);
+
+  return <NowContext.Provider value={minute}>{children}</NowContext.Provider>;
+}
+
+/** Draws only the marker, wherever in the grid it lives. */
+function NowPosition({
+  children,
+}: {
+  children: (minute: number | null) => ReactNode;
+}) {
+  const minute = useContext(NowContext);
+  return <>{children(minute)}</>;
+}
+
 export type GridDay = { dateISO: string; label: string; weekday: string; isToday: boolean };
 
 /** What the optimistic layer can do to the day before the server answers. */
@@ -67,7 +132,6 @@ type BlockPatch =
 export function CalendarGrid({
   days,
   blocks,
-  nowMinute,
   todayISO,
   onCreate,
   onEdit,
@@ -75,8 +139,6 @@ export function CalendarGrid({
 }: {
   days: GridDay[];
   blocks: CalendarBlock[];
-  /** Minutes since local midnight, resolved server-side. Null when not today. */
-  nowMinute: number | null;
   todayISO: string;
   onCreate: (dateISO: string, startMinute: number) => void;
   onEdit: (block: CalendarBlock) => void;
@@ -231,7 +293,7 @@ export function CalendarGrid({
             </p>
             <DayStrip
               blocks={blocksFor(day.dateISO)}
-              nowMinute={day.dateISO === todayISO ? nowMinute : null}
+              isToday={day.dateISO === todayISO}
               index={index}
             />
           </div>
@@ -256,7 +318,7 @@ export function CalendarGrid({
               key={day.dateISO}
               day={day}
               blocks={shown.filter((block) => block.dateISO === day.dateISO)}
-              nowMinute={day.dateISO === todayISO ? nowMinute : null}
+              isToday={day.dateISO === todayISO}
               drag={drag}
               setDrag={setDrag}
               commit={commit}
@@ -294,11 +356,11 @@ const isWeekend = (dateISO: string): boolean => {
  */
 function DayStrip({
   blocks,
-  nowMinute,
+  isToday,
   index,
 }: {
   blocks: CalendarBlock[];
-  nowMinute: number | null;
+  isToday: boolean;
   /** Position in the week, for the stagger. */
   index: number;
 }) {
@@ -344,11 +406,19 @@ function DayStrip({
           style={{ left: position(transition.startMinute) }}
         />
       ))}
-      {nowMinute !== null && nowMinute >= STRIP_FROM && nowMinute <= STRIP_TO && (
-        <div
-          className="bg-running absolute inset-y-0 w-px"
-          style={{ left: position(nowMinute) }}
-        />
+      {isToday && (
+        <NowPosition>
+          {(nowMinute) =>
+            nowMinute !== null &&
+            nowMinute >= STRIP_FROM &&
+            nowMinute <= STRIP_TO && (
+              <div
+                className="bg-running absolute inset-y-0 w-px"
+                style={{ left: position(nowMinute) }}
+              />
+            )
+          }
+        </NowPosition>
       )}
     </div>
   );
@@ -408,7 +478,7 @@ function HourGutter() {
 function DayColumn({
   day,
   blocks,
-  nowMinute,
+  isToday,
   drag,
   setDrag,
   commit,
@@ -420,7 +490,7 @@ function DayColumn({
 }: {
   day: GridDay;
   blocks: CalendarBlock[];
-  nowMinute: number | null;
+  isToday: boolean;
   drag: {
     id: string;
     mode: "move" | "resize";
@@ -608,15 +678,21 @@ function DayColumn({
         />
       ))}
 
-      {nowMinute !== null && (
-        <div
-          className="pointer-events-none absolute inset-x-0 z-20"
-          style={{ top: nowMinute * MINUTE_PX }}
-        >
-          <div className="bg-running relative h-px">
-            <span className="bg-running absolute -top-1 -left-1 size-2 rounded-full" />
-          </div>
-        </div>
+      {isToday && (
+        <NowPosition>
+          {(nowMinute) =>
+            nowMinute !== null && (
+              <div
+                className="pointer-events-none absolute inset-x-0 z-20"
+                style={{ top: nowMinute * MINUTE_PX }}
+              >
+                <div className="bg-running relative h-px">
+                  <span className="bg-running absolute -top-1 -left-1 size-2 rounded-full" />
+                </div>
+              </div>
+            )
+          }
+        </NowPosition>
       )}
 
       {/* Where it would land, at the length it would be. A drop indicator that

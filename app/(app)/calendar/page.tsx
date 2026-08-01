@@ -113,7 +113,9 @@ export default async function CalendarPage({
   const anchorIsToday = anchor.getTime() === today.getTime();
   const nextUp = anchorIsToday
     ? anchorBlocks
-        .filter((block) => block.startMinute > nowMinute)
+        // `>=`: a block starting at the exact current minute is next up, not
+        // behind you.
+        .filter((block) => block.startMinute >= nowMinute)
         .sort((a, b) => a.startMinute - b.startMinute)[0]
     : undefined;
 

@@ -412,3 +412,35 @@ the minute it was drunk — the count for a day is a groupBy, never a stored
 total. That timestamp is what makes "last glass was 3h ago" and the backdate
 menu truthful, and a backdated glass keeps its claimed time: the record is
 "when did this happen", not "when was the button pressed".
+
+### Loading states
+
+**A loading screen is the page's own skeleton, not a spinner.** Every route
+under `(app)` and `(focus)` has a `loading.tsx` built from shadcn `Skeleton`,
+mirroring the page's real container classes and its main shapes — the calendar
+skeleton is the grid, the water skeleton is the vessel — so the page arrives
+already laid out and nothing jumps when it does. The bones pulse; the block
+itself rises in with `rise` (320ms) once. Both are killed by the single global
+reduced-motion rule. They are deliberately dumb: no logic, no data, no motion
+vocabulary of their own.
+
+### The now-tick draws two pixels, so only those re-render
+
+`useNowMinute` used to live in `CalendarView`, which meant every 30-second tick
+re-rendered the whole grid — strips, columns, the optimistic layer — for the
+sake of a 1px line in today's strip and the running line in the day column. The
+tick now lives in a `NowProvider` that holds the grid as a stable child; the two
+markers subscribe through context and re-render alone. Behaviour is unchanged —
+the running line still appears a frame after first paint, because null on the
+first render is what keeps the moving element out of the hydration diff — only
+the blast radius of the tick is gone.
+
+### A failed action still revalidates
+
+The calendar's actions are optimistic: the block moves and the tick flips the
+instant you let go, and the server answers by revalidating. That revalidation
+used to be skipped when an action bailed out early — a malformed payload or a
+missing id left the server cache holding the old state, and the block snapped
+back on the next visit even though the screen said otherwise. Every exit path
+of `moveBlock` and `toggleBlockDone` now revalidates: the cache must agree with
+what the user is looking at, whatever the action decided.

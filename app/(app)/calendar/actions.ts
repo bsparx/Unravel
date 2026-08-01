@@ -288,10 +288,19 @@ export async function updateBlock(
 export async function moveBlock(formData: FormData): Promise<void> {
   const user = await requireUser();
   const parsed = moveBlockSchema.safeParse(formValues(formData));
-  if (!parsed.success) return;
+  if (!parsed.success) {
+    // The optimistic layer has already moved the block on screen; revalidate
+    // anyway so a bad payload can't leave the server cache disagreeing with
+    // what the user is looking at.
+    revalidateCalendar();
+    return;
+  }
 
   const date = parseLocalDate(parsed.data.date);
-  if (!date) return;
+  if (!date) {
+    revalidateCalendar();
+    return;
+  }
 
   const span = clampSpan(
     snap(parsed.data.startMinute),
@@ -448,7 +457,11 @@ export async function toggleBlockDone(formData: FormData): Promise<void> {
   const user = await requireUser();
   const id = String(formData.get("id") ?? "");
   const done = formData.get("done") === "true";
-  if (!id) return;
+  if (!id) {
+    // Same reasoning as moveBlock: the tick was already flipped on screen.
+    revalidateCalendar();
+    return;
+  }
 
   await prisma.timeBlock.updateMany({
     where: { id, userId: user.id },

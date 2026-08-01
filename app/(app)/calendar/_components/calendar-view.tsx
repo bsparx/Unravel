@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useCallback, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import type { CalendarBlock } from "@/lib/time-blocks";
@@ -9,7 +9,7 @@ import { idleState } from "@/lib/validation";
 
 import { scheduleTask } from "../actions";
 import { BlockDialog, type BlockDraft } from "./block-dialog";
-import { CalendarGrid, type GridDay } from "./calendar-grid";
+import { CalendarGrid, NowProvider, type GridDay } from "./calendar-grid";
 
 /**
  * Owns the one piece of state the calendar genuinely needs on the client: which
@@ -30,13 +30,18 @@ export function CalendarView({
   tasks: { id: string; title: string; cueTitle: string | null }[];
 }) {
   const [draft, setDraft] = useState<BlockDraft | null>(null);
-  const nowMinute = useNowMinute(timeZone);
   const [, startTransition] = useTransition();
+
+  // Stable identity: the dialog's toast effect depends on it, and a fresh
+  // function every render would re-run that effect on every CalendarView
+  // render — including the 30-second now-tick.
+  const closeDialog = useCallback(() => setDraft(null), []);
 
   return (
     <>
-      <CalendarGrid
-        onDropItem={(item, dateISO, startMinute) => {
+      <NowProvider timeZone={timeZone}>
+        <CalendarGrid
+          onDropItem={(item, dateISO, startMinute) => {
           startTransition(async () => {
             const formData = new FormData();
             formData.set("taskId", item.id);
@@ -58,7 +63,6 @@ export function CalendarView({
         }}
         days={days}
         blocks={blocks}
-        nowMinute={nowMinute}
         todayISO={todayISO}
         onCreate={(dateISO, startMinute) => {
           const span = spanOfLength(startMinute, 60);
@@ -86,6 +90,7 @@ export function CalendarView({
           })
         }
       />
+      </NowProvider>
 
       {draft && (
         // Keyed so opening a different block remounts the form with that
@@ -94,43 +99,9 @@ export function CalendarView({
           key={draft.id ?? `new-${draft.dateISO}-${draft.startMinute}`}
           draft={draft}
           tasks={tasks}
-          onClose={() => setDraft(null)}
+          onClose={closeDialog}
         />
       )}
     </>
   );
-}
-
-/**
- * Minutes since local midnight, in the user's timezone.
- *
- * Null on the first render on purpose: the server has no "now" it can agree
- * with the client about to the minute, and rendering a line at a
- * server-computed position would be a guaranteed hydration mismatch on the one
- * element that moves. It appears a frame later instead.
- */
-function useNowMinute(timeZone: string): number | null {
-  const [minute, setMinute] = useState<number | null>(null);
-
-  useEffect(() => {
-    const read = () => {
-      const parts = new Intl.DateTimeFormat("en-GB", {
-        timeZone,
-        hour: "2-digit",
-        minute: "2-digit",
-        hourCycle: "h23",
-      }).formatToParts(new Date());
-
-      const value = (type: string) =>
-        Number(parts.find((part) => part.type === type)?.value ?? 0);
-
-      setMinute(value("hour") * 60 + value("minute"));
-    };
-
-    read();
-    const timer = setInterval(read, 30_000);
-    return () => clearInterval(timer);
-  }, [timeZone]);
-
-  return minute;
 }
