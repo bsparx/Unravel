@@ -140,6 +140,10 @@ model User {
   autoStartBreaks    Boolean @default(false)
   autoStartNextFocus Boolean @default(false)
   soundEnabled       Boolean @default(true)
+  // Separate from sound on purpose: the pulses at 50% and 10% are there for a
+  // phone face-down on the desk, which is exactly when someone has the chime
+  // turned off.
+  hapticsEnabled     Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -433,6 +437,19 @@ model FocusSession {
   /// The moment the arc hit zero.
   reachedTargetAt DateTime?
   pausedCount     Int       @default(0)
+
+  /// What the clock actually measured, kept the first time someone corrects
+  /// the log by hand. Null means nobody has.
+  ///
+  /// The correction overwrites `elapsedSeconds` rather than living beside it,
+  /// because every aggregate in the app reads that column and a log you have to
+  /// remember to reconcile is one that will disagree with itself. This keeps
+  /// the original anyway: a timer left running overnight is the single most
+  /// common way an estimate gets learned, and throwing the measurement away
+  /// would also throw away the evidence that the number is a claim, not a
+  /// measurement.
+  measuredSeconds Int?
+  adjustedAt      DateTime?
 
   /// Did the user tick the task done from the timer screen?
   completedTask Boolean           @default(false)

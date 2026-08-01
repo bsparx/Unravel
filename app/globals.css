@@ -6,8 +6,8 @@
 
 /* ---------------------------------------------------------------------------
    Calm focus — see design-notes.md
-   Warm paper / deep ink base, muted teal primary, and amber reserved
-   EXCLUSIVELY for "the clock is moving". Nothing else in the app is amber.
+   Warm paper / deep ink base, muted teal primary, and a calm blue reserved
+   EXCLUSIVELY for "the clock is moving". Nothing else in the app uses it.
 --------------------------------------------------------------------------- */
 
 @theme inline {
@@ -168,9 +168,12 @@
   --input: #ded7c9;
   --ring: #2f6f6a;
 
-  --running: #c97b27;
-  --running-foreground: #fffaf3;
-  --running-muted: #f3e3cd;
+  /* A settled mid-blue, not a bright one. It has to hold a large ring for
+     twenty-five minutes without becoming something you want to look away
+     from, so the chroma stays well under the teal's. */
+  --running: #3b6fb0;
+  --running-foreground: #f7faff;
+  --running-muted: #dce7f6;
 
   /* Cool and low-chroma, so recovery reads as a different kind of time at a
      glance rather than as "the timer, but a bit different". */
@@ -221,9 +224,11 @@
   --input: #35302a;
   --ring: #6fb3ab;
 
-  --running: #e0a050;
-  --running-foreground: #1c1408;
-  --running-muted: #3a2c17;
+  /* Lifted and slightly desaturated for the dark surface: the light-mode blue
+     goes muddy on near-black, and a saturated one glares. */
+  --running: #7ba7de;
+  --running-foreground: #0d1626;
+  --running-muted: #1a2740;
 
   --rest: #7fa6b3;
   --rest-foreground: #0f1a1e;

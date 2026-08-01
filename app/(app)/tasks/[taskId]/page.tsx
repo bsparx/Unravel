@@ -3,11 +3,12 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { ConfirmDelete } from "@/components/confirm-delete";
+import { SessionLog } from "@/components/session-log";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { formatDuration, formatTimestamp, toISODate } from "@/lib/dates";
 import { getProjects, getTask } from "@/lib/tasks";
-import { MODE_LABELS, toWorkMode } from "@/lib/timer-math";
+import { toWorkMode } from "@/lib/timer-math";
 
 import { deleteTask, updateTodo } from "../actions";
 import { TaskForm } from "../_components/task-form";
@@ -38,6 +39,7 @@ export default async function EditTaskPage({
       startedAt: true,
       elapsedSeconds: true,
       overtimeSeconds: true,
+      measuredSeconds: true,
     },
   });
 
@@ -112,31 +114,16 @@ export default async function EditTaskPage({
               ) : null}
             </p>
 
-            <ul className="text-label">
-              {sessions.map((session) => (
-                <li
-                  key={session.id}
-                  className="border-border/60 flex items-center justify-between gap-4 border-b py-2 last:border-b-0"
-                >
-                  <span className="text-muted-foreground">
-                    {formatTimestamp(session.startedAt, user.timezone)}
-                  </span>
-                  <span className="flex items-center gap-3">
-                    <span className="text-muted-foreground text-micro tracking-wider uppercase">
-                      {MODE_LABELS[session.mode]}
-                    </span>
-                    <span className="tabular-nums">
-                      {formatDuration(session.elapsedSeconds)}
-                    </span>
-                    {session.overtimeSeconds > 0 && (
-                      <span className="text-running tabular-nums">
-                        +{formatDuration(session.overtimeSeconds)}
-                      </span>
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <SessionLog
+              sessions={sessions.map((session) => ({
+                id: session.id,
+                mode: session.mode,
+                startedLabel: formatTimestamp(session.startedAt, user.timezone),
+                elapsedSeconds: session.elapsedSeconds,
+                overtimeSeconds: session.overtimeSeconds,
+                measuredSeconds: session.measuredSeconds,
+              }))}
+            />
           </>
         )}
       </section>

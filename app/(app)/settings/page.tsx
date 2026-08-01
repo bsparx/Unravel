@@ -38,6 +38,7 @@ export default async function SettingsPage() {
           autoStartBreaks: user.autoStartBreaks,
           autoStartNextFocus: user.autoStartNextFocus,
           soundEnabled: user.soundEnabled,
+          hapticsEnabled: user.hapticsEnabled,
         }}
       />
     </div>

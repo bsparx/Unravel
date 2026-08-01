@@ -10,6 +10,7 @@ import { parseTimerParams, toTimerMode } from "@/lib/timer-url";
 
 import { TimerScreen } from "./_components/timer-screen";
 import { getActiveSession } from "./_lib/session-hydrate";
+import { getTodayLog } from "./_lib/today-log";
 
 export const metadata = { title: "Timer" };
 
@@ -58,6 +59,10 @@ export default async function TimerPage({
 
   const active = await getActiveSession(user);
 
+  // Only for the task the page was opened for. A live session belonging to a
+  // *different* task is guarded in the screen, exactly as the step list is.
+  const todayLog = task ? await getTodayLog(user, task.id) : null;
+
   return (
     // Nothing here starts the clock. The screen mounts IDLE with the arc full,
     // and `startSession` only ever fires from the Start button's own handler.
@@ -67,6 +72,7 @@ export default async function TimerPage({
         task ? { id: task.id, title: task.title, type: task.type } : null
       }
       initialSteps={task?.steps ?? []}
+      todayLog={todayLog}
       hasActiveSession={active !== null}
     />
   );

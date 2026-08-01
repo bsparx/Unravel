@@ -10,7 +10,11 @@ import { z } from "zod";
 
 import { MINUTES_PER_DAY, MIN_BLOCK_MINUTES } from "@/lib/block-math";
 import { MAX_QUOTA } from "@/lib/quota";
-import { MAX_INTERVALS, MAX_TARGET_SECONDS } from "@/lib/timer-math";
+import {
+  MAX_INTERVALS,
+  MAX_LOGGED_SECONDS,
+  MAX_TARGET_SECONDS,
+} from "@/lib/timer-math";
 
 export const cuid = z.string().min(1).max(64);
 
@@ -298,6 +302,22 @@ export const scheduleTaskSchema = z.object({
 
 export const deleteBlockSchema = z.object({ id: cuid });
 
+/**
+ * Correcting the time logged against a finished session.
+ *
+ * Minutes, because that is the unit the number was wrong in — nobody left a
+ * timer running by 61,200 seconds, they left it running overnight. Zero is
+ * valid and means "this didn't happen"; the row stays, the time goes.
+ */
+export const adjustSessionSchema = z.object({
+  sessionId: cuid,
+  minutes: z.coerce
+    .number()
+    .int("Whole minutes, please.")
+    .min(0, "That can't be negative.")
+    .max(MAX_LOGGED_SECONDS / 60, "That's more than a day."),
+});
+
 export const projectSchema = z.object({
   name: z.string().trim().min(1).max(60),
   color: z.enum(["teal", "clay", "sage", "sand", "ink"]).default("teal"),
@@ -313,6 +333,7 @@ export const settingsSchema = z.object({
   autoStartBreaks: z.coerce.boolean().default(false),
   autoStartNextFocus: z.coerce.boolean().default(false),
   soundEnabled: z.coerce.boolean().default(true),
+  hapticsEnabled: z.coerce.boolean().default(true),
 });
 
 // ---------------------------------------------------------------- action result

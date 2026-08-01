@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { StepList } from "@/components/step-list";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { formatClock, formatDuration } from "@/lib/dates";
 import {
   INTERVAL_LABELS,
@@ -19,16 +20,21 @@ import {
 import { nextStep, type StepLike } from "@/lib/steps";
 import { cn } from "@/lib/utils";
 
+import { adjustLoggedTime } from "../actions";
+import type { TodayLog as TodayLogData } from "../_lib/today-log";
 import { useTimer, type TimerTask } from "../_hooks/timer-provider";
+import { useThresholdHaptics } from "../_hooks/use-threshold-haptics";
 import { useWakeLock } from "../_hooks/use-wake-lock";
 import { ModeSwitcher } from "./mode-switcher";
 import { RecoveryFace } from "./recovery-face";
-import { TimerArc } from "./timer-arc";
+import { TimerFace } from "./timer-face";
+import { TodayLog } from "./today-log";
 
 export function TimerScreen({
   initialConfig,
   initialTask,
   initialSteps = [],
+  todayLog = null,
   hasActiveSession,
 }: {
   initialConfig: TimerConfig;
@@ -41,6 +47,8 @@ export function TimerScreen({
    * the live session really is the task the page was opened for.
    */
   initialSteps?: StepLike[];
+  /** Today's roll-up for the task in the URL. Null when there isn't one. */
+  todayLog?: TodayLogData | null;
   hasActiveSession: boolean;
 }) {
   const router = useRouter();
@@ -72,6 +80,16 @@ export function TimerScreen({
   useWakeLock(state.phase === "RUNNING");
 
   const currentInterval = plan[Math.min(state.intervalIndex, plan.length - 1)];
+
+  // The cue for when you've stopped looking at the face. Recovery is excluded
+  // by its own interval having no target — see the guard in the hook.
+  useThresholdHaptics({
+    enabled: timer.settings.hapticsEnabled,
+    running: state.phase === "RUNNING",
+    intervalIndex: state.intervalIndex,
+    interval: currentInterval,
+    intervalElapsedSeconds,
+  });
   const recovery = state.config.mode === "RECOVERY";
   const isBreak = !recovery && currentInterval?.kind !== "FOCUS";
   const isFlow = state.config.mode === "FLOW";
@@ -116,6 +134,22 @@ export function TimerScreen({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [toggle]);
 
+  // A finished session is committed to the day's roll-up by `endSession`, and
+  // this page's copy of that roll-up is server-rendered — so without a refetch
+  // "logged today" would still be showing the total from before the session
+  // you just did. Fires once per transition into ENDED, not on every render
+  // while the summary is up.
+  const refreshedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (state.phase !== "ENDED") {
+      refreshedFor.current = null;
+      return;
+    }
+    if (refreshedFor.current === state.sessionId) return;
+    refreshedFor.current = state.sessionId;
+    router.refresh();
+  }, [router, state.phase, state.sessionId]);
+
   // Only show the checklist when the running session is genuinely the task
   // this page was opened for. After a cross-route remount the provider can be
   // holding a different task entirely, and a checklist for the wrong thing is
@@ -125,6 +159,12 @@ export function TimerScreen({
       ? initialSteps
       : [];
   const upNext = nextStep(steps);
+
+  // Same guard, same reason: a day's total for the wrong task is a wrong
+  // number presented as a fact, which is worse than not showing one.
+  const ownTask =
+    state.task && initialTask && state.task.id === initialTask.id;
+  const dayLog = ownTask ? todayLog : null;
 
   const focusBlocks = plan.filter((interval) => interval.kind === "FOCUS");
   const focusIndex = plan
@@ -136,6 +176,7 @@ export function TimerScreen({
       <SessionSummary
         mode={state.config.mode}
         task={state.task}
+        sessionId={state.sessionId}
         elapsedSeconds={elapsedSeconds}
         targetSeconds={state.config.targetSeconds}
         onAgain={() => reset(state.config, state.task)}
@@ -230,14 +271,23 @@ export function TimerScreen({
         return recovery ? (
           <RecoveryFace>{face}</RecoveryFace>
         ) : (
-          <TimerArc
-            elapsedSeconds={elapsedSeconds}
-            targetSeconds={state.config.targetSeconds}
-            plan={plan}
+          // The clock itself is handed over, not a progress number: the face
+          // re-derives it every frame from Date.now(). Passing `elapsedSeconds`
+          // would tie it back to this component's 4Hz render and put the
+          // stepping straight back in.
+          <TimerFace
+            clock={{
+              accumulatedMs: state.accumulatedMs,
+              runningSince: state.runningSince,
+            }}
             running={running}
+            plan={plan}
+            intervalIndex={state.intervalIndex}
+            intervalBaseMs={state.intervalBaseMs}
+            config={state.config}
           >
             {face}
-          </TimerArc>
+          </TimerFace>
         );
       })()}
 
@@ -295,6 +345,18 @@ export function TimerScreen({
           </>
         )}
       </div>
+
+      {dayLog && !recovery && (
+        <TodayLog
+          log={dayLog}
+          // The provider's elapsed seconds, which already span breaks —
+          // exactly what `endSession` will commit, so the running number and
+          // the number it settles on are the same one.
+          liveSeconds={elapsedSeconds}
+          live={!idle && state.sessionId !== null}
+          unit={state.task?.type === "HABIT" ? "habit" : "todo"}
+        />
+      )}
 
       {steps.length > 0 && !recovery && (
         <section className="mt-8 w-full max-w-sm">
@@ -380,6 +442,7 @@ function ResumeBanner({ onDiscard }: { onDiscard: () => Promise<void> }) {
 function SessionSummary({
   mode,
   task,
+  sessionId,
   elapsedSeconds,
   targetSeconds,
   onAgain,
@@ -387,13 +450,23 @@ function SessionSummary({
 }: {
   mode: TimerMode;
   task: TimerTask;
+  sessionId: string | null;
   elapsedSeconds: number;
   targetSeconds: number;
   onAgain: () => void;
   onDone: () => Promise<void>;
 }) {
   const recovery = mode === "RECOVERY";
-  const delta = elapsedSeconds - targetSeconds;
+
+  // The corrected figure, once someone has corrected it. Kept locally because
+  // the provider's clock state is the *measurement*, and a claim about where
+  // the time went is not the same object — writing it back into the reducer
+  // would mean a reset or a "go again" could carry it forward.
+  const [claimed, setClaimed] = useState<number | null>(null);
+  const [adjusting, setAdjusting] = useState(false);
+
+  const logged = claimed ?? elapsedSeconds;
+  const delta = logged - targetSeconds;
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col items-center px-5 py-16 text-center">
@@ -407,11 +480,30 @@ function SessionSummary({
           recovery ? "text-rest" : "text-running",
         )}
       >
-        {formatClock(elapsedSeconds)}
+        {formatClock(logged)}
       </p>
 
       {task && !recovery && (
         <p className="font-display mt-3 text-title text-balance">{task.title}</p>
+      )}
+
+      {/* The one moment the number is worth questioning: it is on screen, it
+          is fresh, and the person still remembers whether the clock was
+          telling the truth. Offered here rather than only on the task page
+          because the runaway case — a timer left on for hours — is exactly the
+          one where nobody goes looking for a settings screen afterwards. */}
+      {sessionId && (
+        <AdjustLogged
+          sessionId={sessionId}
+          loggedSeconds={logged}
+          open={adjusting}
+          onOpen={() => setAdjusting(true)}
+          onClose={() => setAdjusting(false)}
+          onSaved={(seconds) => {
+            setClaimed(seconds);
+            setAdjusting(false);
+          }}
+        />
       )}
 
       <p className="text-muted-foreground mt-4 text-label">
@@ -441,6 +533,107 @@ function SessionSummary({
           Go again
         </Button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * "That wasn't how long it took."
+ *
+ * Closed by default and one quiet link wide. The measured number is right the
+ * overwhelming majority of the time, and a summary screen that opens with an
+ * editable field invites second-guessing a figure that was fine — which on
+ * this screen, for this audience, is a decision nobody needed to make.
+ */
+function AdjustLogged({
+  sessionId,
+  loggedSeconds,
+  open,
+  onOpen,
+  onClose,
+  onSaved,
+}: {
+  sessionId: string;
+  loggedSeconds: number;
+  open: boolean;
+  onOpen: () => void;
+  onClose: () => void;
+  onSaved: (seconds: number) => void;
+}) {
+  const [minutes, setMinutes] = useState(
+    String(Math.round(loggedSeconds / 60)),
+  );
+  const [pending, setPending] = useState(false);
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          setMinutes(String(Math.round(loggedSeconds / 60)));
+          onOpen();
+        }}
+        className="text-muted-foreground hover:text-foreground mt-3 text-label underline underline-offset-4"
+      >
+        That&apos;s not how long it took
+      </button>
+    );
+  }
+
+  const save = async () => {
+    const value = Number(minutes);
+    if (!Number.isFinite(value)) {
+      toast.error("That isn't a number of minutes.");
+      return;
+    }
+
+    setPending(true);
+    const result = await adjustLoggedTime({
+      sessionId,
+      minutes: Math.round(value),
+    });
+    setPending(false);
+
+    if (result.status === "error") {
+      toast.error(result.message);
+      return;
+    }
+
+    onSaved(result.loggedSeconds);
+    toast.success(
+      result.loggedSeconds === 0
+        ? "Logged as no time at all."
+        : `Logged as ${formatDuration(result.loggedSeconds)}.`,
+    );
+  };
+
+  return (
+    <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+      <Input
+        type="number"
+        min={0}
+        step={1}
+        inputMode="numeric"
+        autoFocus
+        value={minutes}
+        onChange={(event) => setMinutes(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            void save();
+          }
+          if (event.key === "Escape") onClose();
+        }}
+        className="h-9 w-24 text-center tabular-nums"
+        aria-label="Minutes actually spent"
+      />
+      <span className="text-muted-foreground text-label">min</span>
+      <Button size="sm" onClick={() => void save()} disabled={pending}>
+        Save
+      </Button>
+      <Button variant="ghost" size="sm" onClick={onClose} disabled={pending}>
+        Cancel
+      </Button>
     </div>
   );
 }

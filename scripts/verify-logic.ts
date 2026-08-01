@@ -26,14 +26,21 @@ import {
   isDueOn,
 } from "@/lib/recurrence";
 import {
+  adjustedOvertime,
   arcProgress,
   buildIntervalPlan,
+  clampLoggedSeconds,
+  dualScale,
   endsAutomatically,
   hasProgressIndicator,
   intervalTickFractions,
   liveElapsedMs,
+  macroProgress,
+  MAX_LOGGED_SECONDS,
+  microProgress,
   overtimeProgress,
   planFocusSeconds,
+  planTotalSeconds,
   readoutSeconds,
   sessionKind,
   suggestIntervals,
@@ -76,6 +83,7 @@ import {
   minimumMarkerRatio,
   minutesFromSeconds,
   quotaRatio,
+  recreditedProgress,
   remainingToMinimum,
   statusForTier,
   tierFor,
@@ -351,6 +359,72 @@ check("the arc drains from full to empty and stops there", () => {
   assert.equal(arcProgress(600, 1200), 0.5);
   assert.equal(arcProgress(1200, 1200), 0);
   assert.equal(arcProgress(9999, 1200), 0); // clamped, never negative
+});
+
+check("the macro container measures the whole plan, breaks included", () => {
+  // 3x25 focus with two 5-minute breaks between them: 85 minutes of your
+  // afternoon, not the 75 minutes of focus that arcProgress measures.
+  const plan = buildIntervalPlan({
+    mode: "POMODORO",
+    targetSeconds: 4500,
+    intervals: 3,
+    ...settings,
+  });
+  assert.equal(planTotalSeconds(plan), 5100);
+
+  assert.equal(macroProgress(0, plan), 1);
+  assert.equal(macroProgress(5100, plan), 0);
+  assert.equal(macroProgress(99999, plan), 0); // clamped, never negative
+
+  // The distinction that makes the second container worth drawing: at the end
+  // of the first pomodoro the macro ring has barely moved.
+  assert.equal(Math.round(macroProgress(1500, plan) * 100), 71);
+});
+
+check("the micro container measures only the interval you are in", () => {
+  const interval = { index: 0, kind: "FOCUS" as const, targetSeconds: 1500 };
+  assert.equal(microProgress(0, interval), 1);
+  assert.equal(microProgress(750, interval), 0.5);
+  assert.equal(microProgress(1500, interval), 0);
+  assert.equal(microProgress(9999, interval), 0);
+});
+
+check("LOAD-BEARING: neither container fills over a zero target", () => {
+  // Recovery's single interval has a target of zero and its plan totals zero.
+  // Without these guards rest renders as a fully spent container, and the
+  // haptic thresholds both fire the moment it starts.
+  const plan = buildIntervalPlan({
+    mode: "RECOVERY",
+    targetSeconds: 0,
+    intervals: 1,
+    ...settings,
+  });
+  assert.equal(macroProgress(0, plan), 0);
+  assert.equal(macroProgress(600, plan), 0);
+  assert.equal(microProgress(600, plan[0]), 0);
+  assert.equal(microProgress(600, undefined), 0);
+});
+
+check("both containers are only worth drawing when they differ", () => {
+  const single = buildIntervalPlan({
+    mode: "BASIC",
+    targetSeconds: 1500,
+    intervals: 1,
+    ...settings,
+  });
+  const split = buildIntervalPlan({
+    mode: "POMODORO",
+    targetSeconds: 3000,
+    intervals: 2,
+    ...settings,
+  });
+
+  assert.equal(dualScale(single), false);
+  assert.equal(dualScale(split), true);
+
+  // The reason: with one interval the two are the same number, so the second
+  // ring would be a duplicate drawn at a different radius.
+  assert.equal(macroProgress(750, single), microProgress(750, single[0]));
 });
 
 check("overtime only exists past the target", () => {
@@ -998,6 +1072,50 @@ check("logged time floors into minutes rather than rounding up", () => {
   assert.equal(minutesFromSeconds(60), 1);
   assert.equal(minutesFromSeconds(119), 1);
   assert.equal(minutesFromSeconds(-10), 0);
+});
+
+// ---------------------------------------------------------------- corrections
+
+check("a hand-corrected duration is clamped, not rejected", () => {
+  assert.equal(clampLoggedSeconds(300), 300);
+  // Zero is a legitimate claim: "I left the timer running, this didn't happen".
+  assert.equal(clampLoggedSeconds(0), 0);
+  assert.equal(clampLoggedSeconds(-60), 0);
+  assert.equal(clampLoggedSeconds(MAX_LOGGED_SECONDS + 1), MAX_LOGGED_SECONDS);
+  assert.equal(clampLoggedSeconds(Number.NaN), 0);
+  assert.equal(clampLoggedSeconds(90.6), 91);
+});
+
+check("correcting a session down takes its overtime with it", () => {
+  // The case this feature exists for: 17 hours logged against a 5-minute task.
+  const target = 300;
+  assert.equal(adjustedOvertime("FLOW", 17 * 3600, target), 17 * 3600 - target);
+  // LOAD-BEARING: overtime is a subset of elapsed, so a correction that lands
+  // under the target must leave none behind. Otherwise /stats reports more
+  // time past the goal than was logged at all.
+  assert.equal(adjustedOvertime("FLOW", 300, target), 0);
+  assert.equal(adjustedOvertime("FLOW", 60, target), 0);
+  // Rest has no target to overrun, exactly as in endSession.
+  assert.equal(adjustedOvertime("RECOVERY", 9999, 0), 0);
+  assert.equal(adjustedOvertime("BASIC", 9999, 0), 0);
+});
+
+check("re-crediting follows the clock down when the clock earned it", () => {
+  // 40 minutes logged, 40 minutes of progress: all of it came from the timer,
+  // so correcting the log to 5 minutes must correct the habit too.
+  assert.equal(recreditedProgress(40, 40 * 60, 5 * 60), 5);
+  assert.equal(recreditedProgress(40, 40 * 60, 0), 0);
+  // And still rises, like crediting does.
+  assert.equal(recreditedProgress(5, 5 * 60, 40 * 60), 40);
+});
+
+check("re-crediting never takes back a day someone entered by hand", () => {
+  // Progress 10 with only 2 minutes ever on the clock: 8 of those minutes were
+  // claimed, not measured. Correcting the session cannot revoke the claim.
+  assert.equal(recreditedProgress(10, 2 * 60, 0), 10);
+  assert.equal(recreditedProgress(10, 2 * 60, 60), 10);
+  // Once the clock exceeds the hand-entered floor, the clock wins again.
+  assert.equal(recreditedProgress(10, 2 * 60, 30 * 60), 30);
 });
 
 console.log(`\n${passed} checks passed.\n`);

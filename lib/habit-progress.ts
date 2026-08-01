@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import type { TaskOccurrence } from "@/lib/generated/prisma/client";
 import {
   minutesFromSeconds,
+  recreditedProgress,
   statusForTier,
   tierFor,
   type Quota,
@@ -114,6 +115,39 @@ export async function creditLoggedTime(
   const next = Math.max(existing?.progress ?? 0, earned);
 
   if (next === (existing?.progress ?? 0)) return;
+
+  await writeProgress(userId, quota, date, next);
+}
+
+/**
+ * Re-credit a MINUTES habit after a day's logged time has been *corrected*.
+ *
+ * The counterpart to `creditLoggedTime`, and the only path allowed to move
+ * habit progress **down**. See `recreditedProgress` for why that is safe: the
+ * hand-entered part of the figure is kept as a floor, so correcting a runaway
+ * session cannot take away a day someone explicitly claimed.
+ *
+ * A no-op for COUNT habits, exactly as crediting is — the clock never had an
+ * opinion about pages read, so correcting it has nothing to say either.
+ */
+export async function recreditLoggedTime(
+  userId: string,
+  taskId: string,
+  date: Date,
+  oldLoggedSeconds: number,
+  newLoggedSeconds: number,
+): Promise<void> {
+  const quota = await getHabitQuota(userId, taskId);
+  if (!quota || quota.unit !== "MINUTES") return;
+
+  const existing = await prisma.taskOccurrence.findUnique({
+    where: { taskId_date: { taskId, date } },
+    select: { progress: true },
+  });
+
+  const current = existing?.progress ?? 0;
+  const next = recreditedProgress(current, oldLoggedSeconds, newLoggedSeconds);
+  if (next === current) return;
 
   await writeProgress(userId, quota, date, next);
 }

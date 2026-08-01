@@ -189,6 +189,47 @@ export function arcProgress(elapsedSeconds: number, targetSeconds: number): numb
 }
 
 /**
+ * The most time a single session may claim, once corrected by hand.
+ *
+ * Wider than `MAX_TARGET_SECONDS` on purpose. That constant caps what you can
+ * *plan*; this caps what you can *claim you did*, and a long session that
+ * genuinely overran is exactly the thing being corrected here. A day is the
+ * ceiling because past it the number has stopped meaning anything.
+ */
+export const MAX_LOGGED_SECONDS = 24 * 60 * 60;
+
+/**
+ * A hand-entered duration, made safe to write.
+ *
+ * Zero is allowed and is not the same as refusing the edit: "this session
+ * didn't happen" is a thing people need to be able to say about a timer they
+ * left running, and it is better said by zeroing the row than by deleting it,
+ * which would also delete the fact that the mistake was made.
+ */
+export function clampLoggedSeconds(seconds: number): number {
+  if (!Number.isFinite(seconds)) return 0;
+  return Math.min(MAX_LOGGED_SECONDS, Math.max(0, Math.round(seconds)));
+}
+
+/**
+ * Overtime, recomputed after a correction.
+ *
+ * Overtime is a *subset* of elapsed time, so it can never survive its parent
+ * being cut — a 17-hour session corrected to 5 minutes has no overtime left,
+ * and leaving the old figure behind would make /stats report more time past
+ * the goal than was logged at all. The recovery guard is the same one
+ * `endSession` applies: rest has no target to overrun.
+ */
+export function adjustedOvertime(
+  mode: TimerMode,
+  loggedSeconds: number,
+  targetSeconds: number,
+): number {
+  if (mode === "RECOVERY" || targetSeconds <= 0) return 0;
+  return Math.max(0, clampLoggedSeconds(loggedSeconds) - targetSeconds);
+}
+
+/**
  * Past the target in FLOW mode the arc inverts: a second ring grows outward to
  * show overtime. This returns 0..1 across one further `targetSeconds`, so it
  * fills at the same rate the first ring drained.
@@ -203,6 +244,62 @@ export function overtimeProgress(
   if (targetSeconds <= 0 || elapsedSeconds <= targetSeconds) return 0;
   const over = elapsedSeconds - targetSeconds;
   return Math.min(1, over / targetSeconds);
+}
+
+/**
+ * The **macro** container: how much of the whole plan is left, 0..1.
+ *
+ * Breaks are counted. `arcProgress` measures against focus time only, which is
+ * the right question for "am I going to finish the work", and the wrong one for
+ * "how much longer am I sitting here". A pomodoro block of 3×25 with two
+ * 5-minute breaks is 85 minutes of your afternoon, not 75, and the macro ring
+ * is the thing that says so.
+ *
+ * `elapsedSeconds` is total active session time, which already spans breaks —
+ * the clock keeps accumulating across an ADVANCE, only `intervalBaseMs` moves.
+ * So this is a plain ratio and must not try to subtract break time back out.
+ */
+export function macroProgress(
+  elapsedSeconds: number,
+  plan: PlannedInterval[],
+): number {
+  const total = planTotalSeconds(plan);
+  // Recovery's single interval has a target of zero, so its plan totals zero.
+  // Same guard, same reason, as `arcProgress`: without it rest renders as a
+  // fully spent container.
+  if (total <= 0) return 0;
+  return Math.min(1, Math.max(0, 1 - elapsedSeconds / total));
+}
+
+/**
+ * The **micro** container: how much of the interval you are *currently in* is
+ * left, 0..1.
+ *
+ * This is the one that moves fast enough to feel, which is the entire point of
+ * showing it next to the macro ring. A 90-minute block barely appears to move;
+ * the 25-minute pomodoro inside it visibly drains, and the pair together is
+ * what makes both scales legible at once.
+ */
+export function microProgress(
+  intervalElapsedSeconds: number,
+  interval: PlannedInterval | undefined,
+): number {
+  if (!interval || interval.targetSeconds <= 0) return 0;
+  return Math.min(
+    1,
+    Math.max(0, 1 - intervalElapsedSeconds / interval.targetSeconds),
+  );
+}
+
+/**
+ * Is there anything to gain from drawing both containers?
+ *
+ * BASIC, FLOW and RECOVERY are a single interval, so macro and micro are the
+ * same number and the second ring would be a duplicate drawn at a different
+ * radius — noise on a screen whose whole job is to be quiet.
+ */
+export function dualScale(plan: PlannedInterval[]): boolean {
+  return plan.length > 1;
 }
 
 export type IntervalPosition = {

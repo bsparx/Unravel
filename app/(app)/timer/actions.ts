@@ -14,6 +14,8 @@ import {
   toggleHabitDone,
 } from "@/lib/habit-progress";
 import { addLoggedSeconds, ensureOccurrence } from "@/lib/occurrences";
+import { adjustSessionSeconds } from "@/lib/sessions";
+import { adjustSessionSchema } from "@/lib/validation";
 import {
   buildIntervalPlan,
   clampIntervals,
@@ -430,6 +432,56 @@ export async function startRecoverySession(): Promise<void> {
 
   revalidatePath("/timer");
   revalidatePath("/");
+}
+
+/**
+ * Correct the time logged against a finished session.
+ *
+ * Reachable by a direct POST like every Server Function, so the input is parsed
+ * and the row is re-scoped by `userId` inside `adjustSessionSeconds` — an id
+ * from the client is never enough on its own.
+ *
+ * Revalidates the same surfaces `endSession` does, because it changes exactly
+ * the same numbers: this is the same write arriving late.
+ */
+export async function adjustLoggedTime(input: {
+  sessionId: string;
+  minutes: number;
+}): Promise<{ status: "ok"; loggedSeconds: number } | { status: "error"; message: string }> {
+  const user = await requireUser();
+  const parsed = adjustSessionSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: parsed.error.issues[0]?.message ?? "That didn't look right.",
+    };
+  }
+
+  const result = await adjustSessionSeconds(
+    user.id,
+    parsed.data.sessionId,
+    parsed.data.minutes * 60,
+  );
+
+  if (!result.ok) {
+    return {
+      status: "error",
+      message:
+        result.reason === "live"
+          ? "That session is still running. Stop it first."
+          : "That session is gone.",
+    };
+  }
+
+  revalidatePath("/");
+  revalidatePath("/day");
+  revalidatePath("/tasks");
+  revalidatePath("/habits");
+  revalidatePath("/habits/stats");
+  revalidatePath("/stats");
+
+  return { status: "ok", loggedSeconds: result.loggedSeconds };
 }
 
 /** Throw away a session that was started by mistake. */

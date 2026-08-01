@@ -20,7 +20,12 @@ export async function updateSettings(
   const values = formValues(formData);
 
   // Checkboxes are simply absent when unchecked.
-  for (const key of ["autoStartBreaks", "autoStartNextFocus", "soundEnabled"]) {
+  for (const key of [
+    "autoStartBreaks",
+    "autoStartNextFocus",
+    "soundEnabled",
+    "hapticsEnabled",
+  ]) {
     values[key] = values[key] === "on" || values[key] === "true";
   }
 
@@ -64,6 +69,7 @@ export async function updateSettings(
       autoStartBreaks: input.autoStartBreaks,
       autoStartNextFocus: input.autoStartNextFocus,
       soundEnabled: input.soundEnabled,
+      hapticsEnabled: input.hapticsEnabled,
     },
   });
 

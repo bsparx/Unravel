@@ -38,6 +38,7 @@ export type TimerSettings = {
   autoStartBreaks: boolean;
   autoStartNextFocus: boolean;
   soundEnabled: boolean;
+  hapticsEnabled: boolean;
 };
 
 export type TimerTask = {

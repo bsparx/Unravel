@@ -4,8 +4,10 @@ import { ArrowLeft } from "lucide-react";
 
 import { TaskForm } from "@/app/(app)/tasks/_components/task-form";
 import { ConfirmDelete } from "@/components/confirm-delete";
+import { SessionLog } from "@/components/session-log";
 import { requireUser } from "@/lib/auth";
-import { toISODate } from "@/lib/dates";
+import { prisma } from "@/lib/db";
+import { formatTimestamp, toISODate } from "@/lib/dates";
 import { toWorkMode } from "@/lib/timer-math";
 import { getAnchorHabits, getProjects, getTask } from "@/lib/tasks";
 
@@ -27,6 +29,20 @@ export default async function EditHabitPage({
   ]);
 
   if (!habit || habit.type !== "HABIT") notFound();
+
+  const sessions = await prisma.focusSession.findMany({
+    where: { taskId: habit.id, userId: user.id, status: "COMPLETED" },
+    orderBy: { startedAt: "desc" },
+    take: 20,
+    select: {
+      id: true,
+      mode: true,
+      startedAt: true,
+      elapsedSeconds: true,
+      overtimeSeconds: true,
+      measuredSeconds: true,
+    },
+  });
 
   return (
     <div className="mx-auto w-full max-w-2xl px-5 py-8 md:px-8 md:py-12">
@@ -85,6 +101,28 @@ export default async function EditHabitPage({
           cueMinutes: habit.cue?.anchorMinutes,
         }}
       />
+
+      {sessions.length > 0 && (
+        <section className="border-border mt-10 border-t pt-6">
+          <h2 className="text-micro text-muted-foreground mb-3 font-sans font-medium tracking-wider uppercase">
+            Time on this
+          </h2>
+
+          {/* A MINUTES habit fills its quota from the clock, so a session
+              logged wrong is a tier, a streak and a chart logged wrong with
+              it. Correcting one here moves that day's progress with it. */}
+          <SessionLog
+            sessions={sessions.map((session) => ({
+              id: session.id,
+              mode: session.mode,
+              startedLabel: formatTimestamp(session.startedAt, user.timezone),
+              elapsedSeconds: session.elapsedSeconds,
+              overtimeSeconds: session.overtimeSeconds,
+              measuredSeconds: session.measuredSeconds,
+            }))}
+          />
+        </section>
+      )}
 
       <div className="border-border mt-10 flex items-center justify-between gap-4 border-t pt-6">
         <p className="text-muted-foreground text-label">

@@ -115,6 +115,37 @@ export const remainingToOptimal = (
 export const minutesFromSeconds = (seconds: number): number =>
   Math.max(0, Math.floor(seconds / 60));
 
+/**
+ * Habit progress after a day's logged time is *corrected*, rather than added to.
+ *
+ * `creditLoggedTime` only ever raises progress, which is right when time is
+ * arriving: a retry must not double-count and a short session must not undo a
+ * number you entered by hand. But it makes a correction downwards impossible,
+ * and a correction downwards is the whole reason this exists — a timer left
+ * running all night books an optimal day nobody had.
+ *
+ * So this splits the current figure into the part the clock justified and the
+ * part it didn't:
+ *
+ * - progress at or below what the old total earned was clock-derived, and
+ *   follows the clock down.
+ * - anything above it was entered or ticked by hand, and is a floor. Someone
+ *   who said "I did this" does not lose the day because a *different* session
+ *   on the same date was wrong.
+ */
+export function recreditedProgress(
+  currentProgress: number,
+  oldLoggedSeconds: number,
+  newLoggedSeconds: number,
+): number {
+  const current = Math.max(0, currentProgress);
+  const earnedBefore = minutesFromSeconds(oldLoggedSeconds);
+  const earnedNow = minutesFromSeconds(newLoggedSeconds);
+  const manualFloor = current > earnedBefore ? current : 0;
+
+  return Math.max(earnedNow, manualFloor);
+}
+
 export const clampQuota = (value: number): number =>
   Number.isFinite(value)
     ? Math.min(MAX_QUOTA, Math.max(1, Math.round(value)))

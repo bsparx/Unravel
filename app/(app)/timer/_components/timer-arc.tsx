@@ -21,7 +21,8 @@ const round = (value: number) => Math.round(value * 1000) / 1000;
  * Tick marks sit at each interval boundary, so a 60-minute block visibly reads
  * as three pomodoros *before* you press start.
  *
- * Past the goal in flow mode it inverts: a second ring grows outward in amber,
+ * Past the goal in flow mode it inverts: a second ring grows outward in the
+ * running colour,
  * because overtime is information, not failure.
  */
 export function TimerArc({

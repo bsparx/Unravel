@@ -40,6 +40,7 @@ export async function AuthedProviders({
         autoStartBreaks: user.autoStartBreaks,
         autoStartNextFocus: user.autoStartNextFocus,
         soundEnabled: user.soundEnabled,
+        hapticsEnabled: user.hapticsEnabled,
       }}
     >
       {children}

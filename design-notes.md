@@ -29,26 +29,38 @@ CSS-first.
 | Paper (background) | `#faf7f2` | `#14120f` | Warm, not blue-grey. Reads as paper, not as a dashboard. |
 | Ink (foreground) | `#1c1a17` | `#ece6dc` | Warm near-black; pure `#000` is harsh at this contrast. |
 | Teal (primary) | `#2f6f6a` | `#6fb3ab` | Muted, low-chroma. Actions and links. |
-| **Amber (running)** | `#c97b27` | `#e0a050` | **Reserved.** Means "work is on the clock" and nothing else. |
+| **Blue (running)** | `#3b6fb0` | `#7ba7de` | **Reserved.** Means "work is on the clock" and nothing else. |
 | **Slate blue (rest)** | `#5a7f8c` | `#7fa6b3` | **Reserved.** Recovery, and only recovery. |
 | Clay (destructive) | `#b85c4a` | `#d4796a` | Overdue and delete. A warm relative of the palette, not `red-500`. |
 | Warm grey (muted) | `#8a8378` | `#9d9488` | Secondary text. |
 
 Calendar blocks are coloured by **kind, never by state**: work is a wash of
 teal, recovery a wash of slate blue, buffer a dashed grey. The now-line is the
-only amber on that screen. A planned block borrowing amber would make an entire
-untouched day look like it was already in progress — the reservation holds on
+only running-blue on that screen. A planned block borrowing it would make an
+entire untouched day look like it was already in progress — the reservation holds on
 the calendar exactly as it holds everywhere else.
 
-The amber reservation is the single most load-bearing rule here. If amber
+The running-colour reservation is the single most load-bearing rule here. If it
 appears on a button, a badge, or a chart series that isn't about a live work
 timer, the signal is diluted and the design has failed.
 
-Recovery got its **own** colour rather than a tint of amber, deliberately. Rest
-is a peer of work, not a variation on it, and a paler amber would have said the
-opposite. The two are also temperature-opposed — warm for work, cool for rest —
-so which kind of time is running is legible from across the room, including in
-the mini badge where the label is too small to read.
+The running colour was amber (`#c97b27` / `#e0a050`) until it was deliberately
+moved to blue: a calmer hue to sit under for twenty-five minutes at a stretch,
+on a ring large enough to dominate the screen. The reservation is unchanged —
+only the hue it is spent on.
+
+Recovery got its **own** colour rather than a tint of the running one,
+deliberately. Rest is a peer of work, not a variation on it, and a paler shade
+of work would have said the opposite.
+
+**This is the cost of the move to blue, and it is a real one.** Work and rest
+used to be temperature-opposed — warm for work, cool for rest — so which kind
+of time was running read from across the room, including in the mini badge
+where the label is too small to see. Both are now cool, and the pair is carried
+entirely by hue and chroma: work is a true blue at ~50% saturation, recovery a
+desaturated grey-teal. That still separates, but it is a weaker signal than
+temperature was. If the two are ever confused in use, recovery is the one to
+move — it has no reservation to protect.
 
 ### Typography
 
@@ -80,14 +92,38 @@ of equivalent tiles.
 
 ### Signature element
 
-**The depleting arc, and its deliberate absence.**
+**The draining containers, and their deliberate absence.**
 
-For work: an SVG ring that drains as time passes, modelled on a physical Time
-Timer — the standard tool for making duration legible when your internal clock
-doesn't cooperate. Tick marks around the ring mark pomodoro segment boundaries,
-so you can *see* how the block is split before you start. In flow mode, once
-the target is passed the arc inverts into a growing amber overtime ring and the
-digits count up instead of down.
+For work: two concentric containers rendered per frame in WebGL
+(`decay-field.tsx` + `decay-field.glsl.ts`), modelled on a physical Time Timer —
+the standard tool for making duration legible when your internal clock doesn't
+cooperate.
+
+- **Macro**, a thin outer ring: the whole plan, *breaks included*. A 3×25 block
+  is 85 minutes of your afternoon, not 75, and this is the thing that says so.
+  Boundaries are cut as gaps, so a block is legible as three pomodoros before
+  anything has started.
+- **Micro**, a thick inner well: the interval you are in right now. It is the
+  one that moves fast enough to feel, which is the whole reason for showing two.
+
+Below them is a hole, not a disc: the digits live there, and a filled container
+behind warm mono type is unreadable at this contrast. The two collapse to one
+when the plan is a single interval (BASIC, FLOW), because two rings showing the same
+number is a duplicate drawn at a different radius. In flow mode, past the target
+a third ring grows outward and the digits count up instead of down.
+
+**Why this is rendered rather than transitioned.** The SVG version it replaced
+rode on the provider's 250ms re-render and covered each jump with a 300ms eased
+transition — a hold, then a catch-up, permanently a third of a second behind
+and visibly stepping. What a person saw was an animation *standing in for*
+time. The shader reads `Date.now()` itself every frame and takes nothing from
+React, so the face is the clock. The same property that makes it fluid is what
+makes it truthful: because every frame is derived rather than advanced, a
+throttled tab or a suspended laptop resumes at the right value instead of
+easing toward it.
+
+`TimerArc` is kept as the server render, the pre-hydration paint and the
+no-WebGL fallback. The face must never be a hole in the page.
 
 For recovery: **nothing moves.** A flat static ring in the same 260px footprint
 so the page doesn't jump, and digits counting up. No dasharray, no ticks, no
@@ -120,6 +156,25 @@ On a screen built for people who are easily pulled off task, ambient movement
 is a cost. Motion here either confirms something you just did or shows
 something arriving. Nothing moves to be decorative.
 
+**The timer face is the one continuous exception, and it does not break that
+rule — it is the reason for it.** The movement there *is* the quantity being
+measured; the depletion is the information, not a presentation of it. That
+licence is narrow, and the file is written to keep it narrow: the frame loop
+runs only while the clock does, an idle or paused face is completely still, and
+there is no ambient shimmer, drift or idle breathing anywhere in the shader.
+
+It follows that `prefers-reduced-motion` **cannot** be handled here by the
+global rule that kills every duration — that rule governs CSS, and a WebGL loop
+is invisible to it. Reduced motion switches off the grain drift and nothing
+else. Freezing the depletion would remove the feature rather than calm it,
+which is the wrong reading of the request: someone asking for less motion is
+not asking to stop being able to see how much time is left.
+
+Haptics are the same idea in another channel — a short pulse at 50% and 10% of
+the current interval, for when you have stopped looking at the face. Separate
+from `soundEnabled` (`User.hapticsEnabled`), because a phone face-down on the
+desk is exactly when the chime is off.
+
 ## Per-surface log
 
 | Surface | Archetype | Notes |
@@ -129,13 +184,13 @@ something arriving. Nothing moves to be decorative.
 | `/day` | Single focused column, grouped list | The full picture, one tap away: habits due, overdue, due today, anytime. |
 | `/inbox` | Flat list, row actions | Triage. Deliberate, unlike capture — which is why it's a page and the dump box isn't. |
 | `/tasks` | Grouped list by project | Filters as quiet segmented control, not tabs-as-chrome. Edit and start-timer are hover-revealed row actions; the row body itself is always the timer. |
-| `/tasks/[id]` | Single column form + log | Create and edit are the same form. Delete is behind one dialog — it takes the session history with it. |
+| `/tasks/[id]` | Single column form + log | Create and edit are the same form. Delete is behind one dialog — it takes the session history with it. Every row in the log is correctable in place. |
 | `/calendar` | Two columns: grid + scheduling panel | Week by default, day on request. Blocks are dragged and resized directly; the panel is the only place anything is "assigned" a time by pressing a button. |
-| `/habits` | List + 8-week adherence grid | Grid is a heatmap row per habit; teal ramp, never amber. Two weights of teal for done — full for optimal, half for minimum — because collapsing them throws away the whole point of two quotas. Today's quota meter sits above the grid: history below, the one actionable thing above. |
+| `/habits` | List + 8-week adherence grid | Grid is a heatmap row per habit; teal ramp, never the running colour. Two weights of teal for done — full for optimal, half for minimum — because collapsing them throws away the whole point of two quotas. Today's quota meter sits above the grid: history below, the one actionable thing above. |
 | `/habits/stats` | Filters, then charts, then a per-habit table | shadcn/recharts. Optimal is the full primary and minimum is the same hue at half strength — a good day is *more of the same thing*, not a different metric. Missed is clay; skipped is neutral grey, because a deliberate "not today" is not a failure. |
-| `/timer` | Full-bleed, centred, minimal chrome | Elevation budget spent here. The face is the page. |
+| `/timer` | Full-bleed, centred, minimal chrome | Elevation budget spent here — and since the face is a shader, the "elevation" is a lighting gradient rather than a shadow. The face is the page. One quiet line under the controls carries the day's total for the task, live; correcting it opens today's sessions in place. |
 | `/close` | One input per screen, vertically centred | Ritual, not a form. No progress bar, no "step 2 of 4", no back/next chrome — just the question and one quiet way out. |
-| `/stats` | Dense, chart-first | Work and recovery get identical panel width, bar height and type scale. Amber only where the series genuinely is work on the clock. |
+| `/stats` | Dense, chart-first | Work and recovery get identical panel width, bar height and type scale. The running colour only where the series genuinely is work on the clock. |
 | `/settings` | Single column form | Timezone first — everything date-bucketed depends on it. |
 
 ### Two structural rules
@@ -160,6 +215,64 @@ it's the single most important piece of feedback in the feature.
 `FocusSession` is what happened. They are never merged, because the gap between
 them is the most useful thing the app can show you, and it vanishes the moment
 planning writes to the log.
+
+**A measurement is not a claim, and the log holds both.** While a session runs
+the server is the sole authority on its duration — a number from the client is
+only ever a cross-check. Once it has ended that flips: the person is the
+authority on where their time went, and every finished session is correctable
+in minutes, from the summary screen the moment it ends and from the task's or
+habit's log any time after.
+
+This is not a convenience. An uncorrectable log fails in both directions. It
+can't hold the two hours you did on the train, so the log is quietly incomplete
+and you stop reading it. Worse, it can't disown the seventeen hours a timer
+racked up overnight against a five-minute task — and that number doesn't just
+sit there, it flows into the day roll-up, the estimate you'd have learned, and
+on a MINUTES habit into the day's quota, tier and streak. **A confidently wrong
+number is worse than a missing one**, and for an audience whose whole reason
+for being here is a broken felt sense of duration, one bad figure is enough to
+make the entire record untrustworthy.
+
+Three rules keep the correction honest:
+
+- It **overwrites** `FocusSession.elapsedSeconds` rather than living beside it.
+  Every aggregate in the app reads that column; a parallel "corrected" column
+  would mean auditing all of them forever, and one that got missed would
+  disagree with the others in a chart nobody looks at twice.
+- What the clock actually saw is kept in `measuredSeconds`, and the corrected
+  row keeps saying so. The gap between measured and claimed is worth more than
+  a tidy list — it's what stops an estimate being read back later as a
+  measurement.
+- It is the **only** path allowed to move habit progress downward, and it splits
+  the figure first: the part the clock earned follows the clock down, anything
+  above it was entered by hand and is a floor. Correcting a bad session must
+  never revoke a day someone explicitly claimed.
+
+Zero is a valid correction and does not delete the row. "This didn't happen" is
+a thing people need to be able to say about a timer they left running, and the
+record that the mistake was made is worth keeping.
+
+**The session clock and the day's total are two different numbers, and `/timer`
+shows both.** The big readout answers "how far into *this* sitting am I" — the
+right question for the face, and the wrong one to plan an afternoon on, because
+it resets every time you press start. Someone who already gave a task two hours
+this morning sees `08:14` and has nothing on screen saying otherwise. So the
+day's total sits under the controls, quiet and muted, and ticks while the clock
+runs.
+
+It has to be assembled on the client: `TaskOccurrence.loggedSeconds` is only
+written by `endSession`, so mid-session the true total for today exists nowhere
+else. The server sends the committed part and the live seconds are added on top
+— which is also why the server must not include them, or every running second
+would be counted twice.
+
+**The total is displayed; the sessions under it are what's editable.** Editing
+the roll-up directly would have to guess which session was wrong, and on the
+day that matters most — one runaway session among several good ones — it would
+guess wrong. So "fix today's times" expands the same `SessionLog` the task and
+habit pages use. The session still on the clock is deliberately absent from it:
+a live row can't be corrected because the next heartbeat would overwrite the
+correction, and the panel says so rather than showing a control that fails.
 
 **The dump box is never a route.** It's mounted once in a shared layout and
 opens over whatever you're looking at. The moment capture requires a navigation

@@ -1,3 +1,14 @@
+# pnpm 11 requires an explicit decision per package with a build script. These
+# mirror the onlyBuiltDependencies / ignoredBuiltDependencies lists below,
+# which is what pnpm 10 went on. esbuild ships its platform binary as an
+# optional dependency, so it needs no build step.
+allowBuilds:
+  '@prisma/engines': true
+  esbuild: false
+  prisma: true
+  sharp: false
+  unrs-resolver: false
+
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver

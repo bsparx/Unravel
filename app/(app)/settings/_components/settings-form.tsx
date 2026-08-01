@@ -29,6 +29,7 @@ export type SettingsValues = {
   autoStartBreaks: boolean;
   autoStartNextFocus: boolean;
   soundEnabled: boolean;
+  hapticsEnabled: boolean;
 };
 
 export function SettingsForm({
@@ -169,6 +170,12 @@ export function SettingsForm({
             label="Play a sound when a block ends"
             hint="A short chime. Useful when the tab isn't in front of you."
             defaultChecked={values.soundEnabled}
+          />
+          <CheckboxField
+            id="hapticsEnabled"
+            label="Buzz partway through a block"
+            hint="A short pulse at halfway and again near the end, so you can feel the time passing without looking. Phones only."
+            defaultChecked={values.hapticsEnabled}
           />
         </div>
       </section>
