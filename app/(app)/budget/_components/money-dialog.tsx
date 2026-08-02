@@ -70,6 +70,8 @@ export function MoneyDialog({
   const [categoryId, setCategoryId] = useState(draft.categoryId ?? "none");
   const [date, setDate] = useState(draft.date);
   const [budgetId, setBudgetId] = useState(draft.budgetId ?? "none");
+  const [amountText, setAmountText] = useState(() => rupeesInput(draft.amountCents));
+  const [note, setNote] = useState(draft.note);
 
   const options = kind === "INCOME" ? categories.income : categories.expense;
 
@@ -178,7 +180,8 @@ export function MoneyDialog({
                 autoComplete="off"
                 autoFocus
                 maxLength={12}
-                defaultValue={rupeesInput(draft.amountCents)}
+                value={amountText}
+                onChange={(event) => setAmountText(event.target.value)}
                 placeholder="1250.50"
                 className="pl-10 font-mono tabular-nums"
               />
@@ -216,7 +219,6 @@ export function MoneyDialog({
             <div className="space-y-1.5">
               <Label htmlFor="money-budget">Budget</Label>
               <Select
-                name="budgetId"
                 value={budgetId}
                 onValueChange={setBudgetId}
               >
@@ -262,7 +264,8 @@ export function MoneyDialog({
                 id="money-note"
                 name="note"
                 maxLength={200}
-                defaultValue={draft.note}
+                value={note}
+                onChange={(event) => setNote(event.target.value)}
                 placeholder="Optional."
               />
             </div>
