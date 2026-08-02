@@ -116,6 +116,14 @@ enum BlockKind {
   BUFFER
 }
 
+/// Which side of the ledger a category and its transactions sit on.
+/// Deliberately not a boolean: INCOME and EXPENSE are different objects with
+/// different habits attached, and every read joins on this.
+enum MoneyKind {
+  INCOME
+  EXPENSE
+}
+
 // ---------------------------------------------------------------- identity
 
 model User {
@@ -133,17 +141,17 @@ model User {
 
   // Timer defaults. Inlined rather than a 1-1 Settings model because they are
   // always read together with the user.
-  pomodoroSeconds    Int     @default(1500)
-  shortBreakSeconds  Int     @default(300)
-  longBreakSeconds   Int     @default(900)
-  longBreakEvery     Int     @default(4)
-  autoStartBreaks    Boolean @default(false)
-  autoStartNextFocus Boolean @default(false)
-  soundEnabled       Boolean @default(true)
+  pomodoroSeconds     Int     @default(1500)
+  shortBreakSeconds   Int     @default(300)
+  longBreakSeconds    Int     @default(900)
+  longBreakEvery      Int     @default(4)
+  autoStartBreaks     Boolean @default(false)
+  autoStartNextFocus  Boolean @default(false)
+  soundEnabled        Boolean @default(true)
   // Separate from sound on purpose: the pulses at 50% and 10% are there for a
   // phone face-down on the desk, which is exactly when someone has the chime
   // turned off.
-  hapticsEnabled     Boolean @default(true)
+  hapticsEnabled      Boolean @default(true)
   /// Browser notifications when a break has run over.
   ///
   /// A third switch rather than a mode of `soundEnabled`, because it answers a
@@ -157,29 +165,32 @@ model User {
   // 8×8: 8 glasses × 250ml, one every two hours across a waking window. The
   // science (NASEM) is a range, not a number — 8 is the baseline, the
   // settings let it move to where the person actually is.
-  waterGoal            Int     @default(8)
-  waterRemindersEnabled Boolean @default(false)
+  waterGoal                Int     @default(8)
+  waterRemindersEnabled    Boolean @default(false)
   /// Minutes from local midnight when the reminder window opens. 480 = 08:00.
-  waterReminderStartMin Int     @default(480)
+  waterReminderStartMin    Int     @default(480)
   /// 1320 = 22:00. Past this the day is a closed session: no more reminders.
-  waterReminderEndMin   Int     @default(1320)
+  waterReminderEndMin      Int     @default(1320)
   /// Minimum gap between reminders, minutes. Defaults to 120 (one glass per
   /// two hours fills the day's quota inside the window).
-  waterReminderIntervalMin Int @default(120)
+  waterReminderIntervalMin Int     @default(120)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  projects    Project[]
-  tasks       Task[]
-  occurrences TaskOccurrence[]
-  sessions    FocusSession[]
-  captures    Capture[]
-  waterLog    WaterGlass[]
-  dayLogs     DayLog[]
-  journal     JournalEntry[]
-  steps       TaskStep[]
-  blocks      TimeBlock[]
+  projects        Project[]
+  tasks           Task[]
+  occurrences     TaskOccurrence[]
+  sessions        FocusSession[]
+  captures        Capture[]
+  waterLog        WaterGlass[]
+  dayLogs         DayLog[]
+  journal         JournalEntry[]
+  steps           TaskStep[]
+  blocks          TimeBlock[]
+  moneyCategories MoneyCategory[]
+  transactions    MoneyTransaction[]
+  moneyBudgets    MoneyBudget[]
 }
 
 // ---------------------------------------------------------------- lists
@@ -723,4 +734,107 @@ model JournalEntry {
   /// drop this and switch the actions from upsert to create.
   @@unique([userId, date, kind])
   @@index([userId, date])
+}
+
+// ---------------------------------------------------------------- money
+
+/// A bucket for money movement, on one side of the ledger.
+///
+/// `ownerKey` is "global" for the seeded built-ins (Food, Medical, Salary…)
+/// and the user's id for their own. A nullable `userId` is the reason for
+/// `ownerKey`: Postgres treats NULLs as distinct, so a `@@unique([userId, kind,
+/// name])` could never hold the global set together. Postgres's partial
+/// indexes are unreachable from Prisma, so the key is a plain string.
+///
+/// Categories are archived, never deleted while in use — a transaction's
+/// category is part of its record, so `onDelete: Restrict` and an
+/// `archivedAt`, exactly like Project.
+model MoneyCategory {
+  id       String  @id @default(cuid())
+  ownerKey String
+  userId   String?
+  user     User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  kind  MoneyKind
+  name  String
+  /// Palette token name, resolved to a CSS variable in the UI. The same five
+  /// as Project — validation pins the safe subset (clay is reserved for
+  /// "something went wrong" and never a category).
+  color String    @default("teal")
+
+  sortOrder  Float     @default(0)
+  archivedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions MoneyTransaction[]
+
+  @@unique([ownerKey, kind, name])
+  @@index([ownerKey, archivedAt, sortOrder])
+}
+
+/// One line of the ledger: money in or money out, on a local calendar day.
+///
+/// The amount is integer minor units (paise) — never floats, which is how
+/// money accumulates rounding errors. The date follows the house rule: a local
+/// calendar day in `User.timezone`, stored as a UTC-midnight DATE, resolved
+/// once and never re-bucketed.
+model MoneyTransaction {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  categoryId String
+  category   MoneyCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  /// The envelope this expense counts against, if any. Removing an expense
+  /// from a budget is setting this to null — the transaction itself stays.
+  budgetId String?
+  budget   MoneyBudget? @relation(fields: [budgetId], references: [id], onDelete: SetNull)
+
+  /// Integer minor units. PKR has 100 paise per rupee.
+  amountCents Int
+  /// What it was for, when the category alone doesn't say. Optional.
+  note        String?
+
+  /// Local calendar day in User.timezone, UTC-midnight DATE.
+  date DateTime @db.Date
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, date])
+  @@index([userId, categoryId])
+  @@index([userId, budgetId])
+}
+
+/// A spending envelope: a target amount over a custom range of days.
+///
+/// An expense counts against a budget only when it is explicitly assigned
+/// (`MoneyTransaction.budgetId`) — the envelope is not a filter on the ledger,
+/// it is what you put in it. Ranges are deliberately custom (10–20 Aug),
+/// escaping the month grain: a budget is the shape of a real need, not a
+/// calendar page. An expense may only be assigned when its own date falls
+/// between `startsOn` and `endsOn`.
+model MoneyBudget {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String
+  /// Integer minor units (paise), like every other amount.
+  amountCents Int
+
+  /// Local calendar days in User.timezone, UTC-midnight DATEs.
+  startsOn DateTime @db.Date
+  endsOn   DateTime @db.Date
+
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  transactions MoneyTransaction[]
+
+  @@index([userId, archivedAt, startsOn])
 }

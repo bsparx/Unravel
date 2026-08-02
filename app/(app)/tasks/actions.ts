@@ -5,8 +5,12 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { parseLocalDate, todayLocal } from "@/lib/dates";
-import { getHabitQuota, toggleHabitDone } from "@/lib/habit-progress";
-import { setOccurrenceStatus } from "@/lib/occurrences";
+import { getHabitQuota, toggleHabitDone, creditLoggedTime } from "@/lib/habit-progress";
+import {
+  addLoggedSeconds,
+  ensureOccurrence,
+  setOccurrenceStatus,
+} from "@/lib/occurrences";
 import { parseQuickAdd } from "@/lib/quick-parse";
 import { stepCreateRows, syncSteps } from "@/lib/step-sync";
 import {
@@ -14,6 +18,7 @@ import {
   createTodoSchema,
   fieldErrorsFrom,
   formValues,
+  logAndCompleteSchema,
   projectSchema,
   quickAddSchema,
   toggleOccurrenceSchema,
@@ -194,6 +199,64 @@ export async function quickAdd(
 }
 
 // ---------------------------------------------------------------- completion
+
+/**
+ * Tick done on a day where nothing was logged, and book the time back.
+ *
+ * The one question a checkbox can't answer: "how long did it actually take".
+ * Ticking without the timer running would leave a DONE day with zero minutes
+ * behind it — a hole in every average and habit tier downstream. This is the
+ * other half of that moment.
+ *
+ * For a MINUTES habit the logged minutes are credited through the quota before
+ * the habit is marked done, so the tier, streak and charts all read the real
+ * figure rather than just the minimum. For a COUNT habit the quota is untouched
+ * (time isn't pages) and ticking books the minimum as it always has — the time
+ * still lands in the day's `loggedSeconds` for the stats.
+ */
+export async function logAndComplete(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const parsed = logAndCompleteSchema.safeParse(formValues(formData));
+
+  if (!parsed.success) return;
+
+  const date = parseLocalDate(parsed.data.date);
+  if (!date) return;
+
+  const task = await prisma.task.findFirst({
+    where: { id: parsed.data.taskId, userId: user.id },
+    select: { id: true, type: true },
+  });
+  if (!task) return;
+
+  const occurrence = await ensureOccurrence(user.id, task.id, date);
+  await addLoggedSeconds(occurrence.id, parsed.data.minutes * 60);
+
+  const updated = await prisma.taskOccurrence.findUnique({
+    where: { id: occurrence.id },
+    select: { loggedSeconds: true },
+  });
+  const loggedSeconds = updated?.loggedSeconds ?? 0;
+
+  if (task.type === "HABIT") {
+    const quota = await getHabitQuota(user.id, task.id);
+    if (!quota) return;
+
+    await creditLoggedTime(user.id, task.id, date, loggedSeconds);
+    await toggleHabitDone(user.id, quota, date, true);
+  } else {
+    await prisma.task.updateMany({
+      where: { id: task.id, userId: user.id, type: "TODO" },
+      data: { completedAt: new Date() },
+    });
+    await setOccurrenceStatus(user.id, task.id, date, "DONE");
+  }
+
+  revalidateTaskViews();
+  // The timer's "today's total" is assembled from the committed occurrence
+  // figure, so a manual log lands there too.
+  revalidatePath("/timer");
+}
 
 export async function toggleTodo(formData: FormData): Promise<void> {
   const user = await requireUser();

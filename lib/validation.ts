@@ -9,10 +9,12 @@
 import { z } from "zod";
 
 import { MINUTES_PER_DAY, MIN_BLOCK_MINUTES } from "@/lib/block-math";
+import { parseMoneyToCents } from "@/lib/money";
 import { MAX_QUOTA } from "@/lib/quota";
 import {
   MAX_INTERVALS,
   MAX_LOGGED_SECONDS,
+  MAX_MANUAL_LOG_MINUTES,
   MAX_TARGET_SECONDS,
 } from "@/lib/timer-math";
 import {
@@ -215,6 +217,24 @@ export const toggleTaskSchema = z.object({
   done: z.coerce.boolean(),
 });
 
+/**
+ * The "how long did that take" dialog: ticking done on a day with no logged
+ * time, and booking the time back so the stats stay honest.
+ *
+ * Minutes, floored at one (the app never guesses below a minute) and capped at
+ * ten hours. The per-task floor is a UI concern — the server only needs the
+ * absolute bounds.
+ */
+export const logAndCompleteSchema = z.object({
+  taskId: cuid,
+  date: isoDate,
+  minutes: z.coerce
+    .number()
+    .int("Whole minutes, please.")
+    .min(1, "Log at least a minute.")
+    .max(MAX_MANUAL_LOG_MINUTES, "That's more than 10 hours."),
+});
+
 export const toggleOccurrenceSchema = z.object({
   taskId: cuid,
   date: isoDate,
@@ -382,6 +402,83 @@ export const waterSettingsSchema = z
     message: "The reminder window has to run forwards.",
     path: ["endMin"],
   });
+
+// ---------------------------------------------------------------- budget
+
+/**
+ * Money arrives as a decimal string ("1250.50") and is converted to integer
+ * paise at the action boundary. The format is checked here, the range there —
+ * see `parseMoneyToCents` and `MAX_AMOUNT_CENTS` in lib/money.ts.
+ */
+const moneyAmount = z
+  .string()
+  .trim()
+  .min(1, "Enter an amount.")
+  .refine((value) => parseMoneyToCents(value) !== null, {
+    message: "That doesn't look like an amount — e.g. 1250 or 1250.50.",
+  });
+
+export const moneyTransactionSchema = z.object({
+  /** Present when editing an existing transaction. */
+  id: cuid.optional(),
+  kind: z.enum(["INCOME", "EXPENSE"]),
+  amount: moneyAmount,
+  categoryId: cuid,
+  /** Present only when the expense is assigned to an envelope. */
+  budgetId: emptyToUndefined(cuid).optional(),
+  /** Omitted means today. */
+  date: emptyToUndefined(isoDate),
+  note: notes,
+});
+
+/** The four tokens a category may wear. Clay stays out — see lib/budget.ts. */
+export const moneyCategorySchema = z.object({
+  kind: z.enum(["INCOME", "EXPENSE"]),
+  name: z
+    .string()
+    .trim()
+    .min(1, "Give it a name.")
+    .max(40, "Keep it under 40 characters."),
+  color: z.enum(["teal", "sage", "sand", "ink"]).default("teal"),
+});
+
+export const deleteMoneyTransactionSchema = z.object({ id: cuid });
+
+export const archiveMoneyCategorySchema = z.object({ id: cuid });
+
+/**
+ * A spending envelope. Dates are local calendar days (YYYY-MM-DD); the range
+ * check (end after start) happens here, the calendar-day resolution in the
+ * action.
+ */
+export const moneyBudgetSchema = z.object({
+  /** Present when editing an existing budget. */
+  id: cuid.optional(),
+  name: z
+    .string()
+    .trim()
+    .min(1, "Give it a name.")
+    .max(40, "Keep it under 40 characters."),
+  amount: moneyAmount,
+  startsOn: isoDate,
+  endsOn: isoDate,
+}).superRefine((value, ctx) => {
+  if (
+    value.endsOn &&
+    value.startsOn &&
+    value.endsOn < value.startsOn
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["endsOn"],
+      message: "It ends before it starts.",
+    });
+  }
+});
+
+export const deleteMoneyBudgetSchema = z.object({ id: cuid });
+
+export const removeFromBudgetSchema = z.object({ id: cuid });
 
 // ---------------------------------------------------------------- action result
 

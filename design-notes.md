@@ -225,6 +225,7 @@ changes, all of them re-readings of existing data:
 | `/close` | One input per screen, vertically centred | Ritual, not a form. No progress bar, no "step 2 of 4", no back/next chrome — just the question and one quiet way out. |
 | `/stats` | Dense, chart-first | Work and recovery get identical panel width, bar height and type scale. The running colour only where the series genuinely is work on the clock. "Getting back" reports overruns as a median and only speaks up when there is a real gap between the break you pick and the break you take. |
 | `/water` | One vessel, centred | The day as a column of water — the structural rhyme to the timer's draining ring (time drains, water fills). One tap anywhere on the vessel logs a glass; the count is the only big number and gets the mono display and the app's one overshoot. Edit and reminders sit below in quiet cards. |
+| `/budget` | Two charts, one ledger | Money in is the teal of anything going well; money out is the clay of "the thing to notice" — the only two semantic colours the palette spends, and the pair is the whole story of a month. The headline sentence does the arithmetic ("…spent 61,000 and brought in 85,500 — 24,500 ahead"), the month is the grain (‹ August ›), and logging is a dialog, never a navigation. Categories sit on one side of the ledger each, wearing the existing chart hues — no new colour, and clay is never a category. |
 | `/settings` | Single column form | Timezone first — everything date-bucketed depends on it. |
 
 ### Two structural rules
@@ -444,3 +445,46 @@ missing id left the server cache holding the old state, and the block snapped
 back on the next visit even though the screen said otherwise. Every exit path
 of `moveBlock` and `toggleBlockDone` now revalidates: the cache must agree with
 what the user is looking at, whatever the action decided.
+
+### Money is in and out, not red and black
+
+The budget keeps the palette's discipline by giving the ledger only two
+semantic colours: income is teal (the colour of things going well), spending is
+clay (the colour of "the thing to notice") — which is why clay is never a
+category colour. `MoneyTransaction.amountCents` is paise, an integer, so money
+never rounds on the way in or out; the decimal form is only a string at the
+input boundary, parsed once. The month is the grain: weeks are bars, the
+donut shows one side of the ledger at a time (a question, not a dashboard), and
+the headline sentence does the arithmetic instead of a stat grid. Categories
+are archived, never deleted while they hold entries, and built-ins — owned by
+`"global"`, not the user — can't be archived at all; the unique
+`(ownerKey, kind, name)` pair is what keeps two people's "Coffee" from
+colliding while still letting everyone share one "Food".
+
+**A budget is an envelope, not a filter.** Assigning an expense to a budget
+changes nothing about the ledger — the entry stays where it is, its totals
+untouched; `MoneyTransaction.budgetId` is a pointer that `onDelete: SetNull`
+turns into "no budget" rather than "no transaction". So removing an expense
+from a budget is a single update, never a delete, and deleting a budget leaves
+every entry on the ledger. An envelope has its own dates (10–20 August), not
+the month's — the budget page's grain is the month, but money's grain is
+whatever stretch it belongs to. That is why the server checks an assignment
+against `[startsOn, endsOn]` instead of trusting the form, why the picker only
+offers envelopes covering the entry's date, why changing the date drops a
+selection that no longer fits, and why editing a budget's dates unassigns the
+expenses that fall outside them in the same transaction as the edit. A running
+budget leads the envelopes card with its countdown; everything else is a row.
+
+**The third container.** The budget page's big question is "how much do I have
+left?", and the answer is a jar: the month's net balance as a liquid level in a
+glass vessel — the rhyme to the water glass and the timer ring, the third
+draining container. Income fills it, spending drains it; a full jar is a good
+month, an overspent one turns the liquid clay. The jar is the hero, and the
+statistics are its readout: one big mono number (the balance), In and Out as
+its parts with arrows against last month, and a sentence about the pace. The
+running balance chart keeps last month's line as the palette's dormant fifth
+wheel — brass — the one comparison the page is allowed, "above the line is a
+good month". The motion budget is the app's own: the fill rises once on
+arrival, tilts toward the pointer while you point at it, settles when an
+expense lands, and never moves on its own. WebGL is a luxury, not a
+dependency: if it fails, the same jar is drawn in SVG.

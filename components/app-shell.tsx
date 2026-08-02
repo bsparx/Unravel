@@ -15,6 +15,7 @@ import {
   Settings,
   Sun,
   Timer,
+  Wallet,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -41,6 +42,7 @@ const RAIL_EXTRA = [
   { href: "/tasks", label: "Tasks", icon: ListTodo },
   { href: "/habits", label: "Habits", icon: Repeat },
   { href: "/water", label: "Water", icon: Droplets },
+  { href: "/budget", label: "Budget", icon: Wallet },
   { href: "/close", label: "Close the day", icon: Moon },
 ] as const;
 

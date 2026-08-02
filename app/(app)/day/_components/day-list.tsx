@@ -1,13 +1,19 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { CheckCircle2, Inbox } from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
-import { toggleOccurrence, toggleTodo } from "@/app/(app)/tasks/actions";
+import {
+  logAndComplete,
+  toggleOccurrence,
+  toggleTodo,
+} from "@/app/(app)/tasks/actions";
 import { formatRelativeDate } from "@/lib/dates";
 import type { TodayItem, TodayView } from "@/lib/tasks";
 import type { WaterToday } from "@/lib/water-data";
 
+import { LogTimeDialog } from "./log-time-dialog";
 import { TaskRow } from "./task-row";
 import { WaterRow } from "./water-row";
 
@@ -22,7 +28,29 @@ export function DayList({
   water: WaterToday;
   timezone: string;
 }) {
+  const [logTarget, setLogTarget] = useState<TodayItem | null>(null);
+  const logDialogRef = useRef<((minutes: number | null) => void) | null>(null);
+
   const toggle = async (item: TodayItem, next: boolean) => {
+    // Ticking done with no time behind it would leave a DONE row worth zero
+    // minutes in the stats. Ask for the honest figure first; the checkbox stays
+    // pending (checked + disabled) until the dialog answers, and reverts if it
+    // is dismissed.
+    if (next && item.loggedSeconds === 0) {
+      const minutes = await new Promise<number | null>((resolve) => {
+        logDialogRef.current = resolve;
+        setLogTarget(item);
+      });
+      if (minutes === null) return;
+
+      const formData = new FormData();
+      formData.set("taskId", item.id);
+      formData.set("date", todayISO);
+      formData.set("minutes", String(minutes));
+      await logAndComplete(formData);
+      return;
+    }
+
     const formData = new FormData();
     formData.set("taskId", item.id);
 
@@ -35,6 +63,12 @@ export function DayList({
 
     formData.set("done", String(next));
     await toggleTodo(formData);
+  };
+
+  const closeLogDialog = (minutes: number | null) => {
+    logDialogRef.current?.(minutes);
+    logDialogRef.current = null;
+    setLogTarget(null);
   };
 
   const sections: {
@@ -138,6 +172,15 @@ export function DayList({
             ))}
           </ul>
         </section>
+      )}
+
+      {logTarget && (
+        <LogTimeDialog
+          key={logTarget.id}
+          item={logTarget}
+          onConfirm={(minutes) => closeLogDialog(minutes)}
+          onCancel={() => closeLogDialog(null)}
+        />
       )}
     </div>
   );

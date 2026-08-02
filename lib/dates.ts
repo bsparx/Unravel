@@ -138,6 +138,23 @@ export function startOfWeek(date: Date, weekStart: number): Date {
   return addDays(date, -offset);
 }
 
+/** The first local day of the month containing `date`. */
+export function startOfMonth(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+}
+
+/** `delta` months forward (or back), month-boundary-aligned. */
+export function addMonths(date: Date, delta: number): Date {
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + delta, 1),
+  );
+}
+
+/** "August 2026". Pinned to en-GB and UTC like every other date in this file. */
+export function formatMonthLabel(date: Date): string {
+  return dateFormatter({ month: "long", year: "numeric" }).format(date);
+}
+
 // ---------------------------------------------------------------- display
 
 /**

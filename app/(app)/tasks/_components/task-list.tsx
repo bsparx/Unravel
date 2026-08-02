@@ -71,6 +71,7 @@ export function TaskList({
                   occurrenceStatus: null,
                   loggedSeconds: 0,
                   done: task.completedAt !== null,
+                  minimumMinutes: 1,
                   daysUntilDue: task.dueDate
                     ? Math.round(
                         (task.dueDate.getTime() - today.getTime()) / 86_400_000,

@@ -20,6 +20,7 @@ import { anchorTitleOf } from "@/lib/habit-cue";
 import type { HabitUnit, Quota, QuotaTier } from "@/lib/quota";
 import { isDueOn, type RecurrenceRule } from "@/lib/recurrence";
 import type { StepLike } from "@/lib/steps";
+import { MAX_MANUAL_LOG_MINUTES } from "@/lib/timer-math";
 
 export type TaskSummary = {
   id: string;
@@ -42,6 +43,12 @@ export type TodayItem = TaskSummary & {
   occurrenceStatus: OccurrenceStatus | null;
   loggedSeconds: number;
   done: boolean;
+  /**
+   * The floor for the "how long did that take" dialog, in minutes. For a
+   * MINUTES habit it is the habit's own minimum; for everything else it is
+   * one — time is not the thing a COUNT habit is counted in.
+   */
+  minimumMinutes: number;
   /** Negative = overdue by N days. Null for habits and undated todos. */
   daysUntilDue: number | null;
   recurrenceDays: number[] | null;
@@ -188,6 +195,10 @@ export async function getTodayView(user: User): Promise<TodayView> {
         occurrenceStatus: occurrence?.status ?? null,
         loggedSeconds: occurrence?.loggedSeconds ?? 0,
         done: occurrence?.status === "DONE",
+        minimumMinutes:
+          task.recurrence?.unit === "MINUTES"
+            ? Math.min(task.recurrence.minimumQuota, MAX_MANUAL_LOG_MINUTES)
+            : 1,
         daysUntilDue: null,
         recurrenceDays: task.recurrence?.daysOfWeek ?? null,
         cue: toCue(task.cue),
@@ -201,6 +212,7 @@ export async function getTodayView(user: User): Promise<TodayView> {
       occurrenceStatus: occurrence?.status ?? null,
       loggedSeconds: occurrence?.loggedSeconds ?? 0,
       done: task.completedAt !== null,
+      minimumMinutes: 1,
       daysUntilDue: task.dueDate
         ? Math.round(
             (task.dueDate.getTime() - today.getTime()) / 86_400_000,

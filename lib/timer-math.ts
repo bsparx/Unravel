@@ -199,6 +199,16 @@ export function arcProgress(elapsedSeconds: number, targetSeconds: number): numb
 export const MAX_LOGGED_SECONDS = 24 * 60 * 60;
 
 /**
+ * The most time the "how long did that take" dialog will book in one go.
+ *
+ * Ten hours, in minutes. Deliberately narrower than `MAX_LOGGED_SECONDS`: that
+ * ceiling exists for a session that genuinely overran and gets corrected; this
+ * is a back-of-the-envelope figure for "about how long was it", and past ten
+ * hours the number has stopped being a memory you can trust.
+ */
+export const MAX_MANUAL_LOG_MINUTES = 10 * 60;
+
+/**
  * A hand-entered duration, made safe to write.
  *
  * Zero is allowed and is not the same as refusing the edit: "this session

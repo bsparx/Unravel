@@ -13,6 +13,7 @@ import "dotenv/config";
 
 import { PrismaNeon } from "@prisma/adapter-neon";
 
+import { ensureGlobalCategories } from "@/lib/budget";
 import { tierFor, type Quota } from "@/lib/quota";
 import { PrismaClient } from "../lib/generated/prisma/client";
 import type { TimerMode } from "../lib/generated/prisma/client";
@@ -70,6 +71,9 @@ async function main() {
   await prisma.taskOccurrence.deleteMany({ where: { userId: user.id } });
   await prisma.task.deleteMany({ where: { userId: user.id } });
   await prisma.project.deleteMany({ where: { userId: user.id } });
+  await prisma.moneyBudget.deleteMany({ where: { userId: user.id } });
+  await prisma.moneyTransaction.deleteMany({ where: { userId: user.id } });
+  await prisma.moneyCategory.deleteMany({ where: { ownerKey: user.id } });
 
   const [deepWork, admin, home] = await Promise.all([
     prisma.project.create({
@@ -397,9 +401,157 @@ async function main() {
     }
   }
 
+  // ---- back-dated money, so the budget opens with a real ledger -----------
+
+  await ensureGlobalCategories();
+
+  const salary = await prisma.moneyCategory.findFirstOrThrow({
+    where: { ownerKey: "global", name: "Salary" },
+  });
+
+  await Promise.all([
+    prisma.moneyCategory.create({
+      data: {
+        ownerKey: user.id,
+        userId: user.id,
+        kind: "EXPENSE",
+        name: "Coffee",
+        color: "sand",
+        sortOrder: 1,
+      },
+    }),
+    prisma.moneyCategory.create({
+      data: {
+        ownerKey: user.id,
+        userId: user.id,
+        kind: "INCOME",
+        name: "Bonus",
+        color: "ink",
+        sortOrder: 1,
+      },
+    }),
+  ]);
+  const bonus = await prisma.moneyCategory.findFirstOrThrow({
+    where: { ownerKey: user.id, name: "Bonus" },
+  });
+
+  // Amounts are rupees in the source and paise in the ledger.
+  const EXPENSE_POOL: { name: string; chance: number; min: number; max: number }[] = [
+    { name: "Food", chance: 0.9, min: 300, max: 900 },
+    { name: "Groceries", chance: 0.35, min: 1200, max: 5000 },
+    { name: "Transport", chance: 0.6, min: 150, max: 700 },
+    { name: "Utilities", chance: 0.08, min: 8000, max: 15000 },
+    { name: "Medical", chance: 0.05, min: 1500, max: 9000 },
+    { name: "Shopping", chance: 0.18, min: 1200, max: 12000 },
+    { name: "Entertainment", chance: 0.25, min: 400, max: 3000 },
+    { name: "Subscriptions", chance: 0.14, min: 500, max: 4000 },
+    { name: "Coffee", chance: 0.45, min: 150, max: 500 },
+  ];
+
+  const expenseCategories = await prisma.moneyCategory.findMany({
+    where: { kind: "EXPENSE" },
+  });
+
+  let transactionCount = 0;
+
+  // Today is left empty, so the app opens with something to do.
+  for (let offset = -75; offset < 0; offset += 1) {
+    const date = localDate(offset);
+
+    // Payday, the first of every month — salary plus a plausible rent, and
+    // sometimes a bonus on top.
+    if (date.getUTCDate() === 1) {
+      await prisma.moneyTransaction.create({
+        data: {
+          userId: user.id,
+          categoryId: salary.id,
+          amountCents: 200_000_00,
+          date,
+        },
+      });
+      transactionCount += 1;
+
+      if (random() > 0.6) {
+        await prisma.moneyTransaction.create({
+          data: {
+            userId: user.id,
+            categoryId: bonus.id,
+            amountCents: Math.round(15000 * (1 + random())) * 100,
+            date,
+          },
+        });
+        transactionCount += 1;
+      }
+    }
+
+    // Two to six expenses a day, drawn with category-appropriate frequency.
+    const expenseCount = 2 + Math.floor(random() * 5);
+    for (let i = 0; i < expenseCount; i += 1) {
+      const pick = EXPENSE_POOL[Math.floor(random() * EXPENSE_POOL.length)];
+      if (random() > pick.chance) continue;
+
+      const amountCents = Math.round(pick.min + random() * (pick.max - pick.min)) * 100;
+      const category =
+        expenseCategories.find((entry) => entry.name === pick.name) ??
+        expenseCategories[0];
+
+      await prisma.moneyTransaction.create({
+        data: { userId: user.id, categoryId: category.id, amountCents, date },
+      });
+      transactionCount += 1;
+    }
+  }
+
+  // Two envelopes: one running right now, one that has already run — the
+  // budget page's hero and its "ended" rows. A share of the expenses that
+  // fall inside each window count against it, so the drill-in has something
+  // to show.
+  const budgets = await Promise.all([
+    createBudget(user.id, "This week", 25_000_00, -2, 4),
+    createBudget(user.id, "Shopping weekend", 18_000_00, -11, -7),
+  ]);
+  for (const budget of budgets) {
+    const inRange = await prisma.moneyTransaction.findMany({
+      where: {
+        userId: user.id,
+        date: { gte: budget.startsOn, lt: new Date(budget.endsOn.getTime() + MS_PER_DAY) },
+        category: { kind: "EXPENSE" },
+      },
+      select: { id: true },
+    });
+    await Promise.all(
+      inRange
+        .filter(() => random() < 0.3)
+        .map((transaction) =>
+          prisma.moneyTransaction.update({
+            where: { id: transaction.id },
+            data: { budgetId: budget.id },
+          }),
+        ),
+    );
+  }
+
   console.log(
-    `Done: ${todos.length} tasks, ${habits.length} habits, ${sessionCount} sessions.`,
+    `Done: ${todos.length} tasks, ${habits.length} habits, ${sessionCount} sessions, ${transactionCount} money entries.`,
   );
+}
+
+async function createBudget(
+  userId: string,
+  name: string,
+  amountCents: number,
+  startOffset: number,
+  endOffset: number,
+) {
+  return prisma.moneyBudget.create({
+    data: {
+      userId,
+      name,
+      amountCents,
+      startsOn: localDate(startOffset),
+      endsOn: localDate(endOffset),
+    },
+  });
 }
 
 async function createSession(input: {
