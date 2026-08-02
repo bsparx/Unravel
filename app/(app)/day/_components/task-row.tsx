@@ -60,6 +60,7 @@ export function TaskRow({
           label={item.title}
           priority={item.priority}
           onToggle={onToggle}
+          gatedTick={item.loggedSeconds === 0 && !item.done}
         />
 
         <Link

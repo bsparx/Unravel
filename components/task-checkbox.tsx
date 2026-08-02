@@ -16,12 +16,16 @@ export function TaskCheckbox({
   label,
   onToggle,
   priority = "P4",
+  gatedTick = false,
   className,
 }: {
   done: boolean;
   label: string;
   onToggle: (next: boolean) => void | Promise<void>;
   priority?: "P1" | "P2" | "P3" | "P4";
+  /** Ticking done will be intercepted before any optimistic state — the
+      caller shows a dialog instead. The transition must not block on it. */
+  gatedTick?: boolean;
   className?: string;
 }) {
   const [isPending, startTransition] = useTransition();
@@ -43,6 +47,13 @@ export function TaskCheckbox({
       disabled={isPending}
       onClick={() => {
         const next = !optimisticDone;
+        // A gated tick is handled by the caller (a dialog opens) — don't wrap
+        // it in the transition or optimistically check it, otherwise the
+        // transition hangs waiting on the dialog and the box freezes.
+        if (next && gatedTick) {
+          onToggle(next);
+          return;
+        }
         startTransition(async () => {
           setOptimisticDone(next);
           await onToggle(next);
