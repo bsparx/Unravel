@@ -423,6 +423,8 @@ export const moneyTransactionSchema = z.object({
   id: cuid.optional(),
   kind: z.enum(["INCOME", "EXPENSE"]),
   amount: moneyAmount,
+  /** The account this money sits in — every entry lands in one. */
+  accountId: cuid,
   categoryId: cuid,
   /** Present only when the expense is assigned to an envelope. */
   budgetId: emptyToUndefined(cuid).optional(),
@@ -479,6 +481,44 @@ export const moneyBudgetSchema = z.object({
 export const deleteMoneyBudgetSchema = z.object({ id: cuid });
 
 export const removeFromBudgetSchema = z.object({ id: cuid });
+
+/** A place money lives: a name and a palette token. */
+export const moneyAccountSchema = z.object({
+  /** Present when editing an existing account. */
+  id: cuid.optional(),
+  name: z
+    .string()
+    .trim()
+    .min(1, "Give it a name.")
+    .max(40, "Keep it under 40 characters."),
+  color: z.enum(["teal", "sage", "sand", "ink"]).default("teal"),
+  /** Money already in the account when you started tracking. Omitted = 0. */
+  openingAmount: emptyToUndefined(moneyAmount),
+});
+
+export const archiveMoneyAccountSchema = z.object({ id: cuid });
+
+/** Moving money between two of the user's own accounts. */
+export const logTransferSchema = z.object({
+  amount: moneyAmount,
+  fromAccountId: cuid,
+  toAccountId: cuid,
+  /** Omitted means today. */
+  date: emptyToUndefined(isoDate),
+  note: notes,
+}).superRefine((value, ctx) => {
+  if (
+    value.fromAccountId &&
+    value.toAccountId &&
+    value.fromAccountId === value.toAccountId
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["toAccountId"],
+      message: "It's the same account — there's nothing to move.",
+    });
+  }
+});
 
 // ---------------------------------------------------------------- action result
 

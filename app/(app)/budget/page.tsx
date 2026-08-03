@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
+import { ChevronLeft, ChevronRight, SlidersHorizontal, Wallet } from "lucide-react";
 
+import { backfillDefaultAccount, ensureDefaultAccount } from "@/lib/accounts";
 import { requireUser } from "@/lib/auth";
 import { ensureGlobalCategories } from "@/lib/budget";
 import {
@@ -11,6 +12,7 @@ import {
 } from "@/lib/dates";
 import { formatMoneyCompact } from "@/lib/money";
 
+import { AccountsStrip } from "./_components/accounts-strip";
 import { BalanceChart } from "./_components/balance-chart";
 import { BalancePanel } from "./_components/balance-panel";
 import { BudgetsSection } from "./_components/budgets-section";
@@ -18,6 +20,7 @@ import { CategoryDonut } from "./_components/category-donut";
 import { FlowChart } from "./_components/flow-chart";
 import { TransactionsSection } from "./_components/transactions-section";
 import {
+  getAccounts,
   getBudgetCategories,
   getBudgetMonth,
   getBudgets,
@@ -107,10 +110,16 @@ export default async function BudgetPage({
   // a no-op after the first visit.
   await ensureGlobalCategories();
 
-  const [month, categories, budgets] = await Promise.all([
+  // Accounts came after the ledger: make sure there's always one to log into,
+  // and move any pre-account entry into it.
+  const mainAccount = await ensureDefaultAccount(user.id);
+  await backfillDefaultAccount(user.id, mainAccount.id);
+
+  const [month, categories, budgets, accounts] = await Promise.all([
     getBudgetMonth(user, anchor),
     getBudgetCategories(user),
     getBudgets(user),
+    getAccounts(user),
   ]);
 
   const prev = addMonths(anchor, -1);
@@ -172,6 +181,8 @@ export default async function BudgetPage({
         hasData={month.hasData}
       />
 
+      <AccountsStrip accounts={accounts} />
+
       {month.hasData && (
         <>
           <section className="border-border bg-card mb-6 rounded-lg border p-4">
@@ -185,6 +196,7 @@ export default async function BudgetPage({
 
           <BudgetsSection
             budgets={budgets}
+            accounts={accounts}
             categories={categories}
             todayISO={todayISO}
           />
@@ -204,19 +216,29 @@ export default async function BudgetPage({
 
       <TransactionsSection
         entries={month.entries}
+        accounts={accounts}
         categories={categories}
         budgets={budgets}
         monthLabel={month.monthLabel}
         todayISO={todayISO}
       />
 
-      <Link
-        href="/budget/categories"
-        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring mt-4 inline-flex items-center gap-1.5 rounded-md text-label transition-colors focus-visible:ring-2 focus-visible:outline-none"
-      >
-        <SlidersHorizontal className="size-4" aria-hidden />
-        Manage categories
-      </Link>
+      <div className="mt-4 flex flex-wrap items-center gap-4">
+        <Link
+          href="/budget/accounts"
+          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex items-center gap-1.5 rounded-md text-label transition-colors focus-visible:ring-2 focus-visible:outline-none"
+        >
+          <Wallet className="size-4" aria-hidden />
+          Accounts
+        </Link>
+        <Link
+          href="/budget/categories"
+          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex items-center gap-1.5 rounded-md text-label transition-colors focus-visible:ring-2 focus-visible:outline-none"
+        >
+          <SlidersHorizontal className="size-4" aria-hidden />
+          Manage categories
+        </Link>
+      </div>
     </div>
   );
 }

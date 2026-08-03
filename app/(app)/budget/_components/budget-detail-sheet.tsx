@@ -149,7 +149,7 @@ function BudgetSheetBody({
               <p className="text-muted-foreground mt-2 text-label">
                 {spent === 0
                   ? "Nothing assigned yet — add an expense to start the countdown."
-                  : `${formatMoneyCompact(spent)} in ${detail?.entries.length ?? 0} expense${(detail?.entries.length ?? 0) === 1 ? "" : "s"}.`}
+                  : `${formatMoneyCompact(spent)} in ${detail?.entries.length ?? 0} expense${(detail?.entries.length ?? 0) === 1 ? "" : "s"} · ${percent}% spent.`}
               </p>
             </div>
 

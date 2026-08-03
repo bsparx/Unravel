@@ -4,23 +4,22 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
 /**
- * The month's money as a liquid tank — the budget's rhyme to the water vessel
- * and the timer ring. The third container.
+ * The month's money as a simple rectangular water tank — the budget's rhyme
+ * to the water vessel and the timer ring. The third container.
  *
- * The tank holds what came in (income) and is read by how much of it is still
- * loose. Money that has already gone out sits at the bottom as a darker, denser
- * layer — committed, and visibly unable to be poured back out. The fluid above
- * it is what's still yours. A spend locks a little more in at the bottom and
- * the loose level thins; read the ratio at a glance — near all dark is near
- * empty — without parsing a digit. An overspent month turns the whole tank clay.
+ * The water is what's left of what came in: the level is (income − expenses)
+ * ÷ income, so a month that brought in 1000 and spent 900 shows a tank a
+ * tenth full. A full tank is a month spent against nothing; an empty one is a
+ * month that spent it all. An overspent month empties the tank and tints the
+ * glass clay — the thing to notice, in the palette's one "wrong" colour.
  *
- * The motion budget is the app's own: the boundary between the locked layer and
- * the loose fluid is a real surface with inertia. When a spend lands, a wave
- * runs across it and decays in about a second — the physical consequence the
- * level, not a number. Between spends the tank is still (no ambient wobble).
- * The jar still tilts toward the pointer and stops when you look away.
+ * The motion budget is the app's own: the surface has inertia. When a spend
+ * lands the level drops and a wave runs across the surface, decaying in about
+ * a second — the physical consequence the level, not a number. Between
+ * changes the tank is still (no ambient wobble), and it tilts toward the
+ * pointer until you look away.
  *
- * If WebGL is unavailable the same tank renders in SVG, with the boundary
+ * If WebGL is unavailable the same tank renders in SVG, with the surface
  * animated instead of a loop.
  */
 
@@ -28,24 +27,14 @@ const REDUCED_MOTION =
   typeof window !== "undefined" &&
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/** The jar's profile, from base to rim — a belly and a neck. */
-const PROFILE: [number, number][] = [
-  [0, 0],
-  [0.78, 0],
-  [1.02, 0.18],
-  [1.14, 0.62],
-  [1.12, 1.18],
-  [1.0, 1.74],
-  [0.84, 2.0],
-  [0.62, 2.18],
-  [0, 2.18],
-];
+/** The tank's footprint and full height, in scene units. */
+const TANK_W = 1.0;
+const TANK_D = 0.62;
+const FULL_HEIGHT = 1.9;
 
-/** The tank's full height, in profile units. */
-const FULL_HEIGHT = PROFILE[PROFILE.length - 1][1];
-
-const RINGS = 24;
-const SIDES = 48;
+/** The surface grid: how finely the water's top is cut for the wave. */
+const SX = 28;
+const SZ = 18;
 
 function readHex(token: string): string {
   const value = getComputedStyle(document.documentElement)
@@ -54,79 +43,57 @@ function readHex(token: string): string {
   return value.startsWith("#") ? value : `#${value}`;
 }
 
-function hexToRgb(hex: string): [number, number, number] {
-  const cleaned = hex.replace("#", "");
-  const full =
-    cleaned.length === 3
-      ? cleaned
-          .split("")
-          .map((c) => c + c)
-          .join("")
-      : cleaned;
-  const n = parseInt(full, 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-}
-
-/** The radius of the tank's wall at a given height y, from the outer profile. */
-function radialAt(y: number): number {
-  for (let i = 0; i < PROFILE.length - 1; i += 1) {
-    const a = PROFILE[i];
-    const b = PROFILE[i + 1];
-    if (y >= a[1] && y <= b[1]) {
-      const span = b[1] - a[1] || 1;
-      const t = (y - a[1]) / span;
-      return a[0] + (b[0] - a[0]) * t;
-    }
-  }
-  return 0;
-}
-
 /**
- * A solid band of fluid that fills the tank between two heights, capped at the
- * ends. The top cap (and the top ring of the wall) are tagged so the render
- * loop can displace them as a sloshing surface.
+ * The water band: four walls and a bottom, capped by a subdivided surface
+ * grid. The grid vertices are tagged so the render loop can displace them as
+ * a sloshing surface.
  */
-function bandGeometry(y0: number, y1: number) {
-  const verts: number[] = [];
-  const idx: number[] = [];
+function boxBand(y0: number, y1: number) {
+  const hx = TANK_W / 2;
+  const hz = TANK_D / 2;
 
-  for (let r = 0; r <= RINGS; r += 1) {
-    const y = y0 + ((y1 - y0) * r) / RINGS;
-    const rad = radialAt(y);
-    for (let c = 0; c < SIDES; c += 1) {
-      const a = (c / SIDES) * Math.PI * 2;
-      verts.push(Math.cos(a) * rad, y, Math.sin(a) * rad);
+  // Indices: 0..3 bottom corners, 4..7 top corners, then the surface grid.
+  const verts: number[] = [
+    -hx, y0, -hz,
+    hx, y0, -hz,
+    hx, y0, hz,
+    -hx, y0, hz,
+    -hx, y1, -hz,
+    hx, y1, -hz,
+    hx, y1, hz,
+    -hx, y1, hz,
+  ];
+  const idx: number[] = [
+    // Bottom.
+    0, 1, 2, 0, 2, 3,
+    // Front (+z).
+    3, 2, 6, 3, 6, 7,
+    // Back (−z).
+    0, 1, 5, 0, 5, 4,
+    // Left (−x).
+    0, 3, 7, 0, 7, 4,
+    // Right (+x).
+    1, 2, 6, 1, 6, 5,
+  ];
+
+  const gridX = SX + 1;
+  const gridZ = SZ + 1;
+  const gridStart = 8;
+  for (let ix = 0; ix < gridX; ix += 1) {
+    const x = -hx + (TANK_W * ix) / SX;
+    for (let iz = 0; iz < gridZ; iz += 1) {
+      const z = -hz + (TANK_D * iz) / SZ;
+      verts.push(x, y1, z);
     }
   }
-
-  const topRing = RINGS * SIDES;
-  const topCenter = verts.length / 3;
-  verts.push(0, y1, 0);
-  const bottomCenter = verts.length / 3;
-  verts.push(0, y0, 0);
-
-  // Side walls.
-  for (let r = 0; r < RINGS; r += 1) {
-    const ring0 = r * SIDES;
-    const ring1 = (r + 1) * SIDES;
-    for (let c = 0; c < SIDES; c += 1) {
-      const c2 = (c + 1) % SIDES;
-      const a = ring0 + c;
-      const b = ring0 + c2;
-      const d = ring1 + c;
-      const e = ring1 + c2;
-      idx.push(a, d, b, b, d, e);
+  for (let ix = 0; ix < SX; ix += 1) {
+    for (let iz = 0; iz < SZ; iz += 1) {
+      const a = gridStart + ix * gridZ + iz;
+      const b = a + 1;
+      const c = a + gridZ;
+      const d = c + 1;
+      idx.push(a, c, b, b, c, d);
     }
-  }
-  // Top cap.
-  for (let c = 0; c < SIDES; c += 1) {
-    const c2 = (c + 1) % SIDES;
-    idx.push(topCenter, topRing + c, topRing + c2);
-  }
-  // Bottom cap.
-  for (let c = 0; c < SIDES; c += 1) {
-    const c2 = (c + 1) % SIDES;
-    idx.push(bottomCenter, c2, c);
   }
 
   const geo = new THREE.BufferGeometry();
@@ -135,12 +102,56 @@ function bandGeometry(y0: number, y1: number) {
   geo.computeVertexNormals();
 
   geo.userData = {
-    ring: topRing,
-    segs: SIDES,
-    center: topCenter,
+    gridStart,
+    gridCount: gridX * gridZ,
+    center: gridStart + Math.floor(SX / 2) * gridZ + Math.floor(SZ / 2),
     baseY: y1,
-    radius: radialAt(y1),
+    halfX: hx,
+    halfZ: hz,
   };
+  return geo;
+}
+
+/** The tank's glass: an open-topped box, five planes. */
+function openBoxGeometry(w: number, h: number, d: number) {
+  const hx = w / 2;
+  const hz = d / 2;
+  const verts = [
+    // Front (+z).
+    -hx, 0, hz,
+    hx, 0, hz,
+    hx, h, hz,
+    -hx, h, hz,
+    // Back (−z).
+    hx, 0, -hz,
+    -hx, 0, -hz,
+    -hx, h, -hz,
+    hx, h, -hz,
+    // Left (−x).
+    -hx, 0, -hz,
+    -hx, 0, hz,
+    -hx, h, hz,
+    -hx, h, -hz,
+    // Right (+x).
+    hx, 0, hz,
+    hx, 0, -hz,
+    hx, h, -hz,
+    hx, h, hz,
+    // Bottom.
+    -hx, 0, -hz,
+    hx, 0, -hz,
+    hx, 0, hz,
+    -hx, 0, hz,
+  ];
+  const idx: number[] = [];
+  for (let face = 0; face < 5; face += 1) {
+    const o = face * 4;
+    idx.push(o, o + 1, o + 2, o, o + 2, o + 3);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
   return geo;
 }
 
@@ -154,20 +165,19 @@ export function BalanceVessel({
   const containerRef = useRef<HTMLDivElement>(null);
   const [webglFailed, setWebglFailed] = useState(false);
 
-  // How much of the tank is locked (spent) vs loose (available). The loose
-  // thickness is 1 - committed, sitting on top of the committed band.
-  const committed =
+  // The level is what's left of what came in: (income − expenses) ÷ income.
+  const level =
     incomeCents <= 0
       ? 0
-      : Math.min(1, Math.max(0, (incomeCents - balanceCents) / incomeCents));
+      : Math.min(1, Math.max(0, balanceCents / incomeCents));
   const overspent = balanceCents < 0;
 
   // The scene is set up once and told what to do via these refs — the setup
   // effect below captures nothing but itself. The refs are written in effect,
   // never during render.
-  const committedRef = useRef(committed);
+  const levelRef = useRef(level);
   const overspentRef = useRef(overspent);
-  const refreshFill = useRef<(committed: number, flash: boolean) => void>(
+  const refreshFill = useRef<(level: number, flash: boolean) => void>(
     () => {},
   );
 
@@ -190,9 +200,9 @@ export function BalanceVessel({
 
     const scene = new THREE.Scene();
 
-    const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 20);
-    camera.position.set(0, 1.34, 4.9);
-    camera.lookAt(0, 1.05, 0);
+    const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 20);
+    camera.position.set(0, 1.6, 4.2);
+    camera.lookAt(0, 0.95, 0);
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.62));
     const key = new THREE.DirectionalLight(0xfff1dd, 1.35);
@@ -202,70 +212,55 @@ export function BalanceVessel({
     fill.position.set(-3, 1.6, -2);
     scene.add(fill);
 
-    const jarGroup = new THREE.Group();
-    scene.add(jarGroup);
+    const tankGroup = new THREE.Group();
+    scene.add(tankGroup);
 
     const glassMaterial = new THREE.MeshPhysicalMaterial({
       color: new THREE.Color(readHex("--foreground")),
       transparent: true,
-      opacity: 0.14,
-      roughness: 0.06,
+      opacity: 0.16,
+      roughness: 0.08,
       metalness: 0,
       side: THREE.DoubleSide,
       depthWrite: false,
     });
-    const jarGeometry = new THREE.LatheGeometry(
-      PROFILE.map(([x, y]) => new THREE.Vector2(x, y)),
-      48,
+    const glass = new THREE.Mesh(
+      openBoxGeometry(TANK_W, FULL_HEIGHT, TANK_D),
+      glassMaterial,
     );
-    const glass = new THREE.Mesh(jarGeometry, glassMaterial);
     glass.renderOrder = 2;
-    jarGroup.add(glass);
+    tankGroup.add(glass);
 
-    // The loose-liquid material that fills the tank, coloured by the situation.
-    const looseMaterial = new THREE.MeshPhysicalMaterial({
+    // The water, coloured by the situation.
+    const waterMaterial = new THREE.MeshPhysicalMaterial({
       color: new THREE.Color(readHex("--primary")),
       roughness: 0.3,
       metalness: 0.02,
       side: THREE.DoubleSide,
     });
-    // The locked-spent band is a denser, darker version of the same colour.
-    const lockedMaterial = new THREE.MeshPhysicalMaterial({
-      color: new THREE.Color(0x161413),
-      roughness: 0.45,
-      metalness: 0.06,
-      side: THREE.DoubleSide,
-    });
 
-    let lockedGeo = bandGeometry(0, 0);
-    let looseGeo = bandGeometry(0, FULL_HEIGHT);
-    let committedTop = 0;
+    let waterGeo = boxBand(0, 0);
+    let waterTop = 0;
 
-    const locked = new THREE.Mesh(lockedGeo, lockedMaterial);
-    const loose = new THREE.Mesh(looseGeo, looseMaterial);
-    locked.renderOrder = 1;
-    loose.renderOrder = 1;
-    jarGroup.add(locked, loose);
+    const water = new THREE.Mesh(waterGeo, waterMaterial);
+    water.renderOrder = 1;
+    tankGroup.add(water);
 
     const applyPalette = () => {
-      glassMaterial.color.set(readHex("--foreground"));
-      const base = overspentRef.current
-        ? readHex("--destructive")
-        : readHex("--primary");
-      looseMaterial.color.set(base);
-      // Locked is the same hue, pushed to the ink — darker, denser, matte.
-      const [r, g, b] = hexToRgb(base);
-      const darken = (n: number) => Math.max(0, Math.min(255, Math.round(n * 0.18)));
-      lockedMaterial.color.setRGB(
-        darken(r) / 255,
-        darken(g) / 255,
-        darken(b) / 255,
+      glassMaterial.color.set(
+        overspentRef.current
+          ? readHex("--destructive")
+          : readHex("--foreground"),
       );
-      lockedMaterial.roughness = 0.55;
+      waterMaterial.color.set(
+        overspentRef.current
+          ? readHex("--destructive")
+          : readHex("--primary"),
+      );
     };
     applyPalette();
 
-    // The soft ellipse the tank stands on.
+    // The soft shadow the tank stands on.
     const shadowCanvas = document.createElement("canvas");
     shadowCanvas.width = 128;
     shadowCanvas.height = 64;
@@ -279,7 +274,7 @@ export function BalanceVessel({
     }
     const shadowTexture = new THREE.CanvasTexture(shadowCanvas);
     const shadow = new THREE.Mesh(
-      new THREE.PlaneGeometry(2.6, 1.3),
+      new THREE.PlaneGeometry(1.8, 1.1),
       new THREE.MeshBasicMaterial({
         map: shadowTexture,
         transparent: true,
@@ -306,19 +301,16 @@ export function BalanceVessel({
     const resizeObserver = new ResizeObserver(resize);
     resizeObserver.observe(container);
 
-    const rebuild = (committedLevel: number) => {
-      const top = committedLevel * FULL_HEIGHT;
-      if (Math.abs(top - committedTop) < 0.0001) return;
+    const rebuild = (nextLevel: number) => {
+      const top = nextLevel * FULL_HEIGHT;
+      if (Math.abs(top - waterTop) < 0.0001) return;
 
-      const nextLocked = bandGeometry(0, top);
-      const nextLoose = bandGeometry(top, FULL_HEIGHT);
-      locked.geometry.dispose();
-      loose.geometry.dispose();
-      locked.geometry = nextLocked;
-      loose.geometry = nextLoose;
-      lockedGeo = nextLocked;
-      looseGeo = nextLoose;
-      committedTop = top;
+      const next = boxBand(0, top);
+      water.geometry.dispose();
+      water.geometry = next;
+      waterGeo = next;
+      waterTop = top;
+      water.visible = top > 0.001;
     };
 
     const pointer = { x: 0, y: 0, tx: 0, ty: 0 };
@@ -339,10 +331,10 @@ export function BalanceVessel({
     // The sloshing surface with inertia: an impulse decays over ~a second.
     const wave = { amp: 0, phase: 0.1 };
 
-    const refresh = (committedLevel: number, flash: boolean) => {
-      rebuild(committedLevel);
+    const refresh = (nextLevel: number, flash: boolean) => {
+      rebuild(nextLevel);
       applyPalette();
-      if (flash && Math.abs(committedLevel * FULL_HEIGHT - committedTop) < 0.0001) {
+      if (flash && Math.abs(nextLevel * FULL_HEIGHT - waterTop) < 0.0001) {
         wave.amp = 1;
       }
     };
@@ -367,45 +359,42 @@ export function BalanceVessel({
       if (!visible) return;
 
       if (!reduced && wave.amp > 0.001) {
-        // Draw the locked band's cap as a decaying ripple, only while it has
-        // energy; idle it is a flat surface, not a busy one.
-        const geo = locked.geometry;
+        // Draw the water's surface as a decaying ripple, only while it has
+        // energy; idle it is flat, not busy.
+        const geo = water.geometry;
         const pos = geo.getAttribute("position") as THREE.BufferAttribute;
         const meta = geo.userData;
         const base = meta.baseY;
-        for (let i = 0; i < meta.segs; i += 1) {
-          const vi = meta.ring + i;
+        for (let i = 0; i < meta.gridCount; i += 1) {
+          const vi = meta.gridStart + i;
           const x = pos.getX(vi);
           const z = pos.getZ(vi);
-          const rad = Math.hypot(x, z);
-          const d = rad / (meta.radius || 1);
+          const r = Math.hypot(x / meta.halfX, z / meta.halfZ);
           const dy =
-            wave.amp * 0.045 *
-            Math.sin(wave.phase + rad * 5.5) *
-            Math.max(0, 1 - d * 0.6);
+            wave.amp * 0.05 *
+            Math.sin(wave.phase + r * 7.5) *
+            Math.max(0, 1 - r * 0.5);
           pos.setY(vi, base + dy);
         }
-        pos.setY(meta.center, base + wave.amp * 0.018);
         pos.needsUpdate = true;
         wave.phase += 0.35;
         wave.amp *= 0.9;
       } else if (wave.amp <= 0.001 && wave.amp !== 0) {
         // Flat once still.
         wave.amp = 0;
-        const geo = locked.geometry;
+        const geo = water.geometry;
         const pos = geo.getAttribute("position") as THREE.BufferAttribute;
         const meta = geo.userData;
-        for (let i = 0; i < meta.segs; i += 1) {
-          pos.setY(meta.ring + i, meta.baseY);
+        for (let i = 0; i < meta.gridCount; i += 1) {
+          pos.setY(meta.gridStart + i, meta.baseY);
         }
-        pos.setY(meta.center, meta.baseY);
         pos.needsUpdate = true;
       }
 
       pointer.x += (pointer.tx - pointer.x) * 0.08;
       pointer.y += (pointer.ty - pointer.y) * 0.08;
-      jarGroup.rotation.y = pointer.x;
-      jarGroup.rotation.x = -pointer.y * 0.8;
+      tankGroup.rotation.y = pointer.x;
+      tankGroup.rotation.x = -pointer.y * 0.8;
 
       renderer.render(scene, camera);
     };
@@ -423,11 +412,9 @@ export function BalanceVessel({
       themeObserver.disconnect();
       container.removeEventListener("pointermove", onPointerMove);
       container.removeEventListener("pointerleave", onPointerLeave);
-      locked.geometry.dispose();
-      loose.geometry.dispose();
-      jarGeometry.dispose();
-      lockedMaterial.dispose();
-      looseMaterial.dispose();
+      water.geometry.dispose();
+      glass.geometry.dispose();
+      waterMaterial.dispose();
       glassMaterial.dispose();
       shadowTexture.dispose();
       renderer.domElement.remove();
@@ -435,15 +422,15 @@ export function BalanceVessel({
     };
   }, []);
 
-  // Prop-driven fill: when the month's numbers change the locked band grows
-  // (or the tank goes clay) and the boundary sloshes to say so.
+  // Prop-driven fill: when the month's numbers change the level moves and the
+  // surface sloshes to say so.
   useEffect(() => {
-    const prev = committedRef.current;
-    committedRef.current = committed;
+    const prev = levelRef.current;
+    levelRef.current = level;
     overspentRef.current = overspent;
-    // A spend locks more in — the impulse is a shiver of confirmation.
-    refreshFill.current(committed, committed > prev);
-  }, [committed, overspent]);
+    // A spend drops the level — the impulse is a shiver of confirmation.
+    refreshFill.current(level, level !== prev);
+  }, [level, overspent]);
 
   return (
     <div
@@ -451,67 +438,58 @@ export function BalanceVessel({
       aria-hidden
       className="relative h-64 w-44 md:h-72 md:w-52"
     >
-      {webglFailed && (
-        <SvgTank committed={committed} overspent={overspent} />
-      )}
+      {webglFailed && <SvgTank level={level} overspent={overspent} />}
     </div>
   );
 }
 
-/** The same tank, drawn without WebGL — the boundary waves to its own clock. */
-function SvgTank({ committed, overspent }: { committed: number; overspent: boolean }) {
-  const loose = 1 - committed;
-  const boundY = 150 - 146 * committed;
+/** The same tank, drawn without WebGL — the surface waves to its own clock. */
+function SvgTank({ level, overspent }: { level: number; overspent: boolean }) {
+  const waterH = 140 * level;
+  const waterY = 146 - waterH;
   return (
     <svg viewBox="0 0 100 150" className="h-full w-full" fill="none" stroke="none" aria-hidden>
       <defs>
         <clipPath id="tank-interior">
-          <path d="M14 2 h22 c6 0 8 5 9 14 c2 16 4 44 2 72 c-2 28-6 52-22 52 h-14 c-14 0-20-20-22-48 c-2-26 0-52 1-70 c1-12 5-20 24-20 Z" />
+          <rect x={28} y={4} width={44} height={142} rx={3} />
         </clipPath>
       </defs>
-      <path
-        d="M14 2 h22 c6 0 8 5 9 14 c2 16 4 44 2 72 c-2 28-6 52-22 52 h-14 c-22-20-22-48 c-2-26 0-52 1-70 c1-12 5-20 24-20 Z"
+      <rect
+        x={27}
+        y={3}
+        width={46}
+        height={144}
+        rx={3}
         stroke="var(--foreground)"
-        strokeOpacity={0.35}
+        strokeOpacity={overspent ? 0.8 : 0.35}
         strokeWidth={2}
+        fill="none"
       />
-      <g clipPath="url(#tank-interior)">
-        {loose > 0.001 && (
+      {level > 0.001 && (
+        <g clipPath="url(#tank-interior)">
           <rect
-            x={8}
-            y={4}
-            width={84}
-            height={146 * loose}
+            x={28}
+            y={waterY}
+            width={44}
+            height={waterH}
             className="transition-[y,height] duration-500 ease-out motion-reduce:transition-none"
-            style={{ fill: overspent ? "var(--destructive)" : "var(--primary)", opacity: 0.92 }}
+            style={{
+              fill: overspent ? "var(--destructive)" : "var(--primary)",
+              opacity: 0.92,
+            }}
           />
-        )}
-        <rect
-          x={8}
-          y={150 - 146 * committed}
-          width={84}
-          height={146 * committed}
-          className="transition-[y,height] duration-500 ease-out motion-reduce:transition-none"
-          style={{
-            fill: overspent ? "var(--destructive)" : "var(--primary)",
-            opacity: 0.92,
-            filter: "brightness(0.6)",
-          }}
-        />
-        {committed > 0.001 && (
-          // The locked layer's own denser cap, the sloshing surface.
           <ellipse
-            cx={31}
-            cy={boundY}
-            rx={17}
+            cx={50}
+            cy={waterY}
+            rx={22}
             ry={2}
             fill={overspent ? "var(--destructive)" : "var(--primary)"}
             opacity={0.9}
           >
-            <animate attributeName="ry" values="2;3.4;1.8;2.6;2" dur="1.4s" repeatCount="indefinite" />
+            <animate attributeName="ry" values="2;3.2;1.8;2.6;2" dur="1.4s" repeatCount="indefinite" />
           </ellipse>
-        )}
-      </g>
+        </g>
+      )}
     </svg>
   );
 }

@@ -191,6 +191,8 @@ model User {
   moneyCategories MoneyCategory[]
   transactions    MoneyTransaction[]
   moneyBudgets    MoneyBudget[]
+  moneyAccounts   MoneyAccount[]
+  transfers       AccountTransfer[]
 }
 
 // ---------------------------------------------------------------- lists
@@ -738,6 +740,72 @@ model JournalEntry {
 
 // ---------------------------------------------------------------- money
 
+/// A place money lives: the wallets, banks and cards the ledger is kept in.
+///
+/// Every money movement sits inside exactly one account (except a transfer,
+/// which moves between two). Accounts are archived, never deleted while they
+/// hold history — the same rule as categories — with `openingCents` ("money
+/// already here before I started logging") so a balance can match reality
+/// from day one.
+model MoneyAccount {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name String
+  /// Palette token, resolved to a CSS variable in the UI — the same four as
+  /// categories, so an account's dot reads against them.
+  color String @default("teal")
+  /// Integer minor units (paise). Money already in the account when you
+  /// started tracking, added to the running balance like an income.
+  openingCents Int @default(0)
+
+  sortOrder  Float     @default(0)
+  archivedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions MoneyTransaction[]
+  transfersOut AccountTransfer[] @relation("TransferOut")
+  transfersIn  AccountTransfer[] @relation("TransferIn")
+
+  @@unique([userId, name])
+  @@index([userId, archivedAt, sortOrder])
+}
+
+/// A transfer between two of the user's own accounts.
+///
+/// Deliberately NOT a MoneyTransaction: money moved between your own accounts
+/// is neither income nor expense, and must never show up in the month's
+/// in-vs-out, the donut, the jar or the headline. It only moves the balances
+/// of the two accounts it joins. `from` is exclusive of `to` (a transfer to
+/// yourself is logged as nothing).
+model AccountTransfer {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fromAccountId String
+  fromAccount   MoneyAccount @relation("TransferOut", fields: [fromAccountId], references: [id], onDelete: Restrict)
+  toAccountId   String
+  toAccount     MoneyAccount @relation("TransferIn", fields: [toAccountId], references: [id], onDelete: Restrict)
+
+  /// Integer minor units (paise), like every other amount.
+  amountCents Int
+
+  /// Local calendar day in User.timezone, UTC-midnight DATE.
+  date DateTime @db.Date
+  note String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, date])
+  @@index([userId, fromAccountId, date])
+  @@index([userId, toAccountId, date])
+}
+
 /// A bucket for money movement, on one side of the ledger.
 ///
 /// `ownerKey` is "global" for the seeded built-ins (Food, Medical, Salary…)
@@ -785,6 +853,14 @@ model MoneyTransaction {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  /// The account this money sits in. Every entry — income or expense — lands
+  /// in exactly one account. Nullable only so existing entries can be
+  /// backfilled into a default account; the app never writes one without an
+  /// account. Restrict: an account is archived, never deleted, while it holds
+  /// entries.
+  accountId String?
+  account   MoneyAccount? @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
   categoryId String
   category   MoneyCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
 
@@ -807,6 +883,7 @@ model MoneyTransaction {
   @@index([userId, date])
   @@index([userId, categoryId])
   @@index([userId, budgetId])
+  @@index([userId, accountId])
 }
 
 /// A spending envelope: a target amount over a custom range of days.

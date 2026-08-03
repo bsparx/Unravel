@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 import { BudgetDetailSheet } from "./budget-detail-sheet";
 import { BudgetForm } from "./budget-form";
 import { MoneyDialog, type MoneyDraft } from "./money-dialog";
-import type { Budget, BudgetCategory } from "../_lib/queries";
+import type { Account, Budget, BudgetCategory } from "../_lib/queries";
 
 function isInRange(budget: Budget, dayISO: string): boolean {
   return (
@@ -38,6 +38,13 @@ function periodLabel(budget: Budget): string {
     : `${formatDate(budget.startsOn)} – ${formatDate(budget.endsOn)}`;
 }
 
+/** How much of the envelope has gone, as a percentage — 0% means it's all left. */
+function spentPercent(budget: Budget): number {
+  return budget.amountCents > 0
+    ? Math.round((budget.spentCents / budget.amountCents) * 100)
+    : 0;
+}
+
 /**
  * The envelopes. The envelope that is running right now leads with its
  * countdown — how much is left, how fast it is going — and every other
@@ -45,10 +52,12 @@ function periodLabel(budget: Budget): string {
  */
 export function BudgetsSection({
   budgets,
+  accounts,
   categories,
   todayISO,
 }: {
   budgets: Budget[];
+  accounts: Account[];
   categories: { income: BudgetCategory[]; expense: BudgetCategory[] };
   /** Today, YYYY-MM-DD, so "running right now" is decided where it can't lie. */
   todayISO: string;
@@ -71,6 +80,7 @@ export function BudgetsSection({
         ? todayISO
         : budget.startsOn.toISOString().slice(0, 10),
       note: "",
+      accountId: accounts.find((account) => !account.archived)?.id ?? null,
       categoryId: null,
       budgetId: budget.id,
     });
@@ -138,6 +148,14 @@ export function BudgetsSection({
             <p className="text-muted-foreground mt-2 text-micro">
               {formatMoneyCompact(active.spentCents)} of{" "}
               {formatMoneyCompact(active.amountCents)} spent
+              <span
+                className={cn(
+                  active.remainingCents < 0 && "text-destructive",
+                )}
+              >
+                {" "}
+                · {spentPercent(active)}%
+              </span>
             </p>
           </button>
 
@@ -168,16 +186,21 @@ export function BudgetsSection({
                     {periodLabel(budget)}
                   </p>
                 </div>
-                <p
-                  className={cn(
-                    "font-mono text-label shrink-0 tabular-nums",
-                    budget.remainingCents < 0 ? "text-destructive" : "text-muted-foreground",
-                  )}
-                >
-                  {budget.remainingCents < 0
-                    ? `Over by ${formatMoneyCompact(Math.abs(budget.remainingCents))}`
-                    : formatMoneyCompact(budget.remainingCents)}
-                </p>
+                <div className="shrink-0 text-right">
+                  <p
+                    className={cn(
+                      "font-mono text-label tabular-nums",
+                      budget.remainingCents < 0 ? "text-destructive" : "text-muted-foreground",
+                    )}
+                  >
+                    {budget.remainingCents < 0
+                      ? `Over by ${formatMoneyCompact(Math.abs(budget.remainingCents))}`
+                      : formatMoneyCompact(budget.remainingCents)}
+                  </p>
+                  <p className="text-muted-foreground text-micro tabular-nums">
+                    {spentPercent(budget)}% spent
+                  </p>
+                </div>
                 <ChevronRight
                   className="text-muted-foreground size-4 shrink-0"
                   aria-hidden
@@ -218,6 +241,7 @@ export function BudgetsSection({
         <MoneyDialog
           key={`expense-${expenseDraft.budgetId ?? "none"}`}
           draft={expenseDraft}
+          accounts={accounts}
           categories={categories}
           budgets={budgets}
           onClose={() => setExpenseDraft(null)}

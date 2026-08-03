@@ -73,7 +73,15 @@ async function main() {
   await prisma.project.deleteMany({ where: { userId: user.id } });
   await prisma.moneyBudget.deleteMany({ where: { userId: user.id } });
   await prisma.moneyTransaction.deleteMany({ where: { userId: user.id } });
+  await prisma.accountTransfer.deleteMany({ where: { userId: user.id } });
+  await prisma.moneyAccount.deleteMany({ where: { userId: user.id } });
   await prisma.moneyCategory.deleteMany({ where: { ownerKey: user.id } });
+
+  // One default account, so every seeded entry has a place to sit — the same
+  // "Main" the app creates on first run.
+  const mainAccount = await prisma.moneyAccount.create({
+    data: { userId: user.id, name: "Main", sortOrder: 0 },
+  });
 
   const [deepWork, admin, home] = await Promise.all([
     prisma.project.create({
@@ -464,6 +472,7 @@ async function main() {
       await prisma.moneyTransaction.create({
         data: {
           userId: user.id,
+          accountId: mainAccount.id,
           categoryId: salary.id,
           amountCents: 200_000_00,
           date,
@@ -475,6 +484,7 @@ async function main() {
         await prisma.moneyTransaction.create({
           data: {
             userId: user.id,
+            accountId: mainAccount.id,
             categoryId: bonus.id,
             amountCents: Math.round(15000 * (1 + random())) * 100,
             date,
@@ -496,7 +506,13 @@ async function main() {
         expenseCategories[0];
 
       await prisma.moneyTransaction.create({
-        data: { userId: user.id, categoryId: category.id, amountCents, date },
+        data: {
+          userId: user.id,
+          accountId: mainAccount.id,
+          categoryId: category.id,
+          amountCents,
+          date,
+        },
       });
       transactionCount += 1;
     }

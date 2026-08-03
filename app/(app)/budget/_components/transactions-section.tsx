@@ -10,7 +10,7 @@ import { CATEGORY_COLORS } from "@/lib/money-palette";
 import { cn } from "@/lib/utils";
 
 import { MoneyDialog, type MoneyDraft } from "./money-dialog";
-import type { Budget, BudgetMonth, BudgetCategory } from "../_lib/queries";
+import type { Account, Budget, BudgetMonth, BudgetCategory } from "../_lib/queries";
 
 type Entry = BudgetMonth["entries"][number];
 
@@ -21,6 +21,7 @@ function entryDraft(entry: Entry): MoneyDraft {
     amountCents: entry.amountCents,
     date: toISODate(entry.date),
     note: entry.note ?? "",
+    accountId: entry.account?.id ?? null,
     categoryId: entry.category.id,
     budgetId: entry.budget?.id ?? null,
   };
@@ -35,12 +36,14 @@ function entryDraft(entry: Entry): MoneyDraft {
  */
 export function TransactionsSection({
   entries,
+  accounts,
   categories,
   budgets,
   monthLabel,
   todayISO,
 }: {
   entries: BudgetMonth["entries"];
+  accounts: Account[];
   categories: { income: BudgetCategory[]; expense: BudgetCategory[] };
   budgets: Budget[];
   monthLabel: string;
@@ -65,6 +68,7 @@ export function TransactionsSection({
               amountCents: 0,
               date: todayISO,
               note: "",
+              accountId: accounts.find((account) => !account.archived)?.id ?? null,
               categoryId: null,
               budgetId: null,
             })
@@ -131,6 +135,7 @@ export function TransactionsSection({
         <MoneyDialog
           key={draft.id ?? `new-${draft.date}`}
           draft={draft}
+          accounts={accounts}
           categories={categories}
           budgets={budgets}
           onClose={() => setDraft(null)}

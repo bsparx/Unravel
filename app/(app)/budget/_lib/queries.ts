@@ -56,8 +56,56 @@ export type BudgetMonth = {
     category: BudgetCategory;
     /** The envelope this expense counts against, if any. */
     budget: { id: string; name: string } | null;
+    /** The account this entry sits in. */
+    account: { id: string; name: string; color: CategoryColor } | null;
   }[];
   hasData: boolean;
+};
+
+export type Account = {
+  id: string;
+  name: string;
+  color: CategoryColor;
+  openingCents: number;
+  /** opening + income − expenses ± transfers, whatever happened so far. */
+  balanceCents: number;
+  archived: boolean;
+};
+
+export type AccountTransfer = {
+  id: string;
+  /** The account money left. */
+  from: { id: string; name: string; color: CategoryColor };
+  /** The account money arrived in. */
+  to: { id: string; name: string; color: CategoryColor };
+  amountCents: number;
+  date: Date;
+  note: string | null;
+};
+
+/**
+ * One account's month: the movements that touched it and what they net to.
+ * Income and expenses sit on the ledger; transfers are the money that moved
+ * in from or out to the account's siblings.
+ */
+export type AccountDetail = {
+  account: Account;
+  monthLabel: string;
+  incomeCents: number;
+  expenseCents: number;
+  /** Transfers out are a separate line so a saved balance reads honestly. */
+  transferredOutCents: number;
+  /** Transfers in from other accounts. */
+  transferredInCents: number;
+  runningBalance: { day: number; cents: number }[];
+  entries: {
+    id: string;
+    date: Date;
+    amountCents: number;
+    note: string | null;
+    category: BudgetCategory;
+  }[];
+  transfers: AccountTransfer[];
 };
 
 export type Budget = {
@@ -97,6 +145,7 @@ export async function getBudgetMonth(
         select: { id: true, name: true, color: true, kind: true, ownerKey: true },
       },
       budget: { select: { id: true, name: true } },
+      account: { select: { id: true, name: true, color: true } },
     },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
   });
@@ -114,6 +163,13 @@ export async function getBudgetMonth(
       builtIn: transaction.category.ownerKey === GLOBAL_OWNER,
     },
     budget: transaction.budget,
+    account: transaction.account
+      ? {
+          id: transaction.account.id,
+          name: transaction.account.name,
+          color: transaction.account.color as CategoryColor,
+        }
+      : null,
   }));
 
   const sum = (
@@ -251,7 +307,218 @@ export async function getBudgetCategories(user: User): Promise<{
   return { income: groups.INCOME, expense: groups.EXPENSE };
 }
 
-// ---------------------------------------------------------------- budgets
+// ---------------------------------------------------------------- accounts
+
+/**
+ * Where each account's money stands right now: opening balance, plus every
+ * income, minus every expense, plus transfers in, minus transfers out. The
+ * four movements are fetched scoped to a set of accounts (all of them for the
+ * page, one for the drill-in) and joined by account id.
+ */
+async function liveBalances(
+  user: User,
+  accountIds: string[],
+): Promise<Map<string, number>> {
+  if (accountIds.length === 0) return new Map();
+
+  const [transactions, out, incoming] = await Promise.all([
+    prisma.moneyTransaction.findMany({
+      where: { userId: user.id, accountId: { in: accountIds } },
+      select: {
+        accountId: true,
+        amountCents: true,
+        category: { select: { kind: true } },
+      },
+    }),
+    prisma.accountTransfer.groupBy({
+      by: ["fromAccountId"],
+      where: { userId: user.id, fromAccountId: { in: accountIds } },
+      _sum: { amountCents: true },
+    }),
+    prisma.accountTransfer.groupBy({
+      by: ["toAccountId"],
+      where: { userId: user.id, toAccountId: { in: accountIds } },
+      _sum: { amountCents: true },
+    }),
+  ]);
+
+  const deltas = new Map<string, number>();
+  const add = (key: string, amount: number) =>
+    deltas.set(key, (deltas.get(key) ?? 0) + amount);
+
+  for (const row of transactions) {
+    const delta =
+      row.category.kind === "INCOME" ? row.amountCents : -row.amountCents;
+    add(row.accountId!, delta);
+  }
+  for (const row of out) add(row.fromAccountId, -(row._sum.amountCents ?? 0));
+  for (const row of incoming) add(row.toAccountId, row._sum.amountCents ?? 0);
+
+  return deltas;
+}
+
+function accountBalance(
+  account: { id: string; openingCents: number },
+  deltas: Map<string, number>,
+): number {
+  return account.openingCents + (deltas.get(account.id) ?? 0);
+}
+
+/**
+ * Every account the user has, sorted with the default first, each carrying a
+ * live balance. Same shape as `getBudgets`.
+ */
+export async function getAccounts(user: User): Promise<Account[]> {
+  const rows = await prisma.moneyAccount.findMany({
+    where: { userId: user.id },
+    orderBy: [{ archivedAt: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
+  });
+  if (rows.length === 0) return [];
+
+  const deltas = await liveBalances(user, rows.map((row) => row.id));
+
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    color: row.color as CategoryColor,
+    openingCents: row.openingCents,
+    balanceCents: accountBalance(row, deltas),
+    archived: row.archivedAt !== null,
+  }));
+}
+
+/**
+ * One account across a month: what came in, what went out, what moved between
+ * accounts, and the running balance that lands at the month's net.
+ */
+export async function getAccountDetail(
+  user: User,
+  accountId: string,
+  anchor: Date,
+): Promise<AccountDetail | null> {
+  const account = await prisma.moneyAccount.findFirst({
+    where: { id: accountId, userId: user.id },
+  });
+  if (!account) return null;
+
+  const start = startOfMonth(anchor);
+  const end = addMonths(start, 1);
+
+  const [transactions, transfers] = await Promise.all([
+    prisma.moneyTransaction.findMany({
+      where: { userId: user.id, accountId, date: { gte: start, lt: end } },
+      include: {
+        category: {
+          select: { id: true, name: true, color: true, kind: true, ownerKey: true },
+        },
+      },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+    }),
+    prisma.accountTransfer.findMany({
+      where: {
+        userId: user.id,
+        OR: [
+          { fromAccountId: accountId, date: { gte: start, lt: end } },
+          { toAccountId: accountId, date: { gte: start, lt: end } },
+        ],
+      },
+      include: {
+        fromAccount: { select: { id: true, name: true, color: true } },
+        toAccount: { select: { id: true, name: true, color: true } },
+      },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+    }),
+  ]);
+
+  const toCategory = (row: (typeof transactions)[number]["category"]) => ({
+    id: row.id,
+    name: row.name,
+    color: row.color as CategoryColor,
+    kind: row.kind,
+    builtIn: row.ownerKey === GLOBAL_OWNER,
+  });
+
+  const incomeCents = transactions
+    .filter((t) => t.category.kind === "INCOME")
+    .reduce((sum, t) => sum + t.amountCents, 0);
+  const expenseCents = transactions
+    .filter((t) => t.category.kind === "EXPENSE")
+    .reduce((sum, t) => sum + t.amountCents, 0);
+  const transferredOutCents = transfers
+    .filter((t) => t.fromAccountId === accountId)
+    .reduce((sum, t) => sum + t.amountCents, 0);
+  const transferredInCents = transfers
+    .filter((t) => t.toAccountId === accountId)
+    .reduce((sum, t) => sum + t.amountCents, 0);
+
+  const byDay = new Map<number, number>();
+  for (const t of transactions) {
+    const delta =
+      t.category.kind === "INCOME" ? t.amountCents : -t.amountCents;
+    byDay.set(t.date.getUTCDate(), (byDay.get(t.date.getUTCDate()) ?? 0) + delta);
+  }
+  for (const t of transfers) {
+    const delta =
+      t.fromAccountId === accountId ? -t.amountCents : t.amountCents;
+    byDay.set(t.date.getUTCDate(), (byDay.get(t.date.getUTCDate()) ?? 0) + delta);
+  }
+  const daysInMonth = Math.round((end.getTime() - start.getTime()) / MS_PER_DAY);
+  const runningBalance: { day: number; cents: number }[] = [];
+  // The month starts where the account was at midnight before day one: the
+  // live balance minus whatever moved during this month.
+  const liveBalanceCents = accountBalance(
+    account,
+    await liveBalances(user, [account.id]),
+  );
+  let running =
+    liveBalanceCents -
+    (incomeCents - expenseCents - transferredOutCents + transferredInCents);
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    running += byDay.get(day) ?? 0;
+    runningBalance.push({ day, cents: running });
+  }
+
+  return {
+    account: {
+      id: account.id,
+      name: account.name,
+      color: account.color as CategoryColor,
+      openingCents: account.openingCents,
+      balanceCents: liveBalanceCents,
+      archived: account.archivedAt !== null,
+    },
+    monthLabel: formatMonthLabel(start),
+    incomeCents,
+    expenseCents,
+    transferredOutCents,
+    transferredInCents,
+    runningBalance,
+    entries: transactions.map((t) => ({
+      id: t.id,
+      date: t.date,
+      amountCents: t.amountCents,
+      note: t.note,
+      category: toCategory(t.category),
+    })),
+    transfers: transfers.map((t) => ({
+      id: t.id,
+      from: {
+        id: t.fromAccount.id,
+        name: t.fromAccount.name,
+        color: t.fromAccount.color as CategoryColor,
+      },
+      to: {
+        id: t.toAccount.id,
+        name: t.toAccount.name,
+        color: t.toAccount.color as CategoryColor,
+      },
+      amountCents: t.amountCents,
+      date: t.date,
+      note: t.note,
+    })),
+  };
+}
+
 
 /**
  * Every envelope the user can see, newest first, with what has been spent

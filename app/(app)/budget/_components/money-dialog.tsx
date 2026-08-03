@@ -21,7 +21,7 @@ import { idleState } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 
 import { deleteTransaction, logTransaction, updateTransaction } from "../actions";
-import type { Budget, BudgetCategory } from "../_lib/queries";
+import type { Account, Budget, BudgetCategory } from "../_lib/queries";
 
 export type MoneyDraft = {
   id?: string;
@@ -30,6 +30,8 @@ export type MoneyDraft = {
   /** YYYY-MM-DD */
   date: string;
   note: string;
+  /** The account this entry sits in. */
+  accountId: string | null;
   categoryId: string | null;
   /** The envelope this expense counts against, if any. */
   budgetId: string | null;
@@ -49,11 +51,14 @@ function rupeesInput(amountCents: number): string {
  */
 export function MoneyDialog({
   draft,
+  accounts,
   categories,
   budgets,
   onClose,
 }: {
   draft: MoneyDraft;
+  /** Every account the user can log into, so the picker always has one. */
+  accounts: Account[];
   /** Both sides, so the In/Out toggle can swap the options without a round trip. */
   categories: { income: BudgetCategory[]; expense: BudgetCategory[] };
   /** Every envelope, so the picker can offer the ones covering the date. */
@@ -67,6 +72,17 @@ export function MoneyDialog({
   );
 
   const [kind, setKind] = useState<MoneyDraft["kind"]>(draft.kind);
+  // Only live accounts take new entries; an entry whose account was archived
+  // since keeps it in the list so it can still be edited.
+  const liveAccounts = accounts.filter((account) => !account.archived);
+  const accountOptions = draft.accountId
+    ? liveAccounts.some((account) => account.id === draft.accountId)
+      ? liveAccounts
+      : [...liveAccounts, ...accounts.filter((account) => account.id === draft.accountId)]
+    : liveAccounts;
+  const [accountId, setAccountId] = useState(
+    draft.accountId ?? liveAccounts[0]?.id ?? accounts[0]?.id ?? "none",
+  );
   const [categoryId, setCategoryId] = useState(draft.categoryId ?? "none");
   const [date, setDate] = useState(draft.date);
   const [budgetId, setBudgetId] = useState(draft.budgetId ?? "none");
@@ -142,6 +158,11 @@ export function MoneyDialog({
           <input type="hidden" name="kind" value={kind} />
           <input
             type="hidden"
+            name="accountId"
+            value={accountId === "none" ? "" : accountId}
+          />
+          <input
+            type="hidden"
             name="budgetId"
             value={budgetId === "none" ? "" : budgetId}
           />
@@ -189,6 +210,30 @@ export function MoneyDialog({
             {error("amount") && (
               <p role="alert" className="text-destructive text-label">
                 {error("amount")}
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="money-account">Account</Label>
+            <Select
+              value={accountId}
+              onValueChange={setAccountId}
+            >
+              <SelectTrigger id="money-account">
+                <SelectValue placeholder="Pick an account" />
+              </SelectTrigger>
+              <SelectContent>
+                {accountOptions.map((account) => (
+                  <SelectItem key={account.id} value={account.id}>
+                    {account.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {error("accountId") && (
+              <p role="alert" className="text-destructive text-label">
+                {error("accountId")}
               </p>
             )}
           </div>
