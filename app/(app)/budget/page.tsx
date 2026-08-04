@@ -17,6 +17,7 @@ import { BalanceChart } from "./_components/balance-chart";
 import { BalancePanel } from "./_components/balance-panel";
 import { BudgetsSection } from "./_components/budgets-section";
 import { CategoryDonut } from "./_components/category-donut";
+import { DebtsSection } from "./_components/debts-section";
 import { FlowChart } from "./_components/flow-chart";
 import { TransactionsSection } from "./_components/transactions-section";
 import {
@@ -24,6 +25,7 @@ import {
   getBudgetCategories,
   getBudgetMonth,
   getBudgets,
+  getDebts,
 } from "./_lib/queries";
 import type { BudgetMonth } from "./_lib/queries";
 
@@ -115,11 +117,12 @@ export default async function BudgetPage({
   const mainAccount = await ensureDefaultAccount(user.id);
   await backfillDefaultAccount(user.id, mainAccount.id);
 
-  const [month, categories, budgets, accounts] = await Promise.all([
+  const [month, categories, budgets, accounts, debts] = await Promise.all([
     getBudgetMonth(user, anchor),
     getBudgetCategories(user),
     getBudgets(user),
     getAccounts(user),
+    getDebts(user),
   ]);
 
   const prev = addMonths(anchor, -1);
@@ -213,6 +216,14 @@ export default async function BudgetPage({
           </div>
         </>
       )}
+
+      <DebtsSection
+        debts={debts}
+        accounts={accounts}
+        categories={categories}
+        budgets={budgets}
+        todayISO={todayISO}
+      />
 
       <TransactionsSection
         entries={month.entries}

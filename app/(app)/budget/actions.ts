@@ -11,6 +11,7 @@ import { getAccountDetail, getBudgetDetail } from "./_lib/queries";
 import {
   archiveMoneyAccountSchema,
   archiveMoneyCategorySchema,
+  deleteDebtSchema,
   deleteMoneyBudgetSchema,
   deleteMoneyTransactionSchema,
   fieldErrorsFrom,
@@ -19,8 +20,11 @@ import {
   moneyAccountSchema,
   moneyBudgetSchema,
   moneyCategorySchema,
+  moneyDebtSchema,
   moneyTransactionSchema,
   removeFromBudgetSchema,
+  settleDebtSchema,
+  settleDebtTransactionSchema,
   type ActionState,
 } from "@/lib/validation";
 
@@ -592,4 +596,237 @@ export async function getAccountDetailAction(
   const user = await requireUser();
   const anchor = parseLocalDate(`${anchorISO}-01`) ?? todayLocal(user.timezone);
   return getAccountDetail(user, accountId, startOfMonth(anchor));
+}
+
+// ---------------------------------------------------------------- debts
+
+/**
+ * An IOU: money promised, not money moved. The counterparty is a name —
+ * nothing to re-scope, so after the amount and date checks the write is a
+ * straight create scoped to the user.
+ */
+export async function logDebt(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireUser();
+  const parsed = moneyDebtSchema.safeParse(formValues(formData));
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: "Some of that didn't look right.",
+      fieldErrors: fieldErrorsFrom(parsed.error),
+    };
+  }
+
+  const amountCents = parseMoneyToCents(parsed.data.amount)!;
+  if (amountCents < 1 || amountCents > MAX_AMOUNT_CENTS) {
+    return { status: "error", message: "That amount is out of range." };
+  }
+
+  const date = parsed.data.date
+    ? parseLocalDate(parsed.data.date)
+    : todayLocal(user.timezone);
+  if (!date) return { status: "error", message: "That date didn't parse." };
+
+  await prisma.moneyDebt.create({
+    data: {
+      userId: user.id,
+      direction: parsed.data.direction,
+      counterparty: parsed.data.counterparty,
+      amountCents,
+      note: parsed.data.note || null,
+      date,
+    },
+  });
+
+  revalidateBudgetViews();
+  return {
+    status: "success",
+    message:
+      parsed.data.direction === "OWED_TO_ME" ? "Noted — they owe you." : "Noted — you owe them.",
+  };
+}
+
+export async function updateDebt(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireUser();
+  const parsed = moneyDebtSchema.safeParse(formValues(formData));
+  if (!parsed.success || !parsed.data.id) {
+    return {
+      status: "error",
+      message: "Some of that didn't look right.",
+      fieldErrors: parsed.success ? undefined : fieldErrorsFrom(parsed.error),
+    };
+  }
+
+  const amountCents = parseMoneyToCents(parsed.data.amount)!;
+  if (amountCents < 1 || amountCents > MAX_AMOUNT_CENTS) {
+    return { status: "error", message: "That amount is out of range." };
+  }
+
+  const date = parsed.data.date
+    ? parseLocalDate(parsed.data.date)
+    : todayLocal(user.timezone);
+  if (!date) return { status: "error", message: "That date didn't parse." };
+
+  const { count } = await prisma.moneyDebt.updateMany({
+    where: { id: parsed.data.id, userId: user.id },
+    data: {
+      direction: parsed.data.direction,
+      counterparty: parsed.data.counterparty,
+      amountCents,
+      note: parsed.data.note || null,
+      date,
+    },
+  });
+  if (count === 0) {
+    return { status: "error", message: "That IOU is gone." };
+  }
+
+  revalidateBudgetViews();
+  return { status: "success", message: "Saved." };
+}
+
+/**
+ * Cross an IOU off. A toggle, not a one-way door: a mis-tap on the settle
+ * check is undoable, the same way ticking a task done is.
+ */
+export async function settleDebt(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const parsed = settleDebtSchema.safeParse(formValues(formData));
+  if (!parsed.success) return;
+
+  const existing = await prisma.moneyDebt.findFirst({
+    where: { id: parsed.data.id, userId: user.id },
+    select: { settledAt: true },
+  });
+  if (!existing) return;
+
+  await prisma.moneyDebt.updateMany({
+    where: { id: parsed.data.id, userId: user.id },
+    data: { settledAt: existing.settledAt ? null : new Date() },
+  });
+  revalidateBudgetViews();
+}
+
+/**
+ * Cross an IOU off by logging the money it promised. The ledger entry is the
+ * source of truth — if it can't be created, the IOU stays outstanding — so
+ * both writes happen in one database transaction.
+ */
+export async function settleDebtWithTransaction(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireUser();
+  const parsed = settleDebtTransactionSchema.safeParse(formValues(formData));
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: "Some of that didn't look right.",
+      fieldErrors: fieldErrorsFrom(parsed.error),
+    };
+  }
+
+  const amountCents = parseMoneyToCents(parsed.data.amount)!;
+  if (amountCents < 1 || amountCents > MAX_AMOUNT_CENTS) {
+    return { status: "error", message: "That amount is out of range." };
+  }
+
+  const category = await ownedCategory(
+    user.id,
+    parsed.data.categoryId,
+    parsed.data.kind,
+  );
+  if (!category) {
+    return { status: "error", message: "Pick a category from the list." };
+  }
+
+  const account = await ownedAccount(user.id, parsed.data.accountId);
+  if (!account) {
+    return { status: "error", message: "Pick an account from the list." };
+  }
+
+  const date = parsed.data.date
+    ? parseLocalDate(parsed.data.date)
+    : todayLocal(user.timezone);
+  if (!date) return { status: "error", message: "That date didn't parse." };
+
+  const budget = parsed.data.budgetId
+    ? await ownedBudget(user.id, parsed.data.budgetId, date)
+    : null;
+  if (parsed.data.budgetId && !budget) {
+    return {
+      status: "error",
+      message: "That budget doesn't cover this date.",
+      fieldErrors: { budgetId: "Pick a budget that covers the date, or no budget." },
+    };
+  }
+
+  const debt = await prisma.moneyDebt.findFirst({
+    where: { id: parsed.data.debtId, userId: user.id },
+    select: { direction: true, settledAt: true, counterparty: true },
+  });
+  if (!debt) {
+    return { status: "error", message: "That IOU is gone." };
+  }
+  if (debt.settledAt) {
+    return { status: "error", message: "That IOU is already crossed off." };
+  }
+
+  // The dialog locks the In/Out toggle, but the server never trusts the UI:
+  // money owed to you comes in, money you owe goes out.
+  const expectedKind = debt.direction === "OWED_TO_ME" ? "INCOME" : "EXPENSE";
+  if (parsed.data.kind !== expectedKind) {
+    return {
+      status: "error",
+      message: "The money moves the wrong way for this IOU.",
+    };
+  }
+
+  await prisma.$transaction([
+    prisma.moneyTransaction.create({
+      data: {
+        userId: user.id,
+        accountId: account.id,
+        categoryId: category.id,
+        budgetId: budget?.id ?? null,
+        amountCents,
+        note: parsed.data.note || null,
+        date,
+      },
+    }),
+    prisma.moneyDebt.updateMany({
+      where: { id: parsed.data.debtId, userId: user.id },
+      data: { settledAt: new Date() },
+    }),
+  ]);
+
+  revalidateBudgetViews();
+  return {
+    status: "success",
+    message:
+      parsed.data.kind === "INCOME"
+        ? `Settled — ${debt.counterparty} paid up.`
+        : "Settled — money out.",
+  };
+}
+
+/**
+ * Hard delete, scoped to the user's own row — an IOU that should never have
+ * existed leaves no trace. Settled ones you want gone from the history
+ * disappear the same way.
+ */
+export async function deleteDebt(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const parsed = deleteDebtSchema.safeParse(formValues(formData));
+  if (!parsed.success) return;
+
+  await prisma.moneyDebt.deleteMany({
+    where: { id: parsed.data.id, userId: user.id },
+  });
+  revalidateBudgetViews();
 }

@@ -46,9 +46,79 @@ function spentPercent(budget: Budget): number {
 }
 
 /**
- * The envelopes. The envelope that is running right now leads with its
- * countdown — how much is left, how fast it is going — and every other
- * envelope is a row beneath it. One tap opens the drill-in.
+ * A budget that is running right now: today falls inside its dates, so it
+ * gets the full treatment — countdown, the fill bar, and the spent-out-of
+ * line. Every running budget is a card; nothing gets demoted for being
+ * second.
+ */
+function RunningCard({
+  budget,
+  onOpen,
+}: {
+  budget: Budget;
+  onOpen: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="hover:bg-accent/40 focus-visible:ring-ring block w-full cursor-pointer px-5 py-4 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+    >
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
+        <div className="min-w-0">
+          <p className="text-title truncate">{budget.name}</p>
+          <p className="text-muted-foreground text-micro">
+            {periodLabel(budget)} · running now
+          </p>
+        </div>
+        <p
+          className={cn(
+            "font-mono text-heading tabular-nums",
+            budget.remainingCents < 0
+              ? "text-destructive"
+              : "text-foreground",
+          )}
+        >
+          {budget.remainingCents < 0
+            ? `Over by ${formatMoneyCompact(Math.abs(budget.remainingCents))}`
+            : formatMoneyCompact(budget.remainingCents)}
+        </p>
+      </div>
+      <Progress
+        value={
+          budget.amountCents > 0
+            ? Math.min(
+                100,
+                Math.round((budget.spentCents / budget.amountCents) * 100),
+              )
+            : 0
+        }
+        className={cn(
+          "mt-3",
+          budget.remainingCents < 0 && "[&>div]:bg-destructive",
+        )}
+        aria-label={`${budget.spentCents} of ${budget.amountCents} spent`}
+      />
+      <p className="text-muted-foreground mt-2 text-micro">
+        {formatMoneyCompact(budget.spentCents)} of{" "}
+        {formatMoneyCompact(budget.amountCents)} spent
+        <span
+          className={cn(
+            budget.remainingCents < 0 && "text-destructive",
+          )}
+        >
+          {" "}
+          · {spentPercent(budget)}%
+        </span>
+      </p>
+    </button>
+  );
+}
+
+/**
+ * The envelopes. Every envelope whose dates cover today is a running card —
+ * how much is left, how fast it is going — and every other envelope is a row
+ * beneath them. One tap opens the drill-in.
  */
 export function BudgetsSection({
   budgets,
@@ -66,10 +136,8 @@ export function BudgetsSection({
   const [newOpen, setNewOpen] = useState(false);
   const [expenseDraft, setExpenseDraft] = useState<MoneyDraft | null>(null);
 
-  const active = budgets.find((budget) => isInRange(budget, todayISO)) ?? null;
-  const others = active
-    ? budgets.filter((budget) => budget.id !== active.id)
-    : budgets;
+  const running = budgets.filter((budget) => isInRange(budget, todayISO));
+  const others = budgets.filter((budget) => !isInRange(budget, todayISO));
 
   const openExpenseFor = (budget: Budget) => {
     setOpenBudget(null);
@@ -94,7 +162,9 @@ export function BudgetsSection({
           <p className="text-muted-foreground text-micro">
             {budgets.length === 0
               ? "A target for a stretch — expenses assigned to it count down."
-              : `${budgets.length} budget${budgets.length === 1 ? "" : "s"}.`}
+              : running.length > 0
+                ? `${running.length} running now`
+                : "Nothing running right now."}
           </p>
         </div>
         <Button size="sm" onClick={() => setNewOpen(true)}>
@@ -103,71 +173,15 @@ export function BudgetsSection({
         </Button>
       </header>
 
-      {active && (
-        <div className="border-t">
-          <button
-            type="button"
-            onClick={() => setOpenBudget(active)}
-            className="hover:bg-accent/40 focus-visible:ring-ring block w-full px-5 py-4 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
-          >
-            <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
-              <div className="min-w-0">
-                <p className="text-title truncate">{active.name}</p>
-                <p className="text-muted-foreground text-micro">
-                  {periodLabel(active)} · running now
-                </p>
-              </div>
-              <p
-                className={cn(
-                  "font-mono text-heading tabular-nums",
-                  active.remainingCents < 0
-                    ? "text-destructive"
-                    : "text-foreground",
-                )}
-              >
-                {active.remainingCents < 0
-                  ? `Over by ${formatMoneyCompact(Math.abs(active.remainingCents))}`
-                  : formatMoneyCompact(active.remainingCents)}
-              </p>
-            </div>
-            <Progress
-              value={
-                active.amountCents > 0
-                  ? Math.min(
-                      100,
-                      Math.round((active.spentCents / active.amountCents) * 100),
-                    )
-                  : 0
-              }
-              className={cn(
-                "mt-3",
-                active.remainingCents < 0 && "[&>div]:bg-destructive",
-              )}
-              aria-label={`${active.spentCents} of ${active.amountCents} spent`}
+      {running.length > 0 && (
+        <div className="divide-y border-t">
+          {running.map((budget) => (
+            <RunningCard
+              key={budget.id}
+              budget={budget}
+              onOpen={() => setOpenBudget(budget)}
             />
-            <p className="text-muted-foreground mt-2 text-micro">
-              {formatMoneyCompact(active.spentCents)} of{" "}
-              {formatMoneyCompact(active.amountCents)} spent
-              <span
-                className={cn(
-                  active.remainingCents < 0 && "text-destructive",
-                )}
-              >
-                {" "}
-                · {spentPercent(active)}%
-              </span>
-            </p>
-          </button>
-
-          <div className="flex items-center justify-between gap-3 border-t px-5 py-3">
-            <span className="text-muted-foreground text-micro">
-              Tap the envelope for its expenses, or add one now.
-            </span>
-            <Button size="sm" onClick={() => openExpenseFor(active)}>
-              <Plus className="size-4" aria-hidden />
-              Add expense
-            </Button>
-          </div>
+          ))}
         </div>
       )}
 
@@ -178,27 +192,53 @@ export function BudgetsSection({
               <button
                 type="button"
                 onClick={() => setOpenBudget(budget)}
-                className="hover:bg-accent/40 focus-visible:ring-ring flex w-full items-center gap-3 px-5 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                className="hover:bg-accent/40 focus-visible:ring-ring flex w-full cursor-pointer items-center gap-3 px-5 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-title truncate">{budget.name}</p>
                   <p className="text-muted-foreground text-micro">
                     {periodLabel(budget)}
                   </p>
+                  <Progress
+                    value={
+                      budget.amountCents > 0
+                        ? Math.min(
+                            100,
+                            Math.round((budget.spentCents / budget.amountCents) * 100),
+                          )
+                        : 0
+                    }
+                    className={cn(
+                      "mt-2",
+                      budget.remainingCents < 0 && "[&>div]:bg-destructive",
+                    )}
+                    aria-label={`${budget.spentCents} of ${budget.amountCents} spent`}
+                  />
+                  <p className="text-muted-foreground mt-1.5 text-micro">
+                    {formatMoneyCompact(budget.spentCents)} of{" "}
+                    {formatMoneyCompact(budget.amountCents)} spent
+                    <span
+                      className={cn(
+                        budget.remainingCents < 0 && "text-destructive",
+                      )}
+                    >
+                      {" "}
+                      · {spentPercent(budget)}%
+                    </span>
+                  </p>
                 </div>
                 <div className="shrink-0 text-right">
                   <p
                     className={cn(
                       "font-mono text-label tabular-nums",
-                      budget.remainingCents < 0 ? "text-destructive" : "text-muted-foreground",
+                      budget.remainingCents < 0
+                        ? "text-destructive"
+                        : "text-muted-foreground",
                     )}
                   >
                     {budget.remainingCents < 0
                       ? `Over by ${formatMoneyCompact(Math.abs(budget.remainingCents))}`
                       : formatMoneyCompact(budget.remainingCents)}
-                  </p>
-                  <p className="text-muted-foreground text-micro tabular-nums">
-                    {spentPercent(budget)}% spent
                   </p>
                 </div>
                 <ChevronRight
@@ -211,7 +251,7 @@ export function BudgetsSection({
         </ul>
       )}
 
-      {!active && budgets.length === 0 && (
+      {budgets.length === 0 && (
         <p className="text-muted-foreground border-t px-5 py-4 text-label">
           No budgets yet. Set one for a trip, a project, or a stretch of the
           month — expenses assigned to it count down.

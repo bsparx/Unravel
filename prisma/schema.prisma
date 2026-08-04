@@ -124,6 +124,14 @@ enum MoneyKind {
   EXPENSE
 }
 
+/// Which way an IOU points.
+/// Deliberately not a boolean: I_OWE and OWED_TO_ME are different lists with
+/// different totals, and every read groups on this.
+enum DebtDirection {
+  I_OWE // money I owe someone
+  OWED_TO_ME // money someone owes me
+}
+
 // ---------------------------------------------------------------- identity
 
 model User {
@@ -193,6 +201,7 @@ model User {
   moneyBudgets    MoneyBudget[]
   moneyAccounts   MoneyAccount[]
   transfers       AccountTransfer[]
+  moneyDebts      MoneyDebt[]
 }
 
 // ---------------------------------------------------------------- lists
@@ -914,4 +923,41 @@ model MoneyBudget {
   transactions MoneyTransaction[]
 
   @@index([userId, archivedAt, startsOn])
+}
+
+/// An IOU: money promised between you and someone else, before it moves.
+///
+/// Deliberately NOT a MoneyTransaction — money you owe hasn't left your
+/// account and money owed to you hasn't arrived, so it must never show up in
+/// the month's in-vs-out, the donut, the jar or the headline. It is a claim,
+/// kept on its own ledger, and the two directions are different lists: the
+/// teal pocket (people who owe you) and the clay pocket (people you owe).
+///
+/// Crossing an IOU off is setting `settledAt` — the row stays, struck
+/// through, because "who owed you money in March" is history, not noise. The
+/// row is only ever hard-deleted when it should never have existed.
+model MoneyDebt {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// The person on the other side of the money. A name, not an entity —
+  /// "Ali", "the landlord", "Mum".
+  counterparty String
+  direction    DebtDirection
+  /// What it was for, when the name alone doesn't say. Optional.
+  note         String?
+  /// Integer minor units (paise), like every other amount.
+  amountCents Int
+  /// When it happened. Local calendar day in User.timezone, UTC-midnight DATE.
+  date DateTime @db.Date
+  /// Set when the IOU is crossed off. The row stays, muted, for history.
+  settledAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// The two pockets are reads, so the index covers them: one side of the
+  /// ledger, outstanding first, oldest first within it.
+  @@index([userId, direction, settledAt, date])
 }

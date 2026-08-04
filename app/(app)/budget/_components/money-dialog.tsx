@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { idleState } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 
-import { deleteTransaction, logTransaction, updateTransaction } from "../actions";
+import { deleteTransaction, logTransaction, settleDebtWithTransaction, updateTransaction } from "../actions";
 import type { Account, Budget, BudgetCategory } from "../_lib/queries";
 
 export type MoneyDraft = {
@@ -35,6 +35,12 @@ export type MoneyDraft = {
   categoryId: string | null;
   /** The envelope this expense counts against, if any. */
   budgetId: string | null;
+  /**
+   * Present when this dialog is settling an IOU: logging the money and
+   * crossing the debt off are one server action, so the entry can't land in
+   * the ledger without the cross-off.
+   */
+  settleDebtId?: string;
 };
 
 /** Cents -> the decimal string the form edits. "125050" -> "1250.50". */
@@ -66,8 +72,13 @@ export function MoneyDialog({
   onClose: () => void;
 }) {
   const editing = Boolean(draft.id);
+  const settling = Boolean(draft.settleDebtId);
   const [state, formAction, pending] = useActionState(
-    editing ? updateTransaction : logTransaction,
+    settling
+      ? settleDebtWithTransaction
+      : editing
+        ? updateTransaction
+        : logTransaction,
     idleState,
   );
 
@@ -144,17 +155,28 @@ export function MoneyDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-display">
-            {editing ? "Edit this entry" : "Log money"}
+            {settling
+              ? draft.kind === "INCOME"
+                ? "They paid you back"
+                : "Paying it back"
+              : editing
+                ? "Edit this entry"
+                : "Log money"}
           </DialogTitle>
           <DialogDescription>
-            {editing
-              ? "Fix it, or let it go."
-              : "Money in or money out, in under a tap — the thinking can happen later."}
+            {settling
+              ? "Log the money moving — the IOU is crossed off once it's in the ledger."
+              : editing
+                ? "Fix it, or let it go."
+                : "Money in or money out, in under a tap — the thinking can happen later."}
           </DialogDescription>
         </DialogHeader>
 
         <form action={formAction} className="space-y-4">
           {draft.id && <input type="hidden" name="id" value={draft.id} />}
+          {draft.settleDebtId && (
+            <input type="hidden" name="debtId" value={draft.settleDebtId} />
+          )}
           <input type="hidden" name="kind" value={kind} />
           <input
             type="hidden"
@@ -167,26 +189,28 @@ export function MoneyDialog({
             value={budgetId === "none" ? "" : budgetId}
           />
 
-          <div className="grid grid-cols-2 gap-1.5">
-            {(["INCOME", "EXPENSE"] as const).map((option) => (
-              <button
-                key={option}
-                type="button"
-                onClick={() => pickKind(option)}
-                aria-pressed={kind === option}
-                className={cn(
-                  "focus-visible:ring-ring rounded-md border px-2 py-1.5 text-label transition-colors focus-visible:ring-2 focus-visible:outline-none",
-                  kind === option
-                    ? option === "INCOME"
-                      ? "border-primary bg-accent"
-                      : "border-destructive/50 bg-destructive/10"
-                    : "border-border text-muted-foreground hover:border-primary/40",
-                )}
-              >
-                {option === "INCOME" ? "In" : "Out"}
-              </button>
-            ))}
-          </div>
+          {!settling && (
+            <div className="grid grid-cols-2 gap-1.5">
+              {(["INCOME", "EXPENSE"] as const).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => pickKind(option)}
+                  aria-pressed={kind === option}
+                  className={cn(
+                    "focus-visible:ring-ring rounded-md border px-2 py-1.5 text-label transition-colors focus-visible:ring-2 focus-visible:outline-none",
+                    kind === option
+                      ? option === "INCOME"
+                        ? "border-primary bg-accent"
+                        : "border-destructive/50 bg-destructive/10"
+                      : "border-border text-muted-foreground hover:border-primary/40",
+                  )}
+                >
+                  {option === "INCOME" ? "In" : "Out"}
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label htmlFor="money-amount">Amount</Label>
@@ -350,7 +374,13 @@ export function MoneyDialog({
                 Cancel
               </Button>
               <Button type="submit" disabled={pending}>
-                {pending ? "Saving…" : editing ? "Save" : "Log it"}
+                {pending
+                  ? "Saving…"
+                  : settling
+                    ? "Log it & cross off"
+                    : editing
+                      ? "Save"
+                      : "Log it"}
               </Button>
             </div>
           </DialogFooter>

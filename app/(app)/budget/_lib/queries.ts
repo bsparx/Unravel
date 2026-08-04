@@ -607,3 +607,61 @@ export async function getBudgetDetail(
     })),
   };
 }
+
+// ---------------------------------------------------------------- debts
+
+export type Debt = {
+  id: string;
+  direction: "I_OWE" | "OWED_TO_ME";
+  /** The person on the other side of the money — a name, not an entity. */
+  counterparty: string;
+  note: string | null;
+  amountCents: number;
+  /** When it happened. Local calendar day, UTC-midnight DATE. */
+  date: Date;
+  settled: boolean;
+};
+
+/** One pocket of the IOU ledger. */
+export type DebtPocket = {
+  /** Outstanding only — settled IOUs have left the total but stay in `rows`. */
+  totalCents: number;
+  rows: Debt[];
+};
+
+/**
+ * The IOU ledger, split into the two pockets. One fetch, grouped in JS —
+ * the same "sum over a list the page was going to render anyway" rule as
+ * the rest of this module. Outstanding first, then newest.
+ */
+export async function getDebts(user: User): Promise<{
+  iOwe: DebtPocket;
+  owedToMe: DebtPocket;
+}> {
+  const rows = await prisma.moneyDebt.findMany({
+    where: { userId: user.id },
+    orderBy: [{ settledAt: "asc" }, { date: "desc" }, { createdAt: "desc" }],
+  });
+
+  const debts: Debt[] = rows.map((row) => ({
+    id: row.id,
+    direction: row.direction,
+    counterparty: row.counterparty,
+    note: row.note,
+    amountCents: row.amountCents,
+    date: row.date,
+    settled: row.settledAt !== null,
+  }));
+
+  const pocket = (direction: "I_OWE" | "OWED_TO_ME"): DebtPocket => {
+    const list = debts.filter((debt) => debt.direction === direction);
+    return {
+      totalCents: list
+        .filter((debt) => !debt.settled)
+        .reduce((total, debt) => total + debt.amountCents, 0),
+      rows: list,
+    };
+  };
+
+  return { iOwe: pocket("I_OWE"), owedToMe: pocket("OWED_TO_ME") };
+}

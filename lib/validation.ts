@@ -520,6 +520,40 @@ export const logTransferSchema = z.object({
   }
 });
 
+/**
+ * An IOU: money promised between you and someone else, before it moves.
+ * The counterparty is a name, not an entity — free text, like a note that
+ * happens to be the whole point.
+ */
+export const moneyDebtSchema = z.object({
+  /** Present when editing an existing IOU. */
+  id: cuid.optional(),
+  direction: z.enum(["I_OWE", "OWED_TO_ME"]),
+  counterparty: z
+    .string()
+    .trim()
+    .min(1, "Who's it with?")
+    .max(80, "Keep the name under 80 characters."),
+  amount: moneyAmount,
+  /** Omitted means today. */
+  date: emptyToUndefined(isoDate),
+  note: notes,
+});
+
+export const settleDebtSchema = z.object({ id: cuid });
+
+export const deleteDebtSchema = z.object({ id: cuid });
+
+/**
+ * Settling an IOU logs a real transaction in the same breath it crosses the
+ * debt off — the money moved, so the ledger must know. Everything the
+ * transaction needs is validated exactly like `moneyTransactionSchema`; the
+ * `debtId` is what the action crosses off.
+ */
+export const settleDebtTransactionSchema = moneyTransactionSchema.extend({
+  debtId: cuid,
+});
+
 // ---------------------------------------------------------------- action result
 
 export type ActionState =

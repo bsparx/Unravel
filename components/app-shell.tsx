@@ -65,7 +65,7 @@ export function AppShell({
       {/* Desktop rail */}
       <nav
         aria-label="Main"
-        className="bg-sidebar border-border hidden w-56 shrink-0 flex-col border-r px-3 py-6 md:flex"
+        className="bg-sidebar border-border hidden w-56 shrink-0 flex-col self-start border-r px-3 py-6 md:sticky md:top-0 md:flex md:h-dvh"
       >
         <Link
           href="/"
@@ -77,7 +77,7 @@ export function AppShell({
           </span>
         </Link>
 
-        <ul className="flex flex-1 flex-col gap-0.5">
+        <ul className="flex flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain">
           {[...NAV, ...RAIL_EXTRA].map(({ href, label, icon: Icon }, index) => (
             <li key={href} className={index === NAV.length ? "mt-4" : undefined}>
               <Link
