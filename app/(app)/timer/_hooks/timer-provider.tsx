@@ -64,6 +64,16 @@ type TimerState = {
   intervalIndex: number;
   /** Milliseconds already spent inside the current interval. */
   intervalBaseMs: number;
+  /**
+   * Seconds of break time already consumed by closed intervals.
+   *
+   * Banked on every ADVANCE that leaves a break, so the session's wall clock
+   * can be reduced to active time exactly the way the server's
+   * `loggedElapsedSeconds` does at endSession. Without it a long break would
+   * count against "logged today" and eat the remaining countdown — which is
+   * how the second focus block of a pomodoro used to read as 0:00.
+   */
+  closedBreakSeconds: number;
   sessionId: string | null;
   clientKey: string;
   config: TimerConfig;
@@ -136,6 +146,7 @@ function reducer(state: TimerState, action: Action): TimerState {
         accumulatedMs: 0,
         intervalIndex: 0,
         intervalBaseMs: 0,
+        closedBreakSeconds: 0,
         reachedTarget: false,
         overrunSince: null,
         intervalExtraSeconds: 0,
@@ -185,11 +196,23 @@ function reducer(state: TimerState, action: Action): TimerState {
         { accumulatedMs: state.accumulatedMs, runningSince: state.runningSince },
         action.at,
       );
+
+      // The interval being left behind, resolved from the plan so there is one
+      // source of truth for what kind it was. A break closes with its full
+      // actual duration — overrun included — because every second of it is
+      // break time, whether or not it was claimed by "5 more minutes".
+      const leaving = buildIntervalPlan(state.config)[state.intervalIndex];
+      const closedBreak =
+        leaving && isBreakKind(leaving.kind)
+          ? Math.max(0, Math.round((elapsed - state.intervalBaseMs) / 1000))
+          : 0;
+
       return {
         ...state,
         intervalIndex: action.nextIndex,
         intervalBaseMs: elapsed,
         accumulatedMs: elapsed,
+        closedBreakSeconds: state.closedBreakSeconds + closedBreak,
         runningSince: state.phase === "RUNNING" ? action.at : null,
         // All three belong to the interval being left behind.
         overrunSince: null,
@@ -213,6 +236,7 @@ function reducer(state: TimerState, action: Action): TimerState {
         accumulatedMs: 0,
         intervalIndex: 0,
         intervalBaseMs: 0,
+        closedBreakSeconds: 0,
         sessionId: null,
         clientKey: newClientKey(),
         config: action.config,
@@ -237,6 +261,13 @@ type TimerContextValue = {
   /** Re-renders ~4x a second while running; the number itself is derived. */
   elapsedMs: number;
   elapsedSeconds: number;
+  /**
+   * Active seconds, break time excluded — the client's mirror of what the
+   * server logs at endSession. This is the number every "how much is logged"
+   * surface should show; `elapsedSeconds` is the raw wall clock, which spans
+   * breaks and only exists for the macro container.
+   */
+  focusElapsedSeconds: number;
   intervalElapsedSeconds: number;
   /** The current interval's target, including anything added by hand. */
   currentTargetSeconds: number;
@@ -457,6 +488,20 @@ export function TimerProvider({
 
   const onBreak = current !== undefined && isBreakKind(current.kind);
 
+  // The wall clock runs straight through breaks, so it counts the coffee as
+  // work — the same problem the server's `loggedElapsedSeconds` solves at
+  // endSession. Mirror it here: closed breaks are banked in state as they
+  // close, and the break on the clock right now is subtracted live because it
+  // has not closed yet. Sessions with no breaks reduce to exactly the old
+  // number, the same rule that keeps old logged rows reading as they always
+  // did.
+  const focusElapsedSeconds = Math.max(
+    0,
+    elapsedSeconds -
+      state.closedBreakSeconds -
+      (onBreak ? intervalElapsedSeconds : 0),
+  );
+
   // What the current interval is actually aiming at, once anything added by
   // hand is counted. Zero stays zero: recovery has no target and adding to it
   // would invent one.
@@ -492,8 +537,12 @@ export function TimerProvider({
 
   // Same trap: `elapsedSeconds >= 0` is always true, so an unguarded
   // targetReached would chime at t=0 on a session that had no target.
+  //
+  // Measured against focus time, not the wall clock: a break that ran over
+  // must not ring "you reached your goal" — the goal is the work, and the work
+  // is what `focusElapsedSeconds` counts.
   const targetReached =
-    !recovery && elapsedSeconds >= state.config.targetSeconds;
+    !recovery && focusElapsedSeconds >= state.config.targetSeconds;
 
   useEffect(() => {
     if (!isRunning || !targetReached || state.reachedTarget) return;
@@ -595,6 +644,7 @@ export function TimerProvider({
       plan,
       elapsedMs,
       elapsedSeconds,
+      focusElapsedSeconds,
       intervalElapsedSeconds,
       currentTargetSeconds,
       onBreak,
@@ -619,6 +669,7 @@ export function TimerProvider({
       discard,
       elapsedMs,
       elapsedSeconds,
+      focusElapsedSeconds,
       extendInterval,
       intervalElapsedSeconds,
       isOverrunning,
@@ -674,6 +725,7 @@ function initialState({
       accumulatedMs: 0,
       intervalIndex: 0,
       intervalBaseMs: 0,
+      closedBreakSeconds: 0,
       sessionId: null,
       clientKey: newClientKey(),
       config,
@@ -693,6 +745,7 @@ function initialState({
     accumulatedMs: initialSession.accumulatedSeconds * 1000,
     intervalIndex: initialSession.intervalIndex,
     intervalBaseMs: initialSession.intervalBaseSeconds * 1000,
+    closedBreakSeconds: initialSession.breakElapsedSeconds,
     sessionId: initialSession.id,
     clientKey: initialSession.clientKey,
     config: initialSession.config,

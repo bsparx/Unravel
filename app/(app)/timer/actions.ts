@@ -20,9 +20,8 @@ import {
   buildIntervalPlan,
   clampIntervals,
   clampTarget,
+  isBreakKind,
   type IntervalKind,
-  type IntervalSpan,
-  loggedElapsedSeconds,
   type TimerMode,
 } from "@/lib/timer-math";
 
@@ -227,12 +226,14 @@ export async function heartbeat(
       accumulatedSeconds: accumulated,
       runningSince: now,
       lastBeatAt: now,
-      // Stamp the moment the arc hit zero, once. A recovery session has a
-      // target of 0, so without the mode guard `accumulated >= 0` would be
-      // true on the very first beat and stamp a goal that never existed.
+      // Stamp the moment the work target is met, once. Measured against focus
+      // time, never the wall clock: a break that ran over must not stamp a
+      // goal that the work hasn't reached. A recovery session has a target of
+      // 0, so without the mode guard `focus >= 0` would be true on the very
+      // first beat and stamp a goal that never existed.
       ...(session.mode !== "RECOVERY" &&
       session.reachedTargetAt === null &&
-      accumulated >= session.targetSeconds
+      focusElapsedSeconds(session, now) >= session.targetSeconds
         ? { reachedTargetAt: now }
         : {}),
     },
@@ -388,9 +389,11 @@ export async function endSession(
 
   // What actually gets logged is the wall clock minus the breaks. Without this
   // a pomodoro's break minutes are credited to the task, to habit quota and to
-  // the streak — see `loggedElapsedSeconds` for why it subtracts rather than
-  // sums.
-  const elapsed = loggedElapsedSeconds(wallClock, intervalSpans(session, now));
+  // the streak — see `focusElapsedSeconds` for why it subtracts rather than
+  // sums. `accumulatedSeconds` stays the wall clock: it is the rehydration
+  // figure, and rewriting it to the focus-only total would make a reload read
+  // as if the breaks never happened.
+  const elapsed = focusElapsedSeconds(session, now);
 
   // Recovery has no target to overrun. Without this guard every second of
   // rest is logged as overtime, and /stats' "time past your goal" becomes a
@@ -652,30 +655,37 @@ function currentIndex(session: LoadedSession): number {
 }
 
 /**
- * Every interval's duration as of `now`, including the one still open.
+ * Active seconds the session has earned as of `now`, breaks excluded.
  *
- * A closed interval carries its own `elapsedSeconds`; the open one has to be
- * resolved from `runningSince` the same way the session is. Feeding both into
- * one list is what lets `loggedElapsedSeconds` stay a pure function.
+ * The server-side half of `loggedElapsedSeconds`: the session's wall clock
+ * minus every break inside it. Breaks are subtracted rather than focus summed,
+ * because a focus interval only gets its `elapsedSeconds` written when it
+ * closes and the last one of every session is open at the moment Stop is
+ * pressed — subtraction needs no such bookkeeping, and on a session with no
+ * breaks at all it reduces to exactly the wall clock.
+ *
+ * The client mirrors this with `closedBreakSeconds` in the timer provider, so
+ * the number on screen and the number committed are the same one.
  */
-function intervalSpans(session: LoadedSession, now: Date): IntervalSpan[] {
-  return session.intervals.map((interval) => {
-    if (interval.endedAt !== null) {
-      return {
-        kind: interval.kind as IntervalKind,
-        seconds: interval.elapsedSeconds,
-      };
-    }
+function focusElapsedSeconds(session: LoadedSession, now: Date): number {
+  const breaks = session.intervals.reduce(
+    (total, interval) => {
+      if (!isBreakKind(interval.kind as IntervalKind)) return total;
 
-    const live = interval.runningSince
-      ? Math.max(0, (now.getTime() - interval.runningSince.getTime()) / 1000)
-      : 0;
+      if (interval.endedAt !== null) {
+        return total + interval.elapsedSeconds;
+      }
 
-    return {
-      kind: interval.kind as IntervalKind,
-      seconds: Math.floor(interval.accumulatedSeconds + live),
-    };
-  });
+      const live = interval.runningSince
+        ? Math.max(0, (now.getTime() - interval.runningSince.getTime()) / 1000)
+        : 0;
+
+      return total + Math.floor(interval.accumulatedSeconds + live);
+    },
+    0,
+  );
+
+  return Math.max(0, serverElapsed(session, now) - breaks);
 }
 
 function closeOpenIntervalOps(

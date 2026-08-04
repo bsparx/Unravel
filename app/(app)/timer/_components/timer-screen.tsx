@@ -67,6 +67,7 @@ export function TimerScreen({
     state,
     plan,
     elapsedSeconds,
+    focusElapsedSeconds,
     intervalElapsedSeconds,
     currentTargetSeconds,
     onBreak,
@@ -118,6 +119,11 @@ export function TimerScreen({
   // remaining while you're resting is just wrong. Everything else (recovery
   // counting up, flow's overrun, a plain countdown) is one shared rule.
   //
+  // The countdown is measured against focus time, not the wall clock: a break
+  // that ran over must not eat the remaining digits, or the next focus block
+  // would read as 0:00 the moment it starts. `focusElapsedSeconds` is the
+  // client's mirror of what endSession logs — see the provider.
+  //
   // Once a break is past its time the countdown has nothing left to say, so it
   // turns around and counts up instead. That number is the whole point of the
   // state: a break with no number on it is exactly the break that becomes forty
@@ -129,7 +135,7 @@ export function TimerScreen({
       : formatClock(
           readoutSeconds(
             state.config.mode,
-            elapsedSeconds,
+            focusElapsedSeconds,
             state.config.targetSeconds,
           ),
         );
@@ -201,7 +207,7 @@ export function TimerScreen({
         mode={state.config.mode}
         task={state.task}
         sessionId={state.sessionId}
-        elapsedSeconds={elapsedSeconds}
+        elapsedSeconds={focusElapsedSeconds}
         targetSeconds={state.config.targetSeconds}
         onAgain={() => reset(state.config, state.task)}
         onDone={async () => {
@@ -419,10 +425,11 @@ export function TimerScreen({
       {dayLog && !recovery && (
         <TodayLog
           log={dayLog}
-          // The provider's elapsed seconds, which already span breaks —
-          // exactly what `endSession` will commit, so the running number and
-          // the number it settles on are the same one.
-          liveSeconds={elapsedSeconds}
+          // Focus-only seconds, breaks excluded — the same figure
+          // `endSession` will commit, so the running number and the number it
+          // settles on are the same one. The raw wall clock would count the
+          // coffee as logged time.
+          liveSeconds={focusElapsedSeconds}
           live={!idle && state.sessionId !== null}
           unit={state.task?.type === "HABIT" ? "habit" : "todo"}
         />

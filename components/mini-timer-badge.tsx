@@ -18,7 +18,7 @@ export function MiniTimerBadge() {
   const pathname = usePathname();
   const {
     state,
-    elapsedSeconds,
+    focusElapsedSeconds,
     overrunSeconds,
     isOverrunning,
     skipInterval,
@@ -35,12 +35,16 @@ export function MiniTimerBadge() {
   // up and a plain countdown are all the same function. A break past its time
   // is the exception, because it is the one case where the number people need
   // is how far over they are rather than how far through.
+  //
+  // The countdown is measured against focus time, never the wall clock — a
+  // break that ran over must not eat the remaining digits, or the next focus
+  // block would read as 0:00 from the badge.
   const readout = isOverrunning
     ? `+${formatClock(overrunSeconds)}`
     : formatClock(
         readoutSeconds(
           state.config.mode,
-          elapsedSeconds,
+          focusElapsedSeconds,
           state.config.targetSeconds,
         ),
       );

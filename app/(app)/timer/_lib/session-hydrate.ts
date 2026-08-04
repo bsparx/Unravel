@@ -2,7 +2,12 @@ import "server-only";
 
 import { prisma } from "@/lib/db";
 import type { User } from "@/lib/generated/prisma/client";
-import { buildIntervalPlan, type TimerConfig } from "@/lib/timer-math";
+import {
+  buildIntervalPlan,
+  isBreakKind,
+  type IntervalKind,
+  type TimerConfig,
+} from "@/lib/timer-math";
 
 /** A session left RUNNING this long with no heartbeat was never closed. */
 const REAP_AFTER_MS = 12 * 60 * 60 * 1000;
@@ -16,6 +21,13 @@ export type HydratedSession = {
   runningSince: number | null;
   intervalIndex: number;
   intervalBaseSeconds: number;
+  /**
+   * Seconds of break time in closed intervals, so the client can reduce the
+   * rehydrated wall clock to active time exactly as it does for a session it
+   * watched from the start. Closed intervals carry their own `elapsedSeconds`
+   * — overruns included — which is the same source the server logs from.
+   */
+  breakElapsedSeconds: number;
   /** Seconds added to the open interval by hand, recovered from its target. */
   intervalExtraSeconds: number;
   /** What the open interval says you were in the middle of, if anything. */
@@ -69,6 +81,14 @@ export async function getActiveSession(
     .filter((interval) => interval.index < (openInterval?.index ?? 0))
     .reduce((sum, interval) => sum + interval.elapsedSeconds, 0);
 
+  const breakElapsedSeconds = session.intervals
+    .filter(
+      (interval) =>
+        interval.endedAt !== null &&
+        isBreakKind(interval.kind as IntervalKind),
+    )
+    .reduce((sum, interval) => sum + interval.elapsedSeconds, 0);
+
   const config: TimerConfig = {
     mode: session.mode,
     targetSeconds: session.targetSeconds,
@@ -97,6 +117,7 @@ export async function getActiveSession(
     runningSince: session.runningSince?.getTime() ?? null,
     intervalIndex: openInterval?.index ?? 0,
     intervalBaseSeconds,
+    breakElapsedSeconds,
     intervalExtraSeconds,
     returnNote: openInterval?.returnNote ?? null,
     reachedTarget: session.reachedTargetAt !== null,
