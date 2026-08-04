@@ -9,6 +9,7 @@
 import { z } from "zod";
 
 import { MINUTES_PER_DAY, MIN_BLOCK_MINUTES } from "@/lib/block-math";
+import { CALENDAR_COLOR_NAMES } from "@/lib/calendar-colors";
 import { parseMoneyToCents } from "@/lib/money";
 import { MAX_QUOTA } from "@/lib/quota";
 import {
@@ -114,6 +115,8 @@ export const createTodoSchema = z.object({
     z.coerce.number().int().min(1).max(MAX_INTERVALS),
   ),
   steps: stepsField,
+  /** The calendar hue the task wears. Default teal = the calendar's work colour. */
+  color: z.enum(CALENDAR_COLOR_NAMES).default("teal"),
 });
 
 const quotaValue = z.coerce.number().int().min(1).max(MAX_QUOTA);
@@ -215,6 +218,12 @@ export const quickAddSchema = z.object({
 export const toggleTaskSchema = z.object({
   taskId: cuid,
   done: z.coerce.boolean(),
+});
+
+/** Re-colour a task from the calendar, where its colour is actually worn. */
+export const updateTaskColorSchema = z.object({
+  taskId: cuid,
+  color: z.enum(CALENDAR_COLOR_NAMES),
 });
 
 /**

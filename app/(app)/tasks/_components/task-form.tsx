@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { DurationPicker } from "@/components/duration-picker";
+import { ColorSwatches } from "@/components/color-swatches";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import type { CalendarColor } from "@/lib/calendar-colors";
 import { EVERY_DAY, WEEKDAYS } from "@/lib/dates";
 import { describeRecurrence } from "@/lib/recurrence";
 import {
@@ -37,6 +39,7 @@ export type TaskFormValues = {
   title?: string;
   notes?: string | null;
   priority?: "P1" | "P2" | "P3" | "P4";
+  color?: CalendarColor;
   projectId?: string | null;
   dueDate?: string | null;
   estimateMinutes?: number | null;
@@ -127,6 +130,7 @@ export function TaskForm({
 
   const [days, setDays] = useState<number[]>(values.daysOfWeek ?? EVERY_DAY);
   const [mode, setMode] = useState<WorkMode>(values.defaultMode ?? "POMODORO");
+  const [color, setColor] = useState<CalendarColor>(values.color ?? "teal");
   // Mirrored, not controlled: the title input keeps its defaultValue and this
   // only exists so the stacking preview can read "…, I will read for a bit."
   // back as you type it.
@@ -182,6 +186,7 @@ export function TaskForm({
           <input key={day} type="hidden" name="daysOfWeek[]" value={day} />
         ))}
       <input type="hidden" name="defaultMode" value={mode} />
+      <input type="hidden" name="color" value={color} />
 
       <Field
         label={titleLabel ?? (kind === "HABIT" ? "Habit" : "Task")}
@@ -406,6 +411,13 @@ export function TaskForm({
           </Select>
         </Field>
       </div>
+
+      <Field
+        label="Colour"
+        hint="The hue this wears on the calendar — its blocks come up in this colour, so the eye can track it across days."
+      >
+        <ColorSwatches value={color} onChange={setColor} />
+      </Field>
 
       <Field label="Notes" htmlFor="notes" error={error("notes")}>
         <Textarea

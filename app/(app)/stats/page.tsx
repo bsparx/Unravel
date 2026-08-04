@@ -38,7 +38,7 @@ export default async function StatsPage({
     stats.totals.sessions > 0 || stats.balance.recoverySessions > 0;
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-5 py-8 md:px-8 md:py-12">
+    <div className="mx-auto w-full max-w-7xl px-5 py-8 md:px-8 md:py-12">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-display">Time</h1>

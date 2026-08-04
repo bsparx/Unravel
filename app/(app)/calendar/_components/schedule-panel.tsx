@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { calendarDotStyle, isCalendarColor } from "@/lib/calendar-colors";
 import { formatMinutes, formatRelativeDate } from "@/lib/dates";
 import { clearPlanItem, planMinutes, writePlanItem } from "@/lib/plan-drag";
 import type { SchedulableItem } from "@/lib/time-blocks";
@@ -122,6 +123,13 @@ function ScheduleRow({
 
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-1.5 truncate text-label">
+          {isCalendarColor(item.color) && (
+            <span
+              className="mt-0.5 size-2 shrink-0 rounded-full"
+              style={calendarDotStyle(item.color)}
+              aria-hidden
+            />
+          )}
           {item.kind === "habit" && (
             <Repeat className="text-primary size-3 shrink-0" aria-hidden />
           )}

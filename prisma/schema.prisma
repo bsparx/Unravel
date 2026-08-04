@@ -246,6 +246,12 @@ model Task {
   priority  Priority @default(P4)
   sortOrder Float    @default(0)
 
+  /// Calendar identity: which of the 20 calendar hues a task (and the blocks
+  /// it becomes) wears. Defaults to the primary teal, so an uncoloured task
+  /// is indistinguishable from the calendar's work colour. Validated against
+  /// the same palette list as the picker.
+  color String @default("teal")
+
   /// TODO only. A local calendar date, stored as UTC-midnight DATE.
   dueDate DateTime? @db.Date
 

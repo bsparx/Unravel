@@ -24,6 +24,7 @@ import {
   toggleOccurrenceSchema,
   toggleStepSchema,
   toggleTaskSchema,
+  updateTaskColorSchema,
   updateTodoSchema,
 } from "@/lib/validation";
 
@@ -71,6 +72,7 @@ export async function createTodo(
       defaultMode: input.defaultMode,
       plannedIntervals: input.plannedIntervals ?? null,
       sortOrder: Date.now(),
+      color: input.color,
       steps: { create: stepCreateRows(user.id, input.steps) },
     },
   });
@@ -111,6 +113,7 @@ export async function updateTodo(
         : null,
       defaultMode: input.defaultMode,
       plannedIntervals: input.plannedIntervals ?? null,
+      color: input.color,
     },
   });
 
@@ -123,6 +126,23 @@ export async function updateTodo(
   revalidateTaskViews();
   revalidatePath(`/tasks/${input.id}`);
   return { status: "success", message: "Saved." };
+}
+
+/**
+ * Re-colour a task from the block dialog, where its colour is worn. One
+ * field, scoped like every other write; the task's own row is the single
+ * source of truth, so every block it becomes re-tints with it.
+ */
+export async function updateTaskColor(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const parsed = updateTaskColorSchema.safeParse(formValues(formData));
+  if (!parsed.success) return;
+
+  await prisma.task.updateMany({
+    where: { id: parsed.data.taskId, userId: user.id },
+    data: { color: parsed.data.color },
+  });
+  revalidateTaskViews();
 }
 
 /**

@@ -43,7 +43,7 @@ export default async function BudgetAccountsPage({
   const todayISO = todayLocal(user.timezone).toISOString().slice(0, 10);
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-5 py-8 md:px-8 md:py-12">
+    <div className="mx-auto w-full max-w-3xl px-5 py-8 md:px-8 md:py-12">
       <Link
         href="/budget"
         className="text-muted-foreground hover:text-foreground focus-visible:ring-ring mb-6 inline-flex items-center gap-1.5 rounded-md text-label transition-colors focus-visible:ring-2 focus-visible:outline-none"

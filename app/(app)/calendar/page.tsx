@@ -11,21 +11,24 @@ import {
 } from "@/lib/block-math";
 import {
   addDays,
+  addMonths,
   formatDate,
   formatFullDate,
   minuteOfDayLocal,
   parseLocalDate,
+  startOfMonth,
   startOfWeek,
   toISODate,
   todayLocal,
   WEEKDAYS,
 } from "@/lib/dates";
-import { getBlocks, getSchedulableItems } from "@/lib/time-blocks";
+import { getBlockedDays, getBlocks, getSchedulableItems } from "@/lib/time-blocks";
 import { tightCount, transitionsForDay } from "@/lib/transitions";
 import { cn } from "@/lib/utils";
 
 import { CalendarView } from "./_components/calendar-view";
 import type { GridDay } from "./_components/calendar-grid";
+import { MonthStrip } from "./_components/month-strip";
 import { SchedulePanel } from "./_components/schedule-panel";
 
 export const metadata = { title: "Calendar" };
@@ -60,9 +63,20 @@ export default async function CalendarPage({
   const start = view === "week" ? startOfWeek(anchor, user.weekStart) : anchor;
   const length = view === "week" ? 7 : 1;
 
-  const [blocks, schedulable] = await Promise.all([
+  const [blocks, schedulable, blockedDays] = await Promise.all([
     getBlocks(user, start, length),
     getSchedulableItems(user, anchor),
+    // The mini-month navigator's dots: which days in the anchor's month
+    // already carry a block.
+    getBlockedDays(
+      user,
+      startOfMonth(anchor),
+      Math.round(
+        (addMonths(startOfMonth(anchor), 1).getTime() -
+          startOfMonth(anchor).getTime()) /
+          86_400_000,
+      ),
+    ),
   ]);
 
   const days: GridDay[] = Array.from({ length }, (_, offset) => {
@@ -160,7 +174,7 @@ export default async function CalendarPage({
   })();
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-5 py-8 md:px-8 md:py-12">
+    <div className="mx-auto w-full max-w-7xl px-5 py-8 md:px-8 md:py-12">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-display">Calendar</h1>
@@ -233,10 +247,18 @@ export default async function CalendarPage({
             id: task.id,
             title: task.title,
             cueTitle: task.cueTitle,
+            color: task.color,
           }))}
         />
 
         <aside className="space-y-6">
+          <MonthStrip
+            month={startOfMonth(anchor)}
+            anchor={anchor}
+            weekStart={user.weekStart}
+            timeZone={user.timezone}
+            blockedDays={blockedDays}
+          />
           <section>
             <h2 className="font-display text-title">
               Not on the day yet

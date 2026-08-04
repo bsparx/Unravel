@@ -32,7 +32,7 @@ export default async function TasksPage({
   const tasks = await getTasks(user, filter);
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-5 py-8 md:px-8 md:py-12">
+    <div className="mx-auto w-full max-w-7xl px-5 py-8 md:px-8 md:py-12">
       <header className="mb-8 flex items-end justify-between gap-4">
         <div>
           <h1 className="text-display">Tasks</h1>

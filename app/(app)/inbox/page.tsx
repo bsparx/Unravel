@@ -10,7 +10,7 @@ export default async function InboxPage() {
   const captures = await getRawCaptures(user);
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-5 py-8 md:px-8 md:py-12">
+    <div className="mx-auto w-full max-w-4xl px-5 py-8 md:px-8 md:py-12">
       <header className="mb-8">
         <h1 className="text-display">Inbox</h1>
         <p className="text-muted-foreground mt-1 text-label">

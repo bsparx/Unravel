@@ -106,6 +106,7 @@ const taskSelect = {
   title: true,
   notes: true,
   priority: true,
+  color: true,
   estimatedSeconds: true,
   defaultMode: true,
   plannedIntervals: true,

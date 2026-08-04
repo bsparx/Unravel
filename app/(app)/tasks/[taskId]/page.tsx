@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { ConfirmDelete } from "@/components/confirm-delete";
 import { SessionLog } from "@/components/session-log";
 import { requireUser } from "@/lib/auth";
+import { isCalendarColor } from "@/lib/calendar-colors";
 import { prisma } from "@/lib/db";
 import { formatDuration, formatTimestamp, toISODate } from "@/lib/dates";
 import { getProjects, getTask } from "@/lib/tasks";
@@ -49,7 +50,7 @@ export default async function EditTaskPage({
   );
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-5 py-8 md:px-8 md:py-12">
+    <div className="mx-auto w-full max-w-3xl px-5 py-8 md:px-8 md:py-12">
       <Link
         href="/tasks"
         className="text-muted-foreground hover:text-foreground mb-6 inline-flex items-center gap-1.5 text-label"
@@ -72,6 +73,7 @@ export default async function EditTaskPage({
           notes: task.notes,
           priority: task.priority,
           projectId: task.projectId,
+          color: isCalendarColor(task.color) ? task.color : "teal",
           dueDate: task.dueDate ? toISODate(task.dueDate) : null,
           estimateMinutes: task.estimatedSeconds
             ? Math.round(task.estimatedSeconds / 60)

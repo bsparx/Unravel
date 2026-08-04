@@ -29,7 +29,7 @@ export default async function TodayPage() {
     view.habits[0] ?? view.overdue[0] ?? view.dueToday[0] ?? view.undated[0];
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-5 py-8 md:px-8 md:py-12">
+    <div className="mx-auto w-full max-w-4xl px-5 py-8 md:px-8 md:py-12">
       <header className="mb-8">
         <p className="text-micro text-muted-foreground font-medium tracking-wider uppercase">
           {formatFullDate(view.date)}

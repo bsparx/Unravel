@@ -3,8 +3,8 @@
 import { useCallback, useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import { isCalendarColor } from "@/lib/calendar-colors";
 import type { CalendarBlock } from "@/lib/time-blocks";
-import { spanOfLength } from "@/lib/block-math";
 import { idleState } from "@/lib/validation";
 
 import { scheduleTask } from "../actions";
@@ -26,8 +26,14 @@ export function CalendarView({
   blocks: CalendarBlock[];
   todayISO: string;
   timeZone: string;
-  /** `cueTitle` is set for a habit that brings a precursor block with it. */
-  tasks: { id: string; title: string; cueTitle: string | null }[];
+  /** `cueTitle` is set for a habit that brings a precursor block with it;
+      `color` is the task's calendar hue, shown when the editor opens. */
+  tasks: {
+    id: string;
+    title: string;
+    cueTitle: string | null;
+    color: string;
+  }[];
 }) {
   const [draft, setDraft] = useState<BlockDraft | null>(null);
   const [, startTransition] = useTransition();
@@ -64,14 +70,14 @@ export function CalendarView({
         days={days}
         blocks={blocks}
         todayISO={todayISO}
-        onCreate={(dateISO, startMinute) => {
-          const span = spanOfLength(startMinute, 60);
+        onCreate={(dateISO, span) => {
           setDraft({
             dateISO,
             ...span,
             title: "",
             notes: "",
             taskId: null,
+            taskColor: null,
             kind: "WORK",
             hasCue: false,
           });
@@ -85,6 +91,10 @@ export function CalendarView({
             title: block.title,
             notes: block.notes ?? "",
             taskId: block.task?.id ?? null,
+            taskColor:
+              block.task && isCalendarColor(block.task.color)
+                ? block.task.color
+                : null,
             kind: block.kind,
             hasCue: block.hasCue,
           })

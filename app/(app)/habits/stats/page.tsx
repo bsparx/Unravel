@@ -48,7 +48,7 @@ export default async function HabitStatsPage({
 
   if (stats.allHabits.length === 0) {
     return (
-      <div className="mx-auto w-full max-w-4xl px-5 py-8 md:px-8 md:py-12">
+      <div className="mx-auto w-full max-w-7xl px-5 py-8 md:px-8 md:py-12">
         <BackLink />
         <EmptyState
           icon={BarChart3}
@@ -65,7 +65,7 @@ export default async function HabitStatsPage({
   }
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-5 py-8 md:px-8 md:py-12">
+    <div className="mx-auto w-full max-w-7xl px-5 py-8 md:px-8 md:py-12">
       <BackLink />
 
       <header className="mb-6">

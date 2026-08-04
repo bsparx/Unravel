@@ -17,7 +17,7 @@ export default async function SettingsPage() {
     : [user.timezone, ...zones];
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-5 py-8 md:px-8 md:py-12">
+    <div className="mx-auto w-full max-w-3xl px-5 py-8 md:px-8 md:py-12">
       <header className="mb-8">
         <h1 className="text-display">Settings</h1>
       </header>

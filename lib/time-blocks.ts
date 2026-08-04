@@ -35,6 +35,8 @@ export type CalendarBlock = {
   task: {
     id: string;
     title: string;
+    /** The calendar hue this task wears; blocks inherit it. */
+    color: string;
     estimatedSeconds: number | null;
     defaultMode: "POMODORO" | "BASIC" | "FLOW" | "RECOVERY";
     plannedIntervals: number | null;
@@ -57,6 +59,7 @@ const blockSelect = {
     select: {
       id: true,
       title: true,
+      color: true,
       estimatedSeconds: true,
       defaultMode: true,
       plannedIntervals: true,
@@ -132,6 +135,28 @@ export function blocksByDate(
 }
 
 /**
+ * The ISO dates that have at least one block, across a range. One lightweight
+ * read for the mini-month navigator's dots — a month of days is what it
+ * renders, so asking it for a month of days costs exactly one query.
+ */
+export async function getBlockedDays(
+  user: User,
+  start: Date,
+  days: number,
+): Promise<Set<string>> {
+  const rows = await prisma.timeBlock.findMany({
+    where: {
+      userId: user.id,
+      date: { gte: start, lt: addDays(start, days) },
+    },
+    select: { date: true },
+    distinct: ["date"],
+  });
+
+  return new Set(rows.map((row) => toISODate(row.date)));
+}
+
+/**
  * What actually happened on these days, per task, so the calendar can put
  * planned and logged next to each other.
  *
@@ -167,6 +192,8 @@ export type SchedulableItem = {
   /** Habits come first in the panel and carry no due date; todos do. */
   kind: "task" | "habit";
   title: string;
+  /** The calendar hue the panel's dot wears. */
+  color: string;
   estimatedSeconds: number | null;
   dueDate: Date | null;
   priority: "P1" | "P2" | "P3" | "P4" | null;
@@ -222,6 +249,7 @@ export async function getSchedulableItems(
       select: {
         id: true,
         title: true,
+        color: true,
         estimatedSeconds: true,
         dueDate: true,
         priority: true,
@@ -248,6 +276,7 @@ export async function getSchedulableItems(
       select: {
         id: true,
         title: true,
+        color: true,
         estimatedSeconds: true,
         project: { select: { name: true } },
         recurrence: {
@@ -287,6 +316,7 @@ export async function getSchedulableItems(
       id: habit.id,
       kind: "habit" as const,
       title: habit.title,
+      color: habit.color,
       estimatedSeconds: habit.estimatedSeconds,
       dueDate: null,
       priority: null,
@@ -301,6 +331,7 @@ export async function getSchedulableItems(
     id: task.id,
     kind: "task" as const,
     title: task.title,
+    color: task.color,
     estimatedSeconds: task.estimatedSeconds,
     dueDate: task.dueDate,
     priority: task.priority,

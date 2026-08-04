@@ -11,6 +11,8 @@ import {
   ListChecks,
   ListTodo,
   Moon,
+  PanelLeft,
+  PanelLeftClose,
   Repeat,
   Settings,
   Sun,
@@ -18,6 +20,22 @@ import {
   Wallet,
 } from "lucide-react";
 
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarRail,
+  SidebarSeparator,
+  useSidebar,
+} from "@/components/ui/sidebar";
+import { BrandMark } from "@/components/brand-mark";
 import { cn } from "@/lib/utils";
 
 /**
@@ -31,7 +49,7 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { href: "/", label: "Today", icon: Sun },
   { href: "/day", label: "Day", icon: ListChecks },
-  { href: "/calendar", label: "Plan", icon: CalendarDays },
+  { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/timer", label: "Timer", icon: Timer },
   { href: "/stats", label: "Time", icon: BarChart3 },
 ] as const;
@@ -46,12 +64,21 @@ const RAIL_EXTRA = [
   { href: "/close", label: "Close the day", icon: Moon },
 ] as const;
 
+/**
+ * The shell. The shadcn sidebar owns the desktop rail: fixed, collapsible to
+ * an icon rail (Ctrl/Cmd+B, or the toggle at the top of the menu), with the
+ * choice persisted in a cookie by the provider. Below `md` it never renders —
+ * phones keep the bottom bar, which is the designed mobile nav.
+ */
 export function AppShell({
   children,
   banner,
+  defaultOpen = true,
 }: {
   children: React.ReactNode;
   banner?: React.ReactNode;
+  /** Read from the sidebar_state cookie so the choice survives reloads. */
+  defaultOpen?: boolean;
 }) {
   const pathname = usePathname();
   // `"/"` works here without a special case: the equality catches it, and
@@ -61,63 +88,109 @@ export function AppShell({
     pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <div className="flex min-h-full flex-1 flex-col md:flex-row">
-      {/* Desktop rail */}
-      <nav
-        aria-label="Main"
-        className="bg-sidebar border-border hidden w-56 shrink-0 flex-col self-start border-r px-3 py-6 md:sticky md:top-0 md:flex md:h-dvh"
-      >
-        <Link
-          href="/"
-          className="focus-visible:ring-ring mb-8 flex items-center gap-2 rounded-md px-3 focus-visible:ring-2 focus-visible:outline-none"
-        >
-          <span className="bg-primary size-2.5 rounded-full" />
-          <span className="font-display text-title tracking-tight">
-            Unravel
-          </span>
-        </Link>
+    <SidebarProvider defaultOpen={defaultOpen}>
+      <Sidebar collapsible="icon">
+        <SidebarHeader>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild size="lg" tooltip="Unravel">
+                <Link href="/">
+                  {/* The mark survives the collapse — the wordmark clips away,
+                      the loop doesn't. */}
+                  <BrandMark className="text-primary size-6 shrink-0" />
+                  <span className="font-display text-title tracking-tight">
+                    Unravel
+                  </span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
 
-        <ul className="flex flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain">
-          {[...NAV, ...RAIL_EXTRA].map(({ href, label, icon: Icon }, index) => (
-            <li key={href} className={index === NAV.length ? "mt-4" : undefined}>
-              <Link
-                href={href}
-                aria-current={isActive(href) ? "page" : undefined}
-                className={cn(
-                  "focus-visible:ring-ring flex items-center gap-3 rounded-md px-3 py-2 text-label transition-colors focus-visible:ring-2 focus-visible:outline-none",
-                  isActive(href)
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                    : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50",
-                )}
+            <SidebarMenuItem>
+              <CollapseToggle />
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarHeader>
+
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarMenu>
+              {NAV.map(({ href, label, icon: Icon }) => (
+                <SidebarMenuItem key={href}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive(href)}
+                    tooltip={label}
+                  >
+                    <Link
+                      href={href}
+                      aria-current={isActive(href) ? "page" : undefined}
+                    >
+                      <Icon aria-hidden />
+                      <span>{label}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroup>
+
+          <SidebarSeparator className="mx-3" />
+
+          <SidebarGroup>
+            <SidebarMenu>
+              {RAIL_EXTRA.map(({ href, label, icon: Icon }) => (
+                <SidebarMenuItem key={href}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive(href)}
+                    tooltip={label}
+                  >
+                    <Link
+                      href={href}
+                      aria-current={isActive(href) ? "page" : undefined}
+                    >
+                      <Icon aria-hidden />
+                      <span>{label}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroup>
+        </SidebarContent>
+
+        <SidebarFooter className="border-t">
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={isActive("/settings")}
+                tooltip="Settings"
               >
-                <Icon className="size-4 shrink-0" aria-hidden />
-                {label}
-              </Link>
-            </li>
-          ))}
-        </ul>
+                <Link
+                  href="/settings"
+                  aria-current={isActive("/settings") ? "page" : undefined}
+                >
+                  <Settings aria-hidden />
+                  <span>Settings</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <div className="px-2 py-1.5">
+                <UserButton />
+              </div>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarFooter>
 
-        <div className="border-border mt-4 flex items-center justify-between gap-2 border-t px-3 pt-4">
-          <UserButton />
-          <Link
-            href="/settings"
-            aria-label="Settings"
-            className={cn(
-              "focus-visible:ring-ring rounded-md p-2 transition-colors focus-visible:ring-2 focus-visible:outline-none",
-              isActive("/settings")
-                ? "text-foreground"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <Settings className="size-4" aria-hidden />
-          </Link>
-        </div>
-      </nav>
+        <SidebarRail />
+      </Sidebar>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <SidebarInset>
         {banner}
         <main className="flex-1 pb-20 md:pb-0">{children}</main>
-      </div>
+      </SidebarInset>
 
       {/* Mobile bar */}
       <nav
@@ -139,6 +212,25 @@ export function AppShell({
           </Link>
         ))}
       </nav>
-    </div>
+    </SidebarProvider>
+  );
+}
+
+/** The collapse control, at the top of the menu so every page can reach it. */
+function CollapseToggle() {
+  const { state, toggleSidebar } = useSidebar();
+  const expanded = state === "expanded";
+
+  return (
+    <SidebarMenuButton
+      onClick={toggleSidebar}
+      tooltip={expanded ? "Collapse sidebar" : "Expand sidebar"}
+      aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
+    >
+      {expanded ? <PanelLeftClose aria-hidden /> : <PanelLeft aria-hidden />}
+      <span className="text-muted-foreground">
+        {expanded ? "Collapse" : "Expand"}
+      </span>
+    </SidebarMenuButton>
   );
 }

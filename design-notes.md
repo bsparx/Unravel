@@ -488,3 +488,15 @@ good month". The motion budget is the app's own: the fill rises once on
 arrival, tilts toward the pointer while you point at it, settles when an
 expense lands, and never moves on its own. WebGL is a luxury, not a
 dependency: if it fails, the same jar is drawn in SVG.
+
+## The brand mark
+
+`components/brand-mark.tsx` — a loop that has come undone: a ring with a 50°
+gap at the top (the timer's circle, the day's loop) and a single thread pulled
+loose, unspooling once around the outside and hooking back in. One stroke in
+`currentColor`, so it wears whatever token its context does — primary teal on
+the sidebar rail, foreground on paper. Geometry is deliberate: the arc runs
+the long way around (`large-arc 1, sweep 0`), the tail's control points clear
+the ring's outside edge, and at the collapsed rail's 24px the mark still holds
+~13% ink coverage with strong contrast in both themes. The sidebar shows the
+mark alone when collapsed; the wordmark returns with the labels when expanded.

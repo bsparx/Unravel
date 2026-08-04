@@ -5,6 +5,7 @@ import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { ColorSwatches } from "@/components/color-swatches";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import type { CalendarColor } from "@/lib/calendar-colors";
 import {
   formatMinuteOfDay,
   parseMinuteOfDay,
@@ -33,6 +35,7 @@ import { idleState } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 
 import { createBlock, deleteBlock, updateBlock } from "../actions";
+import { updateTaskColor } from "@/app/(app)/tasks/actions";
 
 export type BlockDraft = {
   id?: string;
@@ -42,6 +45,8 @@ export type BlockDraft = {
   title: string;
   notes: string;
   taskId: string | null;
+  /** The linked task's calendar hue, so the picker opens on it. */
+  taskColor: CalendarColor | null;
   kind: "WORK" | "RECOVERY" | "BUFFER";
   /** This block already has a cue in front of it, so don't offer to add one. */
   hasCue: boolean;
@@ -70,7 +75,7 @@ export function BlockDialog({
   onClose,
 }: {
   draft: BlockDraft;
-  tasks: { id: string; title: string; cueTitle: string | null }[];
+  tasks: { id: string; title: string; cueTitle: string | null; color: string }[];
   onClose: () => void;
 }) {
   const editing = Boolean(draft.id);
@@ -85,11 +90,27 @@ export function BlockDialog({
   // Controlled, unlike the other Selects here, because the cue offer below has
   // to react to which task is picked.
   const [taskId, setTaskId] = useState(draft.taskId ?? "none");
+  const [taskColor, setTaskColor] = useState<CalendarColor>(
+    draft.taskColor ?? "teal",
+  );
   const [includeCue, setIncludeCue] = useState(true);
 
   const cueTitle = draft.hasCue
     ? null
     : (tasks.find((task) => task.id === taskId)?.cueTitle ?? null);
+
+  const linkedTask = tasks.find((task) => task.id === taskId) ?? null;
+
+  /** Re-colour the linked task — the block re-tints with it on revalidate. */
+  const pickTaskColor = (color: CalendarColor) => {
+    setTaskColor(color);
+    if (!linkedTask) return;
+    const formData = new FormData();
+    formData.set("taskId", linkedTask.id);
+    formData.set("color", color);
+    updateTaskColor(formData);
+    toast.success("Colour updated.");
+  };
 
   useEffect(() => {
     if (state.status === "success") {
@@ -255,6 +276,17 @@ export function BlockDialog({
               lands against that task.
             </p>
           </div>
+
+          {linkedTask && (
+            <div className="space-y-1.5">
+              <Label>Colour</Label>
+              <ColorSwatches value={taskColor} onChange={pickTaskColor} />
+              <p className="text-muted-foreground text-label">
+                The task&apos;s hue — every block of it across the calendar
+                re-tints with this.
+              </p>
+            </div>
+          )}
 
           {cueTitle && (
             <label className="border-primary/40 bg-accent/40 flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2">

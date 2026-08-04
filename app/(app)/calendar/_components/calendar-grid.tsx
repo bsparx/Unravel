@@ -18,11 +18,17 @@ import {
   formatMinuteOfDay,
   formatSpanLength,
   layoutColumns,
+  MIN_BLOCK_MINUTES,
   MINUTES_PER_DAY,
   snap,
   SNAP_MINUTES,
   spanMinutes,
+  spanOfLength,
 } from "@/lib/block-math";
+import {
+  calendarChipStyle,
+  isCalendarColor,
+} from "@/lib/calendar-colors";
 import {
   activePlanItem,
   isPlanItemDrag,
@@ -140,7 +146,11 @@ export function CalendarGrid({
   days: GridDay[];
   blocks: CalendarBlock[];
   todayISO: string;
-  onCreate: (dateISO: string, startMinute: number) => void;
+  /** A slot was clicked or dragged into a span: open the editor on it. */
+  onCreate: (
+    dateISO: string,
+    span: { startMinute: number; endMinute: number },
+  ) => void;
   onEdit: (block: CalendarBlock) => void;
   /** Something was dragged in from the panel and let go at `startMinute`. */
   onDropItem: (item: PlanDragItem, dateISO: string, startMinute: number) => void;
@@ -514,7 +524,10 @@ function DayColumn({
     startMinute: number;
     endMinute: number;
   }) => void;
-  onCreate: (dateISO: string, startMinute: number) => void;
+  onCreate: (
+    dateISO: string,
+    span: { startMinute: number; endMinute: number },
+  ) => void;
   onEdit: (block: CalendarBlock) => void;
   onToggleDone: (block: CalendarBlock) => void;
   onDropCue: (block: CalendarBlock) => void;
@@ -526,11 +539,63 @@ function DayColumn({
   // is over this column.
   const [dropMinute, setDropMinute] = useState<number | null>(null);
 
+  // Press-and-drag to create: the live span while the pointer is down on an
+  // empty slot. Released without a drag, the slot just clicks.
+  const [creating, setCreating] = useState<{
+    startMinute: number;
+    endMinute: number;
+  } | null>(null);
+  /** The click that follows a real drag must not also create. */
+  const skipNextClickRef = useRef(false);
+
   /** Where in the day a pointer is, in minutes. */
   const minuteAt = (clientY: number): number => {
     const rect = columnRef.current?.getBoundingClientRect();
     if (!rect) return 0;
     return snap((clientY - rect.top) / MINUTE_PX);
+  };
+
+  /**
+   * Google's gesture: press an empty slot and drag down to claim exactly the
+   * stretch you dragged, rather than asking for a length afterwards. A plain
+   * press that never moves is a click, and clicks still open the editor with
+   * the default hour — nothing is lost by dragging.
+   */
+  const beginCreateDrag = (event: React.PointerEvent, minute: number) => {
+    const element = event.currentTarget as HTMLElement;
+    element.setPointerCapture(event.pointerId);
+
+    let latest: { startMinute: number; endMinute: number } | null = null;
+    setCreating({ startMinute: minute, endMinute: minute });
+
+    const onMove = (moveEvent: PointerEvent) => {
+      const current = minuteAt(moveEvent.clientY);
+      latest = {
+        startMinute: Math.min(minute, current),
+        endMinute: Math.max(minute, current),
+      };
+      setCreating(latest);
+    };
+
+    const onUp = () => {
+      element.releasePointerCapture(event.pointerId);
+      element.removeEventListener("pointermove", onMove);
+      element.removeEventListener("pointerup", onUp);
+      element.removeEventListener("pointercancel", onUp);
+      setCreating(null);
+      if (
+        latest &&
+        latest.endMinute - latest.startMinute >= MIN_BLOCK_MINUTES
+      ) {
+        // The trailing click would otherwise create a second, 1-hour block.
+        skipNextClickRef.current = true;
+        onCreate(day.dateISO, latest);
+      }
+    };
+
+    element.addEventListener("pointermove", onMove);
+    element.addEventListener("pointerup", onUp);
+    element.addEventListener("pointercancel", onUp);
   };
 
   const beginDrag = (
@@ -620,13 +685,8 @@ function DayColumn({
       ref={columnRef}
       className={cn(
         "border-border/60 relative border-l",
-        day.isToday && "bg-accent/20",
+        day.isToday && "bg-accent/30 ring-primary/15 ring-1 ring-inset",
       )}
-      onDoubleClick={(event) => {
-        const rect = columnRef.current?.getBoundingClientRect();
-        if (!rect) return;
-        onCreate(day.dateISO, snap((event.clientY - rect.top) / MINUTE_PX));
-      }}
       onDragOver={(event) => {
         if (!isPlanItemDrag(event.dataTransfer)) return;
         // Without this the browser treats the column as a non-drop zone and
@@ -666,17 +726,47 @@ function DayColumn({
       {/* Click targets, one per half hour. A div with an onClick would swallow
           block clicks; these sit underneath, at z-0. The dashed inset outline
           on hover is the affordance — a clickable slot announces itself, so
-          no instructions are needed. */}
+          no instructions are needed. Pressing and dragging claims the dragged
+          stretch; pressing without moving opens the editor with an hour. */}
       {Array.from({ length: 48 }, (_, half) => (
         <button
           key={half}
           type="button"
           aria-label={`Block out ${formatMinuteOfDay(half * 30)} on ${day.label}`}
-          onClick={() => onCreate(day.dateISO, half * 30)}
+          onPointerDown={(event) => beginCreateDrag(event, half * 30)}
+          onClick={() => {
+            if (skipNextClickRef.current) {
+              skipNextClickRef.current = false;
+              return;
+            }
+            // Keyboard and plain mouse presses both land here: create with the
+            // default hour at this slot.
+            onCreate(day.dateISO, spanOfLength(half * 30, 60));
+          }}
           className="hover:bg-primary/5 focus-visible:bg-primary/10 focus-visible:ring-ring after:border-primary/30 absolute inset-x-0 after:absolute after:inset-x-1 after:inset-y-0.5 after:rounded-md after:border after:border-dashed after:opacity-0 after:transition-opacity hover:after:opacity-100 focus-visible:after:opacity-100 focus-visible:ring-1 focus-visible:outline-none"
           style={{ top: half * 30 * MINUTE_PX, height: 30 * MINUTE_PX }}
         />
       ))}
+
+      {/* The live span while pressing-and-dragging to create. */}
+      {creating && (
+        <div
+          className="border-primary bg-primary/15 pointer-events-none absolute inset-x-0.5 z-30 overflow-hidden rounded-md border border-dashed px-2 py-1"
+          style={{
+            top: creating.startMinute * MINUTE_PX,
+            height: Math.max(
+              18,
+              (creating.endMinute - creating.startMinute) * MINUTE_PX - 2,
+            ),
+          }}
+        >
+          <p className="truncate text-label leading-4 font-medium">New block</p>
+          <p className="text-muted-foreground text-micro tabular-nums">
+            {formatMinuteOfDay(creating.startMinute)} –{" "}
+            {formatMinuteOfDay(creating.endMinute)}
+          </p>
+        </div>
+      )}
 
       {isToday && (
         <NowPosition>
@@ -788,7 +878,9 @@ function DropPreview({
 }
 
 /**
- * Colour is by *kind*, never by state.
+ * Colour is by *kind*, never by state — unless the block is tied to a task
+ * that wears its own colour, in which case the task's identity wins and the
+ * kind's tint only survives for untethered blocks.
  *
  * Amber stays reserved for a clock that is actually running — the now-line is
  * the only amber on this screen, and a planned block borrowing it would make
@@ -822,6 +914,14 @@ function BlockChip({
   const done = block.completedAt !== null;
   /** This block is the cue in front of another one. */
   const isCue = block.cueForId !== null;
+  /**
+   * The task's hue, when there is one. A cue stays quiet — it is part of
+   * something else, not a thing with an identity of its own.
+   */
+  const tint =
+    !isCue && block.task && isCalendarColor(block.task.color)
+      ? calendarChipStyle(block.task.color)
+      : null;
 
   const width = `calc(${100 / columns}% - 4px)`;
   const left = `calc(${(column * 100) / columns}% + 2px)`;
@@ -831,7 +931,9 @@ function BlockChip({
       className={cn(
         "group absolute z-10 overflow-hidden rounded-md border px-2 py-1 select-none",
         "transition-shadow duration-150 hover:shadow-sm",
-        KIND_STYLES[block.kind],
+        // A task-coloured block sheds the kind's tint and the buffer's
+        // dashed "empty on purpose" reading — it has a thing behind it now.
+        tint ? "text-foreground" : KIND_STYLES[block.kind],
         done && "opacity-55",
         // A cue is quieter than what it triggers, and only rounded at the top,
         // so the pair reads as one object with a seam rather than two blocks
@@ -847,6 +949,7 @@ function BlockChip({
         height: Math.max(18, minutes * MINUTE_PX - 2),
         width,
         left,
+        ...tint,
       }}
       onPointerDown={(event) => onPointerDown(event, "move")}
     >

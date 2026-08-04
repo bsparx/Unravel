@@ -14,7 +14,7 @@ export default async function NewTaskPage() {
   const projects = await getProjects(user);
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-5 py-8 md:px-8 md:py-12">
+    <div className="mx-auto w-full max-w-3xl px-5 py-8 md:px-8 md:py-12">
       <Link
         href="/tasks"
         className="text-muted-foreground hover:text-foreground mb-6 inline-flex items-center gap-1.5 text-label"

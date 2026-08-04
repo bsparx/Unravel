@@ -6,6 +6,7 @@ import { TaskForm } from "@/app/(app)/tasks/_components/task-form";
 import { ConfirmDelete } from "@/components/confirm-delete";
 import { SessionLog } from "@/components/session-log";
 import { requireUser } from "@/lib/auth";
+import { isCalendarColor } from "@/lib/calendar-colors";
 import { prisma } from "@/lib/db";
 import { formatTimestamp, toISODate } from "@/lib/dates";
 import { toWorkMode } from "@/lib/timer-math";
@@ -45,7 +46,7 @@ export default async function EditHabitPage({
   });
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-5 py-8 md:px-8 md:py-12">
+    <div className="mx-auto w-full max-w-3xl px-5 py-8 md:px-8 md:py-12">
       <Link
         href="/habits"
         className="text-muted-foreground hover:text-foreground mb-6 inline-flex items-center gap-1.5 text-label"
@@ -69,6 +70,7 @@ export default async function EditHabitPage({
           notes: habit.notes,
           priority: habit.priority,
           projectId: habit.projectId,
+          color: isCalendarColor(habit.color) ? habit.color : "teal",
           estimateMinutes: habit.estimatedSeconds
             ? Math.round(habit.estimatedSeconds / 60)
             : null,
