@@ -10,6 +10,7 @@ import {
   formValues,
   routineDaysSchema,
   routineIdSchema,
+  routineSlotSchema,
   swapRoutineExerciseSchema,
 } from "@/lib/validation";
 import { generateRoutine } from "@/lib/exercise-routine";
@@ -152,7 +153,12 @@ export async function regenerateRoutine(
     return { status: "error", message: "That routine is gone." };
   }
 
-  const variant = routine.updatedAt.getTime() % 100000;
+  // A fresh seed every click: the generator is deterministic per variant, so
+  // a random variant is what makes "Regenerate" actually reshuffle. (The
+  // previous seed came from the routine's `updatedAt`, which never moves —
+  // regeneration only writes slot rows — so every click returned the
+  // identical routine.)
+  const variant = Math.floor(Math.random() * 1_000_000);
   const exercises = await prisma.exercise.findMany({
     where: { active: true },
     select: { id: true, equipment: true, goal: true },
@@ -171,15 +177,28 @@ export async function regenerateRoutine(
     exercises,
     variant,
     pinned,
+    // Push what's on screen down the ranking, so consecutive clicks walk the
+    // catalog instead of circling the same handful of exercises.
+    avoid: routine.exercises.map((slot) => slot.exerciseId),
   });
 
   // Only the unpinned slots move; the person's picks stay put.
   const pinnedKeys = new Set(
     pinned.map((p) => `${p.dayOfWeek}:${p.position}`),
   );
+  const before = new Map(
+    routine.exercises.map((slot) => [
+      `${slot.dayOfWeek}:${slot.position}`,
+      slot.exerciseId,
+    ]),
+  );
+  let moved = 0;
+
   await prisma.$transaction(async (tx) => {
     for (const slot of slots) {
-      if (pinnedKeys.has(`${slot.dayOfWeek}:${slot.position}`)) continue;
+      const key = `${slot.dayOfWeek}:${slot.position}`;
+      if (pinnedKeys.has(key)) continue;
+      if (before.get(key) !== slot.exerciseId) moved += 1;
       await tx.routineExercise.updateMany({
         where: {
           routineId: routine.id,
@@ -192,7 +211,47 @@ export async function regenerateRoutine(
   });
 
   revalidateExercises();
-  return { status: "success", message: "Routine regenerated." };
+  return {
+    status: "success",
+    message:
+      moved === 0
+        ? "Every slot is pinned — nothing left to reshuffle."
+        : `${moved} ${moved === 1 ? "exercise" : "exercises"} swapped out.`,
+  };
+}
+
+/** Release a swapped slot so regeneration can move it again. */
+export async function unpinRoutineExercise(
+  previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireUser();
+  const parsed = routineSlotSchema.safeParse(formValues(formData));
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: "Some of that didn't look right.",
+      fieldErrors: fieldErrorsFrom(parsed.error),
+    };
+  }
+
+  const { routineId, dayOfWeek, position } = parsed.data;
+
+  const routine = await prisma.exerciseRoutine.findFirst({
+    where: { id: routineId, userId: user.id },
+    select: { id: true },
+  });
+  if (!routine) {
+    return { status: "error", message: "That routine is gone." };
+  }
+
+  await prisma.routineExercise.updateMany({
+    where: { routineId, dayOfWeek, position },
+    data: { swapped: false },
+  });
+
+  revalidateExercises();
+  return { status: "success", message: "Unpinned — it can move again." };
 }
 
 /** Replace the whole routine with a fresh builder run. */

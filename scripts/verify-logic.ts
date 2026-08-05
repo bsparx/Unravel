@@ -117,6 +117,12 @@ import {
   buildTimerHref,
   parseTimerParams,
 } from "@/lib/timer-url";
+import { BODY_PARTS } from "@/lib/validation";
+import {
+  BACK_REGIONS,
+  FRONT_REGIONS,
+  MAPPED_PARTS,
+} from "@/app/(app)/exercises/_components/body-map-paths";
 
 let passed = 0;
 const check = (name: string, fn: () => void) => {
@@ -1408,8 +1414,31 @@ const EXERCISES: PoolExercise[] = [
   { id: "db-pullover", equipment: "DUMBBELL", goal: "CHEST_MOBILITY" },
 ];
 
-const generated = (days: number[], variant = 0, pinned: PinnedSlot[] = []) =>
-  generateRoutine({ days, exercises: EXERCISES, variant, pinned });
+const generated = (
+  days: number[],
+  variant = 0,
+  pinned: PinnedSlot[] = [],
+  avoid: string[] = [],
+) => generateRoutine({ days, exercises: EXERCISES, variant, pinned, avoid });
+
+const CATEGORY_OF_GOAL: Record<string, string> = {
+  GLUTE_STRENGTH: "POSTERIOR",
+  HAMSTRING_LENGTH: "POSTERIOR",
+  CORE_STABILITY: "CORE",
+  POSTURE_AWARENESS: "CORE",
+  HIP_FLEXOR_MOBILITY: "MOBILITY",
+  LOWER_BACK_RELIEF: "MOBILITY",
+  CHEST_MOBILITY: "MOBILITY",
+  UPPER_BACK_STRENGTH: "UPPER",
+};
+const categoryOf = (id: string) =>
+  CATEGORY_OF_GOAL[EXERCISES.find((e) => e.id === id)!.goal];
+
+const WEEK_SHAPES = [
+  [1, 3, 5],
+  [1, 2, 3, 4],
+  [0, 1, 2, 3, 4],
+];
 
 check("a workout day never has more than three exercises", () => {
   for (const days of [[1, 3, 5], [1, 2, 3, 4], [0, 1, 2, 3, 4]]) {
@@ -1430,13 +1459,165 @@ check("every selected day gets exactly three exercises", () => {
   assert.equal(slots.filter((s) => s.dayOfWeek === 5).length, 3);
 });
 
-check("the first workout day always carries upper-back/posture work", () => {
-  const byId = new Map(EXERCISES.map((e) => [e.id, e]));
-  const slots = generated([1, 4, 6]);
-  const firstDay = slots.filter((s) => s.dayOfWeek === 1);
+check("every week covers all four corrective categories", () => {
+  for (const days of WEEK_SHAPES) {
+    for (let variant = 0; variant < 40; variant++) {
+      const covered = new Set(
+        generated(days, variant).map((s) => categoryOf(s.exerciseId)),
+      );
+      assert.equal(
+        covered.size,
+        4,
+        `week ${days} variant ${variant} covered only ${[...covered].join(", ")}`,
+      );
+    }
+  }
+});
+
+check("no day carries the same category three times", () => {
+  for (const days of WEEK_SHAPES) {
+    for (let variant = 0; variant < 40; variant++) {
+      const slots = generated(days, variant);
+      for (const day of days) {
+        const categories = slots
+          .filter((s) => s.dayOfWeek === day)
+          .map((s) => categoryOf(s.exerciseId));
+        for (const category of new Set(categories)) {
+          const count = categories.filter((c) => c === category).length;
+          assert.ok(
+            count < 3,
+            `week ${days} variant ${variant} day ${day} is all ${category}`,
+          );
+        }
+      }
+    }
+  }
+});
+
+check("every day carries at least one strength slot", () => {
+  for (const days of WEEK_SHAPES) {
+    for (let variant = 0; variant < 40; variant++) {
+      const slots = generated(days, variant);
+      for (const day of days) {
+        const categories = slots
+          .filter((s) => s.dayOfWeek === day)
+          .map((s) => categoryOf(s.exerciseId));
+        assert.ok(
+          categories.some((c) => c === "POSTERIOR" || c === "UPPER"),
+          `week ${days} variant ${variant} day ${day} is all mobility/core`,
+        );
+      }
+    }
+  }
+});
+
+// The regression test for the bug this generator was rewritten to fix: the
+// old per-slot template demanded "mobility + dumbbell" at one fixed position,
+// a pairing only Dumbbell Pullover satisfies, so that slot never moved no
+// matter how the routine was reseeded.
+check("no slot is welded to a single exercise", () => {
+  for (const days of WEEK_SHAPES) {
+    const seen = new Map<string, Set<string>>();
+    for (let variant = 0; variant < 200; variant++) {
+      for (const slot of generated(days, variant)) {
+        const key = `${slot.dayOfWeek}:${slot.position}`;
+        seen.set(key, (seen.get(key) ?? new Set()).add(slot.exerciseId));
+      }
+    }
+    for (const [key, ids] of seen) {
+      assert.ok(
+        ids.size >= 3,
+        `week ${days} slot ${key} only ever produced ${ids.size} exercise(s): ${[...ids].join(", ")}`,
+      );
+    }
+  }
+});
+
+check("regenerating replaces most of the week", () => {
+  for (const days of WEEK_SHAPES) {
+    const before = generated(days, 0);
+    const avoid = before.map((s) => s.exerciseId);
+    const churn: number[] = [];
+    for (let variant = 1; variant < 200; variant++) {
+      const after = generated(days, variant, [], avoid);
+      const changed = after.filter((slot) => {
+        const previous = before.find(
+          (s) => s.dayOfWeek === slot.dayOfWeek && s.position === slot.position,
+        );
+        return previous?.exerciseId !== slot.exerciseId;
+      }).length;
+      churn.push(changed / after.length);
+    }
+    const worst = Math.min(...churn);
+    const mean = churn.reduce((sum, n) => sum + n, 0) / churn.length;
+    // The average is the property that matters — a regeneration should feel
+    // like a new week, not a nudge. The floor only guards against a variant
+    // that quietly hands most of the old week back.
+    assert.ok(
+      mean >= 0.9,
+      `week ${days}: regeneration changed ${Math.round(mean * 100)}% of slots on average`,
+    );
+    assert.ok(
+      worst >= 0.6,
+      `week ${days}: the laziest regeneration changed only ${Math.round(worst * 100)}% of slots`,
+    );
+  }
+});
+
+// ------------------------------------------------------- the muscle figures
+
+check("the figures can reach every body part an exercise names", () => {
+  // FULL_BODY is the one deliberate omission: it isn't a place on the body,
+  // so it gets no region and those exercises live in the unfiltered list.
+  const expected = BODY_PARTS.filter((part) => part !== "FULL_BODY");
+  for (const part of expected) {
+    assert.ok(
+      MAPPED_PARTS.includes(part),
+      `${part} has no region on either figure, so its exercises can't be clicked to`,
+    );
+  }
+  for (const part of MAPPED_PARTS) {
+    assert.ok(
+      (BODY_PARTS as readonly string[]).includes(part),
+      `the figures draw "${part}", which is not a BodyPart code`,
+    );
+  }
+});
+
+check("a muscle lives on one figure, except the deltoids", () => {
+  const front = new Set(FRONT_REGIONS.map((r) => r.part));
+  const back = new Set(BACK_REGIONS.map((r) => r.part));
+  const both = [...front].filter((part) => back.has(part));
+  assert.deepEqual(
+    both,
+    ["SHOULDERS"],
+    "front and back should only share SHOULDERS — the catalog has one code for both deltoid heads",
+  );
+});
+
+check("every muscle region is a closed path in the view box", () => {
+  for (const region of [...FRONT_REGIONS, ...BACK_REGIONS]) {
+    assert.ok(region.d.startsWith("M"), `${region.part} does not start with a move`);
+    assert.ok(region.d.endsWith("Z"), `${region.part} is not a closed path`);
+    const numbers = region.d.match(/-?\d+(\.\d+)?/g)!.map(Number);
+    assert.ok(
+      numbers.every((n) => n >= -10 && n <= 470),
+      `${region.part} has a coordinate outside the 200x460 view box`,
+    );
+  }
+});
+
+check("successive regenerations reach the whole catalog", () => {
+  let avoid: string[] = [];
+  const touched = new Set<string>();
+  for (let variant = 0; variant < 50; variant++) {
+    const slots = generated([1, 3, 5], variant, [], avoid);
+    avoid = slots.map((s) => s.exerciseId);
+    for (const id of avoid) touched.add(id);
+  }
   assert.ok(
-    firstDay.some((s) => byId.get(s.exerciseId)!.goal === "UPPER_BACK_STRENGTH"),
-    "first day has no upper-back exercise",
+    touched.size >= 28,
+    `50 regenerations of a 3-day week reached only ${touched.size} of ${EXERCISES.length} exercises`,
   );
 });
 
@@ -1448,12 +1629,16 @@ check("no exercise repeats across a 5-day week", () => {
 
 check("equipment lands near 50/50 across any week length", () => {
   const byId = new Map(EXERCISES.map((e) => [e.id, e]));
-  for (const days of [[1, 3, 5], [1, 2, 3, 4], [0, 1, 2, 3, 4]]) {
-    const slots = generated(days);
-    const yoga = slots.filter((s) => byId.get(s.exerciseId)!.equipment === "YOGA").length;
-    const total = slots.length;
-    const share = yoga / total;
-    assert.ok(share >= 0.4 && share <= 0.6, `week ${days}: yoga share ${share}`);
+  for (const days of WEEK_SHAPES) {
+    for (let variant = 0; variant < 40; variant++) {
+      const slots = generated(days, variant);
+      const yoga = slots.filter((s) => byId.get(s.exerciseId)!.equipment === "YOGA").length;
+      const share = yoga / slots.length;
+      assert.ok(
+        share >= 0.4 && share <= 0.6,
+        `week ${days} variant ${variant}: yoga share ${share}`,
+      );
+    }
   }
 });
 
@@ -1482,6 +1667,31 @@ check("the week summary reports equipment and goal coverage", () => {
   assert.equal(summary.days, 3);
   assert.equal(summary.yoga + summary.dumbbell, 9);
   assert.ok(summary.balanced, "a 3-day week should cover most goals");
+});
+
+check("regeneration variants keep producing different weeks", () => {
+  const weeks = new Set<string>();
+  for (let variant = 0; variant < 12; variant++) {
+    const slots = generated([1, 3, 5], variant);
+    weeks.add(JSON.stringify(slots));
+  }
+  assert.ok(
+    weeks.size >= 11,
+    `12 variants should be almost all distinct, got ${weeks.size}`,
+  );
+});
+
+check("a handful of variants draws across most of the catalog", () => {
+  const used = new Set<string>();
+  for (let variant = 0; variant < 6; variant++) {
+    for (const slot of generated([0, 1, 2, 3, 4], variant)) {
+      used.add(slot.exerciseId);
+    }
+  }
+  assert.ok(
+    used.size >= 24,
+    `6 regenerations of a 5-day week should touch most of the 32-exercise catalog, got ${used.size}`,
+  );
 });
 
 console.log(`\n${passed} checks passed.\n`);

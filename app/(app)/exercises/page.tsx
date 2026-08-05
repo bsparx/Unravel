@@ -38,6 +38,7 @@ export default async function ExercisesPage() {
         routine?.exercises.map((slot) => ({
           dayOfWeek: slot.dayOfWeek,
           position: slot.position,
+          swapped: slot.swapped,
           exercise: {
             id: slot.exercise.id,
             name: slot.exercise.name,

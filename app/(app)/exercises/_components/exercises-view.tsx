@@ -9,20 +9,21 @@ import { WEEKDAYS } from "@/lib/dates";
 import { EQUIPMENT_LABELS } from "@/lib/exercise-labels";
 import { summarizeWeek } from "@/lib/exercise-routine";
 
+import type { HoveredExercise } from "./body-map";
 import {
   BuildRoutineDialog,
   type BuildCatalogExercise,
 } from "./build-routine-dialog";
-import { CatalogSection } from "./catalog-section";
-import {
-  RoutineWeek,
-  type RoutineSlot,
-} from "./routine-week";
+import { MuscleExplorer } from "./muscle-explorer";
+import { RoutineWeek, type RoutineSlot } from "./routine-week";
 
 /**
- * The exercises surface, in one place: the routine week (or the invitation to
- * build one) and the catalog beneath it. A plain client shell — all the data
- * arrives ready-shaped from the server page.
+ * The exercises surface: your week first, because that's the thing you came
+ * to do, and the body-map browser underneath for when you want to go looking.
+ *
+ * The hovered exercise lives up here because both halves of the page write to
+ * it — a row of the week and a card in the catalog both light the same two
+ * figures.
  */
 export function ExercisesView({
   routineId,
@@ -36,6 +37,7 @@ export function ExercisesView({
   catalog: BuildCatalogExercise[];
 }) {
   const [building, setBuilding] = useState(false);
+  const [hovered, setHovered] = useState<HoveredExercise>(null);
 
   const hasRoutine = routineId !== null;
   const week = summarizeWeek(
@@ -53,49 +55,60 @@ export function ExercisesView({
 
   return (
     <div className="mx-auto w-full max-w-7xl px-5 py-8 md:px-8 md:py-12">
-      <div className="space-y-10">
-      <header className="space-y-2">
-        <h1 className="font-display text-display">Exercises</h1>
-        <p className="text-muted-foreground max-w-prose text-body">
-          A corrective week for the two postural patterns a desk builds:
-          anterior pelvic tilt and rounded shoulders. Yoga and light dumbbells,
-          three exercises a day, never more.
-        </p>
-        {hasRoutine && (
-          <p className="text-label text-muted-foreground">
-            {daysOfWeek.length} days a week · {daysLabel} ·{" "}
-            {EQUIPMENT_LABELS.YOGA.toLowerCase()} {week.yoga} /{" "}
-            {EQUIPMENT_LABELS.DUMBBELL.toLowerCase()} {week.dumbbell}
+      <div className="space-y-12">
+        <header className="space-y-2">
+          <p className="text-micro text-muted-foreground font-medium tracking-wider uppercase">
+            Undoing the desk
           </p>
+          <h1 className="font-display text-display">Exercises</h1>
+          <p className="text-muted-foreground max-w-prose text-body">
+            A corrective week for the two postural patterns a desk builds:
+            anterior pelvic tilt and rounded shoulders. Yoga and light
+            dumbbells, three exercises a day, never more.
+          </p>
+          {hasRoutine && (
+            <p className="text-label text-muted-foreground">
+              {daysOfWeek.length} days a week · {daysLabel} ·{" "}
+              {EQUIPMENT_LABELS.YOGA.toLowerCase()} {week.yoga} /{" "}
+              {EQUIPMENT_LABELS.DUMBBELL.toLowerCase()} {week.dumbbell}
+            </p>
+          )}
+        </header>
+
+        {hasRoutine ? (
+          <RoutineWeek
+            routineId={routineId!}
+            daysOfWeek={daysOfWeek}
+            slots={slots}
+            catalog={catalog}
+            onHover={setHovered}
+          />
+        ) : (
+          <EmptyState
+            icon={Sparkles}
+            title="No routine yet"
+            description="Build a weekly plan: pick 3, 4 or 5 days, name the exact days, and get a balanced set of exercises for each one — at most three a day."
+            action={
+              <Button type="button" onClick={() => setBuilding(true)}>
+                <Plus className="size-4" aria-hidden />
+                Build your routine
+              </Button>
+            }
+          />
         )}
-      </header>
 
-      {hasRoutine ? (
-        <RoutineWeek
-          routineId={routineId!}
-          daysOfWeek={daysOfWeek}
-          slots={slots}
+        {building && (
+          <BuildRoutineDialog
+            catalog={catalog}
+            onClose={() => setBuilding(false)}
+          />
+        )}
+
+        <MuscleExplorer
           catalog={catalog}
+          hovered={hovered}
+          onHover={setHovered}
         />
-      ) : (
-        <EmptyState
-          icon={Sparkles}
-          title="No routine yet"
-          description="Build a weekly plan: pick 3, 4 or 5 days, name the exact days, and get a balanced set of exercises for each one — at most three a day."
-          action={
-            <Button type="button" onClick={() => setBuilding(true)}>
-              <Plus className="size-4" aria-hidden />
-              Build your routine
-            </Button>
-          }
-        />
-      )}
-
-      {building && (
-        <BuildRoutineDialog catalog={catalog} onClose={() => setBuilding(false)} />
-      )}
-
-      <CatalogSection exercises={catalog} />
       </div>
     </div>
   );

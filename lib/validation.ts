@@ -657,11 +657,15 @@ export const routineDaysSchema = z
     }
   });
 
-/** Swap one slot of the routine for a different exercise. */
-export const swapRoutineExerciseSchema = z.object({
+/** One slot of the week, named by where it sits rather than what's in it. */
+export const routineSlotSchema = z.object({
   routineId: cuid,
   dayOfWeek: weekday,
   position: z.coerce.number().int().min(0).max(2),
+});
+
+/** Swap one slot of the routine for a different exercise. */
+export const swapRoutineExerciseSchema = routineSlotSchema.extend({
   exerciseId,
 });
 
