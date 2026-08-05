@@ -41,22 +41,21 @@ import { cn } from "@/lib/utils";
 
 /**
  * The desktop rail's primary group, in the order the day runs. Five is the
- * ceiling for the mobile bar, but the desktop rail has room — so the mobile
- * shortlist swaps Time for Exercises (a daily body act over a weekly review
- * act), and Time stays put on the rail.
+ * ceiling for the mobile bar; the desktop rail has room, so Exercises lives
+ * here and Statistics moves to the rail's second group.
  */
 const NAV = [
   { href: "/", label: "Today", icon: Sun },
   { href: "/day", label: "Day", icon: ListChecks },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/timer", label: "Timer", icon: Timer },
-  { href: "/stats", label: "Time", icon: BarChart3 },
+  { href: "/exercises", label: "Exercises", icon: Dumbbell },
 ] as const;
 
 /**
  * The mobile bottom bar: the surfaces you touch on an ordinary day, in the
- * order the day runs. Exercises displaces Time here — training is a daily
- * act, reviewing stats is a weekly one.
+ * order the day runs. The desktop rail can hold both Exercises and Statistics;
+ * the bar can't, and training is the daily act.
  */
 const MOBILE_NAV = [
   { href: "/", label: "Today", icon: Sun },
@@ -71,7 +70,7 @@ const RAIL_EXTRA = [
   { href: "/inbox", label: "Inbox", icon: Inbox },
   { href: "/tasks", label: "Tasks", icon: ListTodo },
   { href: "/habits", label: "Habits", icon: Repeat },
-  { href: "/exercises", label: "Exercises", icon: Dumbbell },
+  { href: "/stats", label: "Statistics", icon: BarChart3 },
   { href: "/water", label: "Water", icon: Droplets },
   { href: "/budget", label: "Budget", icon: Wallet },
   { href: "/close", label: "Close the day", icon: Moon },
