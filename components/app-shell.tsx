@@ -93,7 +93,12 @@ export function AppShell({
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild size="lg" tooltip="Unravel">
+              <SidebarMenuButton
+                asChild
+                size="lg"
+                tooltip="Unravel"
+                className="group-data-[collapsible=icon]:justify-center"
+              >
                 <Link href="/">
                   {/* The mark survives the collapse — the wordmark hides, the
                       loop doesn't. */}
