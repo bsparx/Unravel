@@ -224,8 +224,7 @@ changes, all of them re-readings of existing data:
 | `/timer` | Full-bleed, centred, minimal chrome | Elevation budget spent here — and since the face is a shader, the "elevation" is a lighting gradient rather than a shadow. The face is the page. One quiet line under the controls carries the day's total for the task, live; correcting it opens today's sessions in place. A break that runs over takes the controls over entirely — two buttons, clay, counting up — because the moment it catches you is the moment you have the least attention to spend on a menu. |
 | `/close` | One input per screen, vertically centred | Ritual, not a form. No progress bar, no "step 2 of 4", no back/next chrome — just the question and one quiet way out. |
 | `/stats` | Dense, chart-first | Work and recovery get identical panel width, bar height and type scale. The running colour only where the series genuinely is work on the clock. "Getting back" reports overruns as a median and only speaks up when there is a real gap between the break you pick and the break you take. |
-| `/water` | One vessel, centred | The day as a column of water — the structural rhyme to the timer's draining ring (time drains, water fills). One tap anywhere on the vessel logs a glass; the count is the only big number and gets the mono display and the app's one overshoot. Edit and reminders sit below in quiet cards. |
-| `/budget` | Two charts, one ledger | Money in is the teal of anything going well; money out is the clay of "the thing to notice" — the only two semantic colours the palette spends, and the pair is the whole story of a month. The headline sentence does the arithmetic ("…spent 61,000 and brought in 85,500 — 24,500 ahead"), the month is the grain (‹ August ›), and logging is a dialog, never a navigation. Categories sit on one side of the ledger each, wearing the existing chart hues — no new colour, and clay is never a category. |
+| `/water` | One wide aquarium | The day as a fish tank — the structural rhyme to the timer's draining ring (time drains, water fills). The tank spans the column's full width; one tap anywhere on the glass logs a glass; the count is the only big number and gets the mono display and the app's one overshoot. Edit and reminders sit below in quiet cards. || `/budget` | Two charts, one ledger | Money in is the teal of anything going well; money out is the clay of "the thing to notice" — the only two semantic colours the palette spends, and the pair is the whole story of a month. The headline sentence does the arithmetic ("…spent 61,000 and brought in 85,500 — 24,500 ahead"), the month is the grain (‹ August ›), and logging is a dialog, never a navigation. Categories sit on one side of the ledger each, wearing the existing chart hues — no new colour, and clay is never a category. |
 | `/settings` | Single column form | Timezone first — everything date-bucketed depends on it. |
 
 ### Two structural rules
@@ -396,6 +395,19 @@ token in the app and it is never borrowed — so the water vessel fills with
 introduces no new hue. Its one structural addition is the pace line: a quiet
 dashed mark on the vessel at "how many you should have had by now", labelled
 with the clock time that belongs to it — the day's schedule drawn as a level.
+
+**The vessel became an aquarium, and the fish are the reading.** The narrow
+column left empty flanks on a desktop column; the tank now spans the full
+content width, a side-view aquarium whose water level is the count. A shoal
+of three fish carries the state: zero water is a dry tank — cracked floor,
+wilted plants, fish slumped with X-eyes — and happiness is a smooth function
+of the level from there (posture, tail energy, eye shape, bubble rate). The
+shoal wears primary teal plus two borrowed money-palette tokens (amber, rose)
+— the first time those hues are spent outside the budget — so no new colour
+exists and dark mode is free. The motion licence is the timer face's own,
+narrowed: the swimming *is* the signal, so it is the one continuous motion,
+and `prefers-reduced-motion` collapses the tank to one honest frame rather
+than freezing the level.
 
 **The goal being met is the day's end.** Water reminders follow the break
 alerts' posture — permission asked when the feature is first turned on, one

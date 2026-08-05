@@ -9,29 +9,24 @@ export default function Loading() {
           <Skeleton className="h-4 w-40 rounded-md" />
         </header>
 
-        <div className="flex flex-col items-center gap-6">
-          <Skeleton className="h-4 w-24 rounded-md" />
-          <div className="relative h-72 w-44">
-            <Skeleton className="absolute inset-0 rounded-[2rem]" />
-            <Skeleton
-              className="absolute inset-x-3 top-1/2 h-px"
-            />
-          </div>
-          <div className="flex gap-4">
-            <Skeleton className="size-8 rounded-full" />
-            <Skeleton className="size-8 rounded-full" />
+        <div className="relative h-56 w-full md:h-64">
+          <Skeleton className="absolute inset-0 rounded-xl" />
+          <Skeleton className="absolute top-1/4 left-1/2 h-px w-16" />
+          <div className="absolute inset-x-10 bottom-4 flex items-end justify-between">
+            <Skeleton className="size-4 rounded-full" />
+            <Skeleton className="mb-2 size-3 rounded-full" />
+            <Skeleton className="mb-1 size-5 rounded-full" />
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-2 rounded-lg border p-4">
-            <Skeleton className="h-4 w-24 rounded-md" />
-            <Skeleton className="h-3 w-16 rounded-md" />
-          </div>
-          <div className="space-y-2 rounded-lg border p-4">
-            <Skeleton className="h-4 w-24 rounded-md" />
-            <Skeleton className="h-3 w-16 rounded-md" />
-          </div>
+        <div className="flex flex-col items-center gap-2">
+          <Skeleton className="h-9 w-20 rounded-lg" />
+          <Skeleton className="h-4 w-44 rounded-md" />
+        </div>
+
+        <div className="space-y-4">
+          <Skeleton className="h-12 w-full rounded-lg" />
+          <Skeleton className="h-44 w-full rounded-lg" />
         </div>
       </div>
     </div>

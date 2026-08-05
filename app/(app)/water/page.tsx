@@ -35,7 +35,7 @@ export default async function WaterPage() {
         )}
       </header>
 
-      <div className="mb-10 flex justify-center">
+      <div className="mb-10">
         <WaterVessel
           dateISO={day.dateISO}
           settings={day.settings}
