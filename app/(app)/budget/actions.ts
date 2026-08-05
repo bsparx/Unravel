@@ -279,6 +279,52 @@ export async function createCategory(
 }
 
 /**
+ * Rename or re-colour one of the user's own categories. Scoped to
+ * `ownerKey: user.id` — a built-in can never be edited from here — and a
+ * rename simply relabels the history, because the entries keep the category
+ * id.
+ */
+export async function updateCategory(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireUser();
+  const parsed = moneyCategorySchema.safeParse(formValues(formData));
+  if (!parsed.success || !parsed.data.id) {
+    return {
+      status: "error",
+      message: "Some of that didn't look right.",
+      fieldErrors: parsed.success ? undefined : fieldErrorsFrom(parsed.error),
+    };
+  }
+
+  const existing = await prisma.moneyCategory.findUnique({
+    where: {
+      ownerKey_kind_name: {
+        ownerKey: user.id,
+        kind: parsed.data.kind,
+        name: parsed.data.name,
+      },
+    },
+    select: { id: true },
+  });
+  if (existing && existing.id !== parsed.data.id) {
+    return { status: "error", message: "You already have that one." };
+  }
+
+  const { count } = await prisma.moneyCategory.updateMany({
+    where: { id: parsed.data.id, ownerKey: user.id },
+    data: { name: parsed.data.name, color: parsed.data.color },
+  });
+  if (count === 0) {
+    return { status: "error", message: "That category is gone." };
+  }
+
+  revalidateBudgetViews();
+  return { status: "success", message: "Saved." };
+}
+
+/**
  * Soft-delete, scoped to the user's own rows — a built-in can never be
  * archived from here, and a category with history keeps its history.
  */

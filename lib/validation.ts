@@ -10,6 +10,7 @@ import { z } from "zod";
 
 import { MINUTES_PER_DAY, MIN_BLOCK_MINUTES } from "@/lib/block-math";
 import { CALENDAR_COLOR_NAMES } from "@/lib/calendar-colors";
+import { MONEY_COLOR_NAMES } from "@/lib/money-palette";
 import { parseMoneyToCents } from "@/lib/money";
 import { MAX_QUOTA } from "@/lib/quota";
 import {
@@ -442,15 +443,21 @@ export const moneyTransactionSchema = z.object({
   note: notes,
 });
 
-/** The four tokens a category may wear. Clay stays out — see lib/budget.ts. */
+/**
+ * Every palette token a category may wear — the global incomes' four, the
+ * global expenses' ten, and the ten custom shades. Clay stays out — see
+ * lib/budget.ts.
+ */
 export const moneyCategorySchema = z.object({
+  /** Present when editing an existing category. */
+  id: cuid.optional(),
   kind: z.enum(["INCOME", "EXPENSE"]),
   name: z
     .string()
     .trim()
     .min(1, "Give it a name.")
     .max(40, "Keep it under 40 characters."),
-  color: z.enum(["teal", "sage", "sand", "ink"]).default("teal"),
+  color: z.enum(MONEY_COLOR_NAMES).default("teal"),
 });
 
 export const deleteMoneyTransactionSchema = z.object({ id: cuid });
@@ -500,7 +507,7 @@ export const moneyAccountSchema = z.object({
     .trim()
     .min(1, "Give it a name.")
     .max(40, "Keep it under 40 characters."),
-  color: z.enum(["teal", "sage", "sand", "ink"]).default("teal"),
+  color: z.enum(MONEY_COLOR_NAMES).default("teal"),
   /** Money already in the account when you started tracking. Omitted = 0. */
   openingAmount: emptyToUndefined(moneyAmount),
 });

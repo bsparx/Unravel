@@ -11,7 +11,11 @@
 import { prisma } from "@/lib/db";
 import type { MoneyKind } from "@/lib/generated/prisma/client";
 
-import { CATEGORY_COLORS } from "./money-palette";
+import {
+  CATEGORY_COLORS,
+  EXPENSE_COLORS,
+  INCOME_COLORS,
+} from "./money-palette";
 
 export { CATEGORY_COLORS };
 
@@ -23,32 +27,37 @@ export const GLOBAL_OWNER = "global";
  * variable in the UI (see `CATEGORY_COLORS` in `lib/money-palette.ts`); clay
  * is deliberately absent — it is the "something went wrong" colour, and a
  * category is never that.
+ *
+ * Every global income wears its own `INCOME_COLORS` hue and every global
+ * expense its own `EXPENSE_COLORS` hue — the two groups never share a colour,
+ * and neither group repeats one.
  */
 export const GLOBAL_CATEGORIES: {
   kind: MoneyKind;
   name: string;
   color: keyof typeof CATEGORY_COLORS;
 }[] = [
-  { kind: "INCOME", name: "Salary", color: "teal" },
-  { kind: "INCOME", name: "Freelance", color: "sage" },
-  { kind: "INCOME", name: "Gifts", color: "sand" },
-  { kind: "INCOME", name: "Other income", color: "ink" },
-  { kind: "EXPENSE", name: "Food", color: "sand" },
-  { kind: "EXPENSE", name: "Groceries", color: "sage" },
-  { kind: "EXPENSE", name: "Transport", color: "teal" },
-  { kind: "EXPENSE", name: "Housing", color: "ink" },
-  { kind: "EXPENSE", name: "Utilities", color: "sand" },
-  { kind: "EXPENSE", name: "Medical", color: "teal" },
-  { kind: "EXPENSE", name: "Shopping", color: "sage" },
-  { kind: "EXPENSE", name: "Entertainment", color: "sand" },
-  { kind: "EXPENSE", name: "Subscriptions", color: "ink" },
-  { kind: "EXPENSE", name: "Other expenses", color: "teal" },
+  { kind: "INCOME", name: "Salary", color: INCOME_COLORS[0] },
+  { kind: "INCOME", name: "Freelance", color: INCOME_COLORS[1] },
+  { kind: "INCOME", name: "Gifts", color: INCOME_COLORS[2] },
+  { kind: "INCOME", name: "Other income", color: INCOME_COLORS[3] },
+  { kind: "EXPENSE", name: "Food", color: EXPENSE_COLORS[0] },
+  { kind: "EXPENSE", name: "Groceries", color: EXPENSE_COLORS[1] },
+  { kind: "EXPENSE", name: "Transport", color: EXPENSE_COLORS[2] },
+  { kind: "EXPENSE", name: "Housing", color: EXPENSE_COLORS[3] },
+  { kind: "EXPENSE", name: "Utilities", color: EXPENSE_COLORS[4] },
+  { kind: "EXPENSE", name: "Medical", color: EXPENSE_COLORS[5] },
+  { kind: "EXPENSE", name: "Shopping", color: EXPENSE_COLORS[6] },
+  { kind: "EXPENSE", name: "Entertainment", color: EXPENSE_COLORS[7] },
+  { kind: "EXPENSE", name: "Subscriptions", color: EXPENSE_COLORS[8] },
+  { kind: "EXPENSE", name: "Other expenses", color: EXPENSE_COLORS[9] },
 ];
 
 /**
  * Idempotent: upserts every built-in by its unique key. Called from the budget
  * page loader and the seed, so a fresh database and an account that existed
- * before the budget did both get the same starting set.
+ * before the budget did both get the same starting set. The update re-applies
+ * the colour, so a palette change recovers rows seeded under an older one.
  */
 export async function ensureGlobalCategories(): Promise<void> {
   await prisma.$transaction(
@@ -68,7 +77,7 @@ export async function ensureGlobalCategories(): Promise<void> {
           color: category.color,
           sortOrder: index,
         },
-        update: {},
+        update: { color: category.color },
       }),
     ),
   );

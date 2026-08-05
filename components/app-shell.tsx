@@ -95,10 +95,10 @@ export function AppShell({
             <SidebarMenuItem>
               <SidebarMenuButton asChild size="lg" tooltip="Unravel">
                 <Link href="/">
-                  {/* The mark survives the collapse — the wordmark clips away,
-                      the loop doesn't. */}
+                  {/* The mark survives the collapse — the wordmark hides, the
+                      loop doesn't. */}
                   <BrandMark className="text-primary size-6 shrink-0" />
-                  <span className="font-display text-title tracking-tight">
+                  <span className="font-display text-title tracking-tight group-data-[collapsible=icon]:hidden">
                     Unravel
                   </span>
                 </Link>

@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CATEGORY_COLORS } from "@/lib/money-palette";
+import { CATEGORY_COLORS, type CategoryColor } from "@/lib/money-palette";
 import { idleState } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 
@@ -42,7 +42,7 @@ export function AccountForm({
   );
 
   const [name, setName] = useState(account?.name ?? "");
-  const [color, setColor] = useState<(typeof COLORS)[number]>(
+  const [color, setColor] = useState<CategoryColor>(
     account?.color ?? "teal",
   );
   const [openingAmount, setOpeningAmount] = useState(openingInput(account ?? null));

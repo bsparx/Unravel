@@ -205,6 +205,31 @@
   --chart-4: #a8896b;
   --chart-5: #b85c4a;
 
+  /* The wider money palette. Each entry is a distinct hue; amber/clay read
+     from the chart tokens, everything else lives here so the budget can
+     afford each global category its own colour. Clay stays absent — it is
+     the "something went wrong" colour, never a category's identity. */
+  --money-amber: #c97b27;
+  --money-rust: #9c5a3a;
+  --money-rose: #b0656d;
+  --money-plum: #8a4f6e;
+  --money-violet: #7a5f9e;
+  --money-indigo: #3f5aa0;
+  --money-denim: #40598c;
+  --money-azure: #3d7ab5;
+  --money-slate: #5a6a80;
+  --money-pine: #3f6b4f;
+  --money-moss: #7d8a52;
+  --money-olive: #6b6f3a;
+  --money-fern: #4f7353;
+  --money-sky: #4f8a94;
+  --money-stone: #807a6f;
+  --money-cocoa: #6d554a;
+  --money-bronze: #8a6d3f;
+  --money-blush: #c98a84;
+  --money-lilac: #8f7ba8;
+  --money-peach: #c9976b;
+
   --sidebar: #f5f1ea;
   --sidebar-foreground: #3b3630;
   --sidebar-primary: #2f6f6a;
@@ -257,6 +282,27 @@
   --chart-3: #8fae98;
   --chart-4: #c2a184;
   --chart-5: #d4796a;
+
+  --money-amber: #e0a050;
+  --money-rust: #c07a52;
+  --money-rose: #cd8088;
+  --money-plum: #b07192;
+  --money-violet: #9a80b8;
+  --money-indigo: #6f7abf;
+  --money-denim: #6f88b8;
+  --money-azure: #6fa8d8;
+  --money-slate: #7f93a8;
+  --money-pine: #5f8f73;
+  --money-moss: #9db178;
+  --money-olive: #8d9162;
+  --money-fern: #6f9777;
+  --money-sky: #6fa8b2;
+  --money-stone: #a29a8c;
+  --money-cocoa: #937a6c;
+  --money-bronze: #b99a63;
+  --money-blush: #d89c96;
+  --money-lilac: #ad9cc2;
+  --money-peach: #d9ab85;
 
   --sidebar: #1a1814;
   --sidebar-foreground: #ded7cb;
