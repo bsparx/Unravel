@@ -604,3 +604,65 @@ export function formValues(formData: FormData): Record<string, unknown> {
 
   return values;
 }
+
+// ---------------------------------------------------------------- exercises
+
+export const EXERCISE_GOALS = [
+  "HIP_FLEXOR_MOBILITY",
+  "GLUTE_STRENGTH",
+  "HAMSTRING_LENGTH",
+  "CORE_STABILITY",
+  "LOWER_BACK_RELIEF",
+  "UPPER_BACK_STRENGTH",
+  "CHEST_MOBILITY",
+  "POSTURE_AWARENESS",
+] as const;
+
+export const BODY_PARTS = [
+  "HIP_FLEXORS",
+  "QUADS",
+  "GLUTES",
+  "HAMSTRINGS",
+  "CORE",
+  "LOWER_BACK",
+  "UPPER_BACK",
+  "SHOULDERS",
+  "CHEST",
+  "SPINE",
+  "FULL_BODY",
+] as const;
+
+/** The routine builder offers 3, 4 or 5 training days — never more, never less. */
+export const ROUTINE_DAY_OPTIONS = [3, 4, 5] as const;
+
+const weekday = z.coerce.number().int().min(0).max(6);
+const exerciseId = cuid;
+
+/** Name the exact days, in the app's 0 = Sunday convention. */
+export const routineDaysSchema = z
+  .object({
+    daysPerWeek: z.coerce.number().int().min(3).max(5),
+    days: z
+      .array(weekday)
+      .max(7)
+      .transform((days) => [...new Set(days)].sort((a, b) => a - b)),
+  })
+  .superRefine((value, ctx) => {
+    if (value.days.length !== value.daysPerWeek) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["days"],
+        message: `Pick exactly ${value.daysPerWeek} days.`,
+      });
+    }
+  });
+
+/** Swap one slot of the routine for a different exercise. */
+export const swapRoutineExerciseSchema = z.object({
+  routineId: cuid,
+  dayOfWeek: weekday,
+  position: z.coerce.number().int().min(0).max(2),
+  exerciseId,
+});
+
+export const routineIdSchema = z.object({ routineId: cuid });

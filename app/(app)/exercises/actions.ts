@@ -1,0 +1,219 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+
+import { requireUser } from "@/lib/auth";
+import { prisma } from "@/lib/db";
+import {
+  type ActionState,
+  fieldErrorsFrom,
+  formValues,
+  routineDaysSchema,
+  routineIdSchema,
+  swapRoutineExerciseSchema,
+} from "@/lib/validation";
+import { generateRoutine } from "@/lib/exercise-routine";
+
+function revalidateExercises() {
+  revalidatePath("/exercises");
+}
+
+/** Name the exact days, then generate and persist the routine. */
+export async function createRoutine(
+  previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireUser();
+  const parsed = routineDaysSchema.safeParse(formValues(formData));
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: "Some of that didn't look right.",
+      fieldErrors: fieldErrorsFrom(parsed.error),
+    };
+  }
+
+  const { daysPerWeek, days } = parsed.data;
+  if (days.length !== daysPerWeek) {
+    return {
+      status: "error",
+      message: `Pick exactly ${daysPerWeek} days.`,
+      fieldErrors: { days: `Pick exactly ${daysPerWeek} days.` },
+    };
+  }
+
+  const exercises = await prisma.exercise.findMany({
+    where: { active: true },
+    select: { id: true, equipment: true, goal: true },
+    orderBy: { sortOrder: "asc" },
+  });
+
+  const slots = generateRoutine({ days, exercises });
+
+  await prisma.exerciseRoutine.create({
+    data: {
+      userId: user.id,
+      name: "Weekly routine",
+      daysOfWeek: days,
+      exercises: {
+        create: slots.map((slot) => ({
+          exerciseId: slot.exerciseId,
+          dayOfWeek: slot.dayOfWeek,
+          position: slot.position,
+        })),
+      },
+    },
+  });
+
+  revalidateExercises();
+  return { status: "success", message: "Routine built." };
+}
+
+/** Swap one slot for a different exercise, pinning it against regeneration. */
+export async function swapRoutineExercise(
+  previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireUser();
+  const parsed = swapRoutineExerciseSchema.safeParse(formValues(formData));
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: "Some of that didn't look right.",
+      fieldErrors: fieldErrorsFrom(parsed.error),
+    };
+  }
+
+  const { routineId, dayOfWeek, position, exerciseId } = parsed.data;
+
+  const routine = await prisma.exerciseRoutine.findFirst({
+    where: { id: routineId, userId: user.id },
+    select: { id: true },
+  });
+  if (!routine) {
+    return { status: "error", message: "That routine is gone." };
+  }
+
+  // The target exercise exists and is live.
+  const target = await prisma.exercise.findFirst({
+    where: { id: exerciseId, active: true },
+    select: { id: true },
+  });
+  if (!target) {
+    return { status: "error", message: "That exercise is gone." };
+  }
+
+  // One day never carries the same exercise twice.
+  const duplicate = await prisma.routineExercise.findFirst({
+    where: {
+      routineId,
+      dayOfWeek,
+      exerciseId,
+      NOT: { position },
+    },
+    select: { id: true },
+  });
+  if (duplicate) {
+    return {
+      status: "error",
+      message: "That exercise is already on this day.",
+    };
+  }
+
+  await prisma.routineExercise.updateMany({
+    where: { routineId, dayOfWeek, position },
+    data: { exerciseId, swapped: true },
+  });
+
+  revalidateExercises();
+  return { status: "success", message: "Swapped." };
+}
+
+/** Reshuffle every slot the person hasn't pinned. */
+export async function regenerateRoutine(
+  previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireUser();
+  const parsed = routineIdSchema.safeParse(formValues(formData));
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: "Some of that didn't look right.",
+      fieldErrors: fieldErrorsFrom(parsed.error),
+    };
+  }
+
+  const routine = await prisma.exerciseRoutine.findFirst({
+    where: { id: parsed.data.routineId, userId: user.id },
+    include: { exercises: true },
+  });
+  if (!routine) {
+    return { status: "error", message: "That routine is gone." };
+  }
+
+  const variant = routine.updatedAt.getTime() % 100000;
+  const exercises = await prisma.exercise.findMany({
+    where: { active: true },
+    select: { id: true, equipment: true, goal: true },
+    orderBy: { sortOrder: "asc" },
+  });
+
+  const pinned = routine.exercises
+    .filter((slot) => slot.swapped)
+    .map((slot) => ({
+      dayOfWeek: slot.dayOfWeek,
+      position: slot.position,
+      exerciseId: slot.exerciseId,
+    }));
+  const slots = generateRoutine({
+    days: routine.daysOfWeek,
+    exercises,
+    variant,
+    pinned,
+  });
+
+  // Only the unpinned slots move; the person's picks stay put.
+  const pinnedKeys = new Set(
+    pinned.map((p) => `${p.dayOfWeek}:${p.position}`),
+  );
+  await prisma.$transaction(async (tx) => {
+    for (const slot of slots) {
+      if (pinnedKeys.has(`${slot.dayOfWeek}:${slot.position}`)) continue;
+      await tx.routineExercise.updateMany({
+        where: {
+          routineId: routine.id,
+          dayOfWeek: slot.dayOfWeek,
+          position: slot.position,
+        },
+        data: { exerciseId: slot.exerciseId },
+      });
+    }
+  });
+
+  revalidateExercises();
+  return { status: "success", message: "Routine regenerated." };
+}
+
+/** Replace the whole routine with a fresh builder run. */
+export async function deleteRoutine(
+  previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireUser();
+  const parsed = routineIdSchema.safeParse(formValues(formData));
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: "Some of that didn't look right.",
+      fieldErrors: fieldErrorsFrom(parsed.error),
+    };
+  }
+
+  await prisma.exerciseRoutine.deleteMany({
+    where: { id: parsed.data.routineId, userId: user.id },
+  });
+
+  revalidateExercises();
+  return { status: "success", message: "Routine removed." };
+}

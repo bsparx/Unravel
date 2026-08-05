@@ -58,6 +58,12 @@ import {
 } from "@/lib/transitions";
 import { breaksWorthReporting, summariseBreaks } from "@/lib/break-stats";
 import { balanceRatio, describeBalance, recoveryShare } from "@/lib/balance";
+import {
+  generateRoutine,
+  summarizeWeek,
+  type PinnedSlot,
+  type PoolExercise,
+} from "@/lib/exercise-routine";
 import { parseQuickAdd } from "@/lib/quick-parse";
 import {
   gratitudePrompt,
@@ -1362,6 +1368,120 @@ check("there is no story in a handful of breaks that behaved", () => {
 
   // Two bad breaks is a Tuesday, not a pattern.
   assert.equal(breaksWorthReporting(summariseBreaks(stretched.slice(0, 2))), false);
+});
+
+// ---------------------------------------------------------------- routines
+
+/** The 32 seeded exercises, in the shape the generator consumes. */
+const EXERCISES: PoolExercise[] = [
+  { id: "bridge", equipment: "YOGA", goal: "GLUTE_STRENGTH" },
+  { id: "low-lunge", equipment: "YOGA", goal: "HIP_FLEXOR_MOBILITY" },
+  { id: "pelvic-tilts", equipment: "YOGA", goal: "POSTURE_AWARENESS" },
+  { id: "cat-cow", equipment: "YOGA", goal: "LOWER_BACK_RELIEF" },
+  { id: "bird-dog", equipment: "YOGA", goal: "CORE_STABILITY" },
+  { id: "locust", equipment: "YOGA", goal: "UPPER_BACK_STRENGTH" },
+  { id: "boat", equipment: "YOGA", goal: "CORE_STABILITY" },
+  { id: "reclined-twist", equipment: "YOGA", goal: "LOWER_BACK_RELIEF" },
+  { id: "childs", equipment: "YOGA", goal: "LOWER_BACK_RELIEF" },
+  { id: "down-dog", equipment: "YOGA", goal: "HAMSTRING_LENGTH" },
+  { id: "cobra", equipment: "YOGA", goal: "UPPER_BACK_STRENGTH" },
+  { id: "thread-needle", equipment: "YOGA", goal: "CHEST_MOBILITY" },
+  { id: "puppy", equipment: "YOGA", goal: "CHEST_MOBILITY" },
+  { id: "cow-face", equipment: "YOGA", goal: "CHEST_MOBILITY" },
+  { id: "eagle", equipment: "YOGA", goal: "UPPER_BACK_STRENGTH" },
+  { id: "forward-fold", equipment: "YOGA", goal: "HAMSTRING_LENGTH" },
+  { id: "db-glute-bridge", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH" },
+  { id: "db-single-bridge", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH" },
+  { id: "db-hip-thrust", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH" },
+  { id: "db-rdl", equipment: "DUMBBELL", goal: "HAMSTRING_LENGTH" },
+  { id: "db-goblet", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH" },
+  { id: "db-dead-bug", equipment: "DUMBBELL", goal: "CORE_STABILITY" },
+  { id: "db-hip-ext", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH" },
+  { id: "db-reverse-lunge", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH" },
+  { id: "db-farmer", equipment: "DUMBBELL", goal: "POSTURE_AWARENESS" },
+  { id: "db-row", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH" },
+  { id: "db-one-arm-row", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH" },
+  { id: "db-reverse-fly", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH" },
+  { id: "db-y-raise", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH" },
+  { id: "db-t-raise", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH" },
+  { id: "db-ytw", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH" },
+  { id: "db-pullover", equipment: "DUMBBELL", goal: "CHEST_MOBILITY" },
+];
+
+const generated = (days: number[], variant = 0, pinned: PinnedSlot[] = []) =>
+  generateRoutine({ days, exercises: EXERCISES, variant, pinned });
+
+check("a workout day never has more than three exercises", () => {
+  for (const days of [[1, 3, 5], [1, 2, 3, 4], [0, 1, 2, 3, 4]]) {
+    const slots = generated(days);
+    for (const day of days) {
+      const count = slots.filter((s) => s.dayOfWeek === day).length;
+      assert.ok(count <= 3, `day ${day} got ${count} slots`);
+      assert.equal(count, 3, `day ${day} got ${count} slots, expected a full 3`);
+    }
+  }
+});
+
+check("every selected day gets exactly three exercises", () => {
+  const days = [2, 5];
+  const slots = generated(days);
+  assert.equal(slots.length, 6);
+  assert.equal(slots.filter((s) => s.dayOfWeek === 2).length, 3);
+  assert.equal(slots.filter((s) => s.dayOfWeek === 5).length, 3);
+});
+
+check("the first workout day always carries upper-back/posture work", () => {
+  const byId = new Map(EXERCISES.map((e) => [e.id, e]));
+  const slots = generated([1, 4, 6]);
+  const firstDay = slots.filter((s) => s.dayOfWeek === 1);
+  assert.ok(
+    firstDay.some((s) => byId.get(s.exerciseId)!.goal === "UPPER_BACK_STRENGTH"),
+    "first day has no upper-back exercise",
+  );
+});
+
+check("no exercise repeats across a 5-day week", () => {
+  const slots = generated([0, 1, 2, 3, 4]);
+  const ids = slots.map((s) => s.exerciseId);
+  assert.equal(new Set(ids).size, ids.length, `duplicates in week: ${ids.join(", ")}`);
+});
+
+check("equipment lands near 50/50 across any week length", () => {
+  const byId = new Map(EXERCISES.map((e) => [e.id, e]));
+  for (const days of [[1, 3, 5], [1, 2, 3, 4], [0, 1, 2, 3, 4]]) {
+    const slots = generated(days);
+    const yoga = slots.filter((s) => byId.get(s.exerciseId)!.equipment === "YOGA").length;
+    const total = slots.length;
+    const share = yoga / total;
+    assert.ok(share >= 0.4 && share <= 0.6, `week ${days}: yoga share ${share}`);
+  }
+});
+
+check("regeneration shuffles but a different variant keeps its own order", () => {
+  const a = generated([1, 3, 5], 0);
+  const b = generated([1, 3, 5], 0);
+  const c = generated([1, 3, 5], 1);
+  assert.deepEqual(a, b, "same variant must reproduce itself");
+  assert.notDeepEqual(a, c, "a different variant must reshuffle");
+});
+
+check("pinned slots survive regeneration untouched", () => {
+  const pinned = [{ dayOfWeek: 1, position: 0, exerciseId: "db-rdl" }];
+  const slots = generated([1, 3, 5], 1, pinned);
+  const kept = slots.find((s) => s.dayOfWeek === 1 && s.position === 0);
+  assert.equal(kept!.exerciseId, "db-rdl");
+  const others = slots.filter((s) => s.dayOfWeek === 1 && s.position !== 0);
+  assert.ok(
+    others.every((s) => s.exerciseId !== "db-rdl"),
+    "a pinned exercise leaked into another slot of the same day",
+  );
+});
+
+check("the week summary reports equipment and goal coverage", () => {
+  const summary = summarizeWeek(generated([1, 3, 5]), EXERCISES);
+  assert.equal(summary.days, 3);
+  assert.equal(summary.yoga + summary.dumbbell, 9);
+  assert.ok(summary.balanced, "a 3-day week should cover most goals");
 });
 
 console.log(`\n${passed} checks passed.\n`);

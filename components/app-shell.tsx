@@ -7,6 +7,7 @@ import {
   BarChart3,
   CalendarDays,
   Droplets,
+  Dumbbell,
   Inbox,
   ListChecks,
   ListTodo,
@@ -39,12 +40,10 @@ import { BrandMark } from "@/components/brand-mark";
 import { cn } from "@/lib/utils";
 
 /**
- * Five is the ceiling for the mobile bar, so this is the shortlist: the
- * surfaces you touch on an ordinary day, in the order the day runs.
- *
- * Calendar displaced Inbox here rather than Stats, because planning is a daily
- * act and triage is a weekly one — and the inbox is still one tap from `/`,
- * where you already are every morning.
+ * The desktop rail's primary group, in the order the day runs. Five is the
+ * ceiling for the mobile bar, but the desktop rail has room — so the mobile
+ * shortlist swaps Time for Exercises (a daily body act over a weekly review
+ * act), and Time stays put on the rail.
  */
 const NAV = [
   { href: "/", label: "Today", icon: Sun },
@@ -54,11 +53,25 @@ const NAV = [
   { href: "/stats", label: "Time", icon: BarChart3 },
 ] as const;
 
+/**
+ * The mobile bottom bar: the surfaces you touch on an ordinary day, in the
+ * order the day runs. Exercises displaces Time here — training is a daily
+ * act, reviewing stats is a weekly one.
+ */
+const MOBILE_NAV = [
+  { href: "/", label: "Today", icon: Sun },
+  { href: "/day", label: "Day", icon: ListChecks },
+  { href: "/calendar", label: "Calendar", icon: CalendarDays },
+  { href: "/timer", label: "Timer", icon: Timer },
+  { href: "/exercises", label: "Exercises", icon: Dumbbell },
+] as const;
+
 /** There's room on the desktop rail, and losing these from it would be a loss. */
 const RAIL_EXTRA = [
   { href: "/inbox", label: "Inbox", icon: Inbox },
   { href: "/tasks", label: "Tasks", icon: ListTodo },
   { href: "/habits", label: "Habits", icon: Repeat },
+  { href: "/exercises", label: "Exercises", icon: Dumbbell },
   { href: "/water", label: "Water", icon: Droplets },
   { href: "/budget", label: "Budget", icon: Wallet },
   { href: "/close", label: "Close the day", icon: Moon },
@@ -119,7 +132,7 @@ export function AppShell({
         <SidebarContent>
           <SidebarGroup>
             <SidebarMenu>
-              {NAV.map(({ href, label, icon: Icon }) => (
+        {MOBILE_NAV.map(({ href, label, icon: Icon }) => (
                 <SidebarMenuItem key={href}>
                   <SidebarMenuButton
                     asChild

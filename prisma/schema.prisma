@@ -132,6 +132,55 @@ enum DebtDirection {
   OWED_TO_ME // money someone owes me
 }
 
+/// Whether an exercise needs a mat and nothing else, or a pair of (light)
+/// dumbbells. A routine mixes both; the tag drives the generator's balance
+/// and the catalog filter.
+enum ExerciseEquipment {
+  YOGA
+  DUMBBELL
+}
+
+/// The primary corrective job an exercise does. Two postural patterns are
+/// being trained: the lower cross (anterior pelvic tilt) and the upper cross
+/// (rounded shoulders / forward head). The fix is the same shape in both —
+/// stretch the tight front, strengthen the weak back — and each goal is one
+/// half of that equation, so the generator can compose a balanced day.
+enum ExerciseGoal {
+  /// Stretch the tight psoas/quads that pull the pelvis forward (APT).
+  HIP_FLEXOR_MOBILITY
+  /// Strengthen glutes — the muscle present in every pelvic-correction
+  /// strategy, per the EMG literature.
+  GLUTE_STRENGTH
+  /// Hamstring length + posterior chain, the other half of pelvic neutral.
+  HAMSTRING_LENGTH
+  /// Deep core, anti-extension: stops the lower back from arching.
+  CORE_STABILITY
+  /// Release the lower back and keep the spine moving.
+  LOWER_BACK_RELIEF
+  /// Rhomboids, mid/lower traps, rear delts — pull the shoulders back.
+  UPPER_BACK_STRENGTH
+  /// Open the tight chest that rounds the shoulders (upper cross).
+  CHEST_MOBILITY
+  /// Motor control: finding and holding neutral pelvis/spine.
+  POSTURE_AWARENESS
+}
+
+/// The muscle groups an exercise works, for filtering the catalog. One
+/// exercise may tag several; the primary intent lives in `goal`.
+enum BodyPart {
+  HIP_FLEXORS
+  QUADS
+  GLUTES
+  HAMSTRINGS
+  CORE
+  LOWER_BACK
+  UPPER_BACK
+  SHOULDERS
+  CHEST
+  SPINE
+  FULL_BODY
+}
+
 // ---------------------------------------------------------------- identity
 
 model User {
@@ -202,6 +251,7 @@ model User {
   moneyAccounts   MoneyAccount[]
   transfers       AccountTransfer[]
   moneyDebts      MoneyDebt[]
+  exerciseRoutines ExerciseRoutine[]
 }
 
 // ---------------------------------------------------------------- lists
@@ -966,4 +1016,95 @@ model MoneyDebt {
   /// The two pockets are reads, so the index covers them: one side of the
   /// ledger, outstanding first, oldest first within it.
   @@index([userId, direction, settledAt, date])
+}
+
+// ---------------------------------------------------------------- exercises
+
+/// One exercise in the global catalog. Content, not user data: the same
+/// catalog serves every person, so it carries no userId (the same pattern as
+/// the seeded built-in money categories). `active` hides an exercise instead
+/// of deleting it, so routines that already reference it never orphan.
+///
+/// `prescription` is a single human-readable line ("3 × 12–15 each side",
+/// "Hold 60–90s per side") rather than structured numbers, because the dose
+/// that matters for corrective work is written the way a coach says it, not
+/// the way a machine counts it. The generator only needs the tags.
+model Exercise {
+  id       String @id @default(cuid())
+  name     String
+  /// Yoga: mat only. DUMBBELL: a pair of light dumbbells.
+  equipment ExerciseEquipment
+  /// The primary corrective job. The generator composes days from this.
+  goal    ExerciseGoal
+  /// Muscle groups worked, for catalog filters. `goal` is the intent, this is
+  /// the territory.
+  bodyParts BodyPart[]
+  /// Step-by-step lines, in order, as a coach would say them.
+  instructions String[]
+  /// "3 × 12–15 each side" / "Hold 60s per side" / "10 breaths each side".
+  prescription String
+  /// YouTube embed, supplied later. The detail dialog renders it when set.
+  videoUrl String?
+
+  sortOrder Float   @default(0)
+  active    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  routineSlots RoutineExercise[]
+
+  @@unique([name])
+  @@index([equipment, goal])
+  @@index([equipment, active, sortOrder])
+}
+
+/// A person's weekly routine: which days they train, and the exercises that
+/// make up each of those days. A static weekly template — no dates, no
+/// history — because a routine is a plan you repeat, not an event log.
+///
+/// `daysOfWeek` follows the house convention: 0 = Sunday .. 6 = Saturday.
+model ExerciseRoutine {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Auto-named at creation; editable later if we add an edit surface.
+  name String
+
+  /// 0 = Sunday .. 6 = Saturday. Length 3, 4 or 5 — the whole point of the
+  /// builder is that the person picks the exact days.
+  daysOfWeek Int[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  exercises RoutineExercise[]
+
+  @@index([userId])
+}
+
+/// One exercise on one day of a routine. `position` 0..2 IS the "never more
+/// than three exercises a day" rule — the constraint is in the schema, not
+/// the UI.
+///
+/// `swapped` pins a slot: the person replaced what the generator proposed,
+/// and a "Regenerate" reshuffle must leave their pick alone.
+model RoutineExercise {
+  id         String @id @default(cuid())
+  routineId  String
+  routine    ExerciseRoutine @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  exerciseId String
+  exercise   Exercise @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+
+  /// 0 = Sunday .. 6 = Saturday.
+  dayOfWeek Int
+  /// 0..2 — the day's slot. The 3/day cap lives here.
+  position  Int
+  /// True when the person swapped this slot manually; regeneration keeps it.
+  swapped   Boolean @default(false)
+
+  @@unique([routineId, dayOfWeek, position])
+  @@index([routineId, dayOfWeek])
+  @@index([exerciseId])
 }
