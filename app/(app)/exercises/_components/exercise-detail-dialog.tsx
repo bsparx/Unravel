@@ -6,7 +6,9 @@ import { Dumbbell, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import { GOAL_LABELS, bodyPartLabel, goalShort } from "@/lib/exercise-labels";
+import { GOAL_LABELS, goalShort } from "@/lib/exercise-labels";
+
+import { ExerciseFigure } from "./exercise-figure";
 
 export type ExerciseDetail = {
   id: string;
@@ -81,19 +83,18 @@ export function ExerciseDetailDialog({
         <div className="space-y-4">
           <p className="text-body font-medium">{exercise.prescription}</p>
 
+          <ExerciseFigure name={exercise.name} parts={exercise.bodyParts} />
+
           <Separator />
 
           <div>
             <p className="text-micro text-muted-foreground mb-2 tracking-wide uppercase">
               What it is for
             </p>
+            {/* The goal only. The figure above already names every muscle
+                this works, in the same words and on the body itself. */}
             <div className="flex flex-wrap gap-1.5">
               <Badge variant="secondary">{GOAL_LABELS[exercise.goal]}</Badge>
-              {exercise.bodyParts.map((part) => (
-                <Badge key={part} variant="outline">
-                  {bodyPartLabel(part)}
-                </Badge>
-              ))}
             </div>
           </div>
 

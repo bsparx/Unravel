@@ -96,3 +96,41 @@ export const BACK_REGIONS: MuscleRegion[] = [
 export const MAPPED_PARTS: string[] = [
   ...new Set([...FRONT_REGIONS, ...BACK_REGIONS].map((region) => region.part)),
 ];
+
+/** Where a leader line touches its muscle, in un-mirrored user units. */
+export type RegionAnchor = { x: number; y: number };
+
+/*
+ * The anatomy plate in the exercise dialog runs a hairline from each lit
+ * muscle out to its name in the margin, and these are the points it starts
+ * from. Front names sit in the left margin and back names in the right, so
+ * the anchors hug the outer edge of their side.
+ *
+ * They are given un-mirrored, and the plate draws them outside the back
+ * figure's `scale(-1,1)` group — inside it a dot would land on the other
+ * side of the body and every label would render backwards. That works only
+ * because each muscle's box is symmetric about x=100, so one set of
+ * coordinates lands on the muscle either way; verify-logic.ts asserts the
+ * symmetry so the day someone draws an asymmetric region, it says so.
+ *
+ * The y values are spread rather than centred, so the plate's collision
+ * pass has nothing to do for any exercise the catalog actually holds.
+ */
+export const FRONT_ANCHORS: Record<string, RegionAnchor> = {
+  SHOULDERS: { x: 52, y: 106 },
+  CHEST: { x: 68, y: 138 },
+  CORE: { x: 77, y: 174 },
+  HIP_FLEXORS: { x: 76, y: 224 },
+  QUADS: { x: 68, y: 280 },
+};
+
+// SPINE's anchor sits high on purpose: LOWER_BACK paints over the strip
+// below y=158, so the visible spine is only its top half.
+export const BACK_ANCHORS: Record<string, RegionAnchor> = {
+  SHOULDERS: { x: 145, y: 98 },
+  SPINE: { x: 103, y: 128 },
+  UPPER_BACK: { x: 134, y: 158 },
+  LOWER_BACK: { x: 124, y: 190 },
+  GLUTES: { x: 130, y: 232 },
+  HAMSTRINGS: { x: 130, y: 292 },
+};

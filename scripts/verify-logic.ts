@@ -120,10 +120,14 @@ import {
   parseTimerParams,
 } from "@/lib/timer-url";
 import { BODY_PARTS } from "@/lib/validation";
+import { bodyPartLabel } from "@/lib/exercise-labels";
 import {
+  BACK_ANCHORS,
   BACK_REGIONS,
+  FRONT_ANCHORS,
   FRONT_REGIONS,
   MAPPED_PARTS,
+  type MuscleRegion,
 } from "@/app/(app)/exercises/_components/body-map-paths";
 
 let passed = 0;
@@ -1719,6 +1723,158 @@ check("every muscle region is a closed path in the view box", () => {
       numbers.every((n) => n >= -10 && n <= 470),
       `${region.part} has a coordinate outside the 200x460 view box`,
     );
+  }
+});
+
+/**
+ * The tight box a set of region paths occupies, quadratic bulges included.
+ *
+ * Deliberately a second, independent reading of the `d` strings. The anchors
+ * are placed by hand, so a check that re-derived them the way the drawing
+ * does would only be asking whether arithmetic is deterministic.
+ */
+function regionBounds(regions: MuscleRegion[]) {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  const see = (x: number, y: number) => {
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y);
+  };
+  // Where a quadratic turns back on itself, when it does so mid-segment.
+  const bend = (p0: number, p1: number, p2: number) => {
+    const den = p0 - 2 * p1 + p2;
+    if (den === 0) return null;
+    const t = (p0 - p1) / den;
+    if (t <= 0 || t >= 1) return null;
+    return (1 - t) ** 2 * p0 + 2 * (1 - t) * t * p1 + t ** 2 * p2;
+  };
+
+  for (const region of regions) {
+    const tokens = region.d.match(/[MHVLQZ]|-?\d*\.?\d+/g) ?? [];
+    let i = 0;
+    let x = 0;
+    let y = 0;
+    let command = "";
+    while (i < tokens.length) {
+      if (/[A-Za-z]/.test(tokens[i])) command = tokens[i++];
+      if (command === "Z") break;
+      if (command === "M") {
+        x = Number(tokens[i++]);
+        y = Number(tokens[i++]);
+        see(x, y);
+        command = "L";
+      } else if (command === "L") {
+        x = Number(tokens[i++]);
+        y = Number(tokens[i++]);
+        see(x, y);
+      } else if (command === "H") {
+        x = Number(tokens[i++]);
+        see(x, y);
+      } else if (command === "V") {
+        y = Number(tokens[i++]);
+        see(x, y);
+      } else if (command === "Q") {
+        const cx = Number(tokens[i++]);
+        const cy = Number(tokens[i++]);
+        const nx = Number(tokens[i++]);
+        const ny = Number(tokens[i++]);
+        see(nx, ny);
+        const bx = bend(x, cx, nx);
+        if (bx !== null) see(bx, y);
+        const by = bend(y, cy, ny);
+        if (by !== null) see(x, by);
+        x = nx;
+        y = ny;
+      } else i++;
+    }
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+const FIGURES = [
+  ["front", FRONT_REGIONS, FRONT_ANCHORS],
+  ["back", BACK_REGIONS, BACK_ANCHORS],
+] as const;
+
+check("every muscle a figure draws has somewhere to hang its name", () => {
+  for (const [side, regions, anchors] of FIGURES) {
+    const drawn = new Set(regions.map((region) => region.part));
+    for (const part of drawn) {
+      assert.ok(
+        anchors[part] !== undefined,
+        `${side}: ${part} can be lit but has no anchor, so the plate would fill it and never name it`,
+      );
+    }
+    for (const part of Object.keys(anchors)) {
+      assert.ok(
+        drawn.has(part),
+        `${side}: there is an anchor for "${part}", which the ${side} figure does not draw`,
+      );
+    }
+  }
+});
+
+check("a leader line starts on the muscle it names", () => {
+  for (const [side, regions, anchors] of FIGURES) {
+    for (const [part, anchor] of Object.entries(anchors)) {
+      const box = regionBounds(regions.filter((region) => region.part === part));
+      assert.ok(
+        anchor.x >= box.minX &&
+          anchor.x <= box.maxX &&
+          anchor.y >= box.minY &&
+          anchor.y <= box.maxY,
+        `${side}: the ${part} anchor (${anchor.x}, ${anchor.y}) is outside the muscle's box ` +
+          `(x ${box.minX}-${box.maxX}, y ${box.minY}-${box.maxY})`,
+      );
+    }
+  }
+});
+
+check("a leader line never crosses the figure's midline", () => {
+  // The front's names sit in the left margin and the back's in the right, so
+  // the pair reads outward-symmetric. An anchor on the wrong side of centre
+  // would send its line straight across the body to reach its own label.
+  for (const [part, anchor] of Object.entries(FRONT_ANCHORS)) {
+    assert.ok(
+      anchor.x <= 100,
+      `front: the ${part} anchor is right of centre, but its label is on the left`,
+    );
+  }
+  for (const [part, anchor] of Object.entries(BACK_ANCHORS)) {
+    assert.ok(
+      anchor.x >= 100,
+      `back: the ${part} anchor is left of centre, but its label is on the right`,
+    );
+  }
+});
+
+check("the mirror cannot move an anchor off its muscle", () => {
+  // The back figure renders inside translate(200,0) scale(-1,1) and the
+  // anchors do not, which is only safe while every muscle's box is symmetric
+  // about x=100 — mirrored or not, it covers the same span. This is the
+  // check that speaks up if that ever stops being true.
+  for (const [side, regions] of FIGURES) {
+    const parts = new Set(regions.map((region) => region.part));
+    for (const part of parts) {
+      const box = regionBounds(regions.filter((region) => region.part === part));
+      assert.equal(
+        box.minX + box.maxX,
+        200,
+        `${side}: ${part} spans x ${box.minX}-${box.maxX}, which is not symmetric about x=100`,
+      );
+    }
+  }
+});
+
+check("no muscle name is too long for the plate's margin", () => {
+  // 150 user units of margin at font-size 26 is about twelve characters.
+  for (const part of MAPPED_PARTS) {
+    const label = bodyPartLabel(part);
+    assert.ok(label.length <= 12, `"${label}" will overrun the plate's label margin`);
   }
 });
 
