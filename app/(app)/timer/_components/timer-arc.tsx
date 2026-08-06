@@ -11,6 +11,10 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 const OVERTIME_RADIUS = RADIUS + STROKE / 2 + 5;
 const OVERTIME_CIRCUMFERENCE = 2 * Math.PI * OVERTIME_RADIUS;
 
+// The SVG's intrinsic size. The element itself fills its container — the same
+// responsive `w-full max-w-[400px]` square the shader face and the recovery
+// face use — and the viewBox scales the drawing, strokes included.
+
 const round = (value: number) => Math.round(value * 1000) / 1000;
 
 /**
@@ -45,14 +49,12 @@ export function TimerArc({
   const ticks = tickAngles(plan);
 
   return (
-    <div className="relative isolate" style={{ width: SIZE, height: SIZE }}>
+    <div className="relative isolate @container aspect-square w-full max-w-[400px]">
       <svg
-        width={SIZE}
-        height={SIZE}
+        className="-rotate-90 size-full"
         viewBox={`0 0 ${SIZE} ${SIZE}`}
         aria-hidden
         // Start at 12 o'clock and drain clockwise.
-        className="-rotate-90"
       >
         <circle
           cx={CENTER}

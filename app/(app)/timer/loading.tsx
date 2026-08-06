@@ -9,12 +9,13 @@ export default function Loading() {
           <Skeleton className="mx-auto h-4 w-32 rounded-md" />
         </div>
 
-        {/* The face: a ring with a hollow centre, so the page never jumps. */}
-        <div className="relative size-[260px]">
+        {/* The face: a ring with a hollow centre, so the page never jumps.
+            Same responsive square as the real faces, capped at 400px. */}
+        <div className="relative aspect-square w-full max-w-[400px]">
           <Skeleton className="absolute inset-0 rounded-full" />
-          <div className="bg-background absolute inset-4 rounded-full" />
+          <div className="bg-background absolute inset-[7%] rounded-full" />
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-            <Skeleton className="h-8 w-24 rounded-md" />
+            <Skeleton className="h-10 w-28 rounded-md" />
             <Skeleton className="h-3 w-12 rounded-md" />
           </div>
         </div>

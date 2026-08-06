@@ -10,8 +10,8 @@
  * A ring that drained would turn rest into a countdown, which is the exact
  * failure this mode exists to prevent.
  *
- * It keeps the same 260px footprint as the arc so switching modes doesn't make
- * the page jump.
+ * It keeps the same responsive footprint as the arc — a square capped at
+ * 400px — so switching modes doesn't make the page jump.
  */
 
 const SIZE = 260;
@@ -21,13 +21,8 @@ const STROKE = 18;
 
 export function RecoveryFace({ children }: { children?: React.ReactNode }) {
   return (
-    <div className="relative isolate" style={{ width: SIZE, height: SIZE }}>
-      <svg
-        width={SIZE}
-        height={SIZE}
-        viewBox={`0 0 ${SIZE} ${SIZE}`}
-        aria-hidden
-      >
+    <div className="relative isolate @container aspect-square w-full max-w-[400px]">
+      <svg className="size-full" viewBox={`0 0 ${SIZE} ${SIZE}`} aria-hidden>
         <circle
           cx={CENTER}
           cy={CENTER}

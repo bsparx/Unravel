@@ -125,16 +125,19 @@ easing toward it.
 `TimerArc` is kept as the server render, the pre-hydration paint and the
 no-WebGL fallback. The face must never be a hole in the page.
 
-For recovery: **nothing moves.** A flat static ring in the same 260px footprint
-so the page doesn't jump, and digits counting up. No dasharray, no ticks, no
-progress of any kind. This is a separate component (`recovery-face.tsx`), not a
-variant of the arc — `TimerArc`'s whole contract is "draw a target being
-consumed", and recovery has no target to consume. A ring that drained would
-turn rest into a countdown, which is the exact failure the mode exists to
-prevent.
+For recovery: **nothing moves.** A flat static ring in the same responsive
+footprint — a square capped at 400px — so the page doesn't jump, and digits
+counting up. No dasharray, no ticks, no progress of any kind. This is a
+separate component (`recovery-face.tsx`), not a variant of the arc — `TimerArc`'s
+whole contract is "draw a target being consumed", and recovery has no target
+to consume. A ring that drained would turn rest into a countdown, which is the
+exact failure the mode exists to prevent.
 
 The pair *is* the signature: the same screen, the same footprint, two opposite
-answers to "how much is left".
+answers to "how much is left". The footprint is a `w-full max-w-[400px]` square
+— up from a fixed 260px, so the ring dominates the column and the digits have
+a 70%-of-width hole to sit in, with the readout stepped down by length so even
+an overrun never touches the ring.
 
 Everything else on the timer screen is quiet so the faces carry the page.
 

@@ -31,8 +31,15 @@ import {
   VERTEX_SHADER,
 } from "./decay-field.glsl";
 
-/** Matches `TimerArc` and `RecoveryFace`, so switching modes doesn't jump. */
-const SIZE = 260;
+/**
+ * The work face: two draining containers, rendered per frame.
+ *
+ * Sized by its container, not by a constant: the wrapper is an aspect-square
+ * `w-full max-w-[400px]` that the two SVG faces share, so switching modes
+ * never makes the page jump and the canvas shrinks with the column instead of
+ * overflowing a phone. The drawing buffer tracks the measured CSS size times
+ * the device pixel ratio, so the ring stays crisp at any width.
+ */
 
 export type DecayFieldProps = {
   clock: ClockState;
@@ -142,14 +149,10 @@ export function DecayField({
     }
 
     const canvas = renderer.domElement;
-    canvas.style.width = `${SIZE}px`;
-    canvas.style.height = `${SIZE}px`;
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
     canvas.setAttribute("aria-hidden", "true");
     container.appendChild(canvas);
-
-    // Above 2 the extra pixels are invisible and the fill cost is not.
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setSize(SIZE, SIZE, false);
 
     const uniforms = {
       uMacro: { value: 1 },
@@ -158,7 +161,7 @@ export function DecayField({
       uTime: { value: 0 },
       uFlourish: { value: 1 },
       uDual: { value: dual ? 1 : 0 },
-      uResolution: { value: new Vector2(SIZE, SIZE) },
+      uResolution: { value: new Vector2(1, 1) },
       uRun: { value: new Vector3(...colors.running) },
       uTrack: { value: new Vector3(...colors.track) },
       uTicks: { value: new Array<number>(MAX_TICKS).fill(TICK_SENTINEL) },
@@ -279,13 +282,23 @@ export function DecayField({
     };
 
     const resize = () => {
+      // The wrapper is `w-full max-w-[400px]` and square, so one measurement
+      // is the whole size. Measured rather than assumed: the face mounts
+      // inside a column whose width depends on the sidebar state.
+      const width = container.clientWidth;
+      if (width <= 0) return;
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      renderer.setSize(SIZE, SIZE, false);
+      renderer.setSize(width, width, false);
       const buffer = renderer.getDrawingBufferSize(new Vector2());
       uniforms.uResolution.value.set(buffer.x, buffer.y);
       draw();
     };
     resize();
+    // The column can resize without the window doing so — the sidebar
+    // collapsing is the obvious case — so the buffer tracks the container,
+    // not the viewport.
+    const resizeObserver = new ResizeObserver(resize);
+    resizeObserver.observe(container);
     // A face that mounts mid-session is already running, so it must not wait
     // for `running` to *change* before it starts moving.
     kick();
@@ -293,7 +306,6 @@ export function DecayField({
     canvas.addEventListener("webglcontextlost", onLost);
     document.addEventListener("visibilitychange", onVisible);
     reduced.addEventListener("change", applyFlourish);
-    window.addEventListener("resize", resize);
 
     return () => {
       disposing = true;
@@ -303,7 +315,7 @@ export function DecayField({
       canvas.removeEventListener("webglcontextlost", onLost);
       document.removeEventListener("visibilitychange", onVisible);
       reduced.removeEventListener("change", applyFlourish);
-      window.removeEventListener("resize", resize);
+      resizeObserver.disconnect();
       geometry.dispose();
       material.dispose();
       renderer.dispose();
@@ -333,7 +345,7 @@ export function DecayField({
   }, [colors, config, dual, intervalIndex, overrun, plan, running]);
 
   return (
-    <div className="relative isolate" style={{ width: SIZE, height: SIZE }}>
+    <div className="relative isolate @container aspect-square w-full max-w-[400px]">
       <div ref={containerRef} className="absolute inset-0" aria-hidden />
       <div className="absolute inset-0 grid place-items-center">{children}</div>
     </div>

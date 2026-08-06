@@ -62,13 +62,18 @@ export const FRAGMENT_SHADER = /* glsl */ `
   const float TAU = 6.283185307179586;
 
   // ---- geometry, in units where 1.0 is half the quad -----------------------
+  //
+  // The well's inner lip sits at 0.700 so the digits have real clearance: at
+  // the face's 400px cap that is a 280px hole, and the widest readout
+  // ("+1:00:00") needs 250. The macro ring moved out to match, so the groove
+  // between the two containers keeps its width.
 
-  const float MACRO_OUT = 0.905;
-  const float MACRO_IN  = 0.845;
-  const float WELL_OUT  = 0.800;
-  const float WELL_IN   = 0.600;
-  const float OVER_IN   = 0.930;
-  const float OVER_OUT  = 0.965;
+  const float MACRO_OUT = 0.926;
+  const float MACRO_IN  = 0.883;
+  const float WELL_OUT  = 0.850;
+  const float WELL_IN   = 0.700;
+  const float OVER_IN   = 0.944;
+  const float OVER_OUT  = 0.968;
 
   // Half-width of the gap cut at an interval boundary, in turns.
   const float TICK_HALF = 0.0055;

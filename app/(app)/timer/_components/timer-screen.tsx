@@ -133,12 +133,26 @@ export function TimerScreen({
     : isBreak && currentInterval
       ? formatClock(Math.max(0, currentTargetSeconds - intervalElapsedSeconds))
       : formatClock(
-          readoutSeconds(
-            state.config.mode,
-            focusElapsedSeconds,
-            state.config.targetSeconds,
-          ),
-        );
+        readoutSeconds(
+          state.config.mode,
+          focusElapsedSeconds,
+          state.config.targetSeconds,
+        ),
+      );
+
+  // Sized against the face, not the viewport: cqw resolves to the ring's
+  // container, so the digits shrink with the column on a phone. Stepped down
+  // as the readout grows — 25:00 gets the full height, h:mm:ss and overruns
+  // shrink — so the widest string ("+1:00:00") still clears the well's inner
+  // lip (70% of the face width) on every tier.
+  const readoutSize =
+    readout.length <= 5
+      ? "text-[20cqw]"
+      : readout.length === 6
+        ? "text-[17cqw]"
+        : readout.length <= 8
+          ? "text-[13.5cqw]"
+          : "text-[11.5cqw]";
 
   // Space starts and pauses from anywhere on this screen.
   useEffect(() => {
@@ -218,7 +232,7 @@ export function TimerScreen({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-xl flex-col items-center px-5 py-10 md:py-16">
+    <div className="mx-auto flex w-full max-w-3xl flex-col items-center px-5 py-10 md:py-16">
       {hasActiveSession && state.sessionId && (
         <ResumeBanner onDiscard={discard} />
       )}
@@ -264,7 +278,8 @@ export function TimerScreen({
           <div className="text-center">
             <p
               className={cn(
-                "font-mono text-5xl tabular-nums transition-colors",
+                "font-mono tabular-nums transition-colors",
+                readoutSize,
                 // Clay, not the running blue and not rest: this is neither work
                 // on the clock nor rest any more. Reusing either colour would
                 // make the one state you need to notice look like the two you
@@ -363,9 +378,9 @@ export function TimerScreen({
             className={cn(
               "min-w-36",
               running &&
-                (recovery
-                  ? "bg-rest text-rest-foreground hover:bg-rest/90"
-                  : "bg-running text-running-foreground hover:bg-running/90"),
+              (recovery
+                ? "bg-rest text-rest-foreground hover:bg-rest/90"
+                : "bg-running text-running-foreground hover:bg-running/90"),
             )}
           >
             {running ? (
@@ -468,9 +483,8 @@ export function TimerScreen({
 
           <p className="text-muted-foreground text-center text-label">
             {plan.filter((interval) => interval.kind === "FOCUS").length > 1
-              ? `${formatDuration(state.config.targetSeconds)} split into ${
-                  plan.filter((interval) => interval.kind === "FOCUS").length
-                } sessions, with breaks between them.`
+              ? `${formatDuration(state.config.targetSeconds)} split into ${plan.filter((interval) => interval.kind === "FOCUS").length
+              } sessions, with breaks between them.`
               : `${formatDuration(state.config.targetSeconds)} in one go.`}
           </p>
         </div>

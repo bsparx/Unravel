@@ -63,6 +63,56 @@ export function toLocalDate(instant: Date, timeZone: string): Date {
   return new Date(`${get("year")}-${get("month")}-${get("day")}T00:00:00.000Z`);
 }
 
+/** Minutes from UTC to wall clock in `timeZone` at `instant`. Positive east. */
+function offsetMinutes(timeZone: string, instant: Date): number {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(instant);
+
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value ?? 0);
+
+  const asUTC = Date.UTC(
+    get("year"),
+    get("month") - 1,
+    get("day"),
+    get("hour"),
+    get("minute"),
+  );
+
+  return Math.round((asUTC - instant.getTime()) / 60_000);
+}
+
+/**
+ * The instant the current local day began in `timeZone`.
+ *
+ * Inverse of `todayLocal`: that returns the day as a UTC-midnight *bucket*,
+ * which is a representation, not a moment — the true start of "Aug 28 in
+ * Karachi" is 2026-08-27T19:00:00.000Z, five hours before the bucket. Anything
+ * comparing an instant against "when did today start" needs this, not the
+ * bucket.
+ *
+ * Computed by taking the bucket, subtracting the offset that holds at it, and
+ * re-deriving the offset at the result — two passes cover every real zone,
+ * including those that shift at midnight rather than at 02:00.
+ */
+export function startOfLocalDay(
+  timeZone: string,
+  now: Date = new Date(),
+): Date {
+  const bucket = todayLocal(timeZone, now).getTime();
+  const firstPass = bucket - offsetMinutes(timeZone, new Date(bucket)) * 60_000;
+  const secondPass =
+    bucket - offsetMinutes(timeZone, new Date(firstPass)) * 60_000;
+  return new Date(secondPass);
+}
+
 /** Today's calendar day in `timeZone`, as a UTC-midnight Date. */
 export function todayLocal(timeZone: string, now: Date = new Date()): Date {
   return toLocalDate(now, timeZone);

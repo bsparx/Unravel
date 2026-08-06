@@ -16,6 +16,7 @@ import {
   formatDuration,
   formatRelativeDate,
   parseLocalDate,
+  startOfLocalDay,
   toISODate,
   toLocalDate,
 } from "@/lib/dates";
@@ -25,6 +26,7 @@ import {
   expectedDatesBetween,
   isDueOn,
 } from "@/lib/recurrence";
+import { tickIsStale } from "@/lib/habit-steps";
 import {
   adjustedOvertime,
   arcProgress,
@@ -170,6 +172,119 @@ check("dayOfWeek matches the real calendar", () => {
 check("parseLocalDate rejects junk", () => {
   assert.equal(parseLocalDate("not-a-date"), null);
   assert.equal(parseLocalDate("2026-7-8"), null);
+});
+
+console.log("\nhabit steps — the daily reset boundary");
+
+// PKT is UTC+5 with no DST: 00:00 on the 28th in Karachi is 19:00Z on the
+// 27th, so the reset running at 00:30 PKT cuts off at 2026-07-27T19:00:00Z.
+const resetRun = new Date("2026-07-27T19:30:00.000Z"); // 00:30 PKT, Aug 28
+const karachiMidnight = new Date("2026-07-27T19:00:00.000Z");
+
+check("a tick at 23:59 PKT is stale at the 00:30 PKT reset run", () => {
+  const ticked = new Date("2026-07-27T18:59:00.000Z"); // 23:59 PKT, Aug 27
+  assert.ok(tickIsStale(ticked, "Asia/Karachi", resetRun));
+  assert.ok(ticked.getTime() < karachiMidnight.getTime());
+});
+
+check("a tick at 00:05 PKT survives the 00:30 PKT reset run", () => {
+  const ticked = new Date("2026-07-27T19:05:00.000Z"); // 00:05 PKT, Aug 28
+  assert.equal(tickIsStale(ticked, "Asia/Karachi", resetRun), false);
+});
+
+check("a tick exactly at midnight is not stale", () => {
+  assert.equal(tickIsStale(karachiMidnight, "Asia/Karachi", resetRun), false);
+});
+
+check("the same run resets Karachi but not Los Angeles", () => {
+  // 2026-07-27T18:59Z is 23:59 PKT on the 27th (yesterday for Karachi) but
+  // only 11:59 PDT on the 27th (still today for LA). Same tick, same cron
+  // run: reset for one, kept for the other.
+  const ticked = new Date("2026-07-27T18:59:00.000Z");
+  assert.equal(tickIsStale(ticked, "Asia/Karachi", resetRun), true);
+  assert.equal(tickIsStale(ticked, "America/Los_Angeles", resetRun), false);
+});
+
+check("a zone rolls over only at its own midnight", () => {
+  // 2026-07-28T06:00Z is 23:00 PDT on the 27th: LA's day is still the 27th,
+  // so an 08:01 PDT tick survives while one from the 26th does not.
+  const run = new Date("2026-07-28T06:00:00.000Z"); // 23:00 PDT, Jul 27
+  const todayTick = new Date("2026-07-27T15:01:00.000Z"); // 08:01 PDT, Jul 27
+  const yesterdayTick = new Date("2026-07-27T05:00:00.000Z"); // 22:00 PDT, Jul 26
+  assert.equal(tickIsStale(todayTick, "America/Los_Angeles", run), false);
+  assert.equal(tickIsStale(yesterdayTick, "America/Los_Angeles", run), true);
+});
+
+check("startOfLocalDay lands on the real start-of-day instant", () => {
+  assert.equal(
+    startOfLocalDay("Asia/Karachi", resetRun).getTime(),
+    karachiMidnight.getTime(),
+  );
+  assert.equal(
+    startOfLocalDay("UTC", new Date("2026-07-28T10:00:00.000Z")).toISOString(),
+    "2026-07-28T00:00:00.000Z",
+  );
+  // August is PDT (UTC-7), so LA's day starts at 07:00Z.
+  assert.equal(
+    startOfLocalDay("America/Los_Angeles", new Date("2026-07-28T12:00:00.000Z")).toISOString(),
+    "2026-07-28T07:00:00.000Z",
+  );
+});
+
+check("startOfLocalDay is DST-correct on both transition days", () => {
+  // 2026-03-08 is US spring-forward: midnight is still EST (UTC-5).
+  assert.equal(
+    startOfLocalDay("America/New_York", new Date("2026-03-08T12:00:00.000Z")).toISOString(),
+    "2026-03-08T05:00:00.000Z",
+  );
+  // 2026-11-01 is fall-back: the day starts at 00:00 EDT (UTC-4) — 04:00Z.
+  assert.equal(
+    startOfLocalDay("America/New_York", new Date("2026-11-01T12:00:00.000Z")).toISOString(),
+    "2026-11-01T04:00:00.000Z",
+  );
+});
+
+check("the instant form and the bucket form always agree", () => {
+  // The cron pushes `completedAt < startOfLocalDay` into SQL; the pure
+  // predicate buckets both sides. They must never diverge — sweep across
+  // zones, DST boundaries and both sides of midnight.
+  const zones = ["Asia/Karachi", "America/New_York", "UTC"];
+  const nows = [
+    new Date("2026-07-27T19:30:00.000Z"),
+    new Date("2026-03-08T03:30:00.000Z"),
+    new Date("2026-11-01T05:30:00.000Z"),
+  ];
+  for (const zone of zones) {
+    for (const now of nows) {
+      for (const tick of [
+        new Date("2026-03-07T02:00:00.000Z"),
+        new Date("2026-03-08T04:30:00.000Z"),
+        new Date("2026-03-08T12:00:00.000Z"),
+        new Date("2026-07-27T19:00:00.000Z"),
+        new Date("2026-10-31T23:30:00.000Z"),
+        new Date("2026-11-01T04:30:00.000Z"),
+        new Date("2026-11-02T12:00:00.000Z"),
+      ]) {
+        assert.equal(
+          tickIsStale(tick, zone, now),
+          tick.getTime() < startOfLocalDay(zone, now).getTime(),
+          `${tick.toISOString()} @ ${zone}, now ${now.toISOString()}`,
+        );
+      }
+    }
+  }
+});
+
+check("the reset predicate ignores the runtime timezone", () => {
+  const savedTz = process.env.TZ;
+  process.env.TZ = "America/Los_Angeles";
+  try {
+    assert.ok(tickIsStale(new Date("2026-07-27T18:59:00.000Z"), "Asia/Karachi", resetRun));
+    assert.equal(tickIsStale(new Date("2026-07-28T10:00:00.000Z"), "Asia/Karachi", resetRun), false);
+  } finally {
+    if (savedTz === undefined) delete process.env.TZ;
+    else process.env.TZ = savedTz;
+  }
 });
 
 console.log("\ndates — formatting");
