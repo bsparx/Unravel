@@ -64,7 +64,7 @@ export function ExercisesView({
           <p className="text-muted-foreground max-w-prose text-body">
             A corrective week for the two postural patterns a desk builds:
             anterior pelvic tilt and rounded shoulders. Yoga and light
-            dumbbells, three exercises a day, never more.
+            dumbbells, up to five exercises a day — your call per day.
           </p>
           {hasRoutine && (
             <p className="text-label text-muted-foreground">
@@ -87,7 +87,7 @@ export function ExercisesView({
           <EmptyState
             icon={Sparkles}
             title="No routine yet"
-            description="Build a weekly plan: pick 3, 4 or 5 days, name the exact days, and get a balanced set of exercises for each one — at most three a day."
+            description="Build a weekly plan: pick 3 to 6 days, name the exact days, choose how many exercises each day carries (1–5), and get a balanced set for each one."
             action={
               <Button type="button" onClick={() => setBuilding(true)}>
                 <Plus className="size-4" aria-hidden />

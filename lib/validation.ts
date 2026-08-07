@@ -632,20 +632,28 @@ export const BODY_PARTS = [
   "FULL_BODY",
 ] as const;
 
-/** The routine builder offers 3, 4 or 5 training days — never more, never less. */
-export const ROUTINE_DAY_OPTIONS = [3, 4, 5] as const;
+/** The routine builder offers 3, 4, 5 or 6 training days — never more, never less. */
+export const ROUTINE_DAY_OPTIONS = [3, 4, 5, 6] as const;
+
+/** How many exercises a single day may carry. */
+export const MAX_EXERCISES_PER_DAY = 5;
 
 const weekday = z.coerce.number().int().min(0).max(6);
 const exerciseId = cuid;
 
-/** Name the exact days, in the app's 0 = Sunday convention. */
+/**
+ * Name the exact days, in the app's 0 = Sunday convention, and how many
+ * exercises each picked day should carry (1..MAX_EXERCISES_PER_DAY).
+ * `counts` is index-aligned with `days` after dedupe/sort.
+ */
 export const routineDaysSchema = z
   .object({
-    daysPerWeek: z.coerce.number().int().min(3).max(5),
+    daysPerWeek: z.coerce.number().int().min(3).max(6),
     days: z
       .array(weekday)
       .max(7)
       .transform((days) => [...new Set(days)].sort((a, b) => a - b)),
+    counts: z.array(z.coerce.number().int().min(1).max(MAX_EXERCISES_PER_DAY)),
   })
   .superRefine((value, ctx) => {
     if (value.days.length !== value.daysPerWeek) {
@@ -655,13 +663,24 @@ export const routineDaysSchema = z
         message: `Pick exactly ${value.daysPerWeek} days.`,
       });
     }
+    if (value.counts.length !== value.days.length) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["counts"],
+        message: "Pick how many exercises each day will carry.",
+      });
+    }
   });
 
 /** One slot of the week, named by where it sits rather than what's in it. */
 export const routineSlotSchema = z.object({
   routineId: cuid,
   dayOfWeek: weekday,
-  position: z.coerce.number().int().min(0).max(2),
+  position: z
+    .coerce.number()
+    .int()
+    .min(0)
+    .max(MAX_EXERCISES_PER_DAY - 1),
 });
 
 /** Swap one slot of the routine for a different exercise. */

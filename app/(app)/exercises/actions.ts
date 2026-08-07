@@ -34,7 +34,7 @@ export async function createRoutine(
     };
   }
 
-  const { daysPerWeek, days } = parsed.data;
+  const { daysPerWeek, days, counts } = parsed.data;
   if (days.length !== daysPerWeek) {
     return {
       status: "error",
@@ -49,7 +49,7 @@ export async function createRoutine(
     orderBy: { sortOrder: "asc" },
   });
 
-  const slots = generateRoutine({ days, exercises });
+  const slots = generateRoutine({ days, counts, exercises });
 
   await prisma.exerciseRoutine.create({
     data: {
@@ -172,8 +172,18 @@ export async function regenerateRoutine(
       position: slot.position,
       exerciseId: slot.exerciseId,
     }));
+
+  // The week's shape is part of the plan: regeneration reshuffles exercises
+  // but keeps each day's count exactly as it was built.
+  const slotsByDay = new Map<number, number>();
+  for (const slot of routine.exercises) {
+    slotsByDay.set(slot.dayOfWeek, (slotsByDay.get(slot.dayOfWeek) ?? 0) + 1);
+  }
+  const counts = routine.daysOfWeek.map((day) => slotsByDay.get(day) ?? 3);
+
   const slots = generateRoutine({
     days: routine.daysOfWeek,
+    counts,
     exercises,
     variant,
     pinned,

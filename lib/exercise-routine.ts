@@ -4,12 +4,12 @@
  * The corrective logic the whole feature is built on: anterior pelvic tilt
  * (lower cross) is fixed by strengthening glutes + deep core and stretching
  * hip flexors; rounded shoulders (upper cross) by strengthening the upper
- * back and opening the chest. Every day is composed as three slots drawn
- * from those categories, and the week balances yoga vs. dumbbells.
+ * back and opening the chest. Every day is composed of one to five slots
+ * drawn from those categories, and the week balances yoga vs. dumbbells.
  *
  * Structural rules:
- *   - a workout day has exactly 3 slots (positions 0..2) — the "never more
- *     than three exercises a day" rule lives here AND in the schema
+ *   - a workout day has 1..5 slots (positions 0..4) — the per-day cap lives
+ *     here AND in the schema; the builder lets every day carry its own count
  *   - no exercise repeats across the week while the pool allows it
  *   - every week covers all four corrective categories
  *   - every day carries at least one strength slot, and never the same
@@ -47,7 +47,7 @@ export interface PoolExercise {
   goal: ExerciseGoal;
 }
 
-/** One slot of the week being produced. `position` is 0..2 within the day. */
+/** One slot of the week being produced. `position` is 0..4 within the day. */
 export interface GeneratedSlot {
   dayOfWeek: number;
   position: number;
@@ -103,7 +103,8 @@ const CATEGORY_RANK: Record<SlotCategory, number> = {
   MOBILITY: 3,
 };
 
-const SLOTS_PER_DAY = 3;
+/** Hard cap on any single day's slots; mirrored by validation. */
+const MAX_SLOTS_PER_DAY = 5;
 
 /** Deterministic PRNG (mulberry32), so a variant always reproduces itself. */
 function mulberry32(seed: number): () => number {
@@ -205,7 +206,7 @@ function dealCategories(
 
   const days: SlotCategory[][] = Array.from({ length: dayCount }, () => []);
   let cursor = 0;
-  for (let round = 0; round < SLOTS_PER_DAY; round++) {
+  for (let round = 0; round < Math.max(...openings); round++) {
     for (let day = 0; day < dayCount; day++) {
       if (days[day].length >= openings[day]) continue;
       if (cursor >= deck.length) break;
@@ -222,8 +223,10 @@ function dealCategories(
 
   const tripled = (list: SlotCategory[]) =>
     list.find((c) => list.filter((other) => other === c).length >= 3);
+  // A day of two or more deserves a strength move; a one-slot day can't be
+  // guaranteed one when the strength quota is smaller than the week's days.
   const needsStrength = (list: SlotCategory[], opening: number) =>
-    opening === SLOTS_PER_DAY && !list.some((c) => STRENGTH.includes(c));
+    opening >= 2 && !list.some((c) => STRENGTH.includes(c));
 
   // Swap offending entries with a compatible one on another day. Bounded by
   // the slot count — a couple of passes is always enough in practice, and a
@@ -282,8 +285,13 @@ interface OpenSlot {
 }
 
 export interface GenerateOptions {
-  /** 0 = Sunday .. 6 = Saturday. Any length 1..7; the builder offers 3-5. */
+  /** 0 = Sunday .. 6 = Saturday. Any length 1..7; the builder offers 3-6. */
   days: number[];
+  /**
+   * How many slots each entry of `days` carries, index-aligned. Each 1..5.
+   * Defaults to 3 per day, which keeps the canonical shape.
+   */
+  counts?: number[];
   /** The active catalog. */
   exercises: PoolExercise[];
   /** 0 = the canonical routine; higher variants reshuffle the week. */
@@ -304,14 +312,20 @@ export interface GenerateOptions {
  */
 export function generateRoutine({
   days,
+  counts,
   exercises,
   variant = 0,
   pinned = [],
   avoid = [],
 }: GenerateOptions): GeneratedSlot[] {
   const random = mulberry32(variant + 1);
-  const sortedDays = [...new Set(days)].sort((a, b) => a - b);
+  const countByDay = new Map<number, number>();
+  days.forEach((day, index) => {
+    if (!countByDay.has(day)) countByDay.set(day, counts?.[index] ?? 3);
+  });
+  const sortedDays = [...countByDay.keys()].sort((a, b) => a - b);
   if (sortedDays.length === 0) return [];
+  const countOf = (day: number) => countByDay.get(day) ?? 3;
 
   const pools = {} as Record<SlotCategory, PoolExercise[]>;
   for (const category of CATEGORIES) {
@@ -324,7 +338,7 @@ export function generateRoutine({
   const pinnedByDay = new Map<number, PinnedSlot[]>();
   for (const slot of pinned) {
     if (!sortedDays.includes(slot.dayOfWeek)) continue;
-    if (slot.position < 0 || slot.position >= SLOTS_PER_DAY) continue;
+    if (slot.position < 0 || slot.position >= MAX_SLOTS_PER_DAY) continue;
     pinnedByDay.set(slot.dayOfWeek, [
       ...(pinnedByDay.get(slot.dayOfWeek) ?? []),
       slot,
@@ -332,7 +346,8 @@ export function generateRoutine({
   }
 
   const openings = sortedDays.map(
-    (day) => SLOTS_PER_DAY - (pinnedByDay.get(day)?.length ?? 0),
+    (day) =>
+      Math.max(0, countOf(day) - (pinnedByDay.get(day)?.length ?? 0)),
   );
   const total = openings.reduce((sum, n) => sum + n, 0);
 
@@ -467,7 +482,7 @@ export function generateRoutine({
       (pinnedByDay.get(dayOfWeek) ?? []).map((p) => p.position),
     );
     const free: number[] = [];
-    for (let position = 0; position < SLOTS_PER_DAY; position++) {
+    for (let position = 0; position < countOf(dayOfWeek); position++) {
       if (!taken.has(position)) free.push(position);
     }
 

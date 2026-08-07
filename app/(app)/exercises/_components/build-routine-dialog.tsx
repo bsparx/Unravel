@@ -24,9 +24,10 @@ import type { ExerciseDetail } from "./exercise-detail-dialog";
 export type BuildCatalogExercise = ExerciseDetail;
 
 /**
- * The builder, in three steps: the shape of the week (3/4/5 days), the exact
- * days, then a preview of what the generator composed — which is saved as-is,
- * because the server generates identically from the same catalog order.
+ * The builder, in three steps: the shape of the week (3/4/5/6 days), the
+ * exact days, then per-day exercise counts with a live preview — which is
+ * saved as-is, because the server generates identically from the same
+ * catalog order.
  */
 export function BuildRoutineDialog({
   catalog,
@@ -38,6 +39,7 @@ export function BuildRoutineDialog({
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [daysPerWeek, setDaysPerWeek] = useState<number>(3);
   const [days, setDays] = useState<number[]>([]);
+  const [counts, setCounts] = useState<Record<number, number>>({});
 
   const [state, formAction, pending] = useActionState(createRoutine, idleState);
 
@@ -58,17 +60,22 @@ export function BuildRoutineDialog({
   /** Client preview of what the server will build — same inputs, same output. */
   const preview = useMemo(() => {
     if (step !== 3) return [];
-    return generateRoutine({ days, exercises: catalog });
-  }, [step, days, catalog]);
+    const sorted = [...days].sort((a, b) => a - b);
+    return generateRoutine({
+      days: sorted,
+      counts: sorted.map((day) => counts[day] ?? 3),
+      exercises: catalog,
+    });
+  }, [step, days, counts, catalog]);
 
   const toggleDay = (value: number) => {
-    setDays((current) =>
-      current.includes(value)
-        ? current.filter((day) => day !== value)
-        : current.length < daysPerWeek
-          ? [...current, value]
-          : current,
-    );
+    if (days.includes(value)) {
+      setDays(days.filter((day) => day !== value));
+      return;
+    }
+    if (days.length >= daysPerWeek) return;
+    setDays([...days, value]);
+    setCounts((current) => ({ ...current, [value]: 3 }));
   };
 
   const picked = new Set(days);
@@ -79,7 +86,7 @@ export function BuildRoutineDialog({
         <DialogHeader>
           <DialogTitle className="font-display">Build your routine</DialogTitle>
           <DialogDescription>
-            Step {step} of 3 — never more than three exercises a day, ever.
+            Step {step} of 3 — up to five exercises a day, your call.
           </DialogDescription>
         </DialogHeader>
 
@@ -88,7 +95,7 @@ export function BuildRoutineDialog({
             <p className="text-label text-muted-foreground">
               How many days a week will you train?
             </p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               {ROUTINE_DAY_OPTIONS.map((option) => (
                 <button
                   key={option}
@@ -96,6 +103,7 @@ export function BuildRoutineDialog({
                   onClick={() => {
                     setDaysPerWeek(option);
                     setDays([]);
+                    setCounts({});
                   }}
                   className={cn(
                     "border-border hover:bg-accent flex flex-col items-center gap-1 rounded-lg border px-4 py-4 transition-colors",
@@ -166,16 +174,57 @@ export function BuildRoutineDialog({
         {step === 3 && (
           <div className="space-y-3">
             <p className="text-label text-muted-foreground">
-              Here is what the week looks like. Save it, or go back and change
-              the days — you can swap individual exercises after.
+              Set how many exercises each day carries — 1 to 5. The week
+              previews below; save it when it looks right.
             </p>
 
             <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
               {WEEKDAYS.filter((day) => picked.has(day.value)).map((day) => {
-                const daySlots = preview.filter((slot) => slot.dayOfWeek === day.value);
+                const daySlots = preview.filter(
+                  (slot) => slot.dayOfWeek === day.value,
+                );
+                const count = counts[day.value] ?? 3;
                 return (
                   <div key={day.value} className="border-border rounded-lg border">
-                    <p className="font-display text-body px-3 pt-2.5">{day.long}</p>
+                    <div className="flex items-center justify-between gap-2 px-3 pt-2.5">
+                      <p className="font-display text-body">{day.long}</p>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          aria-label={`Fewer exercises on ${day.long}`}
+                          disabled={count <= 1}
+                          onClick={() =>
+                            setCounts((current) => ({
+                              ...current,
+                              [day.value]: Math.max(1, (current[day.value] ?? 3) - 1),
+                            }))
+                          }
+                          className="border-border hover:bg-accent disabled:text-muted-foreground/40 flex size-6 items-center justify-center rounded-md border text-label transition-colors"
+                        >
+                          −
+                        </button>
+                        <span
+                          className="text-label tnum w-6 text-center"
+                          aria-live="polite"
+                        >
+                          {count}
+                        </span>
+                        <button
+                          type="button"
+                          aria-label={`More exercises on ${day.long}`}
+                          disabled={count >= 5}
+                          onClick={() =>
+                            setCounts((current) => ({
+                              ...current,
+                              [day.value]: Math.min(5, (current[day.value] ?? 3) + 1),
+                            }))
+                          }
+                          className="border-border hover:bg-accent disabled:text-muted-foreground/40 flex size-6 items-center justify-center rounded-md border text-label transition-colors"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
                     <ol className="divide-y">
                       {daySlots.map((slot) => {
                         const exercise = catalog.find((e) => e.id === slot.exerciseId);
@@ -206,7 +255,7 @@ export function BuildRoutineDialog({
                 {preview.length} exercises
               </Badge>
               <Badge variant="outline" className="text-muted-foreground">
-                ≤3 per day
+                ≤5 per day
               </Badge>
             </div>
 
@@ -221,8 +270,16 @@ export function BuildRoutineDialog({
                 Back
               </Button>
               <input type="hidden" name="daysPerWeek" value={daysPerWeek} />
-              {days.map((day) => (
+              {[...days].sort((a, b) => a - b).map((day) => (
                 <input key={day} type="hidden" name="days[]" value={day} />
+              ))}
+              {[...days].sort((a, b) => a - b).map((day) => (
+                <input
+                  key={`count-${day}`}
+                  type="hidden"
+                  name="counts[]"
+                  value={counts[day] ?? 3}
+                />
               ))}
               <Button type="submit" disabled={pending}>
                 {pending ? "Building…" : "Save this routine"}

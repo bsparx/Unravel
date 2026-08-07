@@ -30,8 +30,8 @@ export type RoutineSlot = {
 
 /**
  * The week, as a grid of day strips — the plan-first layout. Workout days are
- * raised and carry their three slots; the off days are quiet, staying in the
- * grid so the rhythm of the week is visible at a glance.
+ * raised and carry their slots; the off days are quiet, staying in the grid
+ * so the rhythm of the week is visible at a glance.
  */
 export function RoutineWeek({
   routineId,

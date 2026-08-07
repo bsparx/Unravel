@@ -1072,7 +1072,7 @@ model ExerciseRoutine {
   /// Auto-named at creation; editable later if we add an edit surface.
   name String
 
-  /// 0 = Sunday .. 6 = Saturday. Length 3, 4 or 5 — the whole point of the
+  /// 0 = Sunday .. 6 = Saturday. Length 3, 4, 5 or 6 — the whole point of the
   /// builder is that the person picks the exact days.
   daysOfWeek Int[]
 
@@ -1084,22 +1084,23 @@ model ExerciseRoutine {
   @@index([userId])
 }
 
-/// One exercise on one day of a routine. `position` 0..2 IS the "never more
-/// than three exercises a day" rule — the constraint is in the schema, not
-/// the UI.
+/// One exercise on one day of a routine. `position` 0..4 IS the "never more
+/// than five exercises a day" rule — the constraint is in the schema, not
+/// the UI. Days may carry different counts (1..5), so a day's slots are
+/// simply whatever rows exist for it.
 ///
 /// `swapped` pins a slot: the person replaced what the generator proposed,
 /// and a "Regenerate" reshuffle must leave their pick alone.
 model RoutineExercise {
-  id         String @id @default(cuid())
+  id         String          @id @default(cuid())
   routineId  String
   routine    ExerciseRoutine @relation(fields: [routineId], references: [id], onDelete: Cascade)
   exerciseId String
-  exercise   Exercise @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+  exercise   Exercise        @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
 
   /// 0 = Sunday .. 6 = Saturday.
   dayOfWeek Int
-  /// 0..2 — the day's slot. The 3/day cap lives here.
+  /// 0..4 — the day's slot. The 5/day cap lives here.
   position  Int
   /// True when the person swapped this slot manually; regeneration keeps it.
   swapped   Boolean @default(false)

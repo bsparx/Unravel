@@ -1538,7 +1538,8 @@ const generated = (
   variant = 0,
   pinned: PinnedSlot[] = [],
   avoid: string[] = [],
-) => generateRoutine({ days, exercises: EXERCISES, variant, pinned, avoid });
+  counts?: number[],
+) => generateRoutine({ days, counts, exercises: EXERCISES, variant, pinned, avoid });
 
 const CATEGORY_OF_GOAL: Record<string, string> = {
   GLUTE_STRENGTH: "POSTERIOR",
@@ -1557,25 +1558,36 @@ const WEEK_SHAPES = [
   [1, 3, 5],
   [1, 2, 3, 4],
   [0, 1, 2, 3, 4],
+  [0, 1, 2, 3, 4, 5],
 ];
 
-check("a workout day never has more than three exercises", () => {
-  for (const days of [[1, 3, 5], [1, 2, 3, 4], [0, 1, 2, 3, 4]]) {
-    const slots = generated(days);
-    for (const day of days) {
+check("every day carries exactly its requested count, never more than five", () => {
+  const shapes: Array<[number[], number[]]> = [
+    [[1, 3, 5], [3, 3, 3]],
+    [[0, 1, 2, 3, 4], [1, 2, 3, 4, 5]],
+    [[0, 1, 2, 3, 4, 6], [5, 4, 3, 2, 1, 4]],
+  ];
+  for (const [days, counts] of shapes) {
+    const slots = generated(days, 0, [], [], counts);
+    days.forEach((day, index) => {
       const count = slots.filter((s) => s.dayOfWeek === day).length;
-      assert.ok(count <= 3, `day ${day} got ${count} slots`);
-      assert.equal(count, 3, `day ${day} got ${count} slots, expected a full 3`);
-    }
+      assert.ok(count <= 5, `day ${day} got ${count} slots`);
+      assert.equal(
+        count,
+        counts[index],
+        `day ${day} got ${count} slots, expected ${counts[index]}`,
+      );
+    });
   }
 });
 
-check("every selected day gets exactly three exercises", () => {
+check("a mixed week sums to its requested total", () => {
   const days = [2, 5];
-  const slots = generated(days);
-  assert.equal(slots.length, 6);
-  assert.equal(slots.filter((s) => s.dayOfWeek === 2).length, 3);
-  assert.equal(slots.filter((s) => s.dayOfWeek === 5).length, 3);
+  const counts = [1, 4];
+  const slots = generated(days, 0, [], [], counts);
+  assert.equal(slots.length, 5);
+  assert.equal(slots.filter((s) => s.dayOfWeek === 2).length, 1);
+  assert.equal(slots.filter((s) => s.dayOfWeek === 5).length, 4);
 });
 
 check("every week covers all four corrective categories", () => {
@@ -1626,6 +1638,28 @@ check("every day carries at least one strength slot", () => {
           `week ${days} variant ${variant} day ${day} is all mobility/core`,
         );
       }
+    }
+  }
+});
+
+check("days with two or more slots carry a strength move", () => {
+  const shapes: Array<[number[], number[]]> = [
+    [[0, 1, 2, 3, 4], [2, 3, 4, 5, 1]],
+    [[0, 1, 2, 3, 4, 6], [5, 1, 2, 4, 3, 2]],
+  ];
+  for (const [days, counts] of shapes) {
+    for (let variant = 0; variant < 40; variant++) {
+      const slots = generated(days, variant, [], [], counts);
+      days.forEach((day, index) => {
+        if (counts[index] < 2) return;
+        const categories = slots
+          .filter((s) => s.dayOfWeek === day)
+          .map((s) => categoryOf(s.exerciseId));
+        assert.ok(
+          categories.some((c) => c === "POSTERIOR" || c === "UPPER"),
+          `week ${days} counts ${counts} variant ${variant} day ${day} is all mobility/core`,
+        );
+      });
     }
   }
 });
