@@ -1,6 +1,6 @@
 "use client";
 
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Grape, Monitor, Moon, Sun } from "lucide-react";
 
 import { useMounted, useTheme } from "@/components/theme-provider";
 
@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils";
 const OPTIONS = [
   { value: "light", label: "Light", icon: Sun },
   { value: "dark", label: "Dark", icon: Moon },
+  // No lucide eggplant; a grape reads purple. The theme is the violet night.
+  { value: "eggplant", label: "Eggplant", icon: Grape },
   { value: "system", label: "System", icon: Monitor },
 ] as const;
 

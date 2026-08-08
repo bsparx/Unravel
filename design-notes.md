@@ -516,3 +516,16 @@ the long way around (`large-arc 1, sweep 0`), the tail's control points clear
 the ring's outside edge, and at the collapsed rail's 24px the mark still holds
 ~13% ink coverage with strong contrast in both themes. The sidebar shows the
 mark alone when collapsed; the wordmark returns with the labels when expanded.
+
+## The eggplant theme
+
+`app/globals.css` — a third theme, the violet night. Not a new darkness
+mechanism: `.dark` remains the switch every component keys off, and eggplant
+rides it with a `data-theme="eggplant"` attribute whose token block
+(`.dark[data-theme="eggplant"]`) overrides the surfaces and accent. The base
+is near-black with a deep aubergine cast (`#0b0811`, cards `#120e1a`), the
+accent a lifted mauve (`#b089b2`) — the same lift dark mode gives the teal.
+Reserved colours are
+untouched: running stays the clock's blue, rest the recovery slate, charts
+and money keep their own palettes. Applied by `lib/theme.ts` and the
+before-paint script, toggled from Settings → Appearance.

@@ -94,6 +94,7 @@ import {
   spanOfLength,
 } from "@/lib/block-math";
 import { planMinutes } from "@/lib/plan-drag";
+import { resolveTheme, systemTheme, THEMES } from "@/lib/theme";
 import {
   anchorTitleOf,
   chainOf,
@@ -954,6 +955,15 @@ check("every scheduled block starts at 30 minutes, whatever the estimate", () =>
   assert.equal(planMinutes(), 30);
   assert.equal(PLAN_DEFAULT_MINUTES, 30);
   assert.equal(PLAN_CUE_MINUTES, 15);
+});
+
+check("eggplant is a third theme that resolves to dark", () => {
+  // LOAD-BEARING. The `.dark` class is the switch every dark: variant, sonner
+  // and chart keys off — eggplant must resolve to dark or it renders as the
+  // light theme with a dead data attribute.
+  assert.equal(resolveTheme("eggplant"), "dark");
+  assert.equal(resolveTheme("system"), systemTheme());
+  assert.ok(THEMES.includes("eggplant"));
 });
 
 check("a malformed time is rejected rather than coerced to midnight", () => {

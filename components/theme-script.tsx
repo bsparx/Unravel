@@ -1,5 +1,8 @@
-import { THEME_STORAGE_KEY } from "@/lib/theme";
-
+import {
+  EGGPLANT_THEME_ATTR,
+  EGGPLANT_THEME_VALUE,
+  THEME_STORAGE_KEY,
+} from "@/lib/theme";
 /**
  * The before-paint theme script.
  *
@@ -23,10 +26,18 @@ export function ThemeScript() {
   const script = `
 try {
   var stored = localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});
+  var eggplant = stored === ${JSON.stringify(EGGPLANT_THEME_VALUE)};
   var theme = stored === "light" || stored === "dark" ? stored
+    : eggplant ? "dark"
     : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-  document.documentElement.classList.toggle("dark", theme === "dark");
-  document.documentElement.style.colorScheme = theme;
+  var root = document.documentElement;
+  root.classList.toggle("dark", theme === "dark");
+  if (eggplant) {
+    root.setAttribute(${JSON.stringify(EGGPLANT_THEME_ATTR)}, ${JSON.stringify(EGGPLANT_THEME_VALUE)});
+  } else {
+    root.removeAttribute(${JSON.stringify(EGGPLANT_THEME_ATTR)});
+  }
+  root.style.colorScheme = theme;
 } catch (error) {}
 `.trim();
 

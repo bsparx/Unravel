@@ -13,18 +13,25 @@
  * change here; everything below is the same behaviour next-themes provided.
  */
 
-export type Theme = "light" | "dark" | "system";
+export type Theme = "light" | "dark" | "eggplant" | "system";
 export type ResolvedTheme = "light" | "dark";
 
-export const THEMES: Theme[] = ["light", "dark", "system"];
+export const THEMES: Theme[] = ["light", "dark", "eggplant", "system"];
 
 /** Shared with the inline script in `theme-script.tsx`. Keep them in step. */
 export const THEME_STORAGE_KEY = "theme";
 
+/** The marker the eggplant theme puts on `<html>` — see globals.css. */
+export const EGGPLANT_THEME_ATTR = "data-theme";
+export const EGGPLANT_THEME_VALUE = "eggplant";
+
 const DARK_QUERY = "(prefers-color-scheme: dark)";
 
 const isTheme = (value: unknown): value is Theme =>
-  value === "light" || value === "dark" || value === "system";
+  value === "light" ||
+  value === "dark" ||
+  value === "eggplant" ||
+  value === "system";
 
 // ---------------------------------------------------------------- store
 
@@ -67,8 +74,14 @@ export function systemTheme(): ResolvedTheme {
     : "light";
 }
 
+/**
+ * A concrete light/dark answer to any preference. Eggplant resolves to dark:
+ * it IS the dark theme with a violet palette — the `.dark` class is what every
+ * `dark:` variant, sonner, chart and timer face already keys off, so eggplant
+ * inherits all of that for free and only swaps tokens on top.
+ */
 export const resolveTheme = (theme: Theme): ResolvedTheme =>
-  theme === "system" ? systemTheme() : theme;
+  theme === "system" ? systemTheme() : theme === "eggplant" ? "dark" : theme;
 
 export function setTheme(next: Theme): void {
   if (!isTheme(next)) return;
@@ -143,6 +156,12 @@ function detachPlatformListeners(): void {
 /**
  * Put the theme on `<html>`.
  *
+ * The `.dark` class is the darkness switch — the whole app keys off it. The
+ * eggplant theme sets it AND marks `data-theme="eggplant"`, and globals.css
+ * overrides the palette tokens for that combination. Clearing the marker when
+ * leaving eggplant matters: a stale attribute would keep the violet palette
+ * on a plain dark theme.
+ *
  * `color-scheme` matters as much as the class: it's what makes native form
  * controls, scrollbars and the `<input type="date">` picker match — all of
  * which this app uses, and all of which look broken in a light widget on a
@@ -159,6 +178,11 @@ export function applyTheme(
   const restore = animate ? null : suppressTransitions();
 
   root.classList.toggle("dark", resolved === "dark");
+  if (theme === "eggplant") {
+    root.setAttribute(EGGPLANT_THEME_ATTR, EGGPLANT_THEME_VALUE);
+  } else {
+    root.removeAttribute(EGGPLANT_THEME_ATTR);
+  }
   root.style.colorScheme = resolved;
 
   restore?.();

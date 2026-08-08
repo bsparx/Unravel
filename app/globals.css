@@ -314,6 +314,54 @@
   --sidebar-ring: #6fb3ab;
 }
 
+/* ---------------------------------------------------------------------------
+   Eggplant — the violet night theme. Same dark base as `.dark`, re-tinted:
+   surfaces carry a subtle aubergine cast and the accent becomes a lifted
+   mauve (the same lift dark mode gives the teal). The reserved colours stay
+   untouched: running is still the clock's blue, rest the recovery slate, and
+   the charts and money palettes keep their own identities.
+
+   Selected as `.dark[data-theme="eggplant"]` — the extra attribute (set by
+   lib/theme.ts and the before-paint script) outranks plain `.dark` at equal
+   specificity-plus-one, so every token here wins without touching the base.
+--------------------------------------------------------------------------- */
+
+.dark[data-theme="eggplant"] {
+  --background: #0b0811;
+  --foreground: #ece6dc;
+
+  --card: #120e1a;
+  --card-foreground: #ece6dc;
+  --popover: #120e1a;
+  --popover-foreground: #ece6dc;
+
+  --primary: #b089b2;
+  --primary-foreground: #1f141f;
+  --secondary: #1a1524;
+  --secondary-foreground: #d8cede;
+  --muted: #171122;
+  --muted-foreground: #a494a8;
+  --accent: #201832;
+  --accent-foreground: #c5a8c8;
+  --destructive: #d4796a;
+
+  --border: #221b30;
+  --input: #2a2138;
+  --ring: #b089b2;
+
+  --arc-track: #1c1626;
+  --arc-tick: #3a3148;
+
+  --sidebar: #0e0a16;
+  --sidebar-foreground: #d8cede;
+  --sidebar-primary: #b089b2;
+  --sidebar-primary-foreground: #1f141f;
+  --sidebar-accent: #201832;
+  --sidebar-accent-foreground: #c5a8c8;
+  --sidebar-border: #221b30;
+  --sidebar-ring: #b089b2;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
