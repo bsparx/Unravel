@@ -87,7 +87,7 @@ export function ExercisesView({
           <EmptyState
             icon={Sparkles}
             title="No routine yet"
-            description="Build a weekly plan: pick 3 to 6 days, name the exact days, choose how many exercises each day carries (1–5), and get a balanced set for each one."
+            description="Build a weekly plan: pick 1 to 7 days, name the exact days, choose how many exercises each day carries (1–5), and get a balanced set for each one."
             action={
               <Button type="button" onClick={() => setBuilding(true)}>
                 <Plus className="size-4" aria-hidden />

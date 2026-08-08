@@ -371,6 +371,9 @@ export const settingsSchema = z.object({
   soundEnabled: z.coerce.boolean().default(true),
   hapticsEnabled: z.coerce.boolean().default(true),
   returnAlertsEnabled: z.coerce.boolean().default(true),
+  prayerRemindersEnabled: z.coerce.boolean().default(false),
+  /** Empty means "leave the app default" — the action stores null. */
+  prayerCity: emptyToUndefined(z.string().trim().min(1).max(80)),
 });
 
 // ---------------------------------------------------------------- water
@@ -632,8 +635,8 @@ export const BODY_PARTS = [
   "FULL_BODY",
 ] as const;
 
-/** The routine builder offers 3, 4, 5 or 6 training days — never more, never less. */
-export const ROUTINE_DAY_OPTIONS = [3, 4, 5, 6] as const;
+/** The routine builder offers 1 to 7 training days — any week shape is allowed. */
+export const ROUTINE_DAY_OPTIONS = [1, 2, 3, 4, 5, 6, 7] as const;
 
 /** How many exercises a single day may carry. */
 export const MAX_EXERCISES_PER_DAY = 5;
@@ -648,7 +651,7 @@ const exerciseId = cuid;
  */
 export const routineDaysSchema = z
   .object({
-    daysPerWeek: z.coerce.number().int().min(3).max(6),
+    daysPerWeek: z.coerce.number().int().min(1).max(7),
     days: z
       .array(weekday)
       .max(7)

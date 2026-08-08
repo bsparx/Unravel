@@ -68,6 +68,10 @@ import {
 } from "@/lib/exercise-routine";
 import { parseQuickAdd } from "@/lib/quick-parse";
 import {
+  parseTimings,
+  prayerWindows,
+} from "@/lib/prayer-math";
+import {
   gratitudePrompt,
   nextCloseStep,
   parseCloseStep,
@@ -84,9 +88,12 @@ import {
   MIN_BLOCK_MINUTES,
   overlaps,
   parseMinuteOfDay,
+  PLAN_CUE_MINUTES,
+  PLAN_DEFAULT_MINUTES,
   snap,
   spanOfLength,
 } from "@/lib/block-math";
+import { planMinutes } from "@/lib/plan-drag";
 import {
   anchorTitleOf,
   chainOf,
@@ -939,6 +946,14 @@ check("minute-of-day formatting round-trips", () => {
   assert.equal(formatMinuteOfDay(1440), "00:00", "midnight at the far end");
   assert.equal(parseMinuteOfDay("09:05"), 545);
   assert.equal(parseMinuteOfDay("23:59"), 1439);
+});
+
+check("every scheduled block starts at 30 minutes, whatever the estimate", () => {
+  // LOAD-BEARING. The whole point of the scheduling path: estimates inform,
+  // they don't constrain, and the person adjusts after it lands.
+  assert.equal(planMinutes(), 30);
+  assert.equal(PLAN_DEFAULT_MINUTES, 30);
+  assert.equal(PLAN_CUE_MINUTES, 15);
 });
 
 check("a malformed time is rejected rather than coerced to midnight", () => {
@@ -1996,6 +2011,94 @@ check("a handful of variants draws across most of the catalog", () => {
   assert.ok(
     used.size >= 24,
     `6 regenerations of a 5-day week should touch most of the 32-exercise catalog, got ${used.size}`,
+  );
+});
+
+console.log("\nprayer windows");
+
+// A Karachi summer day's timings, minutes since local midnight. The Isha end
+// is the NEXT day's fajr minus 30, which is why the window math takes it as
+// an argument rather than reading it from the same day's timings.
+const PRAYER_DAY = {
+  fajr: 4 * 60 + 40,
+  sunrise: 6 * 60 + 15,
+  dhuhr: 12 * 60 + 25,
+  asr: 16 * 60 + 10,
+  maghrib: 19 * 60 + 5,
+  isha: 20 * 60 + 20,
+};
+
+const PRAYER_HHMM = {
+  Fajr: "04:40",
+  Sunrise: "06:15",
+  Dhuhr: "12:25",
+  Asr: "16:10",
+  Maghrib: "19:05",
+  Isha: "20:20",
+};
+
+check("the five windows follow the spec exactly", () => {
+  const windows = prayerWindows(PRAYER_DAY, PRAYER_DAY.fajr);
+  assert.deepEqual(
+    windows.map((w) => [w.prayer, w.startMin, w.endMin]),
+    [
+      ["FAJR", 4 * 60 + 40, 6 * 60 + 15],
+      ["ZUHR", 12 * 60 + 25, 16 * 60 + 10 - 30],
+      ["ASR", 16 * 60 + 10, 19 * 60 + 5 - 30],
+      ["MAGHRIB", 19 * 60 + 5, 20 * 60 + 20 - 30],
+      ["ISHA", 20 * 60 + 20, 1440 + 4 * 60 + 40 - 30],
+    ],
+  );
+});
+
+check("isha is the only window that crosses midnight", () => {
+  const windows = prayerWindows(PRAYER_DAY, PRAYER_DAY.fajr);
+  assert.ok(
+    windows.filter((w) => w.endMin > 1440).every((w) => w.prayer === "ISHA"),
+    "only isha may end after midnight",
+  );
+  assert.ok(
+    windows
+      .filter((w) => w.prayer !== "ISHA")
+      .every((w) => w.endMin <= 1440),
+    "every other window stays inside the day",
+  );
+});
+
+check("every window ends 30 minutes before the next prayer's start", () => {
+  const windows = prayerWindows(PRAYER_DAY, PRAYER_DAY.fajr);
+  const expectedEnd: Record<string, number> = {
+    FAJR: PRAYER_DAY.sunrise,
+    ZUHR: PRAYER_DAY.asr - 30,
+    ASR: PRAYER_DAY.maghrib - 30,
+    MAGHRIB: PRAYER_DAY.isha - 30,
+    ISHA: 1440 + PRAYER_DAY.fajr - 30,
+  };
+  for (const window of windows) {
+    assert.equal(window.endMin, expectedEnd[window.prayer]);
+  }
+});
+
+check("malformed API payloads are rejected, valid ones parsed", () => {
+  assert.equal(parseTimings(null), null);
+  assert.equal(parseTimings({}), null);
+  assert.equal(
+    parseTimings({ timings: { Fajr: "04:40", Sunrise: "06:15" } }),
+    null,
+    "a partial payload must not half-parse",
+  );
+  const valid = parseTimings({ timings: PRAYER_HHMM });
+  assert.deepEqual(valid, PRAYER_DAY);
+});
+
+check("non-canonical clock strings are rejected", () => {
+  assert.equal(
+    parseTimings({ timings: { ...PRAYER_HHMM, Fajr: "4:4" } }),
+    null,
+  );
+  assert.equal(
+    parseTimings({ timings: { ...PRAYER_HHMM, Fajr: "25:00" } }),
+    null,
   );
 });
 

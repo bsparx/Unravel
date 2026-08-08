@@ -98,7 +98,7 @@ function ScheduleRow({
   }, [state]);
 
   const overdue = item.dueDate !== null && item.dueDate.getTime() < today.getTime();
-  const minutes = planMinutes(item.estimatedSeconds);
+  const minutes = planMinutes();
 
   return (
     <li
@@ -147,7 +147,7 @@ function ScheduleRow({
 
         {item.firstStep && (
           // The first step, not the task, is what tells you whether this is a
-          // thing you can start in the 25 minutes you're about to block.
+          // thing you can start in the half hour you're about to block.
           <p className="text-muted-foreground mt-0.5 flex items-center gap-1 truncate text-micro">
             <CornerDownRight className="size-3 shrink-0" aria-hidden />
             {item.firstStep}

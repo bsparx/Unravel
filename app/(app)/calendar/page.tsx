@@ -23,6 +23,7 @@ import {
   WEEKDAYS,
 } from "@/lib/dates";
 import { getBlockedDays, getBlocks, getSchedulableItems } from "@/lib/time-blocks";
+import { getPrayerBands } from "@/lib/prayers";
 import { tightCount, transitionsForDay } from "@/lib/transitions";
 import { cn } from "@/lib/utils";
 
@@ -63,7 +64,7 @@ export default async function CalendarPage({
   const start = view === "week" ? startOfWeek(anchor, user.weekStart) : anchor;
   const length = view === "week" ? 7 : 1;
 
-  const [blocks, schedulable, blockedDays] = await Promise.all([
+  const [blocks, schedulable, blockedDays, prayerBands] = await Promise.all([
     getBlocks(user, start, length),
     getSchedulableItems(user, anchor),
     // The mini-month navigator's dots: which days in the anchor's month
@@ -77,6 +78,7 @@ export default async function CalendarPage({
           86_400_000,
       ),
     ),
+    user.prayerRemindersEnabled ? getPrayerBands(user, start, length) : {},
   ]);
 
   const days: GridDay[] = Array.from({ length }, (_, offset) => {
@@ -241,6 +243,7 @@ export default async function CalendarPage({
         <CalendarView
           days={days}
           blocks={blocks}
+          prayerBands={prayerBands}
           todayISO={toISODate(today)}
           timeZone={user.timezone}
           tasks={schedulable.map((task) => ({

@@ -6,14 +6,15 @@ import { requireUser } from "@/lib/auth";
 import {
   clampSpan,
   findFreeSlot,
-  MIN_BLOCK_MINUTES,
+  PLAN_CUE_MINUTES,
+  PLAN_DEFAULT_MINUTES,
   snap,
   type Span,
   spanOfLength,
 } from "@/lib/block-math";
 import { prisma } from "@/lib/db";
 import { parseLocalDate } from "@/lib/dates";
-import { anchorTitleOf, cueLengthMinutes, cueSpanFor } from "@/lib/habit-cue";
+import { anchorTitleOf, cueSpanFor } from "@/lib/habit-cue";
 import {
   type ActionState,
   createBlockSchema,
@@ -25,8 +26,6 @@ import {
   updateBlockSchema,
 } from "@/lib/validation";
 
-/** The default length for a task with no estimate: one pomodoro. */
-const DEFAULT_BLOCK_MINUTES = 25;
 /** Where "find me a slot" starts looking on an otherwise empty day. */
 const DAY_START_MINUTE = 9 * 60;
 
@@ -63,8 +62,7 @@ async function plannedCueFor(
     select: {
       anchorTaskId: true,
       anchorLabel: true,
-      anchorMinutes: true,
-      anchorTask: { select: { title: true, estimatedSeconds: true } },
+      anchorTask: { select: { title: true } },
     },
   });
 
@@ -76,7 +74,7 @@ async function plannedCueFor(
   return {
     taskId: cue.anchorTaskId,
     title,
-    minutes: cueLengthMinutes(cue, cue.anchorTask?.estimatedSeconds),
+    minutes: PLAN_CUE_MINUTES,
   };
 }
 
@@ -324,9 +322,11 @@ export async function moveBlock(formData: FormData): Promise<void> {
 /**
  * "Put this on the calendar" in one click.
  *
- * The length comes from the task's own estimate, so the number you committed
- * to when you wrote the task is the number that shows up in your day — that
- * link is the point of asking for an estimate at all.
+ * Every block lands at 30 minutes — the estimate is information, not a
+ * constraint, and a task with no estimate gets the same honest block as one
+ * with a careful estimate. The length is deliberately coerced here rather than
+ * trusted from the wire: a stale drag payload cannot sneak a different length
+ * in. The resize handle and the editor are how it moves afterwards.
  *
  * With no `startMinute`, it finds the first gap big enough. If the day is
  * genuinely full it says so instead of stacking another block on top: being
@@ -355,18 +355,12 @@ export async function scheduleTask(
 
   const task = await prisma.task.findFirst({
     where: { id: input.taskId, userId: user.id },
-    select: { id: true, title: true, estimatedSeconds: true },
+    select: { id: true, title: true },
   });
 
   if (!task) return { status: "error", message: "That task no longer exists." };
 
-  const minutes = Math.max(
-    MIN_BLOCK_MINUTES,
-    input.minutes ??
-      (task.estimatedSeconds
-        ? Math.round(task.estimatedSeconds / 60)
-        : DEFAULT_BLOCK_MINUTES),
-  );
+  const minutes = PLAN_DEFAULT_MINUTES;
 
   const cue = await plannedCueFor(user.id, task.id, input.includeCue);
   const cueMinutes = cue?.minutes ?? 0;

@@ -140,7 +140,10 @@ function categoryQuotas(
   supply: Record<SlotCategory, number>,
 ): Record<SlotCategory, number> {
   const ceiling = (category: SlotCategory) =>
-    Math.min(supply[category], total - (CATEGORIES.length - 1));
+    Math.min(
+      supply[category],
+      Math.max(0, total - (CATEGORIES.length - 1)),
+    );
 
   const exact = CATEGORIES.map((category) => ({
     category,
@@ -162,8 +165,16 @@ function categoryQuotas(
         (a, b) =>
           b.ideal - quotas[b.category] - (a.ideal - quotas[a.category]),
       );
-    if (candidates.length === 0) break; // catalog too small; caller gets repeats
-    quotas[candidates[0].category] += 1;
+    // No room among the capped candidates: for a small week (total < number
+    // of categories) every ceiling is zero, and for a week bigger than the
+    // catalog every category sits at its supply. Either way, keep dealing by
+    // priority — posterior first — so no position is left empty; the pick
+    // phase falls back to repeats once a pool is genuinely spent.
+    const pick =
+      candidates[0] ??
+      [...exact].sort((a, b) => b.ideal - a.ideal)[0];
+    if (!pick) break; // supply is zero everywhere; caller gets an empty week
+    quotas[pick.category] += 1;
     assigned += 1;
   }
 
@@ -285,7 +296,7 @@ interface OpenSlot {
 }
 
 export interface GenerateOptions {
-  /** 0 = Sunday .. 6 = Saturday. Any length 1..7; the builder offers 3-6. */
+  /** 0 = Sunday .. 6 = Saturday. Any length 1..7; the builder offers all of them. */
   days: number[];
   /**
    * How many slots each entry of `days` carries, index-aligned. Each 1..5.

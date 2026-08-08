@@ -10,7 +10,7 @@
  * already use.
  */
 
-import { MIN_BLOCK_MINUTES } from "@/lib/block-math";
+import { PLAN_DEFAULT_MINUTES } from "@/lib/block-math";
 
 /**
  * A private MIME type, so the grid can tell one of our rows apart from a
@@ -19,20 +19,17 @@ import { MIN_BLOCK_MINUTES } from "@/lib/block-math";
  */
 export const PLAN_ITEM_MIME = "application/x-plan-item";
 
-/** The default length for something with no estimate: one pomodoro. */
-export const DEFAULT_PLAN_MINUTES = 25;
-
 export type PlanDragItem = {
   id: string;
   title: string;
-  /** Already resolved from the estimate, so the grid can size its preview. */
+  /** How the grid sizes its preview: always the 30-minute default. */
   minutes: number;
 };
 
-/** How long a block for this thing should be. */
-export function planMinutes(estimatedSeconds: number | null): number {
-  if (!estimatedSeconds) return DEFAULT_PLAN_MINUTES;
-  return Math.max(MIN_BLOCK_MINUTES, Math.round(estimatedSeconds / 60));
+/** How long a block for this thing should be. Always 30 — estimates inform,
+ * they don't constrain; the person adjusts after it lands. */
+export function planMinutes(): number {
+  return PLAN_DEFAULT_MINUTES;
 }
 
 /**

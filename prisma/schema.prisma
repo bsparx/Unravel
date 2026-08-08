@@ -181,6 +181,15 @@ enum BodyPart {
   FULL_BODY
 }
 
+/// The five daily prayers, in order. `MAGHRIB` keeps its Islamic spelling.
+enum PrayerKind {
+  FAJR
+  ZUHR
+  ASR
+  MAGHRIB
+  ISHA
+}
+
 // ---------------------------------------------------------------- identity
 
 model User {
@@ -232,6 +241,12 @@ model User {
   /// two hours fills the day's quota inside the window).
   waterReminderIntervalMin Int     @default(120)
 
+  // Prayer reminders. Timings are fetched from the Aladhan API once per
+  // (city, date) and cached in PrayerDayTimes; `prayerCity` defaults to
+  // "Karachi" in code when null.
+  prayerRemindersEnabled Boolean @default(false)
+  prayerCity             String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -252,6 +267,7 @@ model User {
   transfers       AccountTransfer[]
   moneyDebts      MoneyDebt[]
   exerciseRoutines ExerciseRoutine[]
+  prayerChecks    PrayerCheck[]
 }
 
 // ---------------------------------------------------------------- lists
@@ -680,6 +696,46 @@ model WaterGlass {
   // two glasses, and a constraint violation is the one failure mode that
   // would make logging cost something.
   @@index([userId, date])
+}
+
+// ---------------------------------------------------------------- prayer
+
+/// One row per prayer actually checked — SPARSE, exactly like WaterGlass and
+/// TaskOccurrence. Absence means "not prayed". The daily cron wipes every row
+/// older than the current day at 04:00 Asia/Karachi, so a cycle lives roughly
+/// fajr-to-fajr and there is no history.
+model PrayerCheck {
+  id     String    @id @default(cuid())
+  userId String
+  user   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// The local day the prayer *belongs* to (the day of its own start time —
+  /// Isha of day D is checkable until Fajr(D+1) − 30, past midnight).
+  date   DateTime  @db.Date
+  prayer PrayerKind
+
+  checkedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@unique([userId, date, prayer])
+  @@index([userId, date])
+}
+
+/// Cache of Aladhan API timings, one row per (city, date). Fetched lazily on a
+/// miss so the API is called at most once per city per day, shared by the day
+/// page and the calendar; pruned by the same daily cron that wipes checks.
+model PrayerDayTimes {
+  id        String   @id @default(cuid())
+  city      String
+  /// The local day the timings belong to, UTC-midnight DATE.
+  date      DateTime @db.Date
+  /// { fajr, sunrise, dhuhr, asr, maghrib, isha } — minutes from local
+  /// midnight. Stored as Json rather than six columns because it is one
+  /// opaque API payload consumed whole.
+  timings   Json
+  fetchedAt DateTime @default(now())
+
+  @@unique([city, date])
 }
 
 // ---------------------------------------------------------------- the day

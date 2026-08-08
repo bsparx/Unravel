@@ -24,7 +24,7 @@ import type { ExerciseDetail } from "./exercise-detail-dialog";
 export type BuildCatalogExercise = ExerciseDetail;
 
 /**
- * The builder, in three steps: the shape of the week (3/4/5/6 days), the
+ * The builder, in three steps: the shape of the week (1–7 days), the
  * exact days, then per-day exercise counts with a live preview — which is
  * saved as-is, because the server generates identically from the same
  * catalog order.
@@ -95,7 +95,7 @@ export function BuildRoutineDialog({
             <p className="text-label text-muted-foreground">
               How many days a week will you train?
             </p>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
               {ROUTINE_DAY_OPTIONS.map((option) => (
                 <button
                   key={option}
@@ -106,7 +106,7 @@ export function BuildRoutineDialog({
                     setCounts({});
                   }}
                   className={cn(
-                    "border-border hover:bg-accent flex flex-col items-center gap-1 rounded-lg border px-4 py-4 transition-colors",
+                    "border-border hover:bg-accent flex flex-col items-center gap-1 rounded-lg border px-2 py-3 transition-colors",
                     daysPerWeek === option && "border-primary bg-accent",
                   )}
                 >

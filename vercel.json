@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/reset-steps",
       "schedule": "0 19 * * *"
+    },
+    {
+      "path": "/api/cron/reset-prayers",
+      "schedule": "0 23 * * *"
     }
   ]
 }

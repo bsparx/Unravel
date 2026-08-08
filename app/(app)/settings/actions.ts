@@ -26,6 +26,7 @@ export async function updateSettings(
     "soundEnabled",
     "hapticsEnabled",
     "returnAlertsEnabled",
+    "prayerRemindersEnabled",
   ]) {
     values[key] = values[key] === "on" || values[key] === "true";
   }
@@ -72,6 +73,8 @@ export async function updateSettings(
       soundEnabled: input.soundEnabled,
       hapticsEnabled: input.hapticsEnabled,
       returnAlertsEnabled: input.returnAlertsEnabled,
+      prayerRemindersEnabled: input.prayerRemindersEnabled,
+      prayerCity: input.prayerCity ?? null,
     },
   });
 

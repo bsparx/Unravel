@@ -20,6 +20,7 @@ import {
   layoutColumns,
   MIN_BLOCK_MINUTES,
   MINUTES_PER_DAY,
+  PLAN_DEFAULT_MINUTES,
   snap,
   SNAP_MINUTES,
   spanMinutes,
@@ -36,12 +37,14 @@ import {
   type PlanDragItem,
 } from "@/lib/plan-drag";
 import type { CalendarBlock } from "@/lib/time-blocks";
+import type { PrayerBand } from "@/lib/prayers";
 import { buildTimerHref } from "@/lib/timer-url";
 import { toWorkMode } from "@/lib/timer-math";
 import { abutsNeighbour, transitionsForDay } from "@/lib/transitions";
 import { cn } from "@/lib/utils";
 
 import { deleteBlock, moveBlock, toggleBlockDone } from "../actions";
+import { PrayerBands } from "./prayer-bands";
 import { TransitionStrip } from "./transition-strip";
 
 /**
@@ -78,7 +81,7 @@ const STRIP_FILL = {
  * re-renders only itself — and the markers that subscribe through context —
  * instead of the whole grid.
  */
-const NowContext = createContext<number | null>(null);
+export const NowContext = createContext<number | null>(null);
 
 export function NowProvider({
   timeZone,
@@ -138,6 +141,7 @@ type BlockPatch =
 export function CalendarGrid({
   days,
   blocks,
+  prayerBands,
   todayISO,
   onCreate,
   onEdit,
@@ -145,6 +149,8 @@ export function CalendarGrid({
 }: {
   days: GridDay[];
   blocks: CalendarBlock[];
+  /** Tinted prayer windows per day ISO — see lib/prayers.ts. */
+  prayerBands: Record<string, PrayerBand[]>;
   todayISO: string;
   /** A slot was clicked or dragged into a span: open the editor on it. */
   onCreate: (
@@ -328,6 +334,7 @@ export function CalendarGrid({
               key={day.dateISO}
               day={day}
               blocks={shown.filter((block) => block.dateISO === day.dateISO)}
+              prayerBands={prayerBands[day.dateISO] ?? []}
               isToday={day.dateISO === todayISO}
               drag={drag}
               setDrag={setDrag}
@@ -488,6 +495,7 @@ function HourGutter() {
 function DayColumn({
   day,
   blocks,
+  prayerBands,
   isToday,
   drag,
   setDrag,
@@ -500,6 +508,7 @@ function DayColumn({
 }: {
   day: GridDay;
   blocks: CalendarBlock[];
+  prayerBands: PrayerBand[];
   isToday: boolean;
   drag: {
     id: string;
@@ -790,7 +799,7 @@ function DayColumn({
           task clears the thing below it — which is the actual question. */}
       {dropMinute !== null &&
         (() => {
-          const minutes = activePlanItem()?.minutes ?? 25;
+          const minutes = activePlanItem()?.minutes ?? PLAN_DEFAULT_MINUTES;
           return (
             <DropPreview
               startMinute={dropMinute}
@@ -818,6 +827,12 @@ function DayColumn({
           minutePx={MINUTE_PX}
         />
       ))}
+
+      {/* The prayer windows of the day, behind the plan. Painted before the
+          blocks so a block always wins the z-stack, and pointer-events-none so
+          the empty slots underneath stay clickable — the check button is the
+          only interactive thing here. */}
+      <PrayerBands bands={prayerBands} isToday={isToday} minutePx={MINUTE_PX} />
 
       {laid.map(({ block, column, columns }) => (
         <BlockChip

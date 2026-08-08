@@ -40,6 +40,8 @@ export default async function SettingsPage() {
           autoStartNextFocus: user.autoStartNextFocus,
           soundEnabled: user.soundEnabled,
           hapticsEnabled: user.hapticsEnabled,
+          prayerRemindersEnabled: user.prayerRemindersEnabled,
+          prayerCity: user.prayerCity ?? "Karachi",
         }}
       />
     </div>

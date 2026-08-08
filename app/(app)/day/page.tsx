@@ -9,12 +9,14 @@ import {
   minuteOfDayLocal,
   toISODate,
 } from "@/lib/dates";
+import { getPrayerCycle } from "@/lib/prayers";
 import { getTodayView } from "@/lib/tasks";
 import { getBlocks } from "@/lib/time-blocks";
 import { getWaterToday } from "@/lib/water-data";
 
 import { DayList } from "./_components/day-list";
 import { PlanStrip } from "./_components/plan-strip";
+import { PrayerSection } from "./_components/prayer-section";
 
 export const metadata = { title: "Your day" };
 
@@ -24,6 +26,8 @@ export default async function TodayPage() {
   const blocks = await getBlocks(user, view.date, 1);
   const water = await getWaterToday(user, view.date);
   const todayISO = toISODate(view.date);
+
+  const prayers = user.prayerRemindersEnabled ? await getPrayerCycle(user) : null;
 
   const upNext =
     view.habits[0] ?? view.overdue[0] ?? view.dueToday[0] ?? view.undated[0];
@@ -66,6 +70,8 @@ export default async function TodayPage() {
           nowMinute={minuteOfDayLocal(user.timezone)}
         />
       </div>
+
+      {user.prayerRemindersEnabled && <PrayerSection view={prayers} />}
 
       {upNext && (
         // One obvious next action. Everything below is optional.

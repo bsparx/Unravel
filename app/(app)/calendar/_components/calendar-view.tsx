@@ -4,6 +4,7 @@ import { useCallback, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { isCalendarColor } from "@/lib/calendar-colors";
+import type { PrayerBand } from "@/lib/prayers";
 import type { CalendarBlock } from "@/lib/time-blocks";
 import { idleState } from "@/lib/validation";
 
@@ -18,12 +19,14 @@ import { CalendarGrid, NowProvider, type GridDay } from "./calendar-grid";
 export function CalendarView({
   days,
   blocks,
+  prayerBands,
   todayISO,
   timeZone,
   tasks,
 }: {
   days: GridDay[];
   blocks: CalendarBlock[];
+  prayerBands: Record<string, PrayerBand[]>;
   todayISO: string;
   timeZone: string;
   /** `cueTitle` is set for a habit that brings a precursor block with it;
@@ -69,6 +72,7 @@ export function CalendarView({
         }}
         days={days}
         blocks={blocks}
+        prayerBands={prayerBands}
         todayISO={todayISO}
         onCreate={(dateISO, span) => {
           setDraft({

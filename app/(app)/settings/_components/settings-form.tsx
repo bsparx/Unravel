@@ -31,6 +31,8 @@ export type SettingsValues = {
   autoStartNextFocus: boolean;
   soundEnabled: boolean;
   hapticsEnabled: boolean;
+  prayerRemindersEnabled: boolean;
+  prayerCity: string;
 };
 
 export function SettingsForm({
@@ -184,6 +186,42 @@ export function SettingsForm({
             hint="A browser notification, then a few reminders if it keeps running. The only one that reaches you in another app, which is where a break usually goes."
             defaultChecked={values.returnAlertsEnabled}
           />
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div>
+          <h2 className="font-display text-title">Prayer reminders</h2>
+          <p className="text-muted-foreground text-label">
+            Shows Fajr, Zuhr, Asr, Maghrib and Isha as time windows on your
+            day and on the calendar. Times are fetched daily from the Aladhan
+            API for the city below — the windows move with sunrise and sunset
+            on their own.
+          </p>
+        </div>
+
+        <CheckboxField
+          id="prayerRemindersEnabled"
+          label="Show prayer windows"
+          hint="Each prayer appears once its window opens and stays visible until the next day's dawn — an unchecked prayer is one you haven't prayed yet. The day restarts at 4 AM."
+          defaultChecked={values.prayerRemindersEnabled}
+        />
+
+        <div className="space-y-2">
+          <Label htmlFor="prayerCity">City</Label>
+          <Input
+            id="prayerCity"
+            name="prayerCity"
+            type="text"
+            maxLength={80}
+            placeholder="Karachi"
+            defaultValue={values.prayerCity}
+          />
+          {error("prayerCity") && (
+            <p role="alert" className="text-destructive text-label">
+              {error("prayerCity")}
+            </p>
+          )}
         </div>
       </section>
 
