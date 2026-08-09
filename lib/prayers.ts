@@ -66,6 +66,12 @@ export type PrayerBand = {
 
 const API = "https://api.aladhan.com/v1";
 const METHOD = 1;
+/**
+ * HANAFI Asr (shadow = 2× object) — the standard calculation for Pakistan.
+ * Aladhan defaults to STANDARD/Shafi, which lands Asr ~70 minutes early
+ * (16:06 vs the correct 17:16 on 2026-08-09 in Karachi).
+ */
+const SCHOOL = 1;
 
 /** Where the single-day and month endpoints agree Karachi sits. */
 const KARACHI_COORDS = { latitude: 24.86, longitude: 67.01 };
@@ -153,7 +159,7 @@ async function fetchMonth(
   month: number,
 ): Promise<Map<string, PrayerTimings> | null> {
   const { latitude, longitude } = await resolveCityCoords(city);
-  const url = `${API}/calendar?latitude=${latitude}&longitude=${longitude}&month=${String(month).padStart(2, "0")}&year=${year}&method=${METHOD}`;
+  const url = `${API}/calendar?latitude=${latitude}&longitude=${longitude}&month=${String(month).padStart(2, "0")}&year=${year}&method=${METHOD}&school=${SCHOOL}`;
 
   try {
     const response = await fetch(url, {

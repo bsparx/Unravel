@@ -11,9 +11,10 @@ import { cn } from "@/lib/utils";
 
 /**
  * The prayer cycle on the day page: five rows, Fajr to Isha, each with its
- * window, each checkable only inside its own window. An unchecked prayer
- * stays visible after its window closes — "not prayed" is information, and
- * the row keeps saying it until the 4 AM reset.
+ * window. A prayer is checkable inside its own window, or retroactively
+ * after it closes — "missed" rows take a check marked late, so a prayer
+ * prayed late is still recorded. Upcoming rows stay locked; an unchecked
+ * prayer stays visible until the 4 AM reset.
  */
 export function PrayerSection({ view }: { view: PrayerCycleView | null }) {
   if (!view) {
@@ -55,7 +56,8 @@ function PrayerRow({
 }) {
   const [, startTransition] = useTransition();
 
-  const checkable = item.status === "active";
+  const checkable =
+    item.status === "active" || item.status === "missed";
 
   const handleToggle = (next: boolean) => {
     if (next && !checkable) return;
@@ -88,7 +90,7 @@ function PrayerRow({
     ) : item.status === "upcoming" ? (
       <span className="text-muted-foreground/70">later</span>
     ) : item.status === "missed" ? (
-      <span className="text-muted-foreground/70">not yet</span>
+      <span className="text-muted-foreground/70">late</span>
     ) : (
       <span className="text-muted-foreground/70">done</span>
     );
@@ -123,7 +125,8 @@ function PrayerRow({
           <p
             className={cn(
               "text-muted-foreground text-micro tabular-nums",
-              item.status === "upcoming" && "opacity-70",
+              (item.status === "upcoming" || item.status === "missed") &&
+                "opacity-70",
             )}
           >
             {range}
