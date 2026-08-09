@@ -162,6 +162,8 @@ export function CalendarGrid({
   onDropItem: (item: PlanDragItem, dateISO: string, startMinute: number) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const scrolledRef = useRef(false);
+  const nowMinute = useContext(NowContext);
   const [, startTransition] = useTransition();
 
   // The optimistic layer is what makes dragging feel like moving an object
@@ -215,16 +217,28 @@ export function CalendarGrid({
 
   // Open on the working day, not on midnight. Scrolling past eight empty hours
   // every time you open the calendar is a small tax you'd pay hundreds of times.
+  // When today is on screen, open at the current time instead — the now-line
+  // near the top with ~30 minutes of context above, so arriving at 5pm never
+  // means hunting down the afternoon. `nowMinute` is null for one frame after
+  // mount (the same tick the now-line waits for), so this fires when it lands.
   useEffect(() => {
+    if (nowMinute === null || scrolledRef.current) return;
     const container = scrollRef.current;
     if (!container) return;
+    scrolledRef.current = true;
+
+    if (days.some((day) => day.dateISO === todayISO)) {
+      container.scrollTop = Math.max(0, (nowMinute - 30) * MINUTE_PX);
+      return;
+    }
+
     const earliest = blocks.length
       ? Math.min(...blocks.map((block) => block.startMinute))
       : 8 * 60;
     container.scrollTop = Math.max(0, (Math.min(earliest, 8 * 60) - 30) * MINUTE_PX);
     // Only on mount: re-running this would yank the viewport away mid-edit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [nowMinute]);
 
   const commit = (next: NonNullable<typeof drag>) => {
     const span = clampSpan(next.startMinute, next.endMinute);
