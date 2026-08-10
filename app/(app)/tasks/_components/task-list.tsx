@@ -80,6 +80,9 @@ export function TaskList({
                   recurrenceDays: null,
                   cue: null,
                   missedYesterday: false,
+                  requiresFeedback: false,
+                  feedbackNote: null,
+                  feedbackPrompt: null,
                 }}
                 onToggle={(next) => toggle(task.id, next)}
                 showDueLabel={

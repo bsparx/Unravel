@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { CheckCircle2, Inbox } from "lucide-react";
+import { toast } from "sonner";
 
 import { EmptyState } from "@/components/empty-state";
 import {
+  completeWithNote,
   logAndComplete,
   toggleOccurrence,
   toggleTodo,
@@ -30,11 +32,15 @@ export function DayList({
 }) {
   const [logTarget, setLogTarget] = useState<TodayItem | null>(null);
 
-  // Ticking done with no time behind it is gated in TaskRow: the transition is
-  // never started, so the box stays idle. This is where we open the dialog —
-  // nothing is written until the dialog answers.
+  // Ticking done with a question hanging over it is gated in TaskRow: the
+  // transition is never started, so the box stays idle. The question is either
+  // "how long did that take" (nothing logged) or, for feedback habits, "write
+  // the note" (no note yet). This is where we open the dialog — nothing is
+  // written until the dialog answers.
   const toggle = async (item: TodayItem, next: boolean) => {
-    if (next && item.loggedSeconds === 0) {
+    const needsTime = item.loggedSeconds === 0 && !item.done;
+    const needsFeedback = item.requiresFeedback && !item.feedbackNote;
+    if (next && (needsTime || needsFeedback)) {
       setLogTarget(item);
       return;
     }
@@ -53,15 +59,27 @@ export function DayList({
     await toggleTodo(formData);
   };
 
-  const closeLogDialog = async (minutes: number | null) => {
+  const closeLogDialog = async (result: { minutes?: number; note?: string }) => {
     const target = logTarget;
     setLogTarget(null);
-    if (minutes === null || !target) return;
+    if (!target) return;
 
+    if (target.type === "HABIT") {
+      const formData = new FormData();
+      formData.set("taskId", target.id);
+      formData.set("date", todayISO);
+      if (result.minutes) formData.set("minutes", String(result.minutes));
+      if (result.note) formData.set("note", result.note);
+      const state = await completeWithNote(formData);
+      if (state.status === "error") toast.error(state.message);
+      return;
+    }
+
+    if (result.minutes === undefined) return;
     const formData = new FormData();
     formData.set("taskId", target.id);
     formData.set("date", todayISO);
-    formData.set("minutes", String(minutes));
+    formData.set("minutes", String(result.minutes));
     await logAndComplete(formData);
   };
 
@@ -135,6 +153,9 @@ export function DayList({
                   key={item.id}
                   item={item}
                   onToggle={(next) => toggle(item, next)}
+                  onEditNote={
+                    item.requiresFeedback ? () => setLogTarget(item) : undefined
+                  }
                   showDueLabel={
                     item.dueDate && section.key === "overdue"
                       ? formatRelativeDate(item.dueDate, view.date)
@@ -162,6 +183,9 @@ export function DayList({
                 key={item.id}
                 item={item}
                 onToggle={(next) => toggle(item, next)}
+                onEditNote={
+                  item.requiresFeedback ? () => setLogTarget(item) : undefined
+                }
               />
             ))}
           </ul>
@@ -172,8 +196,8 @@ export function DayList({
         <LogTimeDialog
           key={logTarget.id}
           item={logTarget}
-          onConfirm={(minutes) => void closeLogDialog(minutes)}
-          onCancel={() => closeLogDialog(null)}
+          onConfirm={(result) => void closeLogDialog(result)}
+          onCancel={() => setLogTarget(null)}
         />
       )}
     </div>

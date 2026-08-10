@@ -25,7 +25,11 @@ import {
  * an argument.
  */
 
-export type HabitQuotaRow = Quota & { taskId: string };
+export type HabitQuotaRow = Quota & {
+  taskId: string;
+  /** The day isn't DONE until a written note lands on the occurrence. */
+  requiresFeedback: boolean;
+};
 
 /** The quota for a habit, or null if it isn't one (or isn't yours). */
 export async function getHabitQuota(
@@ -36,6 +40,7 @@ export async function getHabitQuota(
     where: { id: taskId, userId, type: "HABIT" },
     select: {
       id: true,
+      requiresFeedback: true,
       recurrence: {
         select: { unit: true, minimumQuota: true, optimalQuota: true },
       },
@@ -46,6 +51,7 @@ export async function getHabitQuota(
 
   return {
     taskId: task.id,
+    requiresFeedback: task.requiresFeedback,
     unit: task.recurrence.unit,
     minimum: task.recurrence.minimumQuota,
     optimal: task.recurrence.optimalQuota,
@@ -188,8 +194,25 @@ async function writeProgress(
   progress: number,
 ): Promise<TaskOccurrence> {
   const tier = tierFor(progress, quota);
-  const status = statusForTier(tier);
-  const completedAt = status === "DONE" ? new Date() : null;
+  let status = statusForTier(tier);
+  let completedAt = status === "DONE" ? new Date() : null;
+
+  // A feedback habit's day is only *accepted* once a written note exists on
+  // the occurrence. The progress and tier still record what happened — the
+  // timer's minutes, the +1 taps — but the streak and the DONE state wait.
+  // This is the one gate for every path: the timer's creditLoggedTime, the
+  // +1 buttons, and the checkbox all converge here, so none of them can mark
+  // the day done behind the note's back.
+  if (quota.requiresFeedback) {
+    const existing = await prisma.taskOccurrence.findUnique({
+      where: { taskId_date: { taskId: quota.taskId, date } },
+      select: { note: true },
+    });
+    if (!existing?.note?.trim()) {
+      status = "PENDING";
+      completedAt = null;
+    }
+  }
 
   return prisma.taskOccurrence.upsert({
     where: { taskId_date: { taskId: quota.taskId, date } },

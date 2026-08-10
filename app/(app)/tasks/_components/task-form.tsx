@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { DurationPicker } from "@/components/duration-picker";
 import { ColorSwatches } from "@/components/color-swatches";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -58,6 +59,8 @@ export type TaskFormValues = {
   cueTaskId?: string | null;
   cueLabel?: string | null;
   cueMinutes?: number;
+  requiresFeedback?: boolean;
+  feedbackPrompt?: string | null;
 };
 
 const PRIORITIES: { value: "P1" | "P2" | "P3" | "P4"; label: string }[] = [
@@ -135,6 +138,9 @@ export function TaskForm({
   // only exists so the stacking preview can read "…, I will read for a bit."
   // back as you type it.
   const [title, setTitle] = useState(values.title ?? "");
+  const [requiresFeedback, setRequiresFeedback] = useState(
+    values.requiresFeedback ?? false,
+  );
 
   // The deadline input stays uncontrolled — the presets just write into it.
   // Controlling it would mean re-rendering the whole form on every keystroke in
@@ -187,6 +193,11 @@ export function TaskForm({
         ))}
       <input type="hidden" name="defaultMode" value={mode} />
       <input type="hidden" name="color" value={color} />
+      <input
+        type="hidden"
+        name="requiresFeedback"
+        value={String(requiresFeedback)}
+      />
 
       <Field
         label={titleLabel ?? (kind === "HABIT" ? "Habit" : "Task")}
@@ -314,6 +325,54 @@ export function TaskForm({
               </button>
             ))}
           </div>
+        </Field>
+      ) : null}
+
+      {kind === "HABIT" ? (
+        <Field
+          label="Daily feedback"
+          hint="Some habits aren't done until you can say what they did for you. Turn this on and the day stays open until you write the note."
+        >
+          <label className="border-border flex cursor-pointer items-start gap-3 rounded-lg border p-3">
+            <Checkbox
+              checked={requiresFeedback}
+              onCheckedChange={(checked) =>
+                setRequiresFeedback(checked === true)
+              }
+              className="mt-0.5"
+              aria-label="Enable required user feedback"
+            />
+            <span className="min-w-0 space-y-0.5">
+              <span className="block text-label font-medium">
+                Enable required user feedback
+              </span>
+              <span className="text-muted-foreground block text-label">
+                Off by default. Only the habits where the writing matters —
+                gratitude, a course, a conversation.
+              </span>
+            </span>
+          </label>
+
+          {requiresFeedback && (
+            <div className="border-border bg-card rounded-lg border p-3">
+              <Label htmlFor="feedbackPrompt" className="text-label font-medium">
+                What should they be asked?
+              </Label>
+              <Input
+                id="feedbackPrompt"
+                name="feedbackPrompt"
+                maxLength={200}
+                defaultValue={values.feedbackPrompt ?? ""}
+                placeholder="What did you learn?"
+                className="mt-1.5 h-9"
+              />
+              <p className="text-muted-foreground mt-1.5 text-label">
+                Shown as the reminder when the habit is ticked off — e.g.{" "}
+                &ldquo;What are you grateful for?&rdquo; or &ldquo;What did you
+                learn?&rdquo;. Blank uses a default.
+              </p>
+            </div>
+          )}
         </Field>
       ) : null}
 

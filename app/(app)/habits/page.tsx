@@ -14,6 +14,7 @@ import { getHabits } from "@/lib/tasks";
 import {
   describeRecurrence,
   expectedDatesBetween,
+  isDueOn,
   wasMissedOn,
 } from "@/lib/recurrence";
 import { buildTimerHref } from "@/lib/timer-url";
@@ -21,6 +22,7 @@ import { buildTimerHref } from "@/lib/timer-url";
 import { archiveHabit, deleteHabit } from "./actions";
 import { HabitCard } from "./_components/habit-card";
 import { HabitCueLine, HabitStackTrail } from "./_components/habit-cue-line";
+import { HabitFeedbackButton } from "./_components/habit-feedback-button";
 import { HabitGrid } from "./_components/habit-grid";
 
 export const metadata = { title: "Habits" };
@@ -156,12 +158,26 @@ export default async function HabitsPage() {
                   </>
                 }
                 quota={
-                  <QuotaMeter
-                    taskId={habit.id}
-                    dateISO={toISODate(today)}
-                    quota={habit.quota}
-                    progress={habit.todayProgress}
-                  />
+                  <div className="space-y-1.5">
+                    <QuotaMeter
+                      taskId={habit.id}
+                      dateISO={toISODate(today)}
+                      quota={habit.quota}
+                      progress={habit.todayProgress}
+                    />
+                    {habit.requiresFeedback &&
+                      isDueOn(habit.rule, today) &&
+                      !habit.history.get(toISODate(today)) &&
+                      habit.todayProgress >= habit.quota.minimum &&
+                      !habit.todayNote && (
+                        <HabitFeedbackButton
+                          taskId={habit.id}
+                          title={habit.title}
+                          dateISO={toISODate(today)}
+                          prompt={habit.feedbackPrompt}
+                        />
+                      )}
+                  </div>
                 }
                 meta={
                   <>

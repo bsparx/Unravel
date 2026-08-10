@@ -136,6 +136,16 @@ export const createHabitSchema = createTodoSchema
     minimumQuota: quotaValue.default(1),
     optimalQuota: emptyToUndefined(quotaValue),
 
+    // When on, the day isn't DONE until a written note lands on the
+    // occurrence. Not `z.coerce.boolean()` — `Boolean("false")` is true — see
+    // `includeCue` below for the same trap.
+    requiresFeedback: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((value) => value === "true"),
+    /** The question asked when closing the day. Empty -> the default prompt. */
+    feedbackPrompt: emptyToUndefined(z.string().trim().max(200)),
+
     /**
      * Habit stacking. `cueMode` discriminates rather than "whichever field came
      * back non-empty": the form can leave a stale label behind when you switch
@@ -243,6 +253,20 @@ export const logAndCompleteSchema = z.object({
     .int("Whole minutes, please.")
     .min(1, "Log at least a minute.")
     .max(MAX_MANUAL_LOG_MINUTES, "That's more than 10 hours."),
+});
+
+/**
+ * Closing a habit from the day list: the written note (required for feedback
+ * habits), plus the time to book when the clock never ran. Both optional on
+ * the wire — the action decides what a habit actually needs.
+ */
+export const completeWithNoteSchema = z.object({
+  taskId: cuid,
+  date: isoDate,
+  minutes: emptyToUndefined(
+    z.coerce.number().int().min(1).max(MAX_MANUAL_LOG_MINUTES),
+  ),
+  note: emptyToUndefined(z.string().trim().min(1).max(2000)),
 });
 
 export const toggleOccurrenceSchema = z.object({

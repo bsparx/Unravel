@@ -64,6 +64,18 @@ export type TodayItem = TaskSummary & {
    * marker exists to stop two missed days in a row, not to tally them.
    */
   missedYesterday: boolean;
+  /** Habits only: the day isn't DONE until a written note exists. */
+  requiresFeedback: boolean;
+  /**
+   * Habits only: today's written note, or null. Null when feedback is missing —
+   * that's what gates the tick.
+   */
+  feedbackNote: string | null;
+  /**
+   * Habits only: the question the dialog asks when closing the day, or null to
+   * fall back to the default prompt in `lib/feedback.ts`.
+   */
+  feedbackPrompt: string | null;
 };
 
 /**
@@ -169,7 +181,13 @@ export async function getTodayView(user: User): Promise<TodayView> {
   const [habitTasks, todoTasks, occurrences] = await Promise.all([
     prisma.task.findMany({
       where: { userId: user.id, type: "HABIT", archivedAt: null },
-      select: { ...taskSelect, recurrence: true, cue: cueSelect },
+      select: {
+        ...taskSelect,
+        recurrence: true,
+        requiresFeedback: true,
+        feedbackPrompt: true,
+        cue: cueSelect,
+      },
     }),
     prisma.task.findMany({
       where: {
@@ -236,6 +254,9 @@ export async function getTodayView(user: User): Promise<TodayView> {
         daysUntilDue: null,
         recurrenceDays: task.recurrence?.daysOfWeek ?? null,
         cue: toCue(task.cue),
+        requiresFeedback: task.requiresFeedback,
+        feedbackNote: occurrence?.note ?? null,
+        feedbackPrompt: task.feedbackPrompt,
         missedYesterday: wasMissedOn(
           toRule(task.recurrence!),
           completionsForYesterday(task.id),
@@ -259,6 +280,9 @@ export async function getTodayView(user: User): Promise<TodayView> {
         : null,
       recurrenceDays: null,
       cue: null,
+      requiresFeedback: false,
+      feedbackNote: null,
+      feedbackPrompt: null,
       missedYesterday: false,
     };
   });
@@ -315,6 +339,12 @@ export type HabitWithHistory = TaskSummary & {
   quota: Quota;
   /** Progress on `today`, in the habit's own unit. */
   todayProgress: number;
+  /** Today's written note, for the "write today's note" affordance. */
+  todayNote: string | null;
+  /** The day isn't DONE until a note exists. */
+  requiresFeedback: boolean;
+  /** The question asked when closing the day, or null for the default. */
+  feedbackPrompt: string | null;
   archivedAt: Date | null;
   /** The thing this habit is stacked on, if any. */
   cue: CueSummary | null;
@@ -334,6 +364,8 @@ export async function getHabits(
         ...taskSelect,
         archivedAt: true,
         recurrence: true,
+        requiresFeedback: true,
+        feedbackPrompt: true,
         cue: cueSelect,
       },
       orderBy: [{ archivedAt: "asc" }, { sortOrder: "asc" }],
@@ -346,6 +378,7 @@ export async function getHabits(
         status: true,
         tier: true,
         progress: true,
+        note: true,
       },
     }),
   ]);
@@ -353,6 +386,7 @@ export async function getHabits(
   const historyByTask = new Map<string, Map<string, "DONE" | "SKIPPED">>();
   const tiersByTask = new Map<string, Map<string, QuotaTier>>();
   const todayProgress = new Map<string, number>();
+  const todayNote = new Map<string, string | null>();
   const todayISO = toISODate(today);
 
   for (const occurrence of occurrences) {
@@ -370,6 +404,7 @@ export async function getHabits(
 
     if (iso === todayISO) {
       todayProgress.set(occurrence.taskId, occurrence.progress);
+      todayNote.set(occurrence.taskId, occurrence.note);
     }
   }
 
@@ -388,6 +423,9 @@ export async function getHabits(
         optimal: habit.recurrence!.optimalQuota,
       },
       todayProgress: todayProgress.get(habit.id) ?? 0,
+      todayNote: todayNote.get(habit.id) ?? null,
+      requiresFeedback: habit.requiresFeedback,
+      feedbackPrompt: habit.feedbackPrompt,
       cue: toCue(habit.cue),
     }));
 }

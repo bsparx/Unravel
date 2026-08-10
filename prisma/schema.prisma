@@ -332,6 +332,13 @@ model Task {
   completedAt DateTime?
   archivedAt  DateTime?
 
+  /// Habits only: the day isn't DONE until a written note lands on the
+  /// occurrence. Off by default — most habits just need doing.
+  requiresFeedback Boolean @default(false)
+  /// Habits only: the question asked when closing the day, e.g. "What did you
+  /// learn?" or "What are you grateful for?". Empty falls back to a default.
+  feedbackPrompt String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

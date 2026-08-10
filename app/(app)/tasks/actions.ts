@@ -15,6 +15,7 @@ import { parseQuickAdd } from "@/lib/quick-parse";
 import { stepCreateRows, syncSteps } from "@/lib/step-sync";
 import {
   type ActionState,
+  completeWithNoteSchema,
   createTodoSchema,
   fieldErrorsFrom,
   formValues,
@@ -276,6 +277,83 @@ export async function logAndComplete(formData: FormData): Promise<void> {
   // The timer's "today's total" is assembled from the committed occurrence
   // figure, so a manual log lands there too.
   revalidatePath("/timer");
+}
+
+/**
+ * Close a habit (or todo) from the day list's tick dialog: write today's
+ * note, book the time when the clock never ran, then mark it done.
+ *
+ * The note is written *before* the habit is ticked so `writeProgress`'s
+ * feedback gate sees it and lets the day through. `minutes` and `note` are
+ * both optional on the wire — the action checks what the habit actually
+ * needs rather than trusting the client to have sent the right ones.
+ */
+export async function completeWithNote(formData: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  const parsed = completeWithNoteSchema.safeParse(formValues(formData));
+
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: "Some of that didn't look right.",
+      fieldErrors: fieldErrorsFrom(parsed.error),
+    };
+  }
+
+  const { taskId, minutes, note } = parsed.data;
+  const date = parseLocalDate(parsed.data.date);
+  if (!date) return { status: "error", message: "That date didn't look right." };
+
+  const task = await prisma.task.findFirst({
+    where: { id: taskId, userId: user.id },
+    select: { id: true, type: true },
+  });
+  if (!task) return { status: "error", message: "That task no longer exists." };
+
+  const occurrence = await ensureOccurrence(user.id, task.id, date);
+
+  if (minutes) await addLoggedSeconds(occurrence.id, minutes * 60);
+  if (note) {
+    await prisma.taskOccurrence.update({
+      where: { id: occurrence.id },
+      data: { note },
+    });
+  }
+
+  if (task.type === "HABIT") {
+    const quota = await getHabitQuota(user.id, task.id);
+    if (!quota) return { status: "error", message: "That habit no longer exists." };
+
+    if (quota.requiresFeedback && !note?.trim()) {
+      return {
+        status: "error",
+        message: "Write the note before ticking it off.",
+      };
+    }
+
+    // A MINUTES habit fills its quota from the clock; the note is already on
+    // the row, so `writeProgress`'s gate lets the day through.
+    if (minutes && quota.unit === "MINUTES") {
+      const updated = await prisma.taskOccurrence.findUnique({
+        where: { id: occurrence.id },
+        select: { loggedSeconds: true },
+      });
+      if (updated) {
+        await creditLoggedTime(user.id, task.id, date, updated.loggedSeconds);
+      }
+    }
+    await toggleHabitDone(user.id, quota, date, true);
+  } else {
+    await prisma.task.updateMany({
+      where: { id: task.id, userId: user.id, type: "TODO" },
+      data: { completedAt: new Date() },
+    });
+    await setOccurrenceStatus(user.id, task.id, date, "DONE");
+  }
+
+  revalidateTaskViews();
+  revalidatePath("/timer");
+  return { status: "success" };
 }
 
 export async function toggleTodo(formData: FormData): Promise<void> {

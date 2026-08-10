@@ -101,6 +101,8 @@ export default async function EditHabitPage({
           cueTaskId: habit.cue?.anchorTaskId ?? null,
           cueLabel: habit.cue?.anchorLabel ?? null,
           cueMinutes: habit.cue?.anchorMinutes,
+          requiresFeedback: habit.requiresFeedback,
+          feedbackPrompt: habit.feedbackPrompt,
         }}
       />
 

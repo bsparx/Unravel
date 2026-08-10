@@ -8,6 +8,7 @@ import {
   Link2,
   Pencil,
   Play,
+  Quote,
   Repeat,
   Timer,
 } from "lucide-react";
@@ -33,10 +34,13 @@ import { cn } from "@/lib/utils";
 export function TaskRow({
   item,
   onToggle,
+  onEditNote,
   showDueLabel,
 }: {
   item: TodayItem;
   onToggle: (next: boolean) => Promise<void>;
+  /** Habits with feedback: re-open the dialog to rewrite today's note. */
+  onEditNote?: () => void;
   showDueLabel?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -53,6 +57,11 @@ export function TaskRow({
   const upNext = nextStep(steps);
   const editHref = item.type === "HABIT" ? `/habits/${item.id}` : `/tasks/${item.id}`;
 
+  // Ticking done opens a dialog when the box can't answer alone: no time was
+  // logged, or the habit's day isn't accepted until a note is written.
+  const needsTime = item.loggedSeconds === 0 && !item.done;
+  const needsFeedback = item.requiresFeedback && !item.feedbackNote;
+
   return (
     <li className="group border-border/60 border-b last:border-b-0">
       <div className="flex items-center gap-3 py-2.5">
@@ -61,7 +70,7 @@ export function TaskRow({
           label={item.title}
           priority={item.priority}
           onToggle={onToggle}
-          gatedTick={item.loggedSeconds === 0 && !item.done}
+          gatedTick={!item.done && (needsTime || needsFeedback)}
         />
 
         <Link
@@ -192,6 +201,21 @@ export function TaskRow({
           </Link>
         </div>
       </div>
+
+      {item.feedbackNote && onEditNote && (
+        // Today's written note, shown once it exists and editable by clicking.
+        // Sits outside the timer link — a button inside an anchor is invalid
+        // HTML — and reading it is its own quiet win at the end of a day.
+        <button
+          type="button"
+          onClick={onEditNote}
+          aria-label={`Edit today's note for ${item.title}`}
+          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring -mt-1 mb-2 ml-8 flex min-w-0 items-start gap-1.5 rounded-md pr-2 text-label transition-colors focus-visible:ring-2 focus-visible:outline-none"
+        >
+          <Quote className="mt-0.5 size-3 shrink-0" aria-hidden />
+          <span className="min-w-0 truncate">{item.feedbackNote}</span>
+        </button>
+      )}
 
       {progress.total > 0 && (
         <>

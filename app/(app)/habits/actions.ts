@@ -157,6 +157,8 @@ export async function createHabit(
       plannedIntervals: input.plannedIntervals ?? null,
       sortOrder: Date.now(),
       color: input.color,
+      requiresFeedback: input.requiresFeedback,
+      feedbackPrompt: input.feedbackPrompt ?? null,
       steps: { create: stepCreateRows(user.id, input.steps) },
       recurrence: {
         create: {
@@ -232,6 +234,8 @@ export async function updateHabit(
       defaultMode: input.defaultMode,
       plannedIntervals: input.plannedIntervals ?? null,
       color: input.color,
+      requiresFeedback: input.requiresFeedback,
+      feedbackPrompt: input.feedbackPrompt ?? null,
       recurrence: {
         upsert: {
           create: {
