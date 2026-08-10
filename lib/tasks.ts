@@ -180,7 +180,7 @@ export async function getTodayView(user: User): Promise<TodayView> {
           { completedAt: null },
           // Keep today's finished todos visible — crossing things off is the
           // point, and an empty list reads as "you did nothing".
-          { completedAt: { gte: addDays(today, -1) } },
+          { completedAt: { gte: today } },
         ],
       },
       select: taskSelect,
@@ -192,8 +192,13 @@ export async function getTodayView(user: User): Promise<TodayView> {
     }),
   ]);
 
+  // A habit is only *done* by today's occurrence — yesterday's DONE row
+  // belongs to yesterday and must not tick today's box.
+  const todayISO = toISODate(today);
   const occurrenceByTask = new Map<string, TaskOccurrence>(
-    occurrences.map((occurrence) => [occurrence.taskId, occurrence]),
+    occurrences
+      .filter((occurrence) => toISODate(occurrence.date) === todayISO)
+      .map((occurrence) => [occurrence.taskId, occurrence]),
   );
 
   const yesterdayISO = toISODate(yesterday);
@@ -287,10 +292,9 @@ export async function getTodayView(user: User): Promise<TodayView> {
     (sum, item) => sum + (item.estimatedSeconds ?? 0),
     0,
   );
-  view.loggedSeconds = occurrences.reduce(
-    (sum, occurrence) => sum + occurrence.loggedSeconds,
-    0,
-  );
+  view.loggedSeconds = occurrences
+    .filter((occurrence) => toISODate(occurrence.date) === todayISO)
+    .reduce((sum, occurrence) => sum + occurrence.loggedSeconds, 0);
 
   return view;
 }
