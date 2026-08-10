@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Archive, BarChart3, Flame, Pencil, Plus, Repeat, Timer } from "lucide-react";
+import { Archive, BarChart3, Pencil, Plus, Repeat, Timer } from "lucide-react";
 
 import { ConfirmDelete } from "@/components/confirm-delete";
 import { EmptyState } from "@/components/empty-state";
+import { MissedYesterdayBadge } from "@/components/missed-yesterday-badge";
 import { QuotaMeter } from "@/components/quota-meter";
 import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth";
@@ -11,9 +12,9 @@ import { chainOf, cueEdges } from "@/lib/habit-cue";
 import { describeQuota } from "@/lib/quota";
 import { getHabits } from "@/lib/tasks";
 import {
-  computeStreak,
   describeRecurrence,
   expectedDatesBetween,
+  wasMissedOn,
 } from "@/lib/recurrence";
 import { buildTimerHref } from "@/lib/timer-url";
 
@@ -96,7 +97,11 @@ export default async function HabitsPage() {
       ) : (
         <ul className="space-y-2">
           {active.map((habit) => {
-            const streak = computeStreak(habit.rule, habit.history, today);
+            const missedYesterday = wasMissedOn(
+              habit.rule,
+              habit.history,
+              addDays(today, -1),
+            );
             const expected = expectedDatesBetween(
               habit.rule,
               addDays(today, -55),
@@ -170,12 +175,7 @@ export default async function HabitsPage() {
                           {formatMinutes(habit.estimatedSeconds)}
                         </span>
                       ) : null}
-                      {streak.current > 0 && (
-                        <span className="text-running inline-flex items-center gap-1 tabular-nums">
-                          <Flame className="size-3" aria-hidden />
-                          {streak.current} in a row
-                        </span>
-                      )}
+                      {missedYesterday && <MissedYesterdayBadge />}
                     </p>
                   </>
                 }

@@ -277,7 +277,7 @@ export function TaskForm({
       {kind === "HABIT" ? (
         <Field
           label="How much counts as doing it?"
-          hint="Two bars, and only the first one matters to the streak."
+          hint="Two bars, and only the first one settles the day."
         >
           <QuotaFields
             defaultUnit={values.unit}

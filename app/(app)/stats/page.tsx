@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, Flame } from "lucide-react";
+import { BarChart3 } from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
@@ -192,15 +192,7 @@ export default async function StatsPage({
                 {stats.habitAdherence.map((habit) => (
                   <li key={habit.id} className="space-y-1">
                     <div className="flex items-baseline justify-between gap-4 text-label">
-                      <span className="truncate">
-                        {habit.title}
-                        {habit.streak.current > 1 && (
-                          <span className="text-running ml-2 inline-flex items-center gap-1 text-micro tabular-nums">
-                            <Flame className="size-3" aria-hidden />
-                            {habit.streak.current}
-                          </span>
-                        )}
-                      </span>
+                      <span className="truncate">{habit.title}</span>
                       <span className="text-muted-foreground shrink-0 tabular-nums">
                         {habit.done}/{habit.expected} · {habit.adherence}%
                       </span>

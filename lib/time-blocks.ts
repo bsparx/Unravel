@@ -13,7 +13,7 @@ import { addDays, toISODate } from "@/lib/dates";
 import type { BlockKind, User } from "@/lib/generated/prisma/client";
 import { claimedMinutes, type Span } from "@/lib/block-math";
 import { anchorTitleOf } from "@/lib/habit-cue";
-import { isDueOn } from "@/lib/recurrence";
+import { isDueOn, wasMissedOn } from "@/lib/recurrence";
 
 export type CalendarBlock = {
   id: string;
@@ -205,6 +205,12 @@ export type SchedulableItem = {
    * scheduling one thing and getting two is only a good surprise once.
    */
   cueTitle: string | null;
+  /**
+   * Habits only: the habit was due the day before the one being planned and has
+   * no DONE behind it. A deliberate skip or a day it isn't scheduled for is not
+   * a miss. Exists to stop two missed days in a row, not to tally them.
+   */
+  missedPriorDay: boolean;
 };
 
 /**
@@ -235,7 +241,7 @@ export async function getSchedulableItems(
 
   const notBlocked = excluded.length > 0 ? { id: { notIn: excluded } } : {};
 
-  const [todos, habits, occurrences] = await Promise.all([
+  const [todos, habits, occurrences, priorOccurrences] = await Promise.all([
     prisma.task.findMany({
       where: {
         userId: user.id,
@@ -301,9 +307,34 @@ export async function getSchedulableItems(
       },
       select: { taskId: true },
     }),
+    // Yesterday's touch, for the "missed yesterday" marker: what the habit was
+    // the day before the one being planned, so a habit due today can warn when
+    // it was silently dropped the day before.
+    prisma.taskOccurrence.findMany({
+      where: {
+        userId: user.id,
+        date: addDays(date, -1),
+        status: { in: ["DONE", "SKIPPED"] },
+      },
+      select: { taskId: true, status: true },
+    }),
   ]);
 
   const settled = new Set(occurrences.map((occurrence) => occurrence.taskId));
+
+  const priorStatus = new Map<string, "DONE" | "SKIPPED">(
+    priorOccurrences.map((occurrence) => [
+      occurrence.taskId,
+      occurrence.status as "DONE" | "SKIPPED",
+    ]),
+  );
+  const priorISO = toISODate(addDays(date, -1));
+  const completionsForPriorDay = (
+    taskId: string,
+  ): Map<string, "DONE" | "SKIPPED"> => {
+    const status = priorStatus.get(taskId);
+    return status ? new Map([[priorISO, status]]) : new Map();
+  };
 
   const dueHabits: SchedulableItem[] = habits
     .filter(
@@ -325,6 +356,11 @@ export async function getSchedulableItems(
       cueTitle: habit.cue
         ? anchorTitleOf(habit.cue, habit.cue.anchorTask?.title)
         : null,
+      missedPriorDay: wasMissedOn(
+        habit.recurrence!,
+        completionsForPriorDay(habit.id),
+        addDays(date, -1),
+      ),
     }));
 
   const openTodos: SchedulableItem[] = todos.map((task) => ({
@@ -338,6 +374,7 @@ export async function getSchedulableItems(
     project: task.project,
     firstStep: task.steps[0]?.title ?? null,
     cueTitle: null,
+    missedPriorDay: false,
   }));
 
   return [...dueHabits, ...openTodos].slice(0, limit);

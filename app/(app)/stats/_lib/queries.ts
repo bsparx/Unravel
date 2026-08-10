@@ -5,7 +5,7 @@ import { summariseBreaks } from "@/lib/break-stats";
 import { prisma } from "@/lib/db";
 import { addDays, startOfWeek, toISODate, todayLocal } from "@/lib/dates";
 import type { TimerMode, User } from "@/lib/generated/prisma/client";
-import { computeStreak, expectedDatesBetween } from "@/lib/recurrence";
+import { expectedDatesBetween } from "@/lib/recurrence";
 
 /**
  * Every number on /stats.
@@ -305,7 +305,6 @@ export async function getStats(user: User, range: StatsRange) {
         done,
         adherence:
           expected.length > 0 ? Math.round((done / expected.length) * 100) : 0,
-        streak: computeStreak(rule, history, today),
       };
     })
     .sort((a, b) => b.adherence - a.adherence);

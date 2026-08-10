@@ -18,7 +18,11 @@ import type {
 } from "@/lib/generated/prisma/client";
 import { anchorTitleOf } from "@/lib/habit-cue";
 import type { HabitUnit, Quota, QuotaTier } from "@/lib/quota";
-import { isDueOn, type RecurrenceRule } from "@/lib/recurrence";
+import {
+  isDueOn,
+  wasMissedOn,
+  type RecurrenceRule,
+} from "@/lib/recurrence";
 import type { StepLike } from "@/lib/steps";
 import { MAX_MANUAL_LOG_MINUTES } from "@/lib/timer-math";
 
@@ -54,6 +58,12 @@ export type TodayItem = TaskSummary & {
   recurrenceDays: number[] | null;
   /** Habits only: the thing this one is stacked on. */
   cue: CueSummary | null;
+  /**
+   * Habits only: the habit was due yesterday and has no DONE behind it. A
+   * deliberate skip or a day the habit isn't scheduled for is not a miss — the
+   * marker exists to stop two missed days in a row, not to tally them.
+   */
+  missedYesterday: boolean;
 };
 
 /**
@@ -154,6 +164,7 @@ export type TodayView = {
 
 export async function getTodayView(user: User): Promise<TodayView> {
   const today = todayLocal(user.timezone);
+  const yesterday = addDays(today, -1);
 
   const [habitTasks, todoTasks, occurrences] = await Promise.all([
     prisma.task.findMany({
@@ -174,14 +185,31 @@ export async function getTodayView(user: User): Promise<TodayView> {
       },
       select: taskSelect,
     }),
+    // Yesterday rides along with today so the "missed yesterday" marker never
+    // needs a second query — a habit's history for one extra day is a few rows.
     prisma.taskOccurrence.findMany({
-      where: { userId: user.id, date: today },
+      where: { userId: user.id, date: { in: [yesterday, today] } },
     }),
   ]);
 
   const occurrenceByTask = new Map<string, TaskOccurrence>(
     occurrences.map((occurrence) => [occurrence.taskId, occurrence]),
   );
+
+  const yesterdayISO = toISODate(yesterday);
+  const yesterdayStatus = new Map<string, "DONE" | "SKIPPED">();
+  for (const occurrence of occurrences) {
+    if (toISODate(occurrence.date) !== yesterdayISO) continue;
+    if (occurrence.status === "DONE" || occurrence.status === "SKIPPED") {
+      yesterdayStatus.set(occurrence.taskId, occurrence.status);
+    }
+  }
+  const completionsForYesterday = (
+    taskId: string,
+  ): Map<string, "DONE" | "SKIPPED"> => {
+    const status = yesterdayStatus.get(taskId);
+    return status ? new Map([[yesterdayISO, status]]) : new Map();
+  };
 
   const habits: TodayItem[] = habitTasks
     .filter((task) => {
@@ -203,6 +231,11 @@ export async function getTodayView(user: User): Promise<TodayView> {
         daysUntilDue: null,
         recurrenceDays: task.recurrence?.daysOfWeek ?? null,
         cue: toCue(task.cue),
+        missedYesterday: wasMissedOn(
+          toRule(task.recurrence!),
+          completionsForYesterday(task.id),
+          yesterday,
+        ),
       };
     });
 
@@ -221,6 +254,7 @@ export async function getTodayView(user: User): Promise<TodayView> {
         : null,
       recurrenceDays: null,
       cue: null,
+      missedYesterday: false,
     };
   });
 

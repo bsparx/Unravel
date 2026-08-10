@@ -25,6 +25,7 @@ import {
   describeRecurrence,
   expectedDatesBetween,
   isDueOn,
+  wasMissedOn,
 } from "@/lib/recurrence";
 import { tickIsStale } from "@/lib/habit-steps";
 import {
@@ -393,6 +394,80 @@ check("an explicit skip holds the streak without extending it", () => {
     ["2026-07-29", "DONE"],
   ]);
   assert.equal(computeStreak(monWedFri, history, today).current, 4);
+});
+
+check("a due day with no DONE was missed — and only that day matters", () => {
+  const yesterday = parseLocalDate("2026-07-30")!; // Thursday, due for a daily habit
+  const dailyRule = {
+    daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+    startDate: parseLocalDate("2026-07-01")!,
+    endDate: null,
+  };
+  assert.equal(
+    wasMissedOn(dailyRule, new Map<string, "DONE" | "SKIPPED">(), yesterday),
+    true,
+  );
+  // A hundred-day gap reads the same as a one-day gap: only yesterday is asked.
+  assert.equal(
+    wasMissedOn(
+      dailyRule,
+      new Map<string, "DONE" | "SKIPPED">([["2026-07-01", "DONE"]]),
+      yesterday,
+    ),
+    true,
+  );
+});
+
+check("wasMissedOn is false for DONE, SKIPPED, and non-due days", () => {
+  // Friday the 31st is today in the streak tests above, so the 29th is a
+  // Wednesday (due for a Mon/Wed/Fri rule) and the 30th a Thursday (not due).
+  const monWedFri = {
+    daysOfWeek: [1, 3, 5],
+    startDate: parseLocalDate("2026-07-01")!,
+    endDate: null,
+  };
+
+  // Done on a day that was actually due.
+  assert.equal(
+    wasMissedOn(
+      monWedFri,
+      new Map<string, "DONE" | "SKIPPED">([["2026-07-29", "DONE"]]),
+      parseLocalDate("2026-07-29")!,
+    ),
+    false,
+  );
+  // Skipped on purpose — not a miss.
+  assert.equal(
+    wasMissedOn(
+      monWedFri,
+      new Map<string, "DONE" | "SKIPPED">([["2026-07-29", "SKIPPED"]]),
+      parseLocalDate("2026-07-29")!,
+    ),
+    false,
+  );
+  // Not due on the day in question (Thursday the 30th).
+  assert.equal(
+    wasMissedOn(
+      monWedFri,
+      new Map<string, "DONE" | "SKIPPED">(),
+      parseLocalDate("2026-07-30")!,
+    ),
+    false,
+  );
+  // A habit that started today can't have been missed yesterday.
+  const startedToday = {
+    daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+    startDate: parseLocalDate("2026-07-30")!,
+    endDate: null,
+  };
+  assert.equal(
+    wasMissedOn(
+      startedToday,
+      new Map<string, "DONE" | "SKIPPED">(),
+      parseLocalDate("2026-07-29")!,
+    ),
+    false,
+  );
 });
 
 check("describeRecurrence uses the names people say", () => {

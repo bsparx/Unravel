@@ -115,9 +115,9 @@ export function QuotaFields({
             </span>
           </div>
           <p className="text-muted-foreground text-label">
-            This is all the streak asks for. Make it small enough that you could
-            do it on your worst day — one page, two minutes — because that is
-            the day it has to survive.
+            This is all the day asks for. Make it small enough that you could do
+            it on your worst day — one page, two minutes — because that is the
+            day it has to survive.
           </p>
           {minimumError && (
             <p role="alert" className="text-destructive text-label">
@@ -156,7 +156,7 @@ export function QuotaFields({
           </div>
           <p className="text-muted-foreground text-label">
             What you&apos;d do when it&apos;s going well. Tracked and celebrated,
-            but never what keeps the streak alive.
+            but never the thing the day is judged on.
           </p>
           {(optimalError || collapsed) && (
             <p role="alert" className="text-destructive text-label">

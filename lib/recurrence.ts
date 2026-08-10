@@ -127,6 +127,24 @@ export function computeStreak(
   return { current, longest: Math.max(longest, current) };
 }
 
+/**
+ * Was this habit missed on `date`?
+ *
+ * The answer is about the immediate past, not a tally: a day the habit wasn't
+ * due is not a miss, and a deliberate SKIP is not a miss either — only a due
+ * day that simply has no DONE behind it counts.
+ */
+export function wasMissedOn(
+  rule: RecurrenceRule,
+  completions: Map<string, "DONE" | "SKIPPED">,
+  date: Date,
+): boolean {
+  if (!isDueOn(rule, date)) return false;
+  // The map only ever holds DONE or SKIPPED rows — a due day with no entry at
+  // all is the miss.
+  return completions.get(date.toISOString().slice(0, 10)) === undefined;
+}
+
 /** How the habit's schedule reads in the UI. */
 export function describeRecurrence(daysOfWeek: number[]): string {
   const days = [...new Set(daysOfWeek)].sort((a, b) => a - b);

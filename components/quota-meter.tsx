@@ -21,8 +21,8 @@ import { cn } from "@/lib/utils";
  * The bar is drawn against the **optimal**, with the minimum as a notch partway
  * along, so the two are visible at once and the relationship between them is
  * obvious without reading anything. Filling to the notch changes colour — that
- * moment is "the streak is safe", and it is the single most important piece of
- * feedback this component gives.
+ * moment is "today's minimum is met", and it is the single most important piece
+ * of feedback this component gives.
  *
  * MINUTES habits are read-only here: their progress comes from the timer, and
  * a +1 button next to a number the clock owns would let the two disagree.
@@ -126,7 +126,7 @@ export function QuotaMeter({
               <span className="text-foreground tabular-nums">
                 {formatQuota(toMinimum, quota.unit)}
               </span>{" "}
-              to keep the streak
+              to today&apos;s minimum
             </>
           ) : (
             <span
@@ -139,8 +139,8 @@ export function QuotaMeter({
               {tier === "OPTIMAL"
                 ? "A good day."
                 : toOptimal !== null && toOptimal > 0
-                  ? `Streak safe — ${formatQuota(toOptimal, quota.unit)} to a good day`
-                  : "Streak safe."}
+                  ? `Minimum met — ${formatQuota(toOptimal, quota.unit)} to a good day`
+                  : "Minimum met."}
             </span>
           )}
         </p>

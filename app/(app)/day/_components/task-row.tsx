@@ -14,6 +14,7 @@ import {
 
 import { StepList } from "@/components/step-list";
 import { TaskCheckbox } from "@/components/task-checkbox";
+import { MissedYesterdayBadge } from "@/components/missed-yesterday-badge";
 import { formatDuration, formatMinutes } from "@/lib/dates";
 import { nextStep, stepProgress } from "@/lib/steps";
 import type { TodayItem } from "@/lib/tasks";
@@ -93,6 +94,10 @@ export function TaskRow({
           )}
 
           <span className="text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-label">
+            {item.type === "HABIT" && item.missedYesterday && !item.done && (
+              <MissedYesterdayBadge />
+            )}
+
             {item.type === "HABIT" && (
               <span className="inline-flex items-center gap-1">
                 <Repeat className="size-3" aria-hidden />

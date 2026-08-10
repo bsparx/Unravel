@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { MissedYesterdayBadge } from "@/components/missed-yesterday-badge";
 import { calendarDotStyle, isCalendarColor } from "@/lib/calendar-colors";
 import { formatMinutes, formatRelativeDate } from "@/lib/dates";
 import { clearPlanItem, planMinutes, writePlanItem } from "@/lib/plan-drag";
@@ -162,6 +163,9 @@ function ScheduleRow({
             </span>
           ) : (
             <span className="opacity-70">no estimate · {minutes}m</span>
+          )}
+          {item.kind === "habit" && item.missedPriorDay && (
+            <MissedYesterdayBadge />
           )}
           {item.kind === "habit" && <span>due today</span>}
           {item.project && <span>{item.project.name}</span>}
