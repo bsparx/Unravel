@@ -15,7 +15,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { DEFAULT_FEEDBACK_PROMPT } from "@/lib/feedback";
+import {
+  DEFAULT_FEEDBACK_PROMPT,
+  MAX_FEEDBACK_LENGTH,
+} from "@/lib/feedback";
+import { cn } from "@/lib/utils";
 
 /**
  * The /habits side of a feedback habit: the meter can reach today's minimum —
@@ -81,11 +85,24 @@ export function HabitFeedbackButton({
           <Textarea
             autoFocus
             rows={3}
-            maxLength={2000}
+            maxLength={MAX_FEEDBACK_LENGTH}
             value={note}
             onChange={(event) => setNote(event.target.value)}
             placeholder="A line is enough — but it has to be a real one."
           />
+          <p
+            className={cn(
+              "text-right text-micro tabular-nums",
+              note.trim().length > MAX_FEEDBACK_LENGTH
+                ? "text-destructive"
+                : "text-muted-foreground",
+            )}
+            aria-live="polite"
+          >
+            {note.trim().length > MAX_FEEDBACK_LENGTH
+              ? `${note.length} / ${MAX_FEEDBACK_LENGTH} — over the limit`
+              : `${note.length} / ${MAX_FEEDBACK_LENGTH}`}
+          </p>
 
           <DialogFooter className="sm:justify-between">
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>

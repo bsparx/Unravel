@@ -430,6 +430,53 @@ export async function getHabits(
     }));
 }
 
+// ---------------------------------------------------------------- day log
+
+/**
+ * A habit's day log, newest first: every day that carries something — time on
+ * the clock, or a written note. Full history, unlike `getHabits`, because a
+ * log that silently stops in March is a log that can't be searched for March.
+ *
+ * A day is included when it has either half of the record; absence of a row
+ * means the habit wasn't touched that day. Feedback habits add the note to
+ * each day; every habit gets the time.
+ */
+export async function getHabitDayLog(user: User, taskId: string) {
+  const habit = await prisma.task.findFirst({
+    where: { id: taskId, userId: user.id, type: "HABIT" },
+    select: {
+      id: true,
+      title: true,
+      requiresFeedback: true,
+      feedbackPrompt: true,
+    },
+  });
+  if (!habit) return null;
+
+  const entries = await prisma.taskOccurrence.findMany({
+    where: {
+      userId: user.id,
+      taskId: habit.id,
+      OR: [{ loggedSeconds: { gt: 0 } }, { note: { not: null } }],
+    },
+    orderBy: { date: "desc" },
+    select: { date: true, note: true, loggedSeconds: true },
+  });
+
+  return {
+    ...habit,
+    entries: entries.map((entry) => ({
+      date: entry.date,
+      note: entry.note,
+      loggedSeconds: entry.loggedSeconds,
+    })),
+    totalLoggedSeconds: entries.reduce(
+      (sum, entry) => sum + entry.loggedSeconds,
+      0,
+    ),
+  };
+}
+
 // ---------------------------------------------------------------- all tasks
 
 export type TaskFilter = "open" | "done" | "all";

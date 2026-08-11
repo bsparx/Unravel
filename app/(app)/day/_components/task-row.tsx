@@ -210,10 +210,11 @@ export function TaskRow({
           type="button"
           onClick={onEditNote}
           aria-label={`Edit today's note for ${item.title}`}
-          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring -mt-1 mb-2 ml-8 flex min-w-0 items-start gap-1.5 rounded-md pr-2 text-label transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          title={item.feedbackNote}
+          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring -mt-1 mb-2 ml-8 flex w-full max-w-full min-w-0 items-start gap-1.5 rounded-md pr-2 text-label transition-colors focus-visible:ring-2 focus-visible:outline-none"
         >
           <Quote className="mt-0.5 size-3 shrink-0" aria-hidden />
-          <span className="min-w-0 truncate">{item.feedbackNote}</span>
+          <span className="min-w-0 flex-1 truncate">{item.feedbackNote}</span>
         </button>
       )}
 

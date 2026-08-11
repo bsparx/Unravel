@@ -1,5 +1,13 @@
 import Link from "next/link";
-import { Archive, BarChart3, Pencil, Plus, Repeat, Timer } from "lucide-react";
+import {
+  Archive,
+  BarChart3,
+  NotebookPen,
+  Pencil,
+  Plus,
+  Repeat,
+  Timer,
+} from "lucide-react";
 
 import { ConfirmDelete } from "@/components/confirm-delete";
 import { EmptyState } from "@/components/empty-state";
@@ -122,17 +130,25 @@ export default async function HabitsPage() {
                 adherence={adherence}
                 cue={habit.cue ? <HabitCueLine cue={habit.cue} /> : null}
                 title={
-                  <Link
-                    href={buildTimerHref({
-                      id: habit.id,
-                      estimatedSeconds: habit.estimatedSeconds,
-                      defaultMode: habit.defaultMode,
-                      plannedIntervals: habit.plannedIntervals,
-                    })}
-                    className="focus-visible:ring-ring hover:text-primary font-display block truncate rounded text-title focus-visible:ring-2 focus-visible:outline-none"
-                  >
-                    {habit.title}
-                  </Link>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <Button asChild variant="outline" size="sm" className="shrink-0">
+                      <Link href={`/habits/${habit.id}/log`}>
+                        <NotebookPen className="size-3.5" aria-hidden />
+                        Log
+                      </Link>
+                    </Button>
+                    <Link
+                      href={buildTimerHref({
+                        id: habit.id,
+                        estimatedSeconds: habit.estimatedSeconds,
+                        defaultMode: habit.defaultMode,
+                        plannedIntervals: habit.plannedIntervals,
+                      })}
+                      className="focus-visible:ring-ring hover:text-primary font-display min-w-0 truncate rounded text-title focus-visible:ring-2 focus-visible:outline-none"
+                    >
+                      {habit.title}
+                    </Link>
+                  </div>
                 }
                 actions={
                   <>

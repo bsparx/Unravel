@@ -10,6 +10,7 @@ import { z } from "zod";
 
 import { MINUTES_PER_DAY, MIN_BLOCK_MINUTES } from "@/lib/block-math";
 import { CALENDAR_COLOR_NAMES } from "@/lib/calendar-colors";
+import { MAX_FEEDBACK_LENGTH } from "@/lib/feedback";
 import { MONEY_COLOR_NAMES } from "@/lib/money-palette";
 import { parseMoneyToCents } from "@/lib/money";
 import { MAX_QUOTA } from "@/lib/quota";
@@ -268,7 +269,7 @@ export const completeWithNoteSchema = z.object({
   minutes: emptyToUndefined(
     z.coerce.number().int().min(1).max(MAX_MANUAL_LOG_MINUTES),
   ),
-  note: emptyToUndefined(z.string().trim().min(1).max(2000)),
+  note: emptyToUndefined(z.string().trim().min(1).max(MAX_FEEDBACK_LENGTH)),
 });
 
 export const toggleOccurrenceSchema = z.object({

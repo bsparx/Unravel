@@ -14,7 +14,10 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { DEFAULT_FEEDBACK_PROMPT } from "@/lib/feedback";
+import {
+  DEFAULT_FEEDBACK_PROMPT,
+  MAX_FEEDBACK_LENGTH,
+} from "@/lib/feedback";
 import { MAX_MANUAL_LOG_MINUTES } from "@/lib/timer-math";
 import type { TodayItem } from "@/lib/tasks";
 import { cn } from "@/lib/utils";
@@ -60,7 +63,9 @@ export function LogTimeDialog({
   const parsed = Number(raw);
   const timeValid =
     raw.trim() !== "" && Number.isInteger(parsed) && parsed >= floor && parsed <= max;
-  const noteValid = !needsFeedback || note.trim() !== "";
+  const noteValid =
+    !needsFeedback ||
+    (note.trim() !== "" && note.trim().length <= MAX_FEEDBACK_LENGTH);
   const valid = timeValid && noteValid;
   const shown = Math.min(max, Math.max(floor, Number.isFinite(parsed) ? parsed : floor));
 
@@ -114,7 +119,7 @@ export function LogTimeDialog({
               id="feedback-note"
               name="note"
               rows={3}
-              maxLength={2000}
+              maxLength={MAX_FEEDBACK_LENGTH}
               value={note}
               onChange={(event) => setNote(event.target.value)}
               placeholder="A line is enough — but it has to be a real one."
@@ -122,6 +127,19 @@ export function LogTimeDialog({
                 !noteValid && "border-destructive",
               )}
             />
+            <p
+              className={cn(
+                "text-right text-micro tabular-nums",
+                note.trim().length > MAX_FEEDBACK_LENGTH
+                  ? "text-destructive"
+                  : "text-muted-foreground",
+              )}
+              aria-live="polite"
+            >
+              {note.trim().length > MAX_FEEDBACK_LENGTH
+                ? `${note.length} / ${MAX_FEEDBACK_LENGTH} — over the limit`
+                : `${note.length} / ${MAX_FEEDBACK_LENGTH}`}
+            </p>
           </div>
         )}
 
