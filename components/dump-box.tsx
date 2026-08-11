@@ -23,8 +23,8 @@ import { cn } from "@/lib/utils";
  * From anywhere — `c`, or ⌘K / Ctrl+K — you get a box, you type, you press
  * Enter, and it's out of your head.
  *
- * One field. No project, no estimate, no due date, no parsing. Sorting it out
- * is a separate, deliberate activity that happens at /inbox.
+ * One field. No project, no estimate, no due date, no parsing. It's a record,
+ * not a queue — a behavior entry is written to be seen.
  */
 export function DumpBox() {
   const [open, setOpen] = useState(false);
@@ -81,11 +81,11 @@ export function DumpBox() {
       setBody("");
       setOpen(false);
       toast.success("Got it.", {
-        description: "It's in your inbox. Deal with it later.",
+        description: "It's in your behavior log. Deal with it later.",
       });
 
-      // If they happen to be looking at the inbox, stream the new row in.
-      if (pathname.startsWith("/inbox")) router.refresh();
+      // If they happen to be looking at the behavior log, stream the new row in.
+      if (pathname.startsWith("/behavior")) router.refresh();
     });
   };
 
@@ -117,8 +117,8 @@ export function DumpBox() {
         >
           <DialogTitle className="sr-only">Write something down</DialogTitle>
           <DialogDescription className="sr-only">
-            Anything at all. It goes to your inbox and you can sort it out
-            later.
+            Anything at all. It goes to your behavior log and you can sort it
+            out later.
           </DialogDescription>
 
           <Textarea

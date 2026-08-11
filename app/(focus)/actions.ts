@@ -19,7 +19,7 @@ import {
 function revalidateFocus() {
   revalidatePath("/");
   revalidatePath("/day");
-  revalidatePath("/inbox");
+  revalidatePath("/behavior");
   revalidatePath("/close");
 }
 

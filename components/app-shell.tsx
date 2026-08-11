@@ -67,7 +67,7 @@ const MOBILE_NAV = [
 
 /** There's room on the desktop rail, and losing these from it would be a loss. */
 const RAIL_EXTRA = [
-  { href: "/inbox", label: "Inbox", icon: Inbox },
+  { href: "/behavior", label: "Behavior", icon: Inbox },
   { href: "/tasks", label: "Tasks", icon: ListTodo },
   { href: "/habits", label: "Habits", icon: Repeat },
   { href: "/stats", label: "Statistics", icon: BarChart3 },

@@ -15,7 +15,7 @@ import { captureSchema } from "@/lib/validation";
  *
  * Note what this does NOT do: no parsing, no project, no estimate, no due date.
  * Every one of those is a decision, and a decision at capture time is a reason
- * not to capture at all. Triage happens later, at /inbox.
+ * not to capture at all. The log stays raw — a behavior entry is a record.
  */
 export async function captureThought(
   body: string,
@@ -35,7 +35,7 @@ export async function captureThought(
     },
   });
 
-  revalidatePath("/inbox");
+  revalidatePath("/behavior");
   revalidatePath("/");
 
   return { ok: true };

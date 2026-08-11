@@ -54,10 +54,10 @@ export default async function HomePage() {
           The whole day
         </Link>
         <Link
-          href="/inbox"
+          href="/behavior"
           className="hover:text-foreground underline underline-offset-4"
         >
-          Inbox
+          Behavior
         </Link>
         <Link
           href="/close"
@@ -118,7 +118,7 @@ async function candidateOptions(
     kind: "capture",
     id: capture.id,
     label: capture.body.split("\n")[0].slice(0, 120),
-    detail: "from your inbox",
+    detail: "from your behavior log",
   }));
 
   return [...taskOptions, ...captureOptions].slice(0, CANDIDATES * 2);

@@ -102,7 +102,7 @@ async function candidates(
       kind: "capture",
       id: capture.id,
       label: capture.body.split("\n")[0].slice(0, 120),
-      detail: "from your inbox",
+      detail: "from your behavior log",
     })),
   ];
 }

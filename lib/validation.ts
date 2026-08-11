@@ -195,10 +195,6 @@ export const journalSchema = z.object({
   body: z.string().trim().max(5000),
 });
 
-export const promoteCaptureSchema = z.object({
-  captureId: cuid,
-});
-
 export const selectOneThingSchema = z
   .object({
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),

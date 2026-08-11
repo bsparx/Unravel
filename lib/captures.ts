@@ -3,7 +3,7 @@ import type { Capture, User } from "@/lib/generated/prisma/client";
 
 export type RawCapture = Pick<Capture, "id" | "body" | "createdAt">;
 
-/** The inbox: everything untriaged, oldest thought at the bottom. */
+/** The behavior log: every capture, most recent first. */
 export async function getRawCaptures(
   user: User,
   take = 200,
