@@ -3,12 +3,18 @@
 import { Brain } from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
+import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { formatTimestamp } from "@/lib/dates";
 import type { RawCapture } from "@/lib/captures";
 
 /**
  * The log. No triage, no promotion, no dismiss — a behavior entry is a record,
- * not a queue. You write it to see it; the seeing is the whole point.
+ * not a queue. You write it to see it; the tag is what lets the pattern show.
  */
 export function BehaviorList({
   captures,
@@ -38,12 +44,40 @@ export function BehaviorList({
             <p className="text-body whitespace-pre-wrap break-words">
               {capture.body}
             </p>
-            <p className="text-muted-foreground mt-1 text-micro">
-              {formatTimestamp(capture.createdAt, timezone)}
-            </p>
+            <div className="mt-2 flex items-center gap-2">
+              {capture.tag && (
+                <TagBadge name={capture.tag.name} description={capture.tag.description} />
+              )}
+              <p className="text-muted-foreground text-micro">
+                {formatTimestamp(capture.createdAt, timezone)}
+              </p>
+            </div>
           </div>
         </li>
       ))}
     </ul>
+  );
+}
+
+function TagBadge({
+  name,
+  description,
+}: {
+  name: string;
+  description: string | null;
+}) {
+  const badge = (
+    <Badge variant="secondary" className="h-5 px-2 text-xs normal-case">
+      {name}
+    </Badge>
+  );
+
+  return description ? (
+    <Tooltip>
+      <TooltipTrigger asChild>{badge}</TooltipTrigger>
+      <TooltipContent>{description}</TooltipContent>
+    </Tooltip>
+  ) : (
+    badge
   );
 }

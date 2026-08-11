@@ -205,6 +205,8 @@ model User {
   /// 0 = Sunday .. 6 = Saturday
   weekStart Int    @default(1)
 
+  tags Tag[]
+
   // Timer defaults. Inlined rather than a 1-1 Settings model because they are
   // always read together with the user.
   pomodoroSeconds     Int     @default(1500)
@@ -655,6 +657,11 @@ model Capture {
   body   String
   status CaptureStatus @default(RAW)
 
+  /// What was behind the moment, picked from the tag set. SetNull on delete:
+  /// removing a custom tag keeps the record — it just loses its label.
+  tagId String?
+  tag   Tag?   @relation(fields: [tagId], references: [id], onDelete: SetNull)
+
   /// Set when triage turns this into a task. SetNull rather than Cascade: the
   /// record that the thought existed should outlive the task it became.
   promotedTaskId String?
@@ -672,6 +679,33 @@ model Capture {
   // make capture cost something.
   @@index([userId, status, createdAt])
   @@index([userId, localDate])
+}
+
+// ---------------------------------------------------------------- behavior tags
+
+/// The reason a behavior was logged.
+///
+/// System tags have `userId = null` and belong to everyone — they ship with the
+/// product and cannot be deleted. Custom tags belong to one user and can be.
+/// A row keeps its tag as long as the tag exists; deleting a custom tag keeps
+/// the entries, just untagged (SetNull on Capture.tagId).
+model Tag {
+  id   String @id @default(cuid())
+  user User?  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Null means shared/system — the built-in set, created by the seed script.
+  userId String?
+  name  String
+  /// The tooltip text: what this state actually feels like, so a logged urge
+  /// is classified against a definition, not a memory.
+  description String?
+  /// True for the built-ins, which a user can never edit or delete.
+  system Boolean @default(false)
+
+  captures Capture[]
+
+  @@unique([userId, name])
+  @@index([userId])
 }
 
 // ---------------------------------------------------------------- hydration

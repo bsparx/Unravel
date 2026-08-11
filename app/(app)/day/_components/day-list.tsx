@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Inbox } from "lucide-react";
+import { CheckCircle2, Sun } from "lucide-react";
 import { toast } from "sonner";
 
 import { EmptyState } from "@/components/empty-state";
@@ -109,7 +109,7 @@ export function DayList({
           </ul>
         </section>
         <EmptyState
-          icon={Inbox}
+          icon={Sun}
           title="Nothing on today"
           description="Add the first thing that's on your mind above. One line is enough — you can add a time estimate later."
         />

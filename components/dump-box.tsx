@@ -6,6 +6,7 @@ import { PenLine } from "lucide-react";
 import { toast } from "sonner";
 
 import { captureThought } from "@/app/actions/capture";
+import { TagPicker } from "@/app/(app)/behavior/_components/tag-picker";
 import {
   Dialog,
   DialogContent,
@@ -20,15 +21,17 @@ import { cn } from "@/lib/utils";
  *
  * Mounted once in a layout and never a route: the moment capture requires a
  * navigation you've added a decision point, and the thought is already gone.
- * From anywhere — `c`, or ⌘K / Ctrl+K — you get a box, you type, you press
- * Enter, and it's out of your head.
+ * From anywhere — `c`, or ⌘K / Ctrl+K — you get a box, you type, you pick what
+ * was behind it, you press Enter.
  *
- * One field. No project, no estimate, no due date, no parsing. It's a record,
- * not a queue — a behavior entry is written to be seen.
+ * One field plus one tag. No project, no estimate, no due date, no parsing.
+ * The tag is the one thing asked for, because naming the state is what makes a
+ * behavior log something you can see patterns in.
  */
 export function DumpBox() {
   const [open, setOpen] = useState(false);
   const [body, setBody] = useState("");
+  const [tagId, setTagId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
@@ -66,10 +69,10 @@ export function DumpBox() {
 
   const submit = () => {
     const text = body.trim();
-    if (!text || pending) return;
+    if (!text || !tagId || pending) return;
 
     startTransition(async () => {
-      const result = await captureThought(text);
+      const result = await captureThought(text, tagId);
 
       if (!result.ok) {
         toast.error(result.message);
@@ -79,6 +82,7 @@ export function DumpBox() {
       // Clear and close immediately — the instant feel comes from the dialog
       // getting out of the way, not from waiting on anything.
       setBody("");
+      setTagId(null);
       setOpen(false);
       toast.success("Got it.", {
         description: "It's in your behavior log. Deal with it later.",
@@ -117,8 +121,8 @@ export function DumpBox() {
         >
           <DialogTitle className="sr-only">Write something down</DialogTitle>
           <DialogDescription className="sr-only">
-            Anything at all. It goes to your behavior log and you can sort it
-            out later.
+            What is on your mind and what was behind it. It goes to your
+            behavior log.
           </DialogDescription>
 
           <Textarea
@@ -138,8 +142,10 @@ export function DumpBox() {
             className="resize-none border-0 !text-body shadow-none focus-visible:ring-0"
           />
 
+          <TagPicker value={tagId} onChange={setTagId} />
+
           <p className="text-muted-foreground flex items-center justify-between text-label">
-            <span>Tasks, worries, half-thoughts. Anything.</span>
+            <span>What you felt and what triggered it.</span>
             <span className="text-micro">
               <kbd className="font-mono">Enter</kbd> to save
             </span>

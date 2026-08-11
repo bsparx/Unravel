@@ -1,7 +1,12 @@
 import { prisma } from "@/lib/db";
 import type { Capture, User } from "@/lib/generated/prisma/client";
 
-export type RawCapture = Pick<Capture, "id" | "body" | "createdAt">;
+export type RawCapture = Pick<
+  Capture,
+  "id" | "body" | "createdAt"
+> & {
+  tag: { id: string; name: string; description: string | null } | null;
+};
 
 /** The behavior log: every capture, most recent first. */
 export async function getRawCaptures(
@@ -12,7 +17,12 @@ export async function getRawCaptures(
     where: { userId: user.id, status: "RAW" },
     orderBy: { createdAt: "desc" },
     take,
-    select: { id: true, body: true, createdAt: true },
+    select: {
+      id: true,
+      body: true,
+      createdAt: true,
+      tag: { select: { id: true, name: true, description: true } },
+    },
   });
 }
 

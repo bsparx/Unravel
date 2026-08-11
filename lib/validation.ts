@@ -182,9 +182,15 @@ export const createHabitSchema = createTodoSchema
 export const updateTodoSchema = createTodoSchema.extend({ id: cuid });
 export const updateHabitSchema = createHabitSchema.extend({ id: cuid });
 
-/** The dump box. One field, and the only rule is that it isn't empty. */
+/** The dump box. Text plus the tag that names the moment — both required. */
 export const captureSchema = z.object({
   body: z.string().trim().min(1, "Nothing to save.").max(2000),
+  tagId: cuid,
+});
+
+/** A custom behavior tag. Short enough to fit a chip. */
+export const behaviorTagSchema = z.object({
+  name: z.string().trim().min(1, "Name the tag.").max(24),
 });
 
 /**
