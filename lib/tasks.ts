@@ -76,6 +76,13 @@ export type TodayItem = TaskSummary & {
    * fall back to the default prompt in `lib/feedback.ts`.
    */
   feedbackPrompt: string | null;
+  /**
+   * Habits only: the two bars the day's progress is measured against. Null for
+   * todos, which have no quota.
+   */
+  quota: Quota | null;
+  /** Habits only: today's progress, in the habit's own unit. */
+  progress: number;
 };
 
 /**
@@ -262,6 +269,12 @@ export async function getTodayView(user: User): Promise<TodayView> {
           completionsForYesterday(task.id),
           yesterday,
         ),
+        quota: {
+          unit: task.recurrence!.unit as HabitUnit,
+          minimum: task.recurrence!.minimumQuota,
+          optimal: task.recurrence!.optimalQuota,
+        },
+        progress: occurrence?.progress ?? 0,
       };
     });
 
@@ -284,6 +297,8 @@ export async function getTodayView(user: User): Promise<TodayView> {
       feedbackNote: null,
       feedbackPrompt: null,
       missedYesterday: false,
+      quota: null,
+      progress: 0,
     };
   });
 

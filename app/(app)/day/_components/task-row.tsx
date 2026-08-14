@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   ChevronDown,
+  Check,
   CornerDownRight,
   Link2,
   Pencil,
@@ -17,6 +18,7 @@ import { StepList } from "@/components/step-list";
 import { TaskCheckbox } from "@/components/task-checkbox";
 import { MissedYesterdayBadge } from "@/components/missed-yesterday-badge";
 import { formatDuration, formatMinutes } from "@/lib/dates";
+import { formatQuota, remainingToMinimum, tierFor, type Quota } from "@/lib/quota";
 import { nextStep, stepProgress } from "@/lib/steps";
 import type { TodayItem } from "@/lib/tasks";
 import { buildTimerHref } from "@/lib/timer-url";
@@ -112,6 +114,10 @@ export function TaskRow({
                 <Repeat className="size-3" aria-hidden />
                 Habit
               </span>
+            )}
+
+            {item.type === "HABIT" && item.quota && !item.done && (
+              <HabitQuotaStatus quota={item.quota} progress={item.progress} />
             )}
 
             {item.cue?.anchorTitle && (
@@ -238,5 +244,38 @@ export function TaskRow({
         </>
       )}
     </li>
+  );
+}
+
+/**
+ * Where today's habit stands against its quota, one quiet line in the row's
+ * meta text. Two states only: the minimum is met and the box is ready to tick
+ * (soft primary, with the check), or there's a remainder left (muted). Drawn
+ * against the *minimum* deliberately — it is the bar the tick cares about; the
+ * optimal is a good-day bonus, not a gate.
+ */
+function HabitQuotaStatus({
+  quota,
+  progress,
+}: {
+  quota: Quota;
+  progress: number;
+}) {
+  const tier = tierFor(progress, quota);
+  const toGo = remainingToMinimum(progress, quota);
+
+  if (tier === "NONE") {
+    return (
+      <span className="tabular-nums">
+        {formatQuota(toGo, quota.unit)} to go
+      </span>
+    );
+  }
+
+  return (
+    <span className="text-primary/80 inline-flex items-center gap-1">
+      <Check className="size-3" aria-hidden />
+      Minimum met — tick it off
+    </span>
   );
 }

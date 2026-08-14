@@ -83,6 +83,8 @@ export function TaskList({
                   requiresFeedback: false,
                   feedbackNote: null,
                   feedbackPrompt: null,
+                  quota: null,
+                  progress: 0,
                 }}
                 onToggle={(next) => toggle(task.id, next)}
                 showDueLabel={
