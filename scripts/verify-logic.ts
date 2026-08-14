@@ -1817,6 +1817,46 @@ check("regenerating replaces most of the week", () => {
   }
 });
 
+check("an equipment-only week never draws from the other side", () => {
+  const equipmentOf = (id: string) =>
+    EXERCISES.find((e) => e.id === id)!.equipment;
+  for (const preference of ["YOGA", "DUMBBELL"] as const) {
+    for (const days of WEEK_SHAPES) {
+      for (let variant = 0; variant < 20; variant++) {
+        const slots = generateRoutine({
+          days,
+          exercises: EXERCISES,
+          variant,
+          equipment: preference,
+        });
+        assert.ok(slots.length > 0, `${preference} ${days} v${variant} built nothing`);
+        for (const slot of slots) {
+          assert.equal(
+            equipmentOf(slot.exerciseId),
+            preference,
+            `${preference} week ${days} v${variant} drew ${slot.exerciseId}`,
+          );
+        }
+      }
+    }
+  }
+});
+
+check("a mix week draws both equipment across variants", () => {
+  const equipmentOf = (id: string) =>
+    EXERCISES.find((e) => e.id === id)!.equipment;
+  for (const days of WEEK_SHAPES) {
+    for (let variant = 0; variant < 50; variant++) {
+      const slots = generateRoutine({ days, exercises: EXERCISES, variant });
+      const kinds = new Set(slots.map((s) => equipmentOf(s.exerciseId)));
+      assert.ok(
+        kinds.size === 2,
+        `week ${days} v${variant} drew only ${[...kinds].join(", ")}`,
+      );
+    }
+  }
+});
+
 // ------------------------------------------------------- the muscle figures
 
 check("the figures can reach every body part an exercise names", () => {

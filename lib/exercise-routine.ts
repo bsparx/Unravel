@@ -305,6 +305,12 @@ export interface GenerateOptions {
   counts?: number[];
   /** The active catalog. */
   exercises: PoolExercise[];
+  /**
+   * Which catalog the week may draw from. "YOGA" and "DUMBBELL" filter the
+   * pool to that side before composition — the week is that equipment, not
+   * balanced against the other. Null (the default) mixes both near 50/50.
+   */
+  equipment?: ExerciseEquipment | null;
   /** 0 = the canonical routine; higher variants reshuffle the week. */
   variant?: number;
   /** User-swapped slots: regenerated around, never over. */
@@ -324,11 +330,21 @@ export interface GenerateOptions {
 export function generateRoutine({
   days,
   counts,
-  exercises,
+  exercises: allExercises,
+  equipment = null,
   variant = 0,
   pinned = [],
   avoid = [],
 }: GenerateOptions): GeneratedSlot[] {
+  // The preference is a pool filter, not a second balancing rule: with only
+  // one equipment in the pool, every supply-derived floor and cap below
+  // collapses onto it, and the 50/50 pass finds no room to move. Scarcity
+  // still clamps (a dumbbell-only week has exactly one mobility exercise to
+  // draw from), and repeats stay allowed once a pool is genuinely spent.
+  const exercises = equipment
+    ? allExercises.filter((e) => e.equipment === equipment)
+    : allExercises;
+
   const random = mulberry32(variant + 1);
   const countByDay = new Map<number, number>();
   days.forEach((day, index) => {

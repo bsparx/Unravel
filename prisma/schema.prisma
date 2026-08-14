@@ -140,6 +140,15 @@ enum ExerciseEquipment {
   DUMBBELL
 }
 
+/// What a routine's week is allowed to draw from: yoga only, dumbbells only,
+/// or the mixed catalog. The person's call at build time, stored on the
+/// routine so regeneration keeps drawing from the same pool.
+enum RoutineEquipment {
+  YOGA
+  DUMBBELL
+  MIX
+}
+
 /// The primary corrective job an exercise does. Two postural patterns are
 /// being trained: the lower cross (anterior pelvic tilt) and the upper cross
 /// (rounded shoulders / forward head). The fix is the same shape in both —
@@ -1168,6 +1177,11 @@ model ExerciseRoutine {
 
   /// Auto-named at creation; editable later if we add an edit surface.
   name String
+
+  /// Which catalog the generator draws from: yoga only, dumbbells only, or
+  /// the mix. Set at build time; regeneration keeps drawing from this pool.
+  /// A manual swap may still reach outside it — a deliberate override.
+  equipment RoutineEquipment @default(MIX)
 
   /// 0 = Sunday .. 6 = Saturday. Length 3, 4, 5 or 6 — the whole point of the
   /// builder is that the person picks the exact days.

@@ -684,6 +684,7 @@ export const routineDaysSchema = z
       .max(7)
       .transform((days) => [...new Set(days)].sort((a, b) => a - b)),
     counts: z.array(z.coerce.number().int().min(1).max(MAX_EXERCISES_PER_DAY)),
+    equipment: z.enum(["YOGA", "DUMBBELL", "MIX"]).default("MIX"),
   })
   .superRefine((value, ctx) => {
     if (value.days.length !== value.daysPerWeek) {

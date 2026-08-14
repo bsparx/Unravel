@@ -11,6 +11,16 @@ export const EQUIPMENT_LABELS: Record<"YOGA" | "DUMBBELL", string> = {
   DUMBBELL: "Dumbbells",
 };
 
+/** The routine's catalog choice, as a display string. */
+export const ROUTINE_EQUIPMENT_LABELS: Record<
+  "YOGA" | "DUMBBELL" | "MIX",
+  string
+> = {
+  YOGA: "yoga only",
+  DUMBBELL: "dumbbells only",
+  MIX: "yoga & dumbbells",
+};
+
 export const GOAL_LABELS: Record<ExerciseGoal, string> = {
   HIP_FLEXOR_MOBILITY: "Hip flexor mobility",
   GLUTE_STRENGTH: "Glute strength",

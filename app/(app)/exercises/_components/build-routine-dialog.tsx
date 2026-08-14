@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Dumbbell, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, Dumbbell, Shuffle, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +40,9 @@ export function BuildRoutineDialog({
   const [daysPerWeek, setDaysPerWeek] = useState<number>(3);
   const [days, setDays] = useState<number[]>([]);
   const [counts, setCounts] = useState<Record<number, number>>({});
+  const [equipment, setEquipment] = useState<"YOGA" | "DUMBBELL" | "MIX">(
+    "MIX",
+  );
 
   const [state, formAction, pending] = useActionState(createRoutine, idleState);
 
@@ -65,8 +68,9 @@ export function BuildRoutineDialog({
       days: sorted,
       counts: sorted.map((day) => counts[day] ?? 3),
       exercises: catalog,
+      equipment: equipment === "MIX" ? null : equipment,
     });
-  }, [step, days, counts, catalog]);
+  }, [step, days, counts, catalog, equipment]);
 
   const toggleDay = (value: number) => {
     if (days.includes(value)) {
@@ -117,6 +121,34 @@ export function BuildRoutineDialog({
                 </button>
               ))}
             </div>
+
+            <p className="text-label text-muted-foreground">
+              What will you train with?
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  { value: "YOGA", label: "Yoga only", icon: Sparkles },
+                  { value: "DUMBBELL", label: "Dumbbells only", icon: Dumbbell },
+                  { value: "MIX", label: "Mix of both", icon: Shuffle },
+                ] as const
+              ).map(({ value, label, icon: Icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setEquipment(value)}
+                  aria-pressed={equipment === value}
+                  className={cn(
+                    "border-border hover:bg-accent flex flex-col items-center gap-1 rounded-lg border px-2 py-3 transition-colors",
+                    equipment === value && "border-primary bg-accent",
+                  )}
+                >
+                  <Icon className="size-4" aria-hidden />
+                  <span className="text-label">{label}</span>
+                </button>
+              ))}
+            </div>
+
             <div className="flex justify-end">
               <Button type="button" onClick={() => setStep(2)}>
                 Next
@@ -270,6 +302,7 @@ export function BuildRoutineDialog({
                 Back
               </Button>
               <input type="hidden" name="daysPerWeek" value={daysPerWeek} />
+              <input type="hidden" name="equipment" value={equipment} />
               {[...days].sort((a, b) => a - b).map((day) => (
                 <input key={day} type="hidden" name="days[]" value={day} />
               ))}

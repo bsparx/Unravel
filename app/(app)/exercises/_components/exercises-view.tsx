@@ -6,7 +6,7 @@ import { Plus, Sparkles } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { WEEKDAYS } from "@/lib/dates";
-import { EQUIPMENT_LABELS } from "@/lib/exercise-labels";
+import { EQUIPMENT_LABELS, ROUTINE_EQUIPMENT_LABELS } from "@/lib/exercise-labels";
 import { summarizeWeek } from "@/lib/exercise-routine";
 
 import type { HoveredExercise } from "./body-map";
@@ -27,11 +27,13 @@ import { RoutineWeek, type RoutineSlot } from "./routine-week";
  */
 export function ExercisesView({
   routineId,
+  equipment,
   daysOfWeek,
   slots,
   catalog,
 }: {
   routineId: string | null;
+  equipment: "YOGA" | "DUMBBELL" | "MIX";
   daysOfWeek: number[];
   slots: RoutineSlot[];
   catalog: BuildCatalogExercise[];
@@ -69,6 +71,7 @@ export function ExercisesView({
           {hasRoutine && (
             <p className="text-label text-muted-foreground">
               {daysOfWeek.length} days a week · {daysLabel} ·{" "}
+              {ROUTINE_EQUIPMENT_LABELS[equipment]} ·{" "}
               {EQUIPMENT_LABELS.YOGA.toLowerCase()} {week.yoga} /{" "}
               {EQUIPMENT_LABELS.DUMBBELL.toLowerCase()} {week.dumbbell}
             </p>
@@ -78,6 +81,7 @@ export function ExercisesView({
         {hasRoutine ? (
           <RoutineWeek
             routineId={routineId!}
+            equipment={equipment}
             daysOfWeek={daysOfWeek}
             slots={slots}
             catalog={catalog}
@@ -87,7 +91,7 @@ export function ExercisesView({
           <EmptyState
             icon={Sparkles}
             title="No routine yet"
-            description="Build a weekly plan: pick 1 to 7 days, name the exact days, choose how many exercises each day carries (1–5), and get a balanced set for each one."
+            description="Build a weekly plan: pick 1 to 7 days, name the exact days, choose yoga, dumbbells or both, and set how many exercises each day carries (1–5)."
             action={
               <Button type="button" onClick={() => setBuilding(true)}>
                 <Plus className="size-4" aria-hidden />

@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { WEEKDAYS } from "@/lib/dates";
+import { ROUTINE_EQUIPMENT_LABELS } from "@/lib/exercise-labels";
 import { idleState } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 
@@ -35,12 +36,14 @@ export type RoutineSlot = {
  */
 export function RoutineWeek({
   routineId,
+  equipment,
   daysOfWeek,
   slots,
   catalog,
   onHover,
 }: {
   routineId: string;
+  equipment: "YOGA" | "DUMBBELL" | "MIX";
   daysOfWeek: number[];
   slots: RoutineSlot[];
   catalog: SwapCatalogExercise[];
@@ -218,7 +221,7 @@ export function RoutineWeek({
         <p className="text-muted-foreground text-label">
           {pinned > 0
             ? `${pinned} pinned — Regenerate reshuffles the rest.`
-            : "Regenerate draws a fresh week from all 32 exercises."}
+            : `Regenerate draws a fresh week from the ${ROUTINE_EQUIPMENT_LABELS[equipment]} catalog.`}
         </p>
 
         <div className="flex flex-wrap items-center gap-2">

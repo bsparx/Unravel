@@ -34,7 +34,7 @@ export async function createRoutine(
     };
   }
 
-  const { daysPerWeek, days, counts } = parsed.data;
+  const { daysPerWeek, days, counts, equipment } = parsed.data;
   if (days.length !== daysPerWeek) {
     return {
       status: "error",
@@ -49,12 +49,18 @@ export async function createRoutine(
     orderBy: { sortOrder: "asc" },
   });
 
-  const slots = generateRoutine({ days, counts, exercises });
+  const slots = generateRoutine({
+    days,
+    counts,
+    exercises,
+    equipment: equipment === "MIX" ? null : equipment,
+  });
 
   await prisma.exerciseRoutine.create({
     data: {
       userId: user.id,
       name: "Weekly routine",
+      equipment,
       daysOfWeek: days,
       exercises: {
         create: slots.map((slot) => ({
@@ -185,6 +191,7 @@ export async function regenerateRoutine(
     days: routine.daysOfWeek,
     counts,
     exercises,
+    equipment: routine.equipment === "MIX" ? null : routine.equipment,
     variant,
     pinned,
     // Push what's on screen down the ranking, so consecutive clicks walk the

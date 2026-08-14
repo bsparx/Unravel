@@ -33,6 +33,7 @@ export default async function ExercisesPage() {
   return (
     <ExercisesView
       routineId={routine?.id ?? null}
+      equipment={routine?.equipment ?? "MIX"}
       daysOfWeek={routine?.daysOfWeek ?? []}
       slots={
         routine?.exercises.map((slot) => ({
