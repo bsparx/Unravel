@@ -172,6 +172,17 @@ enum ExerciseGoal {
   CHEST_MOBILITY
   /// Motor control: finding and holding neutral pelvis/spine.
   POSTURE_AWARENESS
+  /// Stretch the tight upper traps, levator scapulae and suboccipitals
+  /// that pull the head forward (forward head posture).
+  NECK_MOBILITY
+  /// Deep neck flexors + chin-tuck control: hold the head back over the
+  /// spine — the weak half of forward head posture.
+  NECK_STRENGTH
+  /// Calf/soleus length and ankle mobility — the distal end of the
+  /// posterior chain that sitting shortens.
+  CALF_MOBILITY
+  /// Wrist and forearm flexor/extensor release for typing and phone work.
+  WRIST_MOBILITY
 }
 
 /// The muscle groups an exercise works, for filtering the catalog. One
@@ -188,6 +199,9 @@ enum BodyPart {
   CHEST
   SPINE
   FULL_BODY
+  NECK
+  CALVES
+  FOREARMS
 }
 
 /// The five daily prayers, in order. `MAGHRIB` keeps its Islamic spelling.

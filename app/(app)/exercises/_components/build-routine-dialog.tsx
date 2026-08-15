@@ -24,9 +24,10 @@ import type { ExerciseDetail } from "./exercise-detail-dialog";
 export type BuildCatalogExercise = ExerciseDetail;
 
 /**
- * The builder, in three steps: the shape of the week (1–7 days), the
- * exact days, then per-day exercise counts with a live preview — which is
- * saved as-is, because the server generates identically from the same
+ * The builder, in three steps: the shape of the week (how many days and
+ * which ones — all seven auto-selected when "7 days" is chosen), then how
+ * many exercises each day carries, then the generated week to review and
+ * save. Saved as-is, because the server generates identically from the same
  * catalog order.
  */
 export function BuildRoutineDialog({
@@ -83,6 +84,7 @@ export function BuildRoutineDialog({
   };
 
   const picked = new Set(days);
+  const totalExercises = days.reduce((sum, day) => sum + (counts[day] ?? 3), 0);
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -106,7 +108,8 @@ export function BuildRoutineDialog({
                   type="button"
                   onClick={() => {
                     setDaysPerWeek(option);
-                    setDays([]);
+                    // Seven days is unambiguous — pre-select the whole week.
+                    setDays(option === 7 ? [0, 1, 2, 3, 4, 5, 6] : []);
                     setCounts({});
                   }}
                   className={cn(
@@ -149,8 +152,47 @@ export function BuildRoutineDialog({
               ))}
             </div>
 
+            {daysPerWeek < 7 ? (
+              <>
+                <p className="text-label text-muted-foreground">
+                  Pick exactly {daysPerWeek} days — those are the ones that count.
+                </p>
+                <div className="grid grid-cols-4 gap-2">
+                  {WEEKDAYS.map((day) => (
+                    <button
+                      key={day.value}
+                      type="button"
+                      onClick={() => toggleDay(day.value)}
+                      aria-pressed={picked.has(day.value)}
+                      className={cn(
+                        "border-border hover:bg-accent flex flex-col items-center gap-0.5 rounded-lg border px-2 py-3 transition-colors",
+                        picked.has(day.value) && "border-primary bg-accent",
+                        !picked.has(day.value) && days.length === daysPerWeek && "opacity-40",
+                      )}
+                    >
+                      <span className="font-display text-body">{day.short}</span>
+                      <span className="text-muted-foreground text-micro tracking-wide uppercase">
+                        {day.letter}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-muted-foreground text-label">
+                  {days.length} of {daysPerWeek} picked
+                </p>
+              </>
+            ) : (
+              <p className="text-muted-foreground text-label">
+                Every day — no rest days.
+              </p>
+            )}
+
             <div className="flex justify-end">
-              <Button type="button" onClick={() => setStep(2)}>
+              <Button
+                type="button"
+                disabled={days.length !== daysPerWeek}
+                onClick={() => setStep(2)}
+              >
                 Next
                 <ArrowRight className="size-4" aria-hidden />
               </Button>
@@ -161,42 +203,75 @@ export function BuildRoutineDialog({
         {step === 2 && (
           <div className="space-y-3">
             <p className="text-label text-muted-foreground">
-              Pick exactly {daysPerWeek} days — those are the ones that count.
+              Set how many exercises each day carries — 1 to 5.
             </p>
-            <div className="grid grid-cols-4 gap-2">
-              {WEEKDAYS.map((day) => (
-                <button
-                  key={day.value}
-                  type="button"
-                  onClick={() => toggleDay(day.value)}
-                  aria-pressed={picked.has(day.value)}
-                  className={cn(
-                    "border-border hover:bg-accent flex flex-col items-center gap-0.5 rounded-lg border px-2 py-3 transition-colors",
-                    picked.has(day.value) && "border-primary bg-accent",
-                    !picked.has(day.value) && days.length === daysPerWeek && "opacity-40",
-                  )}
-                >
-                  <span className="font-display text-body">{day.short}</span>
-                  <span className="text-muted-foreground text-micro tracking-wide uppercase">
-                    {day.letter}
-                  </span>
-                </button>
-              ))}
+
+            <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+              {WEEKDAYS.filter((day) => picked.has(day.value)).map((day) => {
+                const count = counts[day.value] ?? 3;
+                return (
+                  <div
+                    key={day.value}
+                    className="border-border flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5"
+                  >
+                    <p className="font-display text-body">{day.long}</p>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        aria-label={"Fewer exercises on " + day.long}
+                        disabled={count <= 1}
+                        onClick={() =>
+                          setCounts((current) => ({
+                            ...current,
+                            [day.value]: Math.max(1, (current[day.value] ?? 3) - 1),
+                          }))
+                        }
+                        className="border-border hover:bg-accent disabled:text-muted-foreground/40 flex size-6 items-center justify-center rounded-md border text-label transition-colors"
+                      >
+                        −
+                      </button>
+                      <span
+                        className="text-label tnum w-6 text-center"
+                        aria-live="polite"
+                      >
+                        {count}
+                      </span>
+                      <button
+                        type="button"
+                        aria-label={"More exercises on " + day.long}
+                        disabled={count >= 5}
+                        onClick={() =>
+                          setCounts((current) => ({
+                            ...current,
+                            [day.value]: Math.min(5, (current[day.value] ?? 3) + 1),
+                          }))
+                        }
+                        className="border-border hover:bg-accent disabled:text-muted-foreground/40 flex size-6 items-center justify-center rounded-md border text-label transition-colors"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <p className="text-muted-foreground text-label">
-              {days.length} of {daysPerWeek} picked
-            </p>
+
+            <div className="flex flex-wrap gap-1.5">
+              <Badge variant="outline" className="text-muted-foreground">
+                {totalExercises} exercises
+              </Badge>
+              <Badge variant="outline" className="text-muted-foreground">
+                ≤5 per day
+              </Badge>
+            </div>
+
             <div className="flex justify-between">
               <Button type="button" variant="ghost" onClick={() => setStep(1)}>
                 <ArrowLeft className="size-4" aria-hidden />
                 Back
               </Button>
-              <Button
-                type="button"
-                disabled={days.length !== daysPerWeek}
-                onClick={() => setStep(3)}
-              >
-                Preview routine
+              <Button type="button" onClick={() => setStep(3)}>
+                Preview exercises
                 <ArrowRight className="size-4" aria-hidden />
               </Button>
             </div>
@@ -206,8 +281,8 @@ export function BuildRoutineDialog({
         {step === 3 && (
           <div className="space-y-3">
             <p className="text-label text-muted-foreground">
-              Set how many exercises each day carries — 1 to 5. The week
-              previews below; save it when it looks right.
+              Here is the week the generator built — save it when it looks right,
+              and you can swap any exercise from the routine after.
             </p>
 
             <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
@@ -215,47 +290,13 @@ export function BuildRoutineDialog({
                 const daySlots = preview.filter(
                   (slot) => slot.dayOfWeek === day.value,
                 );
-                const count = counts[day.value] ?? 3;
                 return (
                   <div key={day.value} className="border-border rounded-lg border">
                     <div className="flex items-center justify-between gap-2 px-3 pt-2.5">
                       <p className="font-display text-body">{day.long}</p>
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          aria-label={`Fewer exercises on ${day.long}`}
-                          disabled={count <= 1}
-                          onClick={() =>
-                            setCounts((current) => ({
-                              ...current,
-                              [day.value]: Math.max(1, (current[day.value] ?? 3) - 1),
-                            }))
-                          }
-                          className="border-border hover:bg-accent disabled:text-muted-foreground/40 flex size-6 items-center justify-center rounded-md border text-label transition-colors"
-                        >
-                          −
-                        </button>
-                        <span
-                          className="text-label tnum w-6 text-center"
-                          aria-live="polite"
-                        >
-                          {count}
-                        </span>
-                        <button
-                          type="button"
-                          aria-label={`More exercises on ${day.long}`}
-                          disabled={count >= 5}
-                          onClick={() =>
-                            setCounts((current) => ({
-                              ...current,
-                              [day.value]: Math.min(5, (current[day.value] ?? 3) + 1),
-                            }))
-                          }
-                          className="border-border hover:bg-accent disabled:text-muted-foreground/40 flex size-6 items-center justify-center rounded-md border text-label transition-colors"
-                        >
-                          +
-                        </button>
-                      </div>
+                      <span className="text-muted-foreground text-micro tracking-wide uppercase">
+                        {daySlots.length} exercises
+                      </span>
                     </div>
                     <ol className="divide-y">
                       {daySlots.map((slot) => {
@@ -308,7 +349,7 @@ export function BuildRoutineDialog({
               ))}
               {[...days].sort((a, b) => a - b).map((day) => (
                 <input
-                  key={`count-${day}`}
+                  key={"count-" + day}
                   type="hidden"
                   name="counts[]"
                   value={counts[day] ?? 3}

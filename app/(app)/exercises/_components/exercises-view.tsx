@@ -64,9 +64,9 @@ export function ExercisesView({
           </p>
           <h1 className="font-display text-display">Exercises</h1>
           <p className="text-muted-foreground max-w-prose text-body">
-            A corrective week for the two postural patterns a desk builds:
-            anterior pelvic tilt and rounded shoulders. Yoga and light
-            dumbbells, up to five exercises a day — your call per day.
+            A corrective week for the postural patterns a desk builds:
+            anterior pelvic tilt, rounded shoulders and forward head. Yoga and
+            light dumbbells, up to five exercises a day — your call per day.
           </p>
           {hasRoutine && (
             <p className="text-label text-muted-foreground">

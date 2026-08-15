@@ -1597,7 +1597,7 @@ check("there is no story in a handful of breaks that behaved", () => {
 
 // ---------------------------------------------------------------- routines
 
-/** The 32 seeded exercises, in the shape the generator consumes. */
+/** The 40 seeded exercises, in the shape the generator consumes. */
 const EXERCISES: PoolExercise[] = [
   { id: "bridge", equipment: "YOGA", goal: "GLUTE_STRENGTH" },
   { id: "low-lunge", equipment: "YOGA", goal: "HIP_FLEXOR_MOBILITY" },
@@ -1631,6 +1631,14 @@ const EXERCISES: PoolExercise[] = [
   { id: "db-t-raise", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH" },
   { id: "db-ytw", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH" },
   { id: "db-pullover", equipment: "DUMBBELL", goal: "CHEST_MOBILITY" },
+  { id: "chin-tuck", equipment: "YOGA", goal: "NECK_STRENGTH" },
+  { id: "deep-neck-hold", equipment: "YOGA", goal: "NECK_STRENGTH" },
+  { id: "upper-trap-stretch", equipment: "YOGA", goal: "NECK_MOBILITY" },
+  { id: "levator-stretch", equipment: "YOGA", goal: "NECK_MOBILITY" },
+  { id: "calf-stretch", equipment: "YOGA", goal: "CALF_MOBILITY" },
+  { id: "soleus-stretch", equipment: "YOGA", goal: "CALF_MOBILITY" },
+  { id: "wrist-ext-stretch", equipment: "YOGA", goal: "WRIST_MOBILITY" },
+  { id: "wrist-flex-stretch", equipment: "YOGA", goal: "WRIST_MOBILITY" },
 ];
 
 const generated = (
@@ -1650,6 +1658,10 @@ const CATEGORY_OF_GOAL: Record<string, string> = {
   LOWER_BACK_RELIEF: "MOBILITY",
   CHEST_MOBILITY: "MOBILITY",
   UPPER_BACK_STRENGTH: "UPPER",
+  NECK_MOBILITY: "MOBILITY",
+  NECK_STRENGTH: "UPPER",
+  CALF_MOBILITY: "MOBILITY",
+  WRIST_MOBILITY: "MOBILITY",
 };
 const categoryOf = (id: string) =>
   CATEGORY_OF_GOAL[EXERCISES.find((e) => e.id === id)!.goal];
@@ -2072,16 +2084,18 @@ check("no exercise repeats across a 5-day week", () => {
   assert.equal(new Set(ids).size, ids.length, `duplicates in week: ${ids.join(", ")}`);
 });
 
-check("equipment lands near 50/50 across any week length", () => {
+check("equipment lands near the catalog's own mix across any week length", () => {
   const byId = new Map(EXERCISES.map((e) => [e.id, e]));
+  const catalogShare =
+    EXERCISES.filter((e) => e.equipment === "YOGA").length / EXERCISES.length;
   for (const days of WEEK_SHAPES) {
     for (let variant = 0; variant < 40; variant++) {
       const slots = generated(days, variant);
       const yoga = slots.filter((s) => byId.get(s.exerciseId)!.equipment === "YOGA").length;
       const share = yoga / slots.length;
       assert.ok(
-        share >= 0.4 && share <= 0.6,
-        `week ${days} variant ${variant}: yoga share ${share}`,
+        Math.abs(share - catalogShare) <= 0.18,
+        "week " + days + " variant " + variant + ": yoga share " + share + " vs catalog " + catalogShare,
       );
     }
   }
@@ -2135,7 +2149,7 @@ check("a handful of variants draws across most of the catalog", () => {
   }
   assert.ok(
     used.size >= 24,
-    `6 regenerations of a 5-day week should touch most of the 32-exercise catalog, got ${used.size}`,
+    `6 regenerations of a 5-day week should touch most of the 40-exercise catalog, got ${used.size}`,
   );
 });
 

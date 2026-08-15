@@ -58,10 +58,13 @@ function random(): number {
 
 /**
  * The exercise catalog — global content, seeded once, same for every person.
- * Every entry is researched from physio/PT sources for two postural patterns:
- * anterior pelvic tilt (lower cross: stretch hip flexors, strengthen glutes +
- * deep core) and rounded shoulders (upper cross: stretch chest, strengthen
- * upper back). Upserted by name so re-seeding updates instead of duplicating.
+ * Every entry is researched from physio/PT sources for the postural patterns
+ * a desk builds: anterior pelvic tilt (lower cross: stretch hip flexors,
+ * strengthen glutes + deep core), rounded shoulders (upper cross: stretch
+ * chest, strengthen upper back) and forward head (stretch the tight upper
+ * traps/levator, strengthen the deep neck flexors). Also includes the calf
+ * and forearm/wrist releases a desk shortens. Upserted by name so re-seeding
+ * updates instead of duplicating.
  */
 const EXERCISES: Array<{
   name: string;
@@ -493,6 +496,114 @@ const EXERCISES: Array<{
       "Pull back up to the start, keeping the movement controlled throughout.",
     ],
     prescription: "3 × 10–12",
+  },
+
+  // ------------------------------------------------------ yoga — neck (forward head)
+  {
+    name: "Chin Tucks",
+    equipment: "YOGA",
+    goal: "NECK_STRENGTH",
+    bodyParts: ["NECK"],
+    instructions: [
+      "Sit or stand tall, eyes level, shoulders relaxed down.",
+      "Draw your chin straight back — not down — as if making a double chin, keeping your gaze forward.",
+      "Hold the tucked position for 5 seconds, breathing normally, then release slowly.",
+      "The head should glide back over the spine; if it tilts up or down, make it smaller.",
+    ],
+    prescription: "10 slow reps · hold 5s",
+  },
+  {
+    name: "Deep Neck Flexor Hold",
+    equipment: "YOGA",
+    goal: "NECK_STRENGTH",
+    bodyParts: ["NECK"],
+    instructions: [
+      "Lie on your back, knees bent, head resting on the mat.",
+      "Tuck your chin gently, then lift your head barely off the mat — a centimetre or two — without letting the chin poke forward.",
+      "Hold with the deep neck muscles, not the jaw or the big surface muscles.",
+      "Lower slowly. Build time gradually; a long neck beats a high head.",
+    ],
+    prescription: "Hold 10–20s · 5 reps",
+  },
+  {
+    name: "Upper Trapezius Stretch",
+    equipment: "YOGA",
+    goal: "NECK_MOBILITY",
+    bodyParts: ["NECK", "SHOULDERS"],
+    instructions: [
+      "Sit or stand tall, one hand resting lightly at the base of your skull.",
+      "Gently tip your ear toward the same-side shoulder, letting the opposite shoulder drop away.",
+      "Use the hand only for a light nudge — let gravity do the work, and keep the chest open.",
+      "Hold, breathe into the side of the neck, and switch sides.",
+    ],
+    prescription: "Hold 30s per side",
+  },
+  {
+    name: "Levator Scapulae Stretch",
+    equipment: "YOGA",
+    goal: "NECK_MOBILITY",
+    bodyParts: ["NECK", "UPPER_BACK"],
+    instructions: [
+      "Sit tall and turn your nose toward one armpit, then drop the chin down and in.",
+      "Rest the same-side hand lightly on the back of your head — no pulling.",
+      "Feel the stretch along the back of the neck, near the top of the shoulder blade.",
+      "Hold, then release slowly and switch sides.",
+    ],
+    prescription: "Hold 30s per side",
+  },
+
+  // ------------------------------------------------------ yoga — calves & forearms
+  {
+    name: "Standing Calf Stretch",
+    equipment: "YOGA",
+    goal: "CALF_MOBILITY",
+    bodyParts: ["CALVES"],
+    instructions: [
+      "Stand facing a wall, one leg back, heel pressed to the floor, toes pointing straight ahead.",
+      "Keep the back leg straight and lean your body toward the wall until you feel the calf stretch.",
+      "Hold without bouncing; press through the heel to deepen.",
+      "Switch legs.",
+    ],
+    prescription: "Hold 45–60s per side",
+  },
+  {
+    name: "Wall Soleus Stretch",
+    equipment: "YOGA",
+    goal: "CALF_MOBILITY",
+    bodyParts: ["CALVES"],
+    instructions: [
+      "Stand close to a wall, one foot back, and bend both knees slightly.",
+      "Keep the back heel down and let that knee drift forward over the toes.",
+      "The bend is what targets the deep calf (soleus) rather than the big gastrocnemius.",
+      "Hold, breathe, switch sides.",
+    ],
+    prescription: "Hold 45–60s per side",
+  },
+  {
+    name: "Wrist Extensor Stretch",
+    equipment: "YOGA",
+    goal: "WRIST_MOBILITY",
+    bodyParts: ["FOREARMS"],
+    instructions: [
+      "Extend one arm straight in front of you, palm down.",
+      "Use the other hand to gently pull the fingers down and back toward you.",
+      "Keep the elbow straight and the shoulder relaxed; feel the stretch across the top of the forearm.",
+      "Hold, then switch arms.",
+    ],
+    prescription: "Hold 30–45s per side",
+  },
+  {
+    name: "Wrist Flexor Stretch",
+    equipment: "YOGA",
+    goal: "WRIST_MOBILITY",
+    bodyParts: ["FOREARMS"],
+    instructions: [
+      "Extend one arm straight in front of you, palm up.",
+      "Use the other hand to gently pull the fingers down toward the floor.",
+      "Keep the elbow straight; feel the stretch along the underside of the forearm.",
+      "Hold, then switch arms.",
+    ],
+    prescription: "Hold 30–45s per side",
   },
 ];
 

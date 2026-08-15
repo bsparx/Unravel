@@ -38,7 +38,11 @@ export type ExerciseGoal =
   | "LOWER_BACK_RELIEF"
   | "UPPER_BACK_STRENGTH"
   | "CHEST_MOBILITY"
-  | "POSTURE_AWARENESS";
+  | "POSTURE_AWARENESS"
+  | "NECK_MOBILITY"
+  | "NECK_STRENGTH"
+  | "CALF_MOBILITY"
+  | "WRIST_MOBILITY";
 
 /** What the generator actually needs from an exercise. */
 export interface PoolExercise {
@@ -75,6 +79,10 @@ const CATEGORY_OF_GOAL: Record<ExerciseGoal, SlotCategory> = {
   LOWER_BACK_RELIEF: "MOBILITY",
   CHEST_MOBILITY: "MOBILITY",
   UPPER_BACK_STRENGTH: "UPPER",
+  NECK_MOBILITY: "MOBILITY",
+  NECK_STRENGTH: "UPPER",
+  CALF_MOBILITY: "MOBILITY",
+  WRIST_MOBILITY: "MOBILITY",
 };
 
 /**
@@ -540,7 +548,7 @@ export interface WeekSummary {
   yoga: number;
   dumbbell: number;
   goals: Record<ExerciseGoal, number>;
-  /** Every goal covered at least once. */
+  /** Most goals covered at least once (a solid majority of the catalog). */
   balanced: boolean;
 }
 
@@ -555,6 +563,10 @@ export function summarizeWeek(slots: GeneratedSlot[], exercises: PoolExercise[])
     UPPER_BACK_STRENGTH: 0,
     CHEST_MOBILITY: 0,
     POSTURE_AWARENESS: 0,
+    NECK_MOBILITY: 0,
+    NECK_STRENGTH: 0,
+    CALF_MOBILITY: 0,
+    WRIST_MOBILITY: 0,
   };
   let yoga = 0;
   let dumbbell = 0;
@@ -569,5 +581,5 @@ export function summarizeWeek(slots: GeneratedSlot[], exercises: PoolExercise[])
 
   const days = new Set(slots.map((s) => s.dayOfWeek)).size;
   const covered = Object.values(goals).filter((count) => count > 0).length;
-  return { days, yoga, dumbbell, goals, balanced: covered >= 6 };
+  return { days, yoga, dumbbell, goals, balanced: covered >= 8 };
 }

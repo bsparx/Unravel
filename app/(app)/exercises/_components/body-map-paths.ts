@@ -9,8 +9,9 @@
  *
  * Three layers, drawn back to front:
  *   BODY_BASE — every segment of the body, the ground the rest sits on
- *   DETAIL    — head, arms, forearms, hands, shins, feet: never interactive,
- *               because no exercise in the catalog targets them
+ *   DETAIL    — head, upper arms, hands, feet: never interactive, because no
+ *               exercise in the catalog targets them (forearms and shins were
+ *               promoted to FOREARMS and CALVES regions)
  *   REGIONS   — the muscle groups, one entry per `BodyPart` code
  *
  * A muscle that exists on both sides of the body is two paths under one
@@ -52,17 +53,13 @@ export const BODY_BASE: string[] = [
   "M161.5 268H158.5Q150 268 150 276.5L151 297.5Q151 306 159.5 306H159.5Q168 306 168 297.5L170 276.5Q170 268 161.5 268Z",
 ];
 
-/** Head, arms, hands, shins, feet — nothing in the catalog targets these. */
+/** Head, upper arms, hands and feet — nothing in the catalog targets these. */
 export const BODY_DETAIL: string[] = [
   "M100 20a21 24 0 1 0 0.1 0Z",
   "M49 92H51Q62 92 62 103L57 185Q57 196 46 196H44Q33 196 33 185L38 103Q38 92 49 92Z",
   "M151 92H149Q138 92 138 103L143 185Q143 196 154 196H156Q167 196 167 185L162 103Q162 92 151 92Z",
-  "M43 190H45Q55 190 55 200L50 264Q50 274 40 274H39Q29 274 29 264L33 200Q33 190 43 190Z",
-  "M157 190H155Q145 190 145 200L150 264Q150 274 160 274H161Q171 274 171 264L167 200Q167 190 157 190Z",
   "M38.5 268H41.5Q50 268 50 276.5L49 297.5Q49 306 40.5 306H40.5Q32 306 32 297.5L30 276.5Q30 268 38.5 268Z",
   "M161.5 268H158.5Q150 268 150 276.5L151 297.5Q151 306 159.5 306H159.5Q168 306 168 297.5L170 276.5Q170 268 161.5 268Z",
-  "M77.5 336H84.5Q94 336 94 345.5L91 414.5Q91 424 81.5 424H81.5Q72 424 72 414.5L68 345.5Q68 336 77.5 336Z",
-  "M122.5 336H115.5Q106 336 106 345.5L109 414.5Q109 424 118.5 424H118.5Q128 424 128 414.5L132 345.5Q132 336 122.5 336Z",
   "M78 418H85Q93 418 93 426L95 434Q95 442 87 442H74Q66 442 66 434L70 426Q70 418 78 418Z",
   "M122 418H115Q107 418 107 426L105 434Q105 442 113 442H126Q134 442 134 434L130 426Q130 418 122 418Z",
 ];
@@ -77,6 +74,8 @@ export const FRONT_REGIONS: MuscleRegion[] = [
   { part: "HIP_FLEXORS", d: "M117.5 206H113.5Q103 206 103 216.5L103 239.5Q103 250 113.5 250H113.5Q124 250 124 239.5L128 216.5Q128 206 117.5 206Z" },
   { part: "QUADS", d: "M76 252H84Q96 252 96 264L94 322Q94 334 82 334H82Q70 334 70 322L64 264Q64 252 76 252Z" },
   { part: "QUADS", d: "M124 252H116Q104 252 104 264L106 322Q106 334 118 334H118Q130 334 130 322L136 264Q136 252 124 252Z" },
+  { part: "FOREARMS", d: "M43 190H45Q55 190 55 200L50 264Q50 274 40 274H39Q29 274 29 264L33 200Q33 190 43 190Z" },
+  { part: "FOREARMS", d: "M157 190H155Q145 190 145 200L150 264Q150 274 160 274H161Q171 274 171 264L167 200Q167 190 157 190Z" },
 ];
 
 export const BACK_REGIONS: MuscleRegion[] = [
@@ -90,6 +89,9 @@ export const BACK_REGIONS: MuscleRegion[] = [
   { part: "GLUTES", d: "M120 204H117Q103 204 103 218L104 248Q104 262 118 262H118Q132 262 132 248L134 218Q134 204 120 204Z" },
   { part: "HAMSTRINGS", d: "M78 260H84Q96 260 96 272L94 322Q94 334 82 334H82Q70 334 70 322L66 272Q66 260 78 260Z" },
   { part: "HAMSTRINGS", d: "M122 260H116Q104 260 104 272L106 322Q106 334 118 334H118Q130 334 130 322L134 272Q134 260 122 260Z" },
+  { part: "NECK", d: "M94 62H106Q112 62 112 68L115 78Q115 84 109 84H91Q85 84 85 78L88 68Q88 62 94 62Z" },
+  { part: "CALVES", d: "M77.5 336H84.5Q94 336 94 345.5L91 414.5Q91 424 81.5 424H81.5Q72 424 72 414.5L68 345.5Q68 336 77.5 336Z" },
+  { part: "CALVES", d: "M122.5 336H115.5Q106 336 106 345.5L109 414.5Q109 424 118.5 424H118.5Q128 424 128 414.5L132 345.5Q132 336 122.5 336Z" },
 ];
 
 /** Every part the figures can show, for count-building and tests. */
@@ -122,6 +124,7 @@ export const FRONT_ANCHORS: Record<string, RegionAnchor> = {
   CORE: { x: 77, y: 174 },
   HIP_FLEXORS: { x: 76, y: 224 },
   QUADS: { x: 68, y: 280 },
+  FOREARMS: { x: 42, y: 232 },
 };
 
 // SPINE's anchor sits high on purpose: LOWER_BACK paints over the strip
@@ -133,4 +136,6 @@ export const BACK_ANCHORS: Record<string, RegionAnchor> = {
   LOWER_BACK: { x: 124, y: 190 },
   GLUTES: { x: 130, y: 232 },
   HAMSTRINGS: { x: 130, y: 292 },
+  NECK: { x: 104, y: 72 },
+  CALVES: { x: 119, y: 380 },
 };

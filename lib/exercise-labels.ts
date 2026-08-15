@@ -30,6 +30,10 @@ export const GOAL_LABELS: Record<ExerciseGoal, string> = {
   UPPER_BACK_STRENGTH: "Upper back strength",
   CHEST_MOBILITY: "Chest mobility",
   POSTURE_AWARENESS: "Posture awareness",
+  NECK_MOBILITY: "Neck mobility",
+  NECK_STRENGTH: "Deep neck flexors",
+  CALF_MOBILITY: "Calf mobility",
+  WRIST_MOBILITY: "Wrist mobility",
 };
 
 export const GOAL_SHORT: Record<ExerciseGoal, string> = {
@@ -41,6 +45,10 @@ export const GOAL_SHORT: Record<ExerciseGoal, string> = {
   UPPER_BACK_STRENGTH: "Upper back",
   CHEST_MOBILITY: "Chest",
   POSTURE_AWARENESS: "Posture",
+  NECK_MOBILITY: "Neck",
+  NECK_STRENGTH: "Neck flexors",
+  CALF_MOBILITY: "Calves",
+  WRIST_MOBILITY: "Forearms",
 };
 
 export const GOAL_ORDER: ExerciseGoal[] = [
@@ -52,6 +60,10 @@ export const GOAL_ORDER: ExerciseGoal[] = [
   "UPPER_BACK_STRENGTH",
   "CHEST_MOBILITY",
   "POSTURE_AWARENESS",
+  "NECK_MOBILITY",
+  "NECK_STRENGTH",
+  "CALF_MOBILITY",
+  "WRIST_MOBILITY",
 ];
 
 export const BODY_PART_LABELS: Record<string, string> = {
@@ -66,6 +78,9 @@ export const BODY_PART_LABELS: Record<string, string> = {
   CHEST: "Chest",
   SPINE: "Spine",
   FULL_BODY: "Full body",
+  NECK: "Neck",
+  CALVES: "Calves",
+  FOREARMS: "Forearms",
 };
 
 /** Sentence-case a goal code for inline chips. */

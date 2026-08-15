@@ -646,6 +646,10 @@ export const EXERCISE_GOALS = [
   "UPPER_BACK_STRENGTH",
   "CHEST_MOBILITY",
   "POSTURE_AWARENESS",
+  "NECK_MOBILITY",
+  "NECK_STRENGTH",
+  "CALF_MOBILITY",
+  "WRIST_MOBILITY",
 ] as const;
 
 export const BODY_PARTS = [
@@ -660,6 +664,9 @@ export const BODY_PARTS = [
   "CHEST",
   "SPINE",
   "FULL_BODY",
+  "NECK",
+  "CALVES",
+  "FOREARMS",
 ] as const;
 
 /** The routine builder offers 1 to 7 training days — any week shape is allowed. */

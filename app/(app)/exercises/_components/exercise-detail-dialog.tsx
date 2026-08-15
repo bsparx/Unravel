@@ -29,7 +29,11 @@ type ExerciseGoal =
   | "LOWER_BACK_RELIEF"
   | "UPPER_BACK_STRENGTH"
   | "CHEST_MOBILITY"
-  | "POSTURE_AWARENESS";
+  | "POSTURE_AWARENESS"
+  | "NECK_MOBILITY"
+  | "NECK_STRENGTH"
+  | "CALF_MOBILITY"
+  | "WRIST_MOBILITY";
 
 /** A YouTube watch URL -> the embeddable src, when the link is shareable. */
 function embedSrc(url: string | null): string | null {
