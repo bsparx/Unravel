@@ -12,6 +12,7 @@ import { idleState } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 
 import { createOneThing, selectOneThing } from "../actions";
+import { FrogPondLazy } from "./frog-pond-lazy";
 
 export type PassOption = {
   kind: "task" | "capture";
@@ -34,8 +35,8 @@ export function MorningPass({
   options,
   dateISO,
   projects,
-  heading = "What's the one thing?",
-  hint = "Everything else can wait. You can always change it.",
+  heading = "What's the frog?",
+  hint = "The one you're avoiding. Everything else can wait.",
 }: {
   options: PassOption[];
   dateISO: string;
@@ -62,8 +63,9 @@ export function MorningPass({
 
     return (
       <div className="w-full">
-        <h1 className="font-display text-display text-balance">
-          Set up the one thing
+        <FrogPondLazy mood="waiting" />
+        <h1 className="font-display mt-6 text-display text-balance">
+          Set up the frog
         </h1>
         <p className="text-muted-foreground mt-2 text-body">
           {date ? `Due ${formatFullDate(date)} — that's the point of it.` : null}{" "}
@@ -79,7 +81,7 @@ export function MorningPass({
             // The day is the deadline. Asking would be a question with one
             // possible answer.
             showDeadline={false}
-            titleLabel="The one thing"
+            titleLabel="The frog"
             values={{ title: typed }}
             submitLabel="Set it"
             cancelLabel="Never mind"
@@ -95,7 +97,8 @@ export function MorningPass({
 
   return (
     <div className="w-full">
-      <h1 className="font-display text-display text-balance">{heading}</h1>
+      <FrogPondLazy mood="waiting" />
+      <h1 className="font-display mt-6 text-display text-balance">{heading}</h1>
       <p className="text-muted-foreground mt-2 text-body">{hint}</p>
 
       {options.length > 0 && (
@@ -140,7 +143,7 @@ export function MorningPass({
       <form action={formAction} className="mt-6 flex gap-2">
         <input type="hidden" name="date" value={dateISO} />
         <label htmlFor="one-thing-title" className="sr-only">
-          Or type it
+          Or type your frog
         </label>
         <Input
           id="one-thing-title"
@@ -151,7 +154,7 @@ export function MorningPass({
           maxLength={200}
           autoComplete="off"
           placeholder={
-            options.length > 0 ? "Or something else entirely…" : "Type it here…"
+            options.length > 0 ? "Or type your frog…" : "Type your frog…"
           }
           className="h-11 text-body"
         />
@@ -160,7 +163,7 @@ export function MorningPass({
         </Button>
       </form>
 
-      {/* The way out for a one thing that's actually several moves. Quiet, and
+      {/* The way out for a frog that's actually several moves. Quiet, and
           below the fast path, because most mornings the title is enough. */}
       <button
         type="button"

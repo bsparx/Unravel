@@ -150,7 +150,7 @@ export async function createOneThing(
   revalidatePath("/tasks");
   revalidatePath("/calendar");
 
-  return { status: "success", message: "That's the one thing." };
+  return { status: "success", message: "That's the frog." };
 }
 
 /** Change your mind. The task itself is untouched. */

@@ -10,6 +10,7 @@ import { nextStep, stepProgress } from "@/lib/steps";
 import { toWorkMode } from "@/lib/timer-math";
 
 import { clearOneThing } from "../actions";
+import { FrogPondLazy } from "./frog-pond-lazy";
 
 /**
  * One card, one button.
@@ -35,8 +36,10 @@ export function OneThingCard({
 
   return (
     <div className="w-full">
-      <p className="text-micro text-muted-foreground font-medium tracking-wider uppercase">
-        {done ? "Today's one thing — done" : "Today, the one thing is"}
+      <FrogPondLazy mood={done ? "eaten" : "chosen"} />
+
+      <p className="text-micro text-muted-foreground mt-6 font-medium tracking-wider uppercase">
+        {done ? "Today's frog — eaten" : "Today, the frog is"}
       </p>
 
       <h1 className="font-display mt-3 text-display text-balance">
@@ -50,7 +53,7 @@ export function OneThingCard({
       ) : null}
 
       {upNext && !done && (
-        // The one thing, reduced to the one move.
+        // The frog, reduced to the one move.
         //
         // Even a screen showing a single task can be too big to start — the
         // title is the whole scope of the thing. This is the only line on the
@@ -95,7 +98,7 @@ export function OneThingCard({
           <>
             <p className="text-primary inline-flex items-center gap-2 text-body">
               <Check className="size-4" aria-hidden />
-              That was the day. Nothing else is required.
+              That was the frog. Nothing else is required.
             </p>
             <Button asChild variant="outline">
               <Link href={RECOVERY_HREF}>
@@ -114,7 +117,7 @@ export function OneThingCard({
                 plannedIntervals: task.plannedIntervals,
               })}
             >
-              Start on it
+              Eat the frog
             </Link>
           </Button>
         )}
