@@ -650,6 +650,13 @@ export const EXERCISE_GOALS = [
   "NECK_STRENGTH",
   "CALF_MOBILITY",
   "WRIST_MOBILITY",
+  "LEG_STRENGTH",
+  "PUSH_STRENGTH",
+  "BALANCE",
+  "CARDIO",
+  "HIP_MOBILITY",
+  "ANKLE_MOBILITY",
+  "CALF_STRENGTH",
 ] as const;
 
 export const BODY_PARTS = [
@@ -667,6 +674,9 @@ export const BODY_PARTS = [
   "NECK",
   "CALVES",
   "FOREARMS",
+  "ADDUCTORS",
+  "ANKLES",
+  "ARMS",
 ] as const;
 
 /** The routine builder offers 1 to 7 training days — any week shape is allowed. */
@@ -692,6 +702,7 @@ export const routineDaysSchema = z
       .transform((days) => [...new Set(days)].sort((a, b) => a - b)),
     counts: z.array(z.coerce.number().int().min(1).max(MAX_EXERCISES_PER_DAY)),
     equipment: z.enum(["YOGA", "DUMBBELL", "MIX"]).default("MIX"),
+    dayTypes: z.array(z.enum(["STANDARD", "FLOW", "RECOVERY"])).optional(),
   })
   .superRefine((value, ctx) => {
     if (value.days.length !== value.daysPerWeek) {
@@ -706,6 +717,16 @@ export const routineDaysSchema = z
         code: "custom",
         path: ["counts"],
         message: "Pick how many exercises each day will carry.",
+      });
+    }
+    if (
+      value.dayTypes !== undefined &&
+      value.dayTypes.length !== value.days.length
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["dayTypes"],
+        message: "Name a kind for every day.",
       });
     }
   });

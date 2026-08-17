@@ -20,6 +20,7 @@ import type {
   BodyPart,
   ExerciseEquipment,
   ExerciseGoal,
+  ExerciseType,
   TimerMode,
 } from "../lib/generated/prisma/client";
 
@@ -46,7 +47,9 @@ function localDate(offsetDays: number): Date {
     month: "2-digit",
     day: "2-digit",
   }).format(now);
-  return new Date(new Date(`${iso}T00:00:00.000Z`).getTime() + offsetDays * MS_PER_DAY);
+  return new Date(
+    new Date(`${iso}T00:00:00.000Z`).getTime() + offsetDays * MS_PER_DAY,
+  );
 }
 
 /** Deterministic pseudo-random, so re-seeding produces the same story. */
@@ -65,11 +68,18 @@ function random(): number {
  * traps/levator, strengthen the deep neck flexors). Also includes the calf
  * and forearm/wrist releases a desk shortens. Upserted by name so re-seeding
  * updates instead of duplicating.
+ *
+ * Every entry carries a `type` — STRENGTH, MOBILITY or FLOW — the shape the
+ * body is doing, kept separate from `goal` because a goal name can't tell a
+ * hold from a stretch (HAMSTRING_LENGTH names both a fold and a deadlift).
+ * The routine generator composes days from `type`, so a day is never three
+ * stretches wearing a workout's clothes.
  */
 const EXERCISES: Array<{
   name: string;
   equipment: ExerciseEquipment;
   goal: ExerciseGoal;
+  type: ExerciseType;
   bodyParts: BodyPart[];
   instructions: string[];
   prescription: string;
@@ -79,6 +89,7 @@ const EXERCISES: Array<{
     name: "Bridge Pose",
     equipment: "YOGA",
     goal: "GLUTE_STRENGTH",
+    type: "STRENGTH",
     bodyParts: ["GLUTES", "HAMSTRINGS", "LOWER_BACK"],
     instructions: [
       "Lie on your back, knees bent, feet flat and hip-width apart, heels close enough to touch with your fingertips.",
@@ -92,6 +103,7 @@ const EXERCISES: Array<{
     name: "Low Lunge (Anjaneyasana)",
     equipment: "YOGA",
     goal: "HIP_FLEXOR_MOBILITY",
+    type: "MOBILITY",
     bodyParts: ["HIP_FLEXORS", "QUADS", "GLUTES"],
     instructions: [
       "From a lunge, drop the back knee to the mat, toes untucked.",
@@ -105,6 +117,7 @@ const EXERCISES: Array<{
     name: "Pelvic Tilts",
     equipment: "YOGA",
     goal: "POSTURE_AWARENESS",
+    type: "MOBILITY",
     bodyParts: ["CORE", "LOWER_BACK"],
     instructions: [
       "Lie on your back, knees bent, feet flat. Rest your palms on your upper thighs.",
@@ -118,6 +131,7 @@ const EXERCISES: Array<{
     name: "Cat–Cow",
     equipment: "YOGA",
     goal: "LOWER_BACK_RELIEF",
+    type: "MOBILITY",
     bodyParts: ["SPINE", "CORE", "LOWER_BACK"],
     instructions: [
       "Start on hands and knees, wrists under shoulders, knees under hips.",
@@ -131,6 +145,7 @@ const EXERCISES: Array<{
     name: "Bird Dog",
     equipment: "YOGA",
     goal: "CORE_STABILITY",
+    type: "STRENGTH",
     bodyParts: ["CORE", "GLUTES", "LOWER_BACK"],
     instructions: [
       "Start on hands and knees, back flat and neutral.",
@@ -144,6 +159,7 @@ const EXERCISES: Array<{
     name: "Locust Pose",
     equipment: "YOGA",
     goal: "UPPER_BACK_STRENGTH",
+    type: "STRENGTH",
     bodyParts: ["GLUTES", "HAMSTRINGS", "UPPER_BACK", "LOWER_BACK"],
     instructions: [
       "Lie on your belly, legs together, arms by your sides with palms facing in.",
@@ -157,6 +173,7 @@ const EXERCISES: Array<{
     name: "Boat Pose",
     equipment: "YOGA",
     goal: "CORE_STABILITY",
+    type: "STRENGTH",
     bodyParts: ["CORE", "HIP_FLEXORS"],
     instructions: [
       "Sit tall, knees bent, feet flat. Lean back slightly and lift the feet so shins are parallel to the floor.",
@@ -170,6 +187,7 @@ const EXERCISES: Array<{
     name: "Reclined Spinal Twist",
     equipment: "YOGA",
     goal: "LOWER_BACK_RELIEF",
+    type: "MOBILITY",
     bodyParts: ["LOWER_BACK", "SPINE"],
     instructions: [
       "Lie on your back, arms out to a T, palms up.",
@@ -183,6 +201,7 @@ const EXERCISES: Array<{
     name: "Child's Pose",
     equipment: "YOGA",
     goal: "LOWER_BACK_RELIEF",
+    type: "MOBILITY",
     bodyParts: ["LOWER_BACK", "HIP_FLEXORS", "SHOULDERS"],
     instructions: [
       "From hands and knees, sit back toward your heels and walk the hands forward.",
@@ -196,6 +215,7 @@ const EXERCISES: Array<{
     name: "Standing Forward Fold",
     equipment: "YOGA",
     goal: "HAMSTRING_LENGTH",
+    type: "MOBILITY",
     bodyParts: ["HAMSTRINGS", "LOWER_BACK"],
     instructions: [
       "Stand tall, feet hip-width apart, soft knees.",
@@ -209,6 +229,7 @@ const EXERCISES: Array<{
     name: "Downward-Facing Dog",
     equipment: "YOGA",
     goal: "HAMSTRING_LENGTH",
+    type: "MOBILITY",
     bodyParts: ["SHOULDERS", "HAMSTRINGS", "UPPER_BACK"],
     instructions: [
       "From hands and knees, tuck the toes and lift the hips up and back.",
@@ -222,6 +243,7 @@ const EXERCISES: Array<{
     name: "Cobra Pose",
     equipment: "YOGA",
     goal: "UPPER_BACK_STRENGTH",
+    type: "STRENGTH",
     bodyParts: ["UPPER_BACK", "CHEST", "LOWER_BACK"],
     instructions: [
       "Lie on your belly, hands under your shoulders, elbows close to the body.",
@@ -237,6 +259,7 @@ const EXERCISES: Array<{
     name: "Thread the Needle",
     equipment: "YOGA",
     goal: "CHEST_MOBILITY",
+    type: "MOBILITY",
     bodyParts: ["UPPER_BACK", "SHOULDERS", "CHEST"],
     instructions: [
       "From hands and knees, slide the right arm underneath the body, palm up, right shoulder and ear lowering toward the mat.",
@@ -250,6 +273,7 @@ const EXERCISES: Array<{
     name: "Puppy Pose",
     equipment: "YOGA",
     goal: "CHEST_MOBILITY",
+    type: "MOBILITY",
     bodyParts: ["CHEST", "SHOULDERS", "UPPER_BACK"],
     instructions: [
       "From hands and knees, walk the hands forward while keeping the hips stacked over the knees.",
@@ -263,6 +287,7 @@ const EXERCISES: Array<{
     name: "Cow Face Arms",
     equipment: "YOGA",
     goal: "CHEST_MOBILITY",
+    type: "MOBILITY",
     bodyParts: ["SHOULDERS", "UPPER_BACK", "CHEST"],
     instructions: [
       "Sit tall or kneel. Reach the right arm up, then bend the elbow and let the hand drop behind the upper back.",
@@ -276,6 +301,7 @@ const EXERCISES: Array<{
     name: "Eagle Arms",
     equipment: "YOGA",
     goal: "UPPER_BACK_STRENGTH",
+    type: "MOBILITY",
     bodyParts: ["SHOULDERS", "UPPER_BACK"],
     instructions: [
       "Stand tall. Cross the right arm over the left at the elbow, bend both elbows and bring the backs of the forearms together.",
@@ -291,6 +317,7 @@ const EXERCISES: Array<{
     name: "Dumbbell Glute Bridge",
     equipment: "DUMBBELL",
     goal: "GLUTE_STRENGTH",
+    type: "STRENGTH",
     bodyParts: ["GLUTES", "HAMSTRINGS", "CORE"],
     instructions: [
       "Lie on your back, knees bent, feet flat and hip-width apart. Rest a light dumbbell across your hip crease and hold it with both hands.",
@@ -304,6 +331,7 @@ const EXERCISES: Array<{
     name: "Single-Leg Dumbbell Glute Bridge",
     equipment: "DUMBBELL",
     goal: "GLUTE_STRENGTH",
+    type: "STRENGTH",
     bodyParts: ["GLUTES", "HAMSTRINGS", "CORE"],
     instructions: [
       "Lie on your back with one knee bent, foot flat. Extend the other leg straight or hover it above the floor.",
@@ -317,6 +345,7 @@ const EXERCISES: Array<{
     name: "Dumbbell Hip Thrust",
     equipment: "DUMBBELL",
     goal: "GLUTE_STRENGTH",
+    type: "STRENGTH",
     bodyParts: ["GLUTES", "HAMSTRINGS"],
     instructions: [
       "Sit on the floor with your upper back against a bench, a light dumbbell across your hip crease.",
@@ -330,6 +359,7 @@ const EXERCISES: Array<{
     name: "Dumbbell Romanian Deadlift",
     equipment: "DUMBBELL",
     goal: "HAMSTRING_LENGTH",
+    type: "STRENGTH",
     bodyParts: ["HAMSTRINGS", "GLUTES", "LOWER_BACK"],
     instructions: [
       "Stand tall holding light dumbbells in front of your thighs, feet hip-width, soft knees.",
@@ -343,6 +373,7 @@ const EXERCISES: Array<{
     name: "Goblet Squat",
     equipment: "DUMBBELL",
     goal: "GLUTE_STRENGTH",
+    type: "STRENGTH",
     bodyParts: ["GLUTES", "QUADS", "CORE"],
     instructions: [
       "Hold one light dumbbell at your chest, elbows tucked in.",
@@ -356,6 +387,7 @@ const EXERCISES: Array<{
     name: "Weighted Dead Bug",
     equipment: "DUMBBELL",
     goal: "CORE_STABILITY",
+    type: "STRENGTH",
     bodyParts: ["CORE", "HIP_FLEXORS"],
     instructions: [
       "Lie on your back with arms extended over the chest, holding one light dumbbell with both hands.",
@@ -369,6 +401,7 @@ const EXERCISES: Array<{
     name: "Standing Dumbbell Hip Extension",
     equipment: "DUMBBELL",
     goal: "GLUTE_STRENGTH",
+    type: "STRENGTH",
     bodyParts: ["GLUTES", "HAMSTRINGS"],
     instructions: [
       "Stand tall, one hand on a wall or chair for balance. Hold a light dumbbell in the crook of the opposite knee.",
@@ -382,6 +415,7 @@ const EXERCISES: Array<{
     name: "Dumbbell Reverse Lunge",
     equipment: "DUMBBELL",
     goal: "GLUTE_STRENGTH",
+    type: "STRENGTH",
     bodyParts: ["GLUTES", "QUADS", "CORE"],
     instructions: [
       "Stand tall, light dumbbells at your sides.",
@@ -395,6 +429,7 @@ const EXERCISES: Array<{
     name: "Farmer's Carry",
     equipment: "DUMBBELL",
     goal: "POSTURE_AWARENESS",
+    type: "STRENGTH",
     bodyParts: ["FULL_BODY", "CORE", "SHOULDERS"],
     instructions: [
       "Hold a light dumbbell in each hand, arms long, shoulders relaxed down and back.",
@@ -410,6 +445,7 @@ const EXERCISES: Array<{
     name: "Bent-Over Dumbbell Row",
     equipment: "DUMBBELL",
     goal: "UPPER_BACK_STRENGTH",
+    type: "STRENGTH",
     bodyParts: ["UPPER_BACK", "SHOULDERS"],
     instructions: [
       "Hinge forward from the hips to roughly 45°, back straight, core engaged, light dumbbells hanging down.",
@@ -423,6 +459,7 @@ const EXERCISES: Array<{
     name: "Single-Arm Dumbbell Row",
     equipment: "DUMBBELL",
     goal: "UPPER_BACK_STRENGTH",
+    type: "STRENGTH",
     bodyParts: ["UPPER_BACK", "CORE"],
     instructions: [
       "Place one hand and the same-side knee on a bench, back flat, neck neutral.",
@@ -436,6 +473,7 @@ const EXERCISES: Array<{
     name: "Dumbbell Reverse Fly",
     equipment: "DUMBBELL",
     goal: "UPPER_BACK_STRENGTH",
+    type: "STRENGTH",
     bodyParts: ["UPPER_BACK", "SHOULDERS"],
     instructions: [
       "Hinge forward at the hips with a long, flat back, soft knees, light dumbbells hanging straight down, palms facing each other.",
@@ -449,6 +487,7 @@ const EXERCISES: Array<{
     name: "Prone Y Raise",
     equipment: "DUMBBELL",
     goal: "UPPER_BACK_STRENGTH",
+    type: "STRENGTH",
     bodyParts: ["UPPER_BACK", "SHOULDERS"],
     instructions: [
       "Lie face down, arms extended overhead in a Y, thumbs pointing up, very light dumbbells (or none at all).",
@@ -462,6 +501,7 @@ const EXERCISES: Array<{
     name: "Prone T Raise",
     equipment: "DUMBBELL",
     goal: "UPPER_BACK_STRENGTH",
+    type: "STRENGTH",
     bodyParts: ["UPPER_BACK", "SHOULDERS"],
     instructions: [
       "Lie face down, arms out to the sides in a T, palms down, very light dumbbells.",
@@ -475,6 +515,7 @@ const EXERCISES: Array<{
     name: "Dumbbell YTW",
     equipment: "DUMBBELL",
     goal: "UPPER_BACK_STRENGTH",
+    type: "STRENGTH",
     bodyParts: ["UPPER_BACK", "SHOULDERS"],
     instructions: [
       "Hinge forward to about 45° with light dumbbells, arms hanging below your chest.",
@@ -488,6 +529,7 @@ const EXERCISES: Array<{
     name: "Dumbbell Pullover",
     equipment: "DUMBBELL",
     goal: "CHEST_MOBILITY",
+    type: "MOBILITY",
     bodyParts: ["CHEST", "FULL_BODY", "CORE"],
     instructions: [
       "Lie on your back (bench or floor), knees bent. Hold one light dumbbell with both hands over your chest.",
@@ -503,6 +545,7 @@ const EXERCISES: Array<{
     name: "Chin Tucks",
     equipment: "YOGA",
     goal: "NECK_STRENGTH",
+    type: "STRENGTH",
     bodyParts: ["NECK"],
     instructions: [
       "Sit or stand tall, eyes level, shoulders relaxed down.",
@@ -516,6 +559,7 @@ const EXERCISES: Array<{
     name: "Deep Neck Flexor Hold",
     equipment: "YOGA",
     goal: "NECK_STRENGTH",
+    type: "STRENGTH",
     bodyParts: ["NECK"],
     instructions: [
       "Lie on your back, knees bent, head resting on the mat.",
@@ -529,6 +573,7 @@ const EXERCISES: Array<{
     name: "Upper Trapezius Stretch",
     equipment: "YOGA",
     goal: "NECK_MOBILITY",
+    type: "MOBILITY",
     bodyParts: ["NECK", "SHOULDERS"],
     instructions: [
       "Sit or stand tall, one hand resting lightly at the base of your skull.",
@@ -542,6 +587,7 @@ const EXERCISES: Array<{
     name: "Levator Scapulae Stretch",
     equipment: "YOGA",
     goal: "NECK_MOBILITY",
+    type: "MOBILITY",
     bodyParts: ["NECK", "UPPER_BACK"],
     instructions: [
       "Sit tall and turn your nose toward one armpit, then drop the chin down and in.",
@@ -557,6 +603,7 @@ const EXERCISES: Array<{
     name: "Standing Calf Stretch",
     equipment: "YOGA",
     goal: "CALF_MOBILITY",
+    type: "MOBILITY",
     bodyParts: ["CALVES"],
     instructions: [
       "Stand facing a wall, one leg back, heel pressed to the floor, toes pointing straight ahead.",
@@ -570,6 +617,7 @@ const EXERCISES: Array<{
     name: "Wall Soleus Stretch",
     equipment: "YOGA",
     goal: "CALF_MOBILITY",
+    type: "MOBILITY",
     bodyParts: ["CALVES"],
     instructions: [
       "Stand close to a wall, one foot back, and bend both knees slightly.",
@@ -583,6 +631,7 @@ const EXERCISES: Array<{
     name: "Wrist Extensor Stretch",
     equipment: "YOGA",
     goal: "WRIST_MOBILITY",
+    type: "MOBILITY",
     bodyParts: ["FOREARMS"],
     instructions: [
       "Extend one arm straight in front of you, palm down.",
@@ -596,6 +645,7 @@ const EXERCISES: Array<{
     name: "Wrist Flexor Stretch",
     equipment: "YOGA",
     goal: "WRIST_MOBILITY",
+    type: "MOBILITY",
     bodyParts: ["FOREARMS"],
     instructions: [
       "Extend one arm straight in front of you, palm up.",
@@ -604,6 +654,226 @@ const EXERCISES: Array<{
       "Hold, then switch arms.",
     ],
     prescription: "Hold 30–45s per side",
+  },
+
+  // ------------------------------------------------------ yoga — leg strength
+  {
+    name: "Chair Pose",
+    equipment: "YOGA",
+    goal: "LEG_STRENGTH",
+    type: "STRENGTH",
+    bodyParts: ["QUADS", "GLUTES", "CORE", "UPPER_BACK"],
+    instructions: [
+      "Stand with feet hip-width apart. Bend the knees and sit the hips back and down as if lowering into a chair behind you.",
+      "Shift the weight into the heels — you should be able to wiggle your toes. Keep the knees tracking over the middle toes.",
+      "Lengthen the tailbone down and draw the lower ribs in; do not let the lower back arch to lift the chest.",
+      "Reach the arms forward or overhead, shoulders down. Breathe steadily — the legs should be burning by the end.",
+    ],
+    prescription: "Hold 45–60s · 3 rounds",
+  },
+  {
+    name: "Warrior II",
+    equipment: "YOGA",
+    goal: "LEG_STRENGTH",
+    type: "STRENGTH",
+    bodyParts: ["QUADS", "GLUTES", "ADDUCTORS", "SHOULDERS"],
+    instructions: [
+      "Step the feet wide apart. Turn the right foot out 90° and angle the left foot slightly in; align the right heel with the left arch.",
+      "Bend the right knee toward 90°, knee stacked over the ankle and tracking toward the little toe — never collapsing inward.",
+      "Keep the torso stacked directly over the hips, not leaning forward. Tailbone down, ribs quiet.",
+      "Extend the arms parallel to the floor, gaze over the front hand. Actively press the back foot's outer edge into the mat.",
+    ],
+    prescription: "Hold 45–60s per side",
+  },
+  {
+    name: "High Lunge",
+    equipment: "YOGA",
+    goal: "LEG_STRENGTH",
+    type: "STRENGTH",
+    bodyParts: ["QUADS", "GLUTES", "HIP_FLEXORS", "CORE"],
+    instructions: [
+      "From standing, step one foot far back, ball of the foot down, back leg straight and strong.",
+      "Bend the front knee to roughly 90°, shin vertical, weight even between both legs.",
+      "Draw the back hip forward so the pelvis is square, then lengthen the tailbone down — this is where the back hip flexor gets both stretched and loaded.",
+      "Reach the arms overhead or keep hands at the hips. Hold with the legs working, not by resting into the joints.",
+    ],
+    prescription: "Hold 30–45s per side · 2 rounds",
+  },
+  {
+    name: "Garland Pose (Malasana)",
+    equipment: "YOGA",
+    goal: "ANKLE_MOBILITY",
+    type: "MOBILITY",
+    bodyParts: ["ANKLES", "ADDUCTORS", "GLUTES", "LOWER_BACK"],
+    instructions: [
+      "Stand with feet slightly wider than hip-width, toes turned out a little. Squat all the way down, hips below the knees.",
+      "Bring the palms together at the chest and press the elbows lightly against the inner knees to open the hips.",
+      "Work the heels toward the floor — sit on a folded blanket or a book under the heels if they lift.",
+      "Lift the chest and lengthen the spine. This is the deep squat position most desk-bound people lose entirely.",
+    ],
+    prescription: "Hold 60–90s",
+  },
+
+  // ----------------------------------------------------- yoga — push strength
+  {
+    name: "Plank",
+    equipment: "YOGA",
+    goal: "PUSH_STRENGTH",
+    type: "STRENGTH",
+    bodyParts: ["CORE", "SHOULDERS", "CHEST", "GLUTES"],
+    instructions: [
+      "From hands and knees, step the feet back so the body forms one straight line from heels to crown.",
+      "Stack the shoulders directly over the wrists and push the floor away — the upper back should feel broad, not sunken between the blades.",
+      "Squeeze the glutes and tuck the tailbone slightly so the hips neither sag nor pike up.",
+      "Breathe normally throughout. Drop to the knees the moment the lower back starts to dip — a shorter clean hold beats a long sagging one.",
+    ],
+    prescription: "Hold 45–60s · 3 rounds",
+  },
+  {
+    name: "Side Plank",
+    equipment: "YOGA",
+    goal: "CORE_STABILITY",
+    type: "STRENGTH",
+    bodyParts: ["CORE", "SHOULDERS", "GLUTES"],
+    instructions: [
+      "Lie on one side, then prop up on the forearm (elbow under the shoulder) or the straight arm, feet stacked or staggered.",
+      "Lift the hips until the body is one straight line from ankle to head — no sagging at the waist.",
+      "Press the bottom shoulder down and away from the ear; reach the top arm to the ceiling or rest it on the hip.",
+      "Drop the bottom knee to the mat for an easier version. This trains the side of the core, which nothing else in your library covers.",
+    ],
+    prescription: "Hold 30–45s per side · 2 rounds",
+  },
+  {
+    name: "Chaturanga Hold",
+    equipment: "YOGA",
+    goal: "PUSH_STRENGTH",
+    type: "STRENGTH",
+    bodyParts: ["CHEST", "SHOULDERS", "ARMS", "CORE"],
+    instructions: [
+      "From plank, shift slightly forward onto the toes, then bend the elbows and lower until the upper arms are roughly parallel to the floor.",
+      "Keep the elbows hugging in over the wrists — never flaring wide — and the shoulders no lower than elbow height.",
+      "Hold the line: glutes engaged, ribs down, gaze slightly forward.",
+      "Knees down is a legitimate version and better than a collapsed full one. Lower to the mat with control when the hold ends.",
+    ],
+    prescription: "Hold 10–20s · 4 rounds",
+  },
+  {
+    name: "Dolphin Pose",
+    equipment: "YOGA",
+    goal: "PUSH_STRENGTH",
+    type: "STRENGTH",
+    bodyParts: ["SHOULDERS", "UPPER_BACK", "CORE", "HAMSTRINGS"],
+    instructions: [
+      "From hands and knees, lower to the forearms, elbows under the shoulders, forearms parallel.",
+      "Tuck the toes and lift the hips up and back into an inverted V, pressing the forearms firmly down.",
+      "Draw the shoulder blades down the back and let the head hang free between the arms — do not shrug up toward the ears.",
+      "Keep the knees bent if the hamstrings pull the spine round. Wrist-friendly alternative to Downward Dog, and far stronger for the shoulders.",
+    ],
+    prescription: "Hold 30–45s · 3 rounds",
+  },
+
+  // ------------------------------------------------------------- yoga — balance
+  {
+    name: "Tree Pose",
+    equipment: "YOGA",
+    goal: "BALANCE",
+    type: "STRENGTH",
+    bodyParts: ["GLUTES", "CALVES", "CORE", "ANKLES"],
+    instructions: [
+      "Stand tall and shift the weight into the left foot, spreading the toes and gripping the mat lightly.",
+      "Place the right foot on the inner calf or inner thigh — never on the side of the knee. Press foot and leg into each other.",
+      "Level the hips and lengthen the tailbone down; it is tempting to let the standing hip jut out to the side.",
+      "Hands at the chest or overhead. Fix the gaze on a still point. Wobbling is the work, not a failure.",
+    ],
+    prescription: "Hold 45–60s per side",
+  },
+  {
+    name: "Warrior III",
+    equipment: "YOGA",
+    goal: "BALANCE",
+    type: "STRENGTH",
+    bodyParts: ["GLUTES", "HAMSTRINGS", "CORE", "UPPER_BACK"],
+    instructions: [
+      "From standing, shift onto the right foot with a soft knee, hands at the chest.",
+      "Hinge forward from the hip as the left leg lifts behind you, until torso and leg form one line parallel to the floor.",
+      "Keep the lifted hip level with the standing hip — square the pelvis down toward the mat rather than letting it roll open.",
+      "Flex the lifted foot and press back through the heel. Squeeze the standing glute hard; that muscle is holding you up.",
+    ],
+    prescription: "Hold 20–30s per side · 2 rounds",
+  },
+
+  // -------------------------------------------------- yoga — hips (side & deep)
+  {
+    name: "Side-Lying Leg Raise",
+    equipment: "YOGA",
+    goal: "GLUTE_STRENGTH",
+    type: "STRENGTH",
+    bodyParts: ["GLUTES", "CORE"],
+    instructions: [
+      "Lie on one side, body in a straight line, head resting on the lower arm, top hand on the floor for balance.",
+      "Rotate the top leg very slightly inward (toes angled toward the floor) — this targets the side glute rather than the hip flexor.",
+      "Lift the top leg to about 45° without letting the hips roll back. Pause at the top.",
+      "Lower slowly over three counts. Small and precise beats high and swinging.",
+    ],
+    prescription: "12–15 reps per side · 2 rounds",
+  },
+  {
+    name: "Wide-Legged Forward Fold",
+    equipment: "YOGA",
+    goal: "HIP_MOBILITY",
+    type: "MOBILITY",
+    bodyParts: ["ADDUCTORS", "HAMSTRINGS", "LOWER_BACK"],
+    instructions: [
+      "Step the feet wide, outer edges parallel, toes pointing straight ahead.",
+      "Hinge from the hips with a long spine and fold forward, hands to the floor or a block.",
+      "Keep the weight slightly forward in the feet and the knees soft; feel the stretch through the inner thighs and hamstrings.",
+      "Let the head hang heavy and soften a little more on each exhale.",
+    ],
+    prescription: "Hold 60s",
+  },
+
+  // -------------------------------------------------- yoga — calves & cardio
+  {
+    name: "Standing Calf Raise",
+    equipment: "YOGA",
+    goal: "CALF_STRENGTH",
+    type: "STRENGTH",
+    bodyParts: ["CALVES", "ANKLES"],
+    instructions: [
+      "Stand tall, feet hip-width, fingertips on a wall for balance only — not for support.",
+      "Rise onto the balls of the feet as high as you can, keeping the weight even across all the toes rather than rolling to the outer edge.",
+      "Pause for a full second at the top, then lower over three slow counts until the heels touch.",
+      "Progress by moving to one leg at a time once 20 slow reps feel easy.",
+    ],
+    prescription: "15–20 slow reps · 3 rounds",
+  },
+  {
+    name: "Sun Salutation Flow",
+    equipment: "YOGA",
+    goal: "CARDIO",
+    type: "FLOW",
+    bodyParts: ["FULL_BODY", "SHOULDERS", "HAMSTRINGS", "CORE"],
+    instructions: [
+      "Cycle continuously: Mountain → forward fold → half lift → plank → lower down → Cobra → Downward Dog → step forward → rise.",
+      "Move one breath per movement and do not pause between rounds — continuity is the entire point of this one.",
+      "Aim for a pace where breathing is noticeably harder but you could still speak a short sentence.",
+      "This is the only genuinely aerobic item in the library. Build from 8 minutes toward 15.",
+    ],
+    prescription: "10–15 min continuous",
+  },
+  {
+    name: "Bridge March",
+    equipment: "YOGA",
+    goal: "GLUTE_STRENGTH",
+    type: "STRENGTH",
+    bodyParts: ["GLUTES", "HAMSTRINGS", "CORE"],
+    instructions: [
+      "Set up and lift into Bridge Pose, hips high, glutes squeezed, lower back neutral.",
+      "Without dropping the hips, lift one foot a few centimetres off the mat, holding for two counts.",
+      "Lower it and lift the other. The pelvis should not dip or rotate at any point — that stability is the exercise.",
+      "Keep the ribs down and breathe. Progression from the static Bridge you already have.",
+    ],
+    prescription: "8–10 per side · 2 rounds",
   },
 ];
 
@@ -679,8 +949,14 @@ async function main() {
         // existence: step one is deliberately something you could not talk
         // yourself out of.
         steps: [
-          { title: "Open last quarter's proposal and skim the headings", minutes: 2 },
-          { title: "Write the one-sentence version of what we're asking for", minutes: 10 },
+          {
+            title: "Open last quarter's proposal and skim the headings",
+            minutes: 2,
+          },
+          {
+            title: "Write the one-sentence version of what we're asking for",
+            minutes: 10,
+          },
           { title: "Draft the background section badly", minutes: 30 },
           { title: "Put real numbers in the budget table", minutes: 25 },
           { title: "Read it back once and send it", minutes: 20 },
@@ -920,7 +1196,8 @@ async function main() {
           ? Math.max(habit.minimumQuota, Math.round(elapsed / 60))
           : random() < 0.45
             ? ceiling + Math.floor(random() * 3)
-            : habit.minimumQuota + Math.floor(random() * Math.max(1, ceiling - habit.minimumQuota));
+            : habit.minimumQuota +
+              Math.floor(random() * Math.max(1, ceiling - habit.minimumQuota));
 
       const occurrence = await prisma.taskOccurrence.create({
         data: {
@@ -1015,7 +1292,12 @@ async function main() {
   });
 
   // Amounts are rupees in the source and paise in the ledger.
-  const EXPENSE_POOL: { name: string; chance: number; min: number; max: number }[] = [
+  const EXPENSE_POOL: {
+    name: string;
+    chance: number;
+    min: number;
+    max: number;
+  }[] = [
     { name: "Food", chance: 0.9, min: 300, max: 900 },
     { name: "Groceries", chance: 0.35, min: 1200, max: 5000 },
     { name: "Transport", chance: 0.6, min: 150, max: 700 },
@@ -1071,7 +1353,8 @@ async function main() {
       const pick = EXPENSE_POOL[Math.floor(random() * EXPENSE_POOL.length)];
       if (random() > pick.chance) continue;
 
-      const amountCents = Math.round(pick.min + random() * (pick.max - pick.min)) * 100;
+      const amountCents =
+        Math.round(pick.min + random() * (pick.max - pick.min)) * 100;
       const category =
         expenseCategories.find((entry) => entry.name === pick.name) ??
         expenseCategories[0];
@@ -1101,7 +1384,10 @@ async function main() {
     const inRange = await prisma.moneyTransaction.findMany({
       where: {
         userId: user.id,
-        date: { gte: budget.startsOn, lt: new Date(budget.endsOn.getTime() + MS_PER_DAY) },
+        date: {
+          gte: budget.startsOn,
+          lt: new Date(budget.endsOn.getTime() + MS_PER_DAY),
+        },
         category: { kind: "EXPENSE" },
       },
       select: { id: true },

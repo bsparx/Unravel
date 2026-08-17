@@ -9,9 +9,9 @@
  *
  * Three layers, drawn back to front:
  *   BODY_BASE — every segment of the body, the ground the rest sits on
- *   DETAIL    — head, upper arms, hands, feet: never interactive, because no
- *               exercise in the catalog targets them (forearms and shins were
- *               promoted to FOREARMS and CALVES regions)
+ *   DETAIL    — head, hands, feet: never interactive, because no exercise
+ *               in the catalog targets them (upper arms were promoted to the
+ *               ARMS region, forearms and shins to FOREARMS and CALVES)
  *   REGIONS   — the muscle groups, one entry per `BodyPart` code
  *
  * A muscle that exists on both sides of the body is two paths under one
@@ -53,11 +53,9 @@ export const BODY_BASE: string[] = [
   "M161.5 268H158.5Q150 268 150 276.5L151 297.5Q151 306 159.5 306H159.5Q168 306 168 297.5L170 276.5Q170 268 161.5 268Z",
 ];
 
-/** Head, upper arms, hands and feet — nothing in the catalog targets these. */
+/** Head, hands and feet — nothing in the catalog targets these. */
 export const BODY_DETAIL: string[] = [
   "M100 20a21 24 0 1 0 0.1 0Z",
-  "M49 92H51Q62 92 62 103L57 185Q57 196 46 196H44Q33 196 33 185L38 103Q38 92 49 92Z",
-  "M151 92H149Q138 92 138 103L143 185Q143 196 154 196H156Q167 196 167 185L162 103Q162 92 151 92Z",
   "M38.5 268H41.5Q50 268 50 276.5L49 297.5Q49 306 40.5 306H40.5Q32 306 32 297.5L30 276.5Q30 268 38.5 268Z",
   "M161.5 268H158.5Q150 268 150 276.5L151 297.5Q151 306 159.5 306H159.5Q168 306 168 297.5L170 276.5Q170 268 161.5 268Z",
   "M78 418H85Q93 418 93 426L95 434Q95 442 87 442H74Q66 442 66 434L70 426Q70 418 78 418Z",
@@ -74,6 +72,12 @@ export const FRONT_REGIONS: MuscleRegion[] = [
   { part: "HIP_FLEXORS", d: "M117.5 206H113.5Q103 206 103 216.5L103 239.5Q103 250 113.5 250H113.5Q124 250 124 239.5L128 216.5Q128 206 117.5 206Z" },
   { part: "QUADS", d: "M76 252H84Q96 252 96 264L94 322Q94 334 82 334H82Q70 334 70 322L64 264Q64 252 76 252Z" },
   { part: "QUADS", d: "M124 252H116Q104 252 104 264L106 322Q106 334 118 334H118Q130 334 130 322L136 264Q136 252 124 252Z" },
+  { part: "ARMS", d: "M49 92H51Q62 92 62 103L57 185Q57 196 46 196H44Q33 196 33 185L38 103Q38 92 49 92Z" },
+  { part: "ARMS", d: "M151 92H149Q138 92 138 103L143 185Q143 196 154 196H156Q167 196 167 185L162 103Q162 92 151 92Z" },
+  { part: "ADDUCTORS", d: "M86 248H100Q108 248 108 258L104 322Q104 330 96 330H86Q78 330 78 322L72 258Q72 248 86 248Z" },
+  { part: "ADDUCTORS", d: "M114 248H100Q92 248 92 258L96 322Q96 330 104 330H114Q122 330 122 322L128 258Q128 248 114 248Z" },
+  { part: "ANKLES", d: "M77 398H84Q92 398 92 406L90 426Q90 434 82 434H76Q68 434 68 426L66 406Q66 398 77 398Z" },
+  { part: "ANKLES", d: "M123 398H116Q108 398 108 406L110 426Q110 434 118 434H124Q132 434 132 426L134 406Q134 398 123 398Z" },
   { part: "FOREARMS", d: "M43 190H45Q55 190 55 200L50 264Q50 274 40 274H39Q29 274 29 264L33 200Q33 190 43 190Z" },
   { part: "FOREARMS", d: "M157 190H155Q145 190 145 200L150 264Q150 274 160 274H161Q171 274 171 264L167 200Q167 190 157 190Z" },
 ];
@@ -116,14 +120,18 @@ export type RegionAnchor = { x: number; y: number };
  * symmetry so the day someone draws an asymmetric region, it says so.
  *
  * The y values are spread rather than centred, so the plate's collision
- * pass has nothing to do for any exercise the catalog actually holds.
+ * pass mostly has nothing to do; when a tight pair does touch, the pass
+ * resolves it exactly as designed.
  */
 export const FRONT_ANCHORS: Record<string, RegionAnchor> = {
   SHOULDERS: { x: 52, y: 106 },
   CHEST: { x: 68, y: 138 },
   CORE: { x: 77, y: 174 },
+  ARMS: { x: 44, y: 150 },
   HIP_FLEXORS: { x: 76, y: 224 },
   QUADS: { x: 68, y: 280 },
+  ADDUCTORS: { x: 86, y: 300 },
+  ANKLES: { x: 80, y: 416 },
   FOREARMS: { x: 42, y: 232 },
 };
 

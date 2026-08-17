@@ -8,7 +8,11 @@ import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { WEEKDAYS } from "@/lib/dates";
-import { ROUTINE_EQUIPMENT_LABELS } from "@/lib/exercise-labels";
+import {
+  ROUTINE_DAY_TYPE_LABELS,
+  ROUTINE_EQUIPMENT_LABELS,
+} from "@/lib/exercise-labels";
+import type { RoutineDayType } from "@/lib/exercise-routine";
 import { idleState } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +42,7 @@ export function RoutineWeek({
   routineId,
   equipment,
   daysOfWeek,
+  dayTypes,
   slots,
   catalog,
   onHover,
@@ -45,6 +50,8 @@ export function RoutineWeek({
   routineId: string;
   equipment: "YOGA" | "DUMBBELL" | "MIX";
   daysOfWeek: number[];
+  /** Index-aligned with `daysOfWeek`, as stored on the routine. */
+  dayTypes: RoutineDayType[];
   slots: RoutineSlot[];
   catalog: SwapCatalogExercise[];
   /** Lights the parts this exercise works on the figures below. */
@@ -89,6 +96,10 @@ export function RoutineWeek({
       .filter((slot) => slot.dayOfWeek === day)
       .sort((a, b) => a.position - b.position);
 
+  const dayTypeByDay = new Map(
+    daysOfWeek.map((day, index) => [day, dayTypes[index] ?? "STANDARD"]),
+  );
+
   const pinned = slots.filter((slot) => slot.swapped).length;
 
   return (
@@ -96,6 +107,7 @@ export function RoutineWeek({
       {WEEKDAYS.map((day) => {
         const training = daysOfWeek.includes(day.value);
         const daySlots = slotsByDay(day.value);
+        const dayType = dayTypeByDay.get(day.value);
         return (
           <div
             key={day.value}
@@ -114,7 +126,9 @@ export function RoutineWeek({
                 {day.long}
               </p>
               <p className="text-micro text-muted-foreground tracking-wide uppercase">
-                {training ? `${daySlots.length} exercises` : "Rest day"}
+                {training
+                  ? `${ROUTINE_DAY_TYPE_LABELS[dayType ?? "STANDARD"]} · ${daySlots.length} ${daySlots.length === 1 ? "exercise" : "exercises"}`
+                  : "Rest day"}
               </p>
             </div>
 

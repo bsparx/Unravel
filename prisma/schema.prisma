@@ -183,6 +183,24 @@ enum ExerciseGoal {
   CALF_MOBILITY
   /// Wrist and forearm flexor/extensor release for typing and phone work.
   WRIST_MOBILITY
+  /// Legs working under load: quads, glutes, adductors — the held poses
+  /// that burn (Chair, Warrior II, High Lunge).
+  LEG_STRENGTH
+  /// Upper-body pressing endurance: planks and the Chaturanga family.
+  PUSH_STRENGTH
+  /// Single-leg and inversion control — wobbling is the work.
+  BALANCE
+  /// Sustained aerobic work — the one goal the library measures in minutes
+  /// rather than reps or holds.
+  CARDIO
+  /// Deep hip opening: adductors, external rotators, the "hips of a chair"
+  /// the deep squat and wide folds reach.
+  HIP_MOBILITY
+  /// Dorsiflexion and the deep-squat ankle angle that sitting steals.
+  ANKLE_MOBILITY
+  /// Calf strength — the push-off half of the lower leg, paired with
+  /// CALF_MOBILITY's length.
+  CALF_STRENGTH
 }
 
 /// The muscle groups an exercise works, for filtering the catalog. One
@@ -202,6 +220,39 @@ enum BodyPart {
   NECK
   CALVES
   FOREARMS
+  /// Inner thigh — Warrior II and the wide folds load these.
+  ADDUCTORS
+  /// The joint itself: deep-squat dorsiflexion and calf-raise balance.
+  ANKLES
+  /// Upper arms — the pressing half of Chaturanga.
+  ARMS
+}
+
+/// What an exercise *is*, separate from what it corrects. `goal` names the
+/// job (GLUTE_STRENGTH, HIP_MOBILITY…); `type` names the shape the body is
+/// doing: holding against load, lengthening, or moving continuously. Day
+/// composition is built on type — a day that draws three mobility moves is a
+/// rest day wearing a workout's clothes.
+enum ExerciseType {
+  /// Isometric or loaded work — the category every training day is built on.
+  STRENGTH
+  /// Lengthening and release — the recovery half of the cycle.
+  MOBILITY
+  /// Sustained continuous movement (Sun Salutations). A day of this is cardio.
+  FLOW
+}
+
+/// What kind of day a routine's slots belong to. The person can name each
+/// day's kind in the builder, or let the generator auto-assign the pattern:
+/// most days STANDARD (2 strength + 1 mobility), one FLOW day, one RECOVERY
+/// day.
+enum RoutineDayType {
+  /// The workday: strength slots lead, mobility closes.
+  STANDARD
+  /// One continuous FLOW exercise — the aerobic day.
+  FLOW
+  /// All mobility — the recovery day the week is periodized around.
+  RECOVERY
 }
 
 /// The five daily prayers, in order. `MAGHRIB` keeps its Islamic spelling.
@@ -1156,6 +1207,9 @@ model Exercise {
   equipment ExerciseEquipment
   /// The primary corrective job. The generator composes days from this.
   goal    ExerciseGoal
+  /// STRENGTH / MOBILITY / FLOW — the shape the body is doing. Day
+  /// composition draws on this, so a workout day can never be all stretches.
+  type    ExerciseType
   /// Muscle groups worked, for catalog filters. `goal` is the intent, this is
   /// the territory.
   bodyParts BodyPart[]
@@ -1200,6 +1254,11 @@ model ExerciseRoutine {
   /// 0 = Sunday .. 6 = Saturday. Length 3, 4, 5 or 6 — the whole point of the
   /// builder is that the person picks the exact days.
   daysOfWeek Int[]
+
+  /// What each day is *for*, index-aligned with `daysOfWeek`: STANDARD
+  /// (strength + mobility), FLOW (the aerobic day) or RECOVERY (all
+  /// mobility). Chosen in the builder, or auto-assigned by the generator.
+  dayTypes RoutineDayType[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

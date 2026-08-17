@@ -13,7 +13,7 @@ import {
   routineSlotSchema,
   swapRoutineExerciseSchema,
 } from "@/lib/validation";
-import { generateRoutine } from "@/lib/exercise-routine";
+import { autoDayTypes, generateRoutine } from "@/lib/exercise-routine";
 
 function revalidateExercises() {
   revalidatePath("/exercises");
@@ -34,7 +34,7 @@ export async function createRoutine(
     };
   }
 
-  const { daysPerWeek, days, counts, equipment } = parsed.data;
+  const { daysPerWeek, days, counts, equipment, dayTypes } = parsed.data;
   if (days.length !== daysPerWeek) {
     return {
       status: "error",
@@ -45,13 +45,14 @@ export async function createRoutine(
 
   const exercises = await prisma.exercise.findMany({
     where: { active: true },
-    select: { id: true, equipment: true, goal: true },
+    select: { id: true, equipment: true, goal: true, type: true },
     orderBy: { sortOrder: "asc" },
   });
 
   const slots = generateRoutine({
     days,
     counts,
+    dayTypes,
     exercises,
     equipment: equipment === "MIX" ? null : equipment,
   });
@@ -62,6 +63,7 @@ export async function createRoutine(
       name: "Weekly routine",
       equipment,
       daysOfWeek: days,
+      dayTypes: dayTypes ?? autoDayTypes(days),
       exercises: {
         create: slots.map((slot) => ({
           exerciseId: slot.exerciseId,
@@ -167,7 +169,7 @@ export async function regenerateRoutine(
   const variant = Math.floor(Math.random() * 1_000_000);
   const exercises = await prisma.exercise.findMany({
     where: { active: true },
-    select: { id: true, equipment: true, goal: true },
+    select: { id: true, equipment: true, goal: true, type: true },
     orderBy: { sortOrder: "asc" },
   });
 
@@ -190,6 +192,7 @@ export async function regenerateRoutine(
   const slots = generateRoutine({
     days: routine.daysOfWeek,
     counts,
+    dayTypes: routine.dayTypes,
     exercises,
     equipment: routine.equipment === "MIX" ? null : routine.equipment,
     variant,

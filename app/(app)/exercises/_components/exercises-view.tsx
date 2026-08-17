@@ -7,7 +7,10 @@ import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { WEEKDAYS } from "@/lib/dates";
 import { EQUIPMENT_LABELS, ROUTINE_EQUIPMENT_LABELS } from "@/lib/exercise-labels";
-import { summarizeWeek } from "@/lib/exercise-routine";
+import {
+  summarizeWeek,
+  type RoutineDayType,
+} from "@/lib/exercise-routine";
 
 import type { HoveredExercise } from "./body-map";
 import {
@@ -29,12 +32,14 @@ export function ExercisesView({
   routineId,
   equipment,
   daysOfWeek,
+  dayTypes,
   slots,
   catalog,
 }: {
   routineId: string | null;
   equipment: "YOGA" | "DUMBBELL" | "MIX";
   daysOfWeek: number[];
+  dayTypes: RoutineDayType[];
   slots: RoutineSlot[];
   catalog: BuildCatalogExercise[];
 }) {
@@ -83,6 +88,7 @@ export function ExercisesView({
             routineId={routineId!}
             equipment={equipment}
             daysOfWeek={daysOfWeek}
+            dayTypes={dayTypes}
             slots={slots}
             catalog={catalog}
             onHover={setHovered}

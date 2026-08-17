@@ -62,10 +62,12 @@ import {
 import { breaksWorthReporting, summariseBreaks } from "@/lib/break-stats";
 import { balanceRatio, describeBalance, recoveryShare } from "@/lib/balance";
 import {
+  autoDayTypes,
   generateRoutine,
   summarizeWeek,
   type PinnedSlot,
   type PoolExercise,
+  type RoutineDayType,
 } from "@/lib/exercise-routine";
 import { parseQuickAdd } from "@/lib/quick-parse";
 import {
@@ -1597,48 +1599,63 @@ check("there is no story in a handful of breaks that behaved", () => {
 
 // ---------------------------------------------------------------- routines
 
-/** The 40 seeded exercises, in the shape the generator consumes. */
+/** The 55 seeded exercises, in the shape the generator consumes. */
 const EXERCISES: PoolExercise[] = [
-  { id: "bridge", equipment: "YOGA", goal: "GLUTE_STRENGTH" },
-  { id: "low-lunge", equipment: "YOGA", goal: "HIP_FLEXOR_MOBILITY" },
-  { id: "pelvic-tilts", equipment: "YOGA", goal: "POSTURE_AWARENESS" },
-  { id: "cat-cow", equipment: "YOGA", goal: "LOWER_BACK_RELIEF" },
-  { id: "bird-dog", equipment: "YOGA", goal: "CORE_STABILITY" },
-  { id: "locust", equipment: "YOGA", goal: "UPPER_BACK_STRENGTH" },
-  { id: "boat", equipment: "YOGA", goal: "CORE_STABILITY" },
-  { id: "reclined-twist", equipment: "YOGA", goal: "LOWER_BACK_RELIEF" },
-  { id: "childs", equipment: "YOGA", goal: "LOWER_BACK_RELIEF" },
-  { id: "down-dog", equipment: "YOGA", goal: "HAMSTRING_LENGTH" },
-  { id: "cobra", equipment: "YOGA", goal: "UPPER_BACK_STRENGTH" },
-  { id: "thread-needle", equipment: "YOGA", goal: "CHEST_MOBILITY" },
-  { id: "puppy", equipment: "YOGA", goal: "CHEST_MOBILITY" },
-  { id: "cow-face", equipment: "YOGA", goal: "CHEST_MOBILITY" },
-  { id: "eagle", equipment: "YOGA", goal: "UPPER_BACK_STRENGTH" },
-  { id: "forward-fold", equipment: "YOGA", goal: "HAMSTRING_LENGTH" },
-  { id: "db-glute-bridge", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH" },
-  { id: "db-single-bridge", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH" },
-  { id: "db-hip-thrust", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH" },
-  { id: "db-rdl", equipment: "DUMBBELL", goal: "HAMSTRING_LENGTH" },
-  { id: "db-goblet", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH" },
-  { id: "db-dead-bug", equipment: "DUMBBELL", goal: "CORE_STABILITY" },
-  { id: "db-hip-ext", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH" },
-  { id: "db-reverse-lunge", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH" },
-  { id: "db-farmer", equipment: "DUMBBELL", goal: "POSTURE_AWARENESS" },
-  { id: "db-row", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH" },
-  { id: "db-one-arm-row", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH" },
-  { id: "db-reverse-fly", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH" },
-  { id: "db-y-raise", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH" },
-  { id: "db-t-raise", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH" },
-  { id: "db-ytw", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH" },
-  { id: "db-pullover", equipment: "DUMBBELL", goal: "CHEST_MOBILITY" },
-  { id: "chin-tuck", equipment: "YOGA", goal: "NECK_STRENGTH" },
-  { id: "deep-neck-hold", equipment: "YOGA", goal: "NECK_STRENGTH" },
-  { id: "upper-trap-stretch", equipment: "YOGA", goal: "NECK_MOBILITY" },
-  { id: "levator-stretch", equipment: "YOGA", goal: "NECK_MOBILITY" },
-  { id: "calf-stretch", equipment: "YOGA", goal: "CALF_MOBILITY" },
-  { id: "soleus-stretch", equipment: "YOGA", goal: "CALF_MOBILITY" },
-  { id: "wrist-ext-stretch", equipment: "YOGA", goal: "WRIST_MOBILITY" },
-  { id: "wrist-flex-stretch", equipment: "YOGA", goal: "WRIST_MOBILITY" },
+  { id: "bridge", equipment: "YOGA", goal: "GLUTE_STRENGTH", type: "STRENGTH" },
+  { id: "low-lunge", equipment: "YOGA", goal: "HIP_FLEXOR_MOBILITY", type: "MOBILITY" },
+  { id: "pelvic-tilts", equipment: "YOGA", goal: "POSTURE_AWARENESS", type: "MOBILITY" },
+  { id: "cat-cow", equipment: "YOGA", goal: "LOWER_BACK_RELIEF", type: "MOBILITY" },
+  { id: "bird-dog", equipment: "YOGA", goal: "CORE_STABILITY", type: "STRENGTH" },
+  { id: "locust", equipment: "YOGA", goal: "UPPER_BACK_STRENGTH", type: "STRENGTH" },
+  { id: "boat", equipment: "YOGA", goal: "CORE_STABILITY", type: "STRENGTH" },
+  { id: "reclined-twist", equipment: "YOGA", goal: "LOWER_BACK_RELIEF", type: "MOBILITY" },
+  { id: "childs", equipment: "YOGA", goal: "LOWER_BACK_RELIEF", type: "MOBILITY" },
+  { id: "down-dog", equipment: "YOGA", goal: "HAMSTRING_LENGTH", type: "MOBILITY" },
+  { id: "cobra", equipment: "YOGA", goal: "UPPER_BACK_STRENGTH", type: "STRENGTH" },
+  { id: "thread-needle", equipment: "YOGA", goal: "CHEST_MOBILITY", type: "MOBILITY" },
+  { id: "puppy", equipment: "YOGA", goal: "CHEST_MOBILITY", type: "MOBILITY" },
+  { id: "cow-face", equipment: "YOGA", goal: "CHEST_MOBILITY", type: "MOBILITY" },
+  { id: "eagle", equipment: "YOGA", goal: "UPPER_BACK_STRENGTH", type: "MOBILITY" },
+  { id: "forward-fold", equipment: "YOGA", goal: "HAMSTRING_LENGTH", type: "MOBILITY" },
+  { id: "db-glute-bridge", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH", type: "STRENGTH" },
+  { id: "db-single-bridge", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH", type: "STRENGTH" },
+  { id: "db-hip-thrust", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH", type: "STRENGTH" },
+  { id: "db-rdl", equipment: "DUMBBELL", goal: "HAMSTRING_LENGTH", type: "STRENGTH" },
+  { id: "db-goblet", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH", type: "STRENGTH" },
+  { id: "db-dead-bug", equipment: "DUMBBELL", goal: "CORE_STABILITY", type: "STRENGTH" },
+  { id: "db-hip-ext", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH", type: "STRENGTH" },
+  { id: "db-reverse-lunge", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH", type: "STRENGTH" },
+  { id: "db-farmer", equipment: "DUMBBELL", goal: "POSTURE_AWARENESS", type: "STRENGTH" },
+  { id: "db-row", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH", type: "STRENGTH" },
+  { id: "db-one-arm-row", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH", type: "STRENGTH" },
+  { id: "db-reverse-fly", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH", type: "STRENGTH" },
+  { id: "db-y-raise", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH", type: "STRENGTH" },
+  { id: "db-t-raise", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH", type: "STRENGTH" },
+  { id: "db-ytw", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH", type: "STRENGTH" },
+  { id: "db-pullover", equipment: "DUMBBELL", goal: "CHEST_MOBILITY", type: "MOBILITY" },
+  { id: "chin-tuck", equipment: "YOGA", goal: "NECK_STRENGTH", type: "STRENGTH" },
+  { id: "deep-neck-hold", equipment: "YOGA", goal: "NECK_STRENGTH", type: "STRENGTH" },
+  { id: "upper-trap-stretch", equipment: "YOGA", goal: "NECK_MOBILITY", type: "MOBILITY" },
+  { id: "levator-stretch", equipment: "YOGA", goal: "NECK_MOBILITY", type: "MOBILITY" },
+  { id: "calf-stretch", equipment: "YOGA", goal: "CALF_MOBILITY", type: "MOBILITY" },
+  { id: "soleus-stretch", equipment: "YOGA", goal: "CALF_MOBILITY", type: "MOBILITY" },
+  { id: "wrist-ext-stretch", equipment: "YOGA", goal: "WRIST_MOBILITY", type: "MOBILITY" },
+  { id: "wrist-flex-stretch", equipment: "YOGA", goal: "WRIST_MOBILITY", type: "MOBILITY" },
+  { id: "chair", equipment: "YOGA", goal: "LEG_STRENGTH", type: "STRENGTH" },
+  { id: "warrior-2", equipment: "YOGA", goal: "LEG_STRENGTH", type: "STRENGTH" },
+  { id: "high-lunge", equipment: "YOGA", goal: "LEG_STRENGTH", type: "STRENGTH" },
+  { id: "garland", equipment: "YOGA", goal: "ANKLE_MOBILITY", type: "MOBILITY" },
+  { id: "plank", equipment: "YOGA", goal: "PUSH_STRENGTH", type: "STRENGTH" },
+  { id: "side-plank", equipment: "YOGA", goal: "CORE_STABILITY", type: "STRENGTH" },
+  { id: "chaturanga", equipment: "YOGA", goal: "PUSH_STRENGTH", type: "STRENGTH" },
+  { id: "dolphin", equipment: "YOGA", goal: "PUSH_STRENGTH", type: "STRENGTH" },
+  { id: "tree", equipment: "YOGA", goal: "BALANCE", type: "STRENGTH" },
+  { id: "warrior-3", equipment: "YOGA", goal: "BALANCE", type: "STRENGTH" },
+  { id: "side-leg-raise", equipment: "YOGA", goal: "GLUTE_STRENGTH", type: "STRENGTH" },
+  { id: "wide-fold", equipment: "YOGA", goal: "HIP_MOBILITY", type: "MOBILITY" },
+  { id: "calf-raise", equipment: "YOGA", goal: "CALF_STRENGTH", type: "STRENGTH" },
+  { id: "sun-salutation", equipment: "YOGA", goal: "CARDIO", type: "FLOW" },
+  { id: "bridge-march", equipment: "YOGA", goal: "GLUTE_STRENGTH", type: "STRENGTH" },
 ];
 
 const generated = (
@@ -1647,24 +1664,11 @@ const generated = (
   pinned: PinnedSlot[] = [],
   avoid: string[] = [],
   counts?: number[],
-) => generateRoutine({ days, counts, exercises: EXERCISES, variant, pinned, avoid });
+  dayTypes?: RoutineDayType[],
+) => generateRoutine({ days, counts, dayTypes, exercises: EXERCISES, variant, pinned, avoid });
 
-const CATEGORY_OF_GOAL: Record<string, string> = {
-  GLUTE_STRENGTH: "POSTERIOR",
-  HAMSTRING_LENGTH: "POSTERIOR",
-  CORE_STABILITY: "CORE",
-  POSTURE_AWARENESS: "CORE",
-  HIP_FLEXOR_MOBILITY: "MOBILITY",
-  LOWER_BACK_RELIEF: "MOBILITY",
-  CHEST_MOBILITY: "MOBILITY",
-  UPPER_BACK_STRENGTH: "UPPER",
-  NECK_MOBILITY: "MOBILITY",
-  NECK_STRENGTH: "UPPER",
-  CALF_MOBILITY: "MOBILITY",
-  WRIST_MOBILITY: "MOBILITY",
-};
-const categoryOf = (id: string) =>
-  CATEGORY_OF_GOAL[EXERCISES.find((e) => e.id === id)!.goal];
+const typeOf = (id: string) =>
+  EXERCISES.find((e) => e.id === id)!.type;
 
 const WEEK_SHAPES = [
   [1, 3, 5],
@@ -1673,6 +1677,9 @@ const WEEK_SHAPES = [
   [0, 1, 2, 3, 4, 5],
 ];
 
+/** All STANDARD days — the plain-workweek shape for count-based checks. */
+const standardTypes = (days: number[]) => days.map(() => "STANDARD" as RoutineDayType);
+
 check("every day carries exactly its requested count, never more than five", () => {
   const shapes: Array<[number[], number[]]> = [
     [[1, 3, 5], [3, 3, 3]],
@@ -1680,7 +1687,9 @@ check("every day carries exactly its requested count, never more than five", () 
     [[0, 1, 2, 3, 4, 6], [5, 4, 3, 2, 1, 4]],
   ];
   for (const [days, counts] of shapes) {
-    const slots = generated(days, 0, [], [], counts);
+    // All-STANDARD days, so the counts mean exactly what they say; a FLOW
+    // day deliberately collapses to one slot.
+    const slots = generated(days, 0, [], [], counts, standardTypes(days));
     days.forEach((day, index) => {
       const count = slots.filter((s) => s.dayOfWeek === day).length;
       assert.ok(count <= 5, `day ${day} got ${count} slots`);
@@ -1696,95 +1705,141 @@ check("every day carries exactly its requested count, never more than five", () 
 check("a mixed week sums to its requested total", () => {
   const days = [2, 5];
   const counts = [1, 4];
-  const slots = generated(days, 0, [], [], counts);
+  const slots = generated(days, 0, [], [], counts, ["STANDARD", "STANDARD"]);
   assert.equal(slots.length, 5);
   assert.equal(slots.filter((s) => s.dayOfWeek === 2).length, 1);
   assert.equal(slots.filter((s) => s.dayOfWeek === 5).length, 4);
 });
 
-check("every week covers all four corrective categories", () => {
-  for (const days of WEEK_SHAPES) {
-    for (let variant = 0; variant < 40; variant++) {
-      const covered = new Set(
-        generated(days, variant).map((s) => categoryOf(s.exerciseId)),
-      );
-      assert.equal(
-        covered.size,
-        4,
-        `week ${days} variant ${variant} covered only ${[...covered].join(", ")}`,
-      );
-    }
-  }
-});
-
-check("no day carries the same category three times", () => {
-  for (const days of WEEK_SHAPES) {
-    for (let variant = 0; variant < 40; variant++) {
-      const slots = generated(days, variant);
-      for (const day of days) {
-        const categories = slots
-          .filter((s) => s.dayOfWeek === day)
-          .map((s) => categoryOf(s.exerciseId));
-        for (const category of new Set(categories)) {
-          const count = categories.filter((c) => c === category).length;
-          assert.ok(
-            count < 3,
-            `week ${days} variant ${variant} day ${day} is all ${category}`,
-          );
-        }
-      }
-    }
-  }
-});
-
-check("every day carries at least one strength slot", () => {
-  for (const days of WEEK_SHAPES) {
-    for (let variant = 0; variant < 40; variant++) {
-      const slots = generated(days, variant);
-      for (const day of days) {
-        const categories = slots
-          .filter((s) => s.dayOfWeek === day)
-          .map((s) => categoryOf(s.exerciseId));
-        assert.ok(
-          categories.some((c) => c === "POSTERIOR" || c === "UPPER"),
-          `week ${days} variant ${variant} day ${day} is all mobility/core`,
-        );
-      }
-    }
-  }
-});
-
-check("days with two or more slots carry a strength move", () => {
+check("a standard day's slots follow the strength-mobility mix", () => {
+  // The table by count: 1:[S] 2:[S,M] 3:[S,S,M] 4:[S,S,M,M] 5:[S,S,S,M,M].
   const shapes: Array<[number[], number[]]> = [
-    [[0, 1, 2, 3, 4], [2, 3, 4, 5, 1]],
+    [[0, 1, 2, 3, 4], [1, 2, 3, 4, 5]],
     [[0, 1, 2, 3, 4, 6], [5, 1, 2, 4, 3, 2]],
   ];
+  const expectedMix: Record<number, [number, number]> = {
+    1: [1, 0],
+    2: [1, 1],
+    3: [2, 1],
+    4: [2, 2],
+    5: [3, 2],
+  };
   for (const [days, counts] of shapes) {
-    for (let variant = 0; variant < 40; variant++) {
-      const slots = generated(days, variant, [], [], counts);
+    for (let variant = 0; variant < 20; variant++) {
+      const slots = generated(days, variant, [], [], counts, standardTypes(days));
       days.forEach((day, index) => {
-        if (counts[index] < 2) return;
-        const categories = slots
+        const types = slots
           .filter((s) => s.dayOfWeek === day)
-          .map((s) => categoryOf(s.exerciseId));
-        assert.ok(
-          categories.some((c) => c === "POSTERIOR" || c === "UPPER"),
-          `week ${days} counts ${counts} variant ${variant} day ${day} is all mobility/core`,
+          .map((s) => typeOf(s.exerciseId));
+        const strength = types.filter((t) => t === "STRENGTH").length;
+        const mobility = types.filter((t) => t === "MOBILITY").length;
+        const [wantStrength, wantMobility] = expectedMix[counts[index]];
+        assert.equal(
+          strength,
+          wantStrength,
+          `week ${days} counts ${counts} v${variant} day ${day} has ${strength} strength slots, want ${wantStrength}`,
+        );
+        assert.equal(
+          mobility,
+          wantMobility,
+          `week ${days} counts ${counts} v${variant} day ${day} has ${mobility} mobility slots, want ${wantMobility}`,
         );
       });
     }
   }
 });
 
+check("a standard day never becomes all stretches", () => {
+  // The bug this composition model exists to fix: a day drawn from body-part
+  // tags alone could land three passive stretches and call itself a workout.
+  for (const days of WEEK_SHAPES) {
+    for (let variant = 0; variant < 40; variant++) {
+      const slots = generated(days, variant, [], [], undefined, standardTypes(days));
+      for (const day of days) {
+        const types = slots
+          .filter((s) => s.dayOfWeek === day)
+          .map((s) => typeOf(s.exerciseId));
+        if (types.length === 0) continue;
+        assert.ok(
+          types.includes("STRENGTH"),
+          `week ${days} v${variant} day ${day} is all mobility: ${types.join(", ")}`,
+        );
+      }
+    }
+  }
+});
+
+check("a recovery day is all mobility", () => {
+  const dayTypes: RoutineDayType[] = ["RECOVERY", "STANDARD", "RECOVERY"];
+  for (let variant = 0; variant < 40; variant++) {
+    const slots = generated([1, 3, 5], variant, [], [], undefined, dayTypes);
+    for (const day of [1, 5]) {
+      const types = slots
+        .filter((s) => s.dayOfWeek === day)
+        .map((s) => typeOf(s.exerciseId));
+      assert.ok(
+        types.length > 0 && types.every((t) => t === "MOBILITY"),
+        `week v${variant} recovery day ${day} drew ${types.join(", ")}`,
+      );
+    }
+  }
+});
+
+check("a flow day is exactly one flow exercise", () => {
+  const dayTypes: RoutineDayType[] = ["STANDARD", "FLOW", "STANDARD"];
+  for (let variant = 0; variant < 40; variant++) {
+    const slots = generated([1, 3, 5], variant, [], [], [3, 3, 3], dayTypes);
+    const flowSlots = slots.filter((s) => s.dayOfWeek === 3);
+    assert.equal(flowSlots.length, 1, "a flow day must be a single slot");
+    assert.equal(
+      typeOf(flowSlots[0].exerciseId),
+      "FLOW",
+      "the flow day's slot must be the FLOW exercise",
+    );
+  }
+});
+
+check("the auto pattern marks first recovery and last flow", () => {
+  for (const days of WEEK_SHAPES) {
+    const types = autoDayTypes(days);
+    assert.equal(
+      types[0],
+      "RECOVERY",
+      `week ${days}: the first training day should be the recovery day`,
+    );
+    assert.equal(
+      types[types.length - 1],
+      "FLOW",
+      `week ${days}: the last training day should be the flow day`,
+    );
+    const middles = types.slice(1, -1);
+    const expectedFlows = middles.filter((t) => t === "FLOW").length;
+    assert.equal(
+      expectedFlows,
+      days.length >= 6 ? 1 : 0,
+      `week ${days}: ${expectedFlows} flow days in the middle, expected ${days.length >= 6 ? 1 : 0}`,
+    );
+    for (const type of middles) {
+      assert.ok(
+        type === "STANDARD" || type === "FLOW",
+        `week ${days}: the days between can only be standard or flow`,
+      );
+    }
+  }
+  assert.deepEqual(autoDayTypes([2]), ["STANDARD"], "one day is just a standard day");
+});
+
 // The regression test for the bug this generator was rewritten to fix: the
 // old per-slot template demanded "mobility + dumbbell" at one fixed position,
 // a pairing only Dumbbell Pullover satisfies, so that slot never moved no
-// matter how the routine was reseeded.
+// matter how the routine was reseeded. Run against all-STANDARD weeks — a
+// FLOW day's single slot is the one place a fixed exercise is by design.
 check("no slot is welded to a single exercise", () => {
   for (const days of WEEK_SHAPES) {
     const seen = new Map<string, Set<string>>();
     for (let variant = 0; variant < 200; variant++) {
-      for (const slot of generated(days, variant)) {
+      const slots = generated(days, variant, [], [], undefined, standardTypes(days));
+      for (const slot of slots) {
         const key = `${slot.dayOfWeek}:${slot.position}`;
         seen.set(key, (seen.get(key) ?? new Set()).add(slot.exerciseId));
       }
@@ -1800,11 +1855,12 @@ check("no slot is welded to a single exercise", () => {
 
 check("regenerating replaces most of the week", () => {
   for (const days of WEEK_SHAPES) {
-    const before = generated(days, 0);
+    const dayTypes = standardTypes(days);
+    const before = generated(days, 0, [], [], undefined, dayTypes);
     const avoid = before.map((s) => s.exerciseId);
     const churn: number[] = [];
     for (let variant = 1; variant < 200; variant++) {
-      const after = generated(days, variant, [], avoid);
+      const after = generated(days, variant, [], avoid, undefined, dayTypes);
       const changed = after.filter((slot) => {
         const previous = before.find(
           (s) => s.dayOfWeek === slot.dayOfWeek && s.position === slot.position,
@@ -2084,18 +2140,20 @@ check("no exercise repeats across a 5-day week", () => {
   assert.equal(new Set(ids).size, ids.length, `duplicates in week: ${ids.join(", ")}`);
 });
 
-check("equipment lands near the catalog's own mix across any week length", () => {
+check("equipment lands near half yoga across any week length", () => {
   const byId = new Map(EXERCISES.map((e) => [e.id, e]));
-  const catalogShare =
-    EXERCISES.filter((e) => e.equipment === "YOGA").length / EXERCISES.length;
+  // The design target is 50/50, not the catalog's own mix — the catalog is
+  // yoga-heavy and the composition is mobility-heavy, so the balance pass
+  // pushes dumbbells into the strength slots to hold the line. Supply
+  // clamps (one dumbbell mobility exercise) are what the tolerance is for.
   for (const days of WEEK_SHAPES) {
     for (let variant = 0; variant < 40; variant++) {
       const slots = generated(days, variant);
       const yoga = slots.filter((s) => byId.get(s.exerciseId)!.equipment === "YOGA").length;
       const share = yoga / slots.length;
       assert.ok(
-        Math.abs(share - catalogShare) <= 0.18,
-        "week " + days + " variant " + variant + ": yoga share " + share + " vs catalog " + catalogShare,
+        Math.abs(share - 0.5) <= 0.18,
+        "week " + days + " variant " + variant + ": yoga share " + share,
       );
     }
   }
@@ -2124,8 +2182,9 @@ check("pinned slots survive regeneration untouched", () => {
 check("the week summary reports equipment and goal coverage", () => {
   const summary = summarizeWeek(generated([1, 3, 5]), EXERCISES);
   assert.equal(summary.days, 3);
-  assert.equal(summary.yoga + summary.dumbbell, 9);
-  assert.ok(summary.balanced, "a 3-day week should cover most goals");
+  // Auto day types: 3 recovery + 2+1 standard + 1 flow = 7 slots.
+  assert.equal(summary.yoga + summary.dumbbell, 7);
+  assert.ok(summary.balanced, "a 3-day week should cover a decent spread of goals");
 });
 
 check("regeneration variants keep producing different weeks", () => {
@@ -2149,7 +2208,7 @@ check("a handful of variants draws across most of the catalog", () => {
   }
   assert.ok(
     used.size >= 24,
-    `6 regenerations of a 5-day week should touch most of the 40-exercise catalog, got ${used.size}`,
+    `6 regenerations of a 5-day week should touch a good slice of the catalog, got ${used.size}`,
   );
 });
 

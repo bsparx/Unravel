@@ -6,7 +6,12 @@ import { Dumbbell, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import { GOAL_LABELS, goalShort } from "@/lib/exercise-labels";
+import {
+  EXERCISE_TYPE_LABELS,
+  GOAL_LABELS,
+  goalShort,
+} from "@/lib/exercise-labels";
+import type { ExerciseGoal, ExerciseType } from "@/lib/exercise-routine";
 
 import { ExerciseFigure } from "./exercise-figure";
 
@@ -15,25 +20,12 @@ export type ExerciseDetail = {
   name: string;
   equipment: "YOGA" | "DUMBBELL";
   goal: ExerciseGoal;
+  type: ExerciseType;
   bodyParts: string[];
   instructions: string[];
   prescription: string;
   videoUrl: string | null;
 };
-
-type ExerciseGoal =
-  | "HIP_FLEXOR_MOBILITY"
-  | "GLUTE_STRENGTH"
-  | "HAMSTRING_LENGTH"
-  | "CORE_STABILITY"
-  | "LOWER_BACK_RELIEF"
-  | "UPPER_BACK_STRENGTH"
-  | "CHEST_MOBILITY"
-  | "POSTURE_AWARENESS"
-  | "NECK_MOBILITY"
-  | "NECK_STRENGTH"
-  | "CALF_MOBILITY"
-  | "WRIST_MOBILITY";
 
 /** A YouTube watch URL -> the embeddable src, when the link is shareable. */
 function embedSrc(url: string | null): string | null {
@@ -95,10 +87,13 @@ export function ExerciseDetailDialog({
             <p className="text-micro text-muted-foreground mb-2 tracking-wide uppercase">
               What it is for
             </p>
-            {/* The goal only. The figure above already names every muscle
-                this works, in the same words and on the body itself. */}
+            {/* The goal and the type. The figure above already names every
+                muscle this works, in the same words and on the body itself. */}
             <div className="flex flex-wrap gap-1.5">
               <Badge variant="secondary">{GOAL_LABELS[exercise.goal]}</Badge>
+              <Badge variant="outline">
+                {EXERCISE_TYPE_LABELS[exercise.type]}
+              </Badge>
             </div>
           </div>
 

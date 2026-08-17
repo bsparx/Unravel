@@ -4,31 +4,32 @@
  * The corrective logic the whole feature is built on: anterior pelvic tilt
  * (lower cross) is fixed by strengthening glutes + deep core and stretching
  * hip flexors; rounded shoulders (upper cross) by strengthening the upper
- * back and opening the chest. Every day is composed of one to five slots
- * drawn from those categories, and the week balances yoga vs. dumbbells.
+ * back and opening the chest. Every exercise now carries a `type` —
+ * STRENGTH, MOBILITY or FLOW — and days are composed from those types, not
+ * from body-part tags, because tags alone cannot tell a stretch from a hold.
+ *
+ * A week is periodized into day types:
+ *   - STANDARD: strength leads, mobility closes. One slot => one strength
+ *     move; two => one of each; three => two strength + one mobility (and
+ *     the table continues up to five).
+ *   - FLOW: a single continuous FLOW exercise — the aerobic day.
+ *   - RECOVERY: all mobility — the day the rest of the week rests on.
+ * The person names each day's type in the builder, or takes the auto
+ * pattern: first training day RECOVERY, last FLOW, the rest STANDARD.
  *
  * Structural rules:
  *   - a workout day has 1..5 slots (positions 0..4) — the per-day cap lives
  *     here AND in the schema; the builder lets every day carry its own count
  *   - no exercise repeats across the week while the pool allows it
- *   - every week covers all four corrective categories
- *   - every day carries at least one strength slot, and never the same
- *     category three times over
  *   - equipment balances near 50/50 across the week
  *   - pinned (user-swapped) slots are left untouched by regeneration
- *
- * Why quotas rather than a fixed per-slot template: the catalog is lopsided.
- * There are 8 mobility exercises but only ONE of them uses dumbbells, and
- * exactly 5 core exercises. The previous version derived both category and
- * equipment from the day index, so slot (day-index 1, position 2) demanded
- * "mobility + dumbbell" — a set of size one — and Dumbbell Pullover was
- * welded into every routine forever, while a 5-day week's five core slots
- * exhausted the core pool exactly. Neither could be shaken loose by any
- * amount of reseeding. Composition is now decided for the WEEK and only then
- * dealt out to days, so no slot is ever cornered into a single candidate.
  */
 
 export type ExerciseEquipment = "YOGA" | "DUMBBELL";
+
+export type ExerciseType = "STRENGTH" | "MOBILITY" | "FLOW";
+
+export type RoutineDayType = "STANDARD" | "FLOW" | "RECOVERY";
 
 export type ExerciseGoal =
   | "HIP_FLEXOR_MOBILITY"
@@ -42,13 +43,21 @@ export type ExerciseGoal =
   | "NECK_MOBILITY"
   | "NECK_STRENGTH"
   | "CALF_MOBILITY"
-  | "WRIST_MOBILITY";
+  | "WRIST_MOBILITY"
+  | "LEG_STRENGTH"
+  | "PUSH_STRENGTH"
+  | "BALANCE"
+  | "CARDIO"
+  | "HIP_MOBILITY"
+  | "ANKLE_MOBILITY"
+  | "CALF_STRENGTH";
 
 /** What the generator actually needs from an exercise. */
 export interface PoolExercise {
   id: string;
   equipment: ExerciseEquipment;
   goal: ExerciseGoal;
+  type: ExerciseType;
 }
 
 /** One slot of the week being produced. `position` is 0..4 within the day. */
@@ -65,50 +74,47 @@ export interface PinnedSlot {
   exerciseId: string;
 }
 
-/** The corrective jobs a workout day is made of. */
-export type SlotCategory = "POSTERIOR" | "CORE" | "MOBILITY" | "UPPER";
-
-const CATEGORIES: SlotCategory[] = ["POSTERIOR", "UPPER", "MOBILITY", "CORE"];
-
-const CATEGORY_OF_GOAL: Record<ExerciseGoal, SlotCategory> = {
-  GLUTE_STRENGTH: "POSTERIOR",
-  HAMSTRING_LENGTH: "POSTERIOR",
-  CORE_STABILITY: "CORE",
-  POSTURE_AWARENESS: "CORE",
-  HIP_FLEXOR_MOBILITY: "MOBILITY",
-  LOWER_BACK_RELIEF: "MOBILITY",
-  CHEST_MOBILITY: "MOBILITY",
-  UPPER_BACK_STRENGTH: "UPPER",
-  NECK_MOBILITY: "MOBILITY",
-  NECK_STRENGTH: "UPPER",
-  CALF_MOBILITY: "MOBILITY",
-  WRIST_MOBILITY: "MOBILITY",
-};
+/** The day kinds the builder offers, in their picker order. */
+export const ROUTINE_DAY_TYPES: RoutineDayType[] = [
+  "STANDARD",
+  "FLOW",
+  "RECOVERY",
+];
 
 /**
- * How the week's slots are split between the four corrective jobs. Posterior
- * chain and upper back lead because they are the two things a desk actually
- * weakens; mobility and core support them.
+ * The auto periodization pattern: the first training day is the recovery
+ * day, the last is the flow day, everything between is standard work. Weeks
+ * of six or more days earn a second flow day, since "one or two flow days"
+ * is the classic aerobic dose.
  */
-const CATEGORY_WEIGHT: Record<SlotCategory, number> = {
-  POSTERIOR: 0.3,
-  UPPER: 0.27,
-  MOBILITY: 0.23,
-  CORE: 0.2,
-};
-
-/** The load-bearing categories. Every day gets at least one. */
-const STRENGTH: SlotCategory[] = ["POSTERIOR", "UPPER"];
+export function autoDayTypes(days: number[]): RoutineDayType[] {
+  const count = days.length;
+  const types: RoutineDayType[] = days.map(() => "STANDARD");
+  if (count >= 2) types[count - 1] = "FLOW";
+  if (count >= 3) types[0] = "RECOVERY";
+  if (count >= 6) types[count - 2] = "FLOW";
+  return types;
+}
 
 /**
- * Order within a day: strength while you're fresh, mobility last as the
- * cooldown. Lower sorts earlier.
+ * How a STANDARD day's slots split between strength and mobility, by the
+ * day's total. Strength always leads, mobility always closes, and a day
+ * never becomes all of one thing: the three-slot default is the canonical
+ * two-plus-one.
  */
-const CATEGORY_RANK: Record<SlotCategory, number> = {
-  POSTERIOR: 0,
-  UPPER: 1,
-  CORE: 2,
-  MOBILITY: 3,
+const STANDARD_MIX: Record<number, [number, number]> = {
+  1: [1, 0],
+  2: [1, 1],
+  3: [2, 1],
+  4: [2, 2],
+  5: [3, 2],
+};
+
+/** Order within a day: strength while fresh, mobility as the cooldown. */
+const TYPE_RANK: Record<ExerciseType, number> = {
+  STRENGTH: 0,
+  MOBILITY: 1,
+  FLOW: 2,
 };
 
 /** Hard cap on any single day's slots; mirrored by validation. */
@@ -135,182 +141,20 @@ function shuffle<T>(items: T[], random: () => number): T[] {
   return copy;
 }
 
-/**
- * How many slots each category gets across the whole week, by largest
- * remainder, clamped to what the catalog can actually supply.
- *
- * The clamp is the important half: a category can never be asked for more
- * exercises than exist, because that is what forces repeats and, worse,
- * corners the equipment choice down to a single candidate.
- */
-function categoryQuotas(
-  total: number,
-  supply: Record<SlotCategory, number>,
-): Record<SlotCategory, number> {
-  const ceiling = (category: SlotCategory) =>
-    Math.min(
-      supply[category],
-      Math.max(0, total - (CATEGORIES.length - 1)),
-    );
-
-  const exact = CATEGORIES.map((category) => ({
-    category,
-    ideal: total * CATEGORY_WEIGHT[category],
-  }));
-
-  const quotas = {} as Record<SlotCategory, number>;
-  for (const { category, ideal } of exact) {
-    quotas[category] = Math.min(Math.max(1, Math.floor(ideal)), ceiling(category));
-  }
-
-  // Hand out what's left to whoever was cut shortest of its ideal share and
-  // still has room, so the rounding error lands where it hurts least.
-  let assigned = CATEGORIES.reduce((sum, c) => sum + quotas[c], 0);
-  while (assigned < total) {
-    const candidates = exact
-      .filter(({ category }) => quotas[category] < ceiling(category))
-      .sort(
-        (a, b) =>
-          b.ideal - quotas[b.category] - (a.ideal - quotas[a.category]),
-      );
-    // No room among the capped candidates: for a small week (total < number
-    // of categories) every ceiling is zero, and for a week bigger than the
-    // catalog every category sits at its supply. Either way, keep dealing by
-    // priority — posterior first — so no position is left empty; the pick
-    // phase falls back to repeats once a pool is genuinely spent.
-    const pick =
-      candidates[0] ??
-      [...exact].sort((a, b) => b.ideal - a.ideal)[0];
-    if (!pick) break; // supply is zero everywhere; caller gets an empty week
-    quotas[pick.category] += 1;
-    assigned += 1;
-  }
-
-  // Over-assigned (possible when every ceiling is generous and floors round
-  // up): take back from whoever is furthest above its ideal share.
-  while (assigned > total) {
-    const candidates = exact
-      .filter(({ category }) => quotas[category] > 1)
-      .sort(
-        (a, b) =>
-          quotas[b.category] - b.ideal - (quotas[a.category] - a.ideal),
-      );
-    if (candidates.length === 0) break;
-    quotas[candidates[0].category] -= 1;
-    assigned -= 1;
-  }
-
-  return quotas;
-}
-
-/**
- * Deal a shuffled multiset of categories across the days, then repair it so
- * no day triples up on one category and every day gets a strength slot.
- *
- * Dealing round-robin (every day's first slot, then every day's second) is
- * what spreads categories in the first place; the repair pass only has to
- * clean up the tail of an unlucky shuffle.
- */
-function dealCategories(
-  quotas: Record<SlotCategory, number>,
-  dayCount: number,
-  openings: number[],
-  random: () => number,
-): SlotCategory[][] {
-  const bag: SlotCategory[] = [];
-  for (const category of CATEGORIES) {
-    for (let i = 0; i < quotas[category]; i++) bag.push(category);
-  }
-  const deck = shuffle(bag, random);
-
-  const days: SlotCategory[][] = Array.from({ length: dayCount }, () => []);
-  let cursor = 0;
-  for (let round = 0; round < Math.max(...openings); round++) {
-    for (let day = 0; day < dayCount; day++) {
-      if (days[day].length >= openings[day]) continue;
-      if (cursor >= deck.length) break;
-      days[day].push(deck[cursor++]);
-    }
-  }
-  // Anything the round-robin couldn't place (days fill unevenly once pins
-  // take positions) goes wherever there is still room.
-  for (let day = 0; day < dayCount && cursor < deck.length; day++) {
-    while (days[day].length < openings[day] && cursor < deck.length) {
-      days[day].push(deck[cursor++]);
-    }
-  }
-
-  const tripled = (list: SlotCategory[]) =>
-    list.find((c) => list.filter((other) => other === c).length >= 3);
-  // A day of two or more deserves a strength move; a one-slot day can't be
-  // guaranteed one when the strength quota is smaller than the week's days.
-  const needsStrength = (list: SlotCategory[], opening: number) =>
-    opening >= 2 && !list.some((c) => STRENGTH.includes(c));
-
-  // Swap offending entries with a compatible one on another day. Bounded by
-  // the slot count — a couple of passes is always enough in practice, and a
-  // hard bound means a pathological catalog can't spin here.
-  for (let pass = 0; pass < deck.length; pass++) {
-    let repaired = false;
-
-    for (let day = 0; day < dayCount; day++) {
-      const excess = tripled(days[day]);
-      if (excess === undefined) continue;
-      const donor = days.findIndex(
-        (other, index) =>
-          index !== day &&
-          !other.includes(excess) &&
-          other.some((c) => days[day].filter((x) => x === c).length === 0),
-      );
-      if (donor === -1) continue;
-      const give = days[day].indexOf(excess);
-      const take = days[donor].findIndex(
-        (c) => !days[day].includes(c) || c !== excess,
-      );
-      [days[day][give], days[donor][take]] = [days[donor][take], days[day][give]];
-      repaired = true;
-    }
-
-    for (let day = 0; day < dayCount; day++) {
-      if (!needsStrength(days[day], openings[day])) continue;
-      const donor = days.findIndex(
-        (other, index) =>
-          index !== day &&
-          other.filter((c) => STRENGTH.includes(c)).length > 1,
-      );
-      if (donor === -1) continue;
-      const take = days[donor].findIndex((c) => STRENGTH.includes(c));
-      const give = days[day].findIndex((c) => !days[donor].includes(c));
-      const giveIndex = give === -1 ? 0 : give;
-      [days[day][giveIndex], days[donor][take]] = [
-        days[donor][take],
-        days[day][giveIndex],
-      ];
-      repaired = true;
-    }
-
-    if (!repaired) break;
-  }
-
-  return days;
-}
-
-/** One slot after composition, before an exercise is chosen for it. */
-interface OpenSlot {
-  dayOfWeek: number;
-  dayIndex: number;
-  category: SlotCategory;
-  equipment: ExerciseEquipment | null;
-}
-
 export interface GenerateOptions {
   /** 0 = Sunday .. 6 = Saturday. Any length 1..7; the builder offers all of them. */
   days: number[];
   /**
    * How many slots each entry of `days` carries, index-aligned. Each 1..5.
-   * Defaults to 3 per day, which keeps the canonical shape.
+   * Defaults to 3 per day, which keeps the canonical shape. FLOW days are
+   * always exactly one slot — the flow itself.
    */
   counts?: number[];
+  /**
+   * What each day is for, index-aligned with `days`. Omitted => the auto
+   * pattern (first RECOVERY, last FLOW, rest STANDARD).
+   */
+  dayTypes?: RoutineDayType[];
   /** The active catalog. */
   exercises: PoolExercise[];
   /**
@@ -331,13 +175,21 @@ export interface GenerateOptions {
   avoid?: string[];
 }
 
+/** One slot after composition, before an exercise is chosen for it. */
+interface OpenSlot {
+  dayOfWeek: number;
+  type: ExerciseType;
+  equipment: ExerciseEquipment | null;
+}
+
 /**
- * Build a week: for each day, three non-repeating exercises drawn from the
- * corrective categories, balanced across equipment.
+ * Build a week: for each day, the mix its type calls for, drawn from the
+ * catalog with no repeats while the pool allows, balanced across equipment.
  */
 export function generateRoutine({
   days,
   counts,
+  dayTypes,
   exercises: allExercises,
   equipment = null,
   variant = 0,
@@ -362,11 +214,15 @@ export function generateRoutine({
   if (sortedDays.length === 0) return [];
   const countOf = (day: number) => countByDay.get(day) ?? 3;
 
-  const pools = {} as Record<SlotCategory, PoolExercise[]>;
-  for (const category of CATEGORIES) {
-    pools[category] = exercises.filter(
-      (e) => CATEGORY_OF_GOAL[e.goal] === category,
-    );
+  // The auto pattern fills in any day the person didn't name.
+  const dayTypeOf = (day: number, index: number): RoutineDayType => {
+    if (dayTypes) return dayTypes[index] ?? "STANDARD";
+    return autoDayTypes(sortedDays)[index];
+  };
+
+  const pools = {} as Record<ExerciseType, PoolExercise[]>;
+  for (const type of Object.keys(TYPE_RANK) as ExerciseType[]) {
+    pools[type] = exercises.filter((e) => e.type === type);
   }
 
   // Pinned slots hold their exact place; composition only fills what's left.
@@ -380,12 +236,6 @@ export function generateRoutine({
     ]);
   }
 
-  const openings = sortedDays.map(
-    (day) =>
-      Math.max(0, countOf(day) - (pinnedByDay.get(day)?.length ?? 0)),
-  );
-  const total = openings.reduce((sum, n) => sum + n, 0);
-
   const slots: GeneratedSlot[] = [];
   for (const list of pinnedByDay.values()) {
     for (const slot of list) {
@@ -396,106 +246,159 @@ export function generateRoutine({
       });
     }
   }
-  if (total === 0) return slots.sort(byDayThenPosition);
 
-  const supply = {} as Record<SlotCategory, number>;
-  for (const category of CATEGORIES) supply[category] = pools[category].length;
-
-  const quotas = categoryQuotas(total, supply);
-  const dealt = dealCategories(quotas, sortedDays.length, openings, random);
-
+  // --- per-day plans: how many open slots each day has, and what types.
+  //
+  // A FLOW day is exactly one slot — the flow. A RECOVERY day is all
+  // mobility. A STANDARD day reads its mix from the table and then deducts
+  // whatever the person's pinned picks already supply, so a pinned
+  // mobility move shrinks the mobility demand rather than being replaced.
   const open: OpenSlot[] = [];
-  sortedDays.forEach((dayOfWeek, dayIndex) => {
-    for (const category of dealt[dayIndex]) {
-      open.push({ dayOfWeek, dayIndex, category, equipment: null });
+  sortedDays.forEach((day, dayIndex) => {
+    const dayType = dayTypeOf(day, dayIndex);
+    const pinnedSlots = pinnedByDay.get(day) ?? [];
+    const total = dayType === "FLOW" ? 1 : countOf(day);
+    const openings = Math.max(0, total - pinnedSlots.length);
+    if (openings === 0) return;
+
+    if (dayType === "FLOW") {
+      // The flow pool can be empty under a dumbbells-only preference —
+      // degrade to a standard day rather than leave a hole in the week.
+      const kind: ExerciseType =
+        pools.FLOW.length > 0
+          ? "FLOW"
+          : STANDARD_MIX[openings][0] > 0
+            ? "STRENGTH"
+            : "MOBILITY";
+      open.push({ dayOfWeek: day, type: kind, equipment: null });
+      return;
+    }
+
+    const types: ExerciseType[] = [];
+    if (dayType === "RECOVERY") {
+      for (let i = 0; i < openings; i++) types.push("MOBILITY");
+    } else {
+      const [strength, mobility] = STANDARD_MIX[openings] ?? [0, 0];
+      const pinnedStrength = pinnedSlots.filter(
+        (slot) =>
+          exercises.find((e) => e.id === slot.exerciseId)?.type === "STRENGTH",
+      ).length;
+      const pinnedMobility = pinnedSlots.filter(
+        (slot) =>
+          exercises.find((e) => e.id === slot.exerciseId)?.type !== "STRENGTH",
+      ).length;
+      for (let i = 0; i < Math.max(0, strength - pinnedStrength); i++) {
+        types.push("STRENGTH");
+      }
+      for (let i = 0; i < Math.max(0, mobility - pinnedMobility); i++) {
+        types.push("MOBILITY");
+      }
+      // A day whose pins are all strength and whose table wants all mobility
+      // (or vice versa) could end up shorter than its count — fill from the
+      // strength side, which is never a bad place for a spare slot to land.
+      while (types.length < openings) types.push("STRENGTH");
+    }
+    for (const type of types) {
+      open.push({ dayOfWeek: day, type, equipment: null });
     }
   });
 
   // --- equipment, as a week-level target rather than a per-slot mandate.
   //
-  // Decided per category against what that category can actually supply,
-  // never slot-by-slot. A greedy "give this slot whichever side is behind on
+  // Decided per type against what that type can actually supply, never
+  // slot-by-slot. A greedy "give this slot whichever side is behind on
   // quota" rule looks reasonable and is quietly fatal: it strictly
   // alternates, so a fixed slot in the sequence always lands on the same
   // side, and for mobility — which offers exactly one dumbbell exercise —
-  // that means Dumbbell Pullover in every week forever. Allocating per
-  // category instead lets mobility take the yoga side it can genuinely fill
-  // and the roomy categories absorb the balance.
-  const yogaByCategory = {} as Record<SlotCategory, number>;
-  const floorOf = {} as Record<SlotCategory, number>;
-  const capOf = {} as Record<SlotCategory, number>;
-  for (const category of CATEGORIES) {
-    const yogaCount = pools[category].filter((e) => e.equipment === "YOGA").length;
-    const dumbbellCount = pools[category].length - yogaCount;
-    floorOf[category] = Math.max(0, quotas[category] - dumbbellCount);
-    capOf[category] = Math.max(
-      floorOf[category],
-      Math.min(quotas[category], yogaCount),
-    );
-    yogaByCategory[category] = floorOf[category];
+  // that means Dumbbell Pullover in every week forever. Allocating per type
+  // instead lets mobility take the yoga side it can genuinely fill and the
+  // roomy types absorb the balance.
+  const total = open.length;
+  const types = ["STRENGTH", "MOBILITY", "FLOW"] as ExerciseType[];
+  const yogaByType = {} as Record<ExerciseType, number>;
+  const floorOf = {} as Record<ExerciseType, number>;
+  const capOf = {} as Record<ExerciseType, number>;
+  for (const type of types) {
+    const yogaCount = pools[type].filter((e) => e.equipment === "YOGA").length;
+    const dumbbellCount = pools[type].length - yogaCount;
+    const wanted = open.filter((slot) => slot.type === type).length;
+    floorOf[type] = Math.max(0, wanted - dumbbellCount);
+    capOf[type] = Math.max(floorOf[type], Math.min(wanted, yogaCount));
+    yogaByType[type] = floorOf[type];
   }
 
   const yogaTarget = Math.round(total / 2);
-  let yogaAssigned = CATEGORIES.reduce((sum, c) => sum + yogaByCategory[c], 0);
+  let yogaAssigned = types.reduce((sum, t) => sum + yogaByType[t], 0);
   while (yogaAssigned !== yogaTarget) {
     const up = yogaAssigned < yogaTarget;
-    const room = CATEGORIES.filter((c) =>
-      up ? yogaByCategory[c] < capOf[c] : yogaByCategory[c] > floorOf[c],
+    const room = types.filter((t) =>
+      up ? yogaByType[t] < capOf[t] : yogaByType[t] > floorOf[t],
     );
     if (room.length === 0) break; // catalog can't reach 50/50; get as close as it allows
-    yogaByCategory[room[Math.floor(random() * room.length)]] += up ? 1 : -1;
+    yogaByType[room[Math.floor(random() * room.length)]] += up ? 1 : -1;
     yogaAssigned += up ? 1 : -1;
   }
 
-  for (const category of CATEGORIES) {
-    const inCategory = shuffle(
-      open.filter((slot) => slot.category === category),
+  for (const type of types) {
+    const inType = shuffle(
+      open.filter((slot) => slot.type === type),
       random,
     );
-    inCategory.forEach((slot, index) => {
-      slot.equipment = index < yogaByCategory[category] ? "YOGA" : "DUMBBELL";
+    inType.forEach((slot, index) => {
+      slot.equipment = index < yogaByType[type] ? "YOGA" : "DUMBBELL";
     });
   }
 
-  // Scarcest categories pick their exercises first, so a tight pool isn't
-  // left holding whatever the roomy ones didn't want.
-  const scarcity = (category: SlotCategory) => {
-    const pool = pools[category];
+  // Scarcest types pick their exercises first, so a tight pool isn't left
+  // holding whatever the roomy ones didn't want.
+  const scarcity = (type: ExerciseType) => {
+    const pool = pools[type];
     return Math.min(
       pool.filter((e) => e.equipment === "YOGA").length,
       pool.filter((e) => e.equipment === "DUMBBELL").length,
     );
   };
   const order = shuffle(open, random).sort(
-    (a, b) => scarcity(a.category) - scarcity(b.category),
+    (a, b) => scarcity(a.type) - scarcity(b.type),
   );
 
   // --- pick the exercises.
   //
   // Scored rather than "first match wins", so several soft preferences can
-  // compete: the equipment this slot was allotted, a goal the week hasn't
-  // covered yet, and something the outgoing routine wasn't using. The jitter
-  // is what keeps two runs of the same variant apart from each other in feel
-  // without ever making the variant itself non-reproducible.
+  // compete: a goal the week hasn't covered yet, and something the outgoing
+  // routine wasn't using. The equipment, though, is not soft — the slot was
+  // allotted a side by the balance pass, and honoring it is what makes that
+  // pass mean anything. The other side only gets drawn on when the allotted
+  // side is genuinely spent, and the whole type pool only when the type is.
+  // The jitter is what keeps two runs of the same variant apart from each
+  // other in feel without ever making the variant itself non-reproducible.
   const used = new Set<string>(pinned.map((p) => p.exerciseId));
   const stale = new Set(avoid);
   const seenGoals = new Set<ExerciseGoal>();
   const picked: Array<{ slot: OpenSlot; exercise: PoolExercise }> = [];
 
   for (const slot of order) {
-    const pool = pools[slot.category];
+    const pool = pools[slot.type];
     if (pool.length === 0) continue;
 
-    const fresh = pool.filter((e) => !used.has(e.id));
-    // Relax only when the pool is genuinely spent, so a hole is never left
-    // in the week.
-    const candidates = fresh.length > 0 ? fresh : pool;
+    const allotted = pool.filter((e) => e.equipment === slot.equipment);
+    const fresh = allotted.filter((e) => !used.has(e.id));
+    // Relax step by step, so a hole is never left in the week: the allotted
+    // side first, then the whole type, then (only when the week is huge and
+    // the type is genuinely exhausted) repeats.
+    const candidates =
+      fresh.length > 0
+        ? fresh
+        : allotted.length > 0
+          ? allotted
+          : pool.filter((e) => !used.has(e.id)).length > 0
+            ? pool.filter((e) => !used.has(e.id))
+            : pool;
 
     let best: PoolExercise | null = null;
     let bestScore = -Infinity;
     for (const candidate of candidates) {
       const score =
-        (candidate.equipment === slot.equipment ? 3 : 0) +
         (seenGoals.has(candidate.goal) ? 0 : 2.5) +
         (stale.has(candidate.id) ? 0 : 2) +
         random() * 1.5;
@@ -523,10 +426,7 @@ export function generateRoutine({
 
     const picks = picked
       .filter((entry) => entry.slot.dayOfWeek === dayOfWeek)
-      .sort(
-        (a, b) =>
-          CATEGORY_RANK[a.slot.category] - CATEGORY_RANK[b.slot.category],
-      );
+      .sort((a, b) => TYPE_RANK[a.slot.type] - TYPE_RANK[b.slot.type]);
 
     picks.forEach((entry, index) => {
       const position = free[index];
@@ -552,7 +452,10 @@ export interface WeekSummary {
   balanced: boolean;
 }
 
-export function summarizeWeek(slots: GeneratedSlot[], exercises: PoolExercise[]): WeekSummary {
+export function summarizeWeek(
+  slots: GeneratedSlot[],
+  exercises: PoolExercise[],
+): WeekSummary {
   const byId = new Map(exercises.map((e) => [e.id, e]));
   const goals: Record<ExerciseGoal, number> = {
     HIP_FLEXOR_MOBILITY: 0,
@@ -567,6 +470,13 @@ export function summarizeWeek(slots: GeneratedSlot[], exercises: PoolExercise[])
     NECK_STRENGTH: 0,
     CALF_MOBILITY: 0,
     WRIST_MOBILITY: 0,
+    LEG_STRENGTH: 0,
+    PUSH_STRENGTH: 0,
+    BALANCE: 0,
+    CARDIO: 0,
+    HIP_MOBILITY: 0,
+    ANKLE_MOBILITY: 0,
+    CALF_STRENGTH: 0,
   };
   let yoga = 0;
   let dumbbell = 0;
@@ -581,5 +491,7 @@ export function summarizeWeek(slots: GeneratedSlot[], exercises: PoolExercise[])
 
   const days = new Set(slots.map((s) => s.dayOfWeek)).size;
   const covered = Object.values(goals).filter((count) => count > 0).length;
-  return { days, yoga, dumbbell, goals, balanced: covered >= 8 };
+  // Six of nineteen goals is what a typed 3-day week (recovery + standard +
+  // flow) genuinely covers; longer weeks cover more.
+  return { days, yoga, dumbbell, goals, balanced: covered >= 6 };
 }

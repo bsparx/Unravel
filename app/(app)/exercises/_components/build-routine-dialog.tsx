@@ -14,7 +14,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { WEEKDAYS } from "@/lib/dates";
-import { generateRoutine } from "@/lib/exercise-routine";
+import {
+  ROUTINE_DAY_TYPE_LABELS,
+} from "@/lib/exercise-labels";
+import {
+  autoDayTypes,
+  generateRoutine,
+  ROUTINE_DAY_TYPES,
+  type RoutineDayType,
+} from "@/lib/exercise-routine";
 import { idleState, ROUTINE_DAY_OPTIONS } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +49,7 @@ export function BuildRoutineDialog({
   const [daysPerWeek, setDaysPerWeek] = useState<number>(3);
   const [days, setDays] = useState<number[]>([]);
   const [counts, setCounts] = useState<Record<number, number>>({});
+  const [dayTypes, setDayTypes] = useState<Record<number, RoutineDayType>>({});
   const [equipment, setEquipment] = useState<"YOGA" | "DUMBBELL" | "MIX">(
     "MIX",
   );
@@ -61,17 +70,46 @@ export function BuildRoutineDialog({
     [catalog],
   );
 
+  const sortedDays = useMemo(() => [...days].sort((a, b) => a - b), [days]);
+
+  /** The auto periodization pattern — the starting point, not a straitjacket. */
+  const applyAutoDayTypes = () => {
+    const auto = autoDayTypes(sortedDays);
+    const next: Record<number, RoutineDayType> = {};
+    sortedDays.forEach((day, index) => {
+      next[day] = auto[index];
+    });
+    setDayTypes(next);
+    // The flow day is exactly one exercise — the flow itself.
+    setCounts((current) => {
+      const updated = { ...current };
+      sortedDays.forEach((day, index) => {
+        if (auto[index] === "FLOW") updated[day] = 1;
+      });
+      return updated;
+    });
+  };
+
+  const setDayType = (day: number, type: RoutineDayType) => {
+    setDayTypes((current) => ({ ...current, [day]: type }));
+    if (type === "FLOW") {
+      setCounts((current) => ({ ...current, [day]: 1 }));
+    }
+  };
+
+  const dayTypeOf = (day: number): RoutineDayType => dayTypes[day] ?? "STANDARD";
+
   /** Client preview of what the server will build — same inputs, same output. */
   const preview = useMemo(() => {
     if (step !== 3) return [];
-    const sorted = [...days].sort((a, b) => a - b);
     return generateRoutine({
-      days: sorted,
-      counts: sorted.map((day) => counts[day] ?? 3),
+      days: sortedDays,
+      counts: sortedDays.map((day) => counts[day] ?? 3),
+      dayTypes: sortedDays.map((day) => dayTypes[day] ?? "STANDARD"),
       exercises: catalog,
       equipment: equipment === "MIX" ? null : equipment,
     });
-  }, [step, days, counts, catalog, equipment]);
+  }, [step, sortedDays, counts, dayTypes, catalog, equipment]);
 
   const toggleDay = (value: number) => {
     if (days.includes(value)) {
@@ -191,7 +229,12 @@ export function BuildRoutineDialog({
               <Button
                 type="button"
                 disabled={days.length !== daysPerWeek}
-                onClick={() => setStep(2)}
+                onClick={() => {
+                  // First pass through the picker starts from the auto
+                  // pattern — the person can always rewrite it per day.
+                  if (Object.keys(dayTypes).length === 0) applyAutoDayTypes();
+                  setStep(2);
+                }}
               >
                 Next
                 <ArrowRight className="size-4" aria-hidden />
@@ -202,54 +245,91 @@ export function BuildRoutineDialog({
 
         {step === 2 && (
           <div className="space-y-3">
-            <p className="text-label text-muted-foreground">
-              Set how many exercises each day carries — 1 to 5.
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-label text-muted-foreground">
+                Set how many exercises each day carries — 1 to 5 — and what
+                each day is for.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={applyAutoDayTypes}
+              >
+                <Sparkles className="size-3.5" aria-hidden />
+                Auto
+              </Button>
+            </div>
+            <p className="text-muted-foreground text-label">
+              Standard days mix strength and mobility. Flow days are one
+              continuous flow, and recovery days are all release work — Auto
+              lays out the classic pattern, yours to change.
             </p>
 
             <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
               {WEEKDAYS.filter((day) => picked.has(day.value)).map((day) => {
                 const count = counts[day.value] ?? 3;
+                const dayType = dayTypeOf(day.value);
                 return (
                   <div
                     key={day.value}
-                    className="border-border flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5"
+                    className="border-border flex flex-col gap-2 rounded-lg border px-3 py-2.5"
                   >
-                    <p className="font-display text-body">{day.long}</p>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        aria-label={"Fewer exercises on " + day.long}
-                        disabled={count <= 1}
-                        onClick={() =>
-                          setCounts((current) => ({
-                            ...current,
-                            [day.value]: Math.max(1, (current[day.value] ?? 3) - 1),
-                          }))
-                        }
-                        className="border-border hover:bg-accent disabled:text-muted-foreground/40 flex size-6 items-center justify-center rounded-md border text-label transition-colors"
-                      >
-                        −
-                      </button>
-                      <span
-                        className="text-label tnum w-6 text-center"
-                        aria-live="polite"
-                      >
-                        {count}
-                      </span>
-                      <button
-                        type="button"
-                        aria-label={"More exercises on " + day.long}
-                        disabled={count >= 5}
-                        onClick={() =>
-                          setCounts((current) => ({
-                            ...current,
-                            [day.value]: Math.min(5, (current[day.value] ?? 3) + 1),
-                          }))
-                        }
-                        className="border-border hover:bg-accent disabled:text-muted-foreground/40 flex size-6 items-center justify-center rounded-md border text-label transition-colors"
-                      >
-                        +
-                      </button>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-display text-body">{day.long}</p>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          aria-label={"Fewer exercises on " + day.long}
+                          disabled={count <= 1 || dayType === "FLOW"}
+                          onClick={() =>
+                            setCounts((current) => ({
+                              ...current,
+                              [day.value]: Math.max(1, (current[day.value] ?? 3) - 1),
+                            }))
+                          }
+                          className="border-border hover:bg-accent disabled:text-muted-foreground/40 flex size-6 items-center justify-center rounded-md border text-label transition-colors"
+                        >
+                          −
+                        </button>
+                        <span
+                          className="text-label tnum w-6 text-center"
+                          aria-live="polite"
+                        >
+                          {count}
+                        </span>
+                        <button
+                          type="button"
+                          aria-label={"More exercises on " + day.long}
+                          disabled={count >= 5 || dayType === "FLOW"}
+                          onClick={() =>
+                            setCounts((current) => ({
+                              ...current,
+                              [day.value]: Math.min(5, (current[day.value] ?? 3) + 1),
+                            }))
+                          }
+                          className="border-border hover:bg-accent disabled:text-muted-foreground/40 flex size-6 items-center justify-center rounded-md border text-label transition-colors"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-1.5">
+                      {ROUTINE_DAY_TYPES.map((type) => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setDayType(day.value, type)}
+                          aria-pressed={dayType === type}
+                          className={cn(
+                            "border-border hover:bg-accent flex-1 rounded-md border px-1.5 py-1 text-label transition-colors",
+                            dayType === type && "border-primary bg-accent",
+                          )}
+                        >
+                          {ROUTINE_DAY_TYPE_LABELS[type]}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 );
@@ -295,7 +375,9 @@ export function BuildRoutineDialog({
                     <div className="flex items-center justify-between gap-2 px-3 pt-2.5">
                       <p className="font-display text-body">{day.long}</p>
                       <span className="text-muted-foreground text-micro tracking-wide uppercase">
-                        {daySlots.length} exercises
+                        {ROUTINE_DAY_TYPE_LABELS[dayTypeOf(day.value)]} ·{" "}
+                        {daySlots.length}{" "}
+                        {daySlots.length === 1 ? "exercise" : "exercises"}
                       </span>
                     </div>
                     <ol className="divide-y">
@@ -344,15 +426,23 @@ export function BuildRoutineDialog({
               </Button>
               <input type="hidden" name="daysPerWeek" value={daysPerWeek} />
               <input type="hidden" name="equipment" value={equipment} />
-              {[...days].sort((a, b) => a - b).map((day) => (
+              {sortedDays.map((day) => (
                 <input key={day} type="hidden" name="days[]" value={day} />
               ))}
-              {[...days].sort((a, b) => a - b).map((day) => (
+              {sortedDays.map((day) => (
                 <input
                   key={"count-" + day}
                   type="hidden"
                   name="counts[]"
                   value={counts[day] ?? 3}
+                />
+              ))}
+              {sortedDays.map((day) => (
+                <input
+                  key={"type-" + day}
+                  type="hidden"
+                  name="dayTypes[]"
+                  value={dayTypeOf(day)}
                 />
               ))}
               <Button type="submit" disabled={pending}>

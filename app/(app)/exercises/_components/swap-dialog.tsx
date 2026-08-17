@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { goalShort } from "@/lib/exercise-labels";
+import type { ExerciseGoal } from "@/lib/exercise-routine";
 import { idleState } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 
@@ -27,20 +28,6 @@ export type SwapCatalogExercise = {
   equipment: "YOGA" | "DUMBBELL";
   goal: ExerciseGoal;
 };
-
-type ExerciseGoal =
-  | "HIP_FLEXOR_MOBILITY"
-  | "GLUTE_STRENGTH"
-  | "HAMSTRING_LENGTH"
-  | "CORE_STABILITY"
-  | "LOWER_BACK_RELIEF"
-  | "UPPER_BACK_STRENGTH"
-  | "CHEST_MOBILITY"
-  | "POSTURE_AWARENESS"
-  | "NECK_MOBILITY"
-  | "NECK_STRENGTH"
-  | "CALF_MOBILITY"
-  | "WRIST_MOBILITY";
 
 export function SwapDialog({
   routineId,

@@ -4,7 +4,11 @@
  * language.
  */
 
-import type { ExerciseGoal } from "@/lib/exercise-routine";
+import type {
+  ExerciseGoal,
+  ExerciseType,
+  RoutineDayType,
+} from "@/lib/exercise-routine";
 
 export const EQUIPMENT_LABELS: Record<"YOGA" | "DUMBBELL", string> = {
   YOGA: "Yoga",
@@ -21,6 +25,19 @@ export const ROUTINE_EQUIPMENT_LABELS: Record<
   MIX: "yoga & dumbbells",
 };
 
+export const EXERCISE_TYPE_LABELS: Record<ExerciseType, string> = {
+  STRENGTH: "Strength",
+  MOBILITY: "Mobility",
+  FLOW: "Flow",
+};
+
+/** What a routine day is for, as a display string. */
+export const ROUTINE_DAY_TYPE_LABELS: Record<RoutineDayType, string> = {
+  STANDARD: "Standard",
+  FLOW: "Flow day",
+  RECOVERY: "Recovery",
+};
+
 export const GOAL_LABELS: Record<ExerciseGoal, string> = {
   HIP_FLEXOR_MOBILITY: "Hip flexor mobility",
   GLUTE_STRENGTH: "Glute strength",
@@ -34,6 +51,13 @@ export const GOAL_LABELS: Record<ExerciseGoal, string> = {
   NECK_STRENGTH: "Deep neck flexors",
   CALF_MOBILITY: "Calf mobility",
   WRIST_MOBILITY: "Wrist mobility",
+  LEG_STRENGTH: "Leg strength",
+  PUSH_STRENGTH: "Push strength",
+  BALANCE: "Balance",
+  CARDIO: "Cardio",
+  HIP_MOBILITY: "Hip mobility",
+  ANKLE_MOBILITY: "Ankle mobility",
+  CALF_STRENGTH: "Calf strength",
 };
 
 export const GOAL_SHORT: Record<ExerciseGoal, string> = {
@@ -49,21 +73,35 @@ export const GOAL_SHORT: Record<ExerciseGoal, string> = {
   NECK_STRENGTH: "Neck flexors",
   CALF_MOBILITY: "Calves",
   WRIST_MOBILITY: "Forearms",
+  LEG_STRENGTH: "Legs",
+  PUSH_STRENGTH: "Push",
+  BALANCE: "Balance",
+  CARDIO: "Cardio",
+  HIP_MOBILITY: "Hips",
+  ANKLE_MOBILITY: "Ankles",
+  CALF_STRENGTH: "Calves",
 };
 
 export const GOAL_ORDER: ExerciseGoal[] = [
   "GLUTE_STRENGTH",
+  "LEG_STRENGTH",
+  "PUSH_STRENGTH",
+  "BALANCE",
   "HAMSTRING_LENGTH",
   "CORE_STABILITY",
-  "HIP_FLEXOR_MOBILITY",
-  "LOWER_BACK_RELIEF",
   "UPPER_BACK_STRENGTH",
+  "CALF_STRENGTH",
+  "HIP_FLEXOR_MOBILITY",
+  "HIP_MOBILITY",
+  "ANKLE_MOBILITY",
+  "LOWER_BACK_RELIEF",
   "CHEST_MOBILITY",
   "POSTURE_AWARENESS",
   "NECK_MOBILITY",
   "NECK_STRENGTH",
   "CALF_MOBILITY",
   "WRIST_MOBILITY",
+  "CARDIO",
 ];
 
 export const BODY_PART_LABELS: Record<string, string> = {
@@ -81,6 +119,9 @@ export const BODY_PART_LABELS: Record<string, string> = {
   NECK: "Neck",
   CALVES: "Calves",
   FOREARMS: "Forearms",
+  ADDUCTORS: "Adductors",
+  ANKLES: "Ankles",
+  ARMS: "Arms",
 };
 
 /** Sentence-case a goal code for inline chips. */
