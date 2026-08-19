@@ -20,6 +20,7 @@ import { MissedYesterdayBadge } from "@/components/missed-yesterday-badge";
 import { formatDuration, formatMinutes } from "@/lib/dates";
 import { formatQuota, remainingToMinimum, tierFor, type Quota } from "@/lib/quota";
 import { nextStep, stepProgress } from "@/lib/steps";
+import { clampTarget, DEFAULTS } from "@/lib/timer-math";
 import type { TodayItem } from "@/lib/tasks";
 import { buildTimerHref } from "@/lib/timer-url";
 import { cn } from "@/lib/utils";
@@ -47,9 +48,19 @@ export function TaskRow({
 }) {
   const [expanded, setExpanded] = useState(false);
 
+  // Habits run against their own bars rather than their estimate: the minimum
+  // required time first, then the optimal, and only when neither is a time
+  // (COUNT habits) the estimate, then the classic 25 minutes.
+  const estimatedSeconds =
+    item.type === "HABIT" && item.quota
+      ? habitTimerTargetSeconds(item.quota) ??
+        item.estimatedSeconds ??
+        DEFAULTS.targetSeconds
+      : item.estimatedSeconds;
+
   const href = buildTimerHref({
     id: item.id,
-    estimatedSeconds: item.estimatedSeconds,
+    estimatedSeconds,
     defaultMode: item.defaultMode,
     plannedIntervals: item.plannedIntervals,
   });
@@ -245,6 +256,21 @@ export function TaskRow({
       )}
     </li>
   );
+}
+
+/**
+ * The timer target for a habit, or null when its quota is not measured in
+ * time. The minimum is the bar that matters — the optimal only covers rows
+ * with a missing or zero minimum. Clamped so a very large quota can't exceed
+ * the URL schema's ceiling and invalidate the whole query string.
+ */
+function habitTimerTargetSeconds(quota: Quota): number | null {
+  if (quota.unit !== "MINUTES") return null;
+  if (quota.minimum > 0) return clampTarget(quota.minimum * 60);
+  if (quota.optimal !== null && quota.optimal > 0) {
+    return clampTarget(quota.optimal * 60);
+  }
+  return null;
 }
 
 /**
