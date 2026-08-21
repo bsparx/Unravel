@@ -55,6 +55,8 @@ export type TaskFormValues = {
   unit?: "MINUTES" | "COUNT";
   minimumQuota?: number;
   optimalQuota?: number | null;
+  /** Minutes from midnight. The implementation intention's time half. */
+  timeAnchorMinutes?: number | null;
   cueMode?: CueMode;
   cueTaskId?: string | null;
   cueLabel?: string | null;
@@ -263,6 +265,37 @@ export function TaskForm({
                 {describeRecurrence(days)}
               </span>
             </div>
+          </div>
+        </Field>
+      ) : null}
+
+      {kind === "HABIT" ? (
+        <Field
+          label="When will you do it?"
+          htmlFor="timeAnchor"
+          hint="Optional. Habits that happen at a set time happen — 'I will do this at 07:00' is the strongest form of a plan. Anchored habits sort by time on /day."
+          error={error("timeAnchor")}
+        >
+          <div className="flex items-center gap-2">
+            <Input
+              id="timeAnchor"
+              name="timeAnchor"
+              type="time"
+              defaultValue={minutesToTimeInput(values.timeAnchorMinutes)}
+              className="w-40 tabular-nums"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const input = document.getElementById(
+                  "timeAnchor",
+                ) as HTMLInputElement | null;
+                if (input) input.value = "";
+              }}
+              className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded text-label underline underline-offset-4 focus-visible:ring-2 focus-visible:outline-none"
+            >
+              Clear
+            </button>
           </div>
         </Field>
       ) : null}
@@ -503,6 +536,15 @@ export function TaskForm({
       </div>
     </form>
   );
+}
+
+/** Minutes from midnight -> the native time input's HH:MM. */
+function minutesToTimeInput(
+  minutes: number | null | undefined,
+): string {
+  if (minutes === null || minutes === undefined) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
 }
 
 function Field({

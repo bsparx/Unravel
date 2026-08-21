@@ -242,6 +242,27 @@ enum ExerciseType {
   FLOW
 }
 
+/// How hard an exercise is to do well, on a three-point scale. Set per
+/// exercise in the catalog; the routine generator reads it when the person
+/// asked for a gentle week.
+enum ExerciseDifficulty {
+  /// Gentle enough for a first week or a sore day.
+  EASY
+  /// The default effort — honest work, nothing exotic.
+  MODERATE
+  /// Genuinely demanding: strength, balance or position a desk body has to
+  /// earn back first.
+  HARD
+}
+
+/// The intensity the person asked the builder for. EASY filters the pool to
+/// easy exercises (relaxing toward moderate only when an easy pool runs
+/// out); CHALLENGING draws from the whole catalog.
+enum RoutineDifficulty {
+  EASY
+  CHALLENGING
+}
+
 /// What kind of day a routine's slots belong to. The person can name each
 /// day's kind in the builder, or let the generator auto-assign the pattern:
 /// most days STANDARD (2 strength + 1 mobility), one FLOW day, one RECOVERY
@@ -495,6 +516,11 @@ model HabitRecurrence {
   /// The habit is inert outside this window. startDate also anchors streaks.
   startDate    DateTime  @db.Date
   endDate      DateTime? @db.Date
+
+  /// The implementation intention: "I will do this at 07:00". Minutes from
+  /// midnight in User.timezone. Null means no time plan yet — the habit
+  /// sorts after anchored ones and is never the time-aware "Start here" pick.
+  timeAnchor   Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1210,6 +1236,8 @@ model Exercise {
   /// STRENGTH / MOBILITY / FLOW — the shape the body is doing. Day
   /// composition draws on this, so a workout day can never be all stretches.
   type    ExerciseType
+  /// How hard it is to do this well. Drives the gentle-week pool filter.
+  difficulty ExerciseDifficulty @default(MODERATE)
   /// Muscle groups worked, for catalog filters. `goal` is the intent, this is
   /// the territory.
   bodyParts BodyPart[]
@@ -1250,6 +1278,12 @@ model ExerciseRoutine {
   /// the mix. Set at build time; regeneration keeps drawing from this pool.
   /// A manual swap may still reach outside it — a deliberate override.
   equipment RoutineEquipment @default(MIX)
+
+  /// The intensity chosen at build time: EASY keeps the week to easy
+  /// exercises, CHALLENGING uses the whole catalog. Regeneration keeps
+  /// drawing at this level. Existing routines read as CHALLENGING — the
+  /// migration backfills it that way on purpose.
+  difficulty RoutineDifficulty @default(CHALLENGING)
 
   /// 0 = Sunday .. 6 = Saturday. Length 3, 4, 5 or 6 — the whole point of the
   /// builder is that the person picks the exact days.

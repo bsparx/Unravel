@@ -10,9 +10,10 @@ import { Button } from "@/components/ui/button";
 import { WEEKDAYS } from "@/lib/dates";
 import {
   ROUTINE_DAY_TYPE_LABELS,
+  ROUTINE_DIFFICULTY_LABELS,
   ROUTINE_EQUIPMENT_LABELS,
 } from "@/lib/exercise-labels";
-import type { RoutineDayType } from "@/lib/exercise-routine";
+import type { RoutineDayType, RoutineDifficulty } from "@/lib/exercise-routine";
 import { idleState } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +42,7 @@ export type RoutineSlot = {
 export function RoutineWeek({
   routineId,
   equipment,
+  difficulty,
   daysOfWeek,
   dayTypes,
   slots,
@@ -49,6 +51,7 @@ export function RoutineWeek({
 }: {
   routineId: string;
   equipment: "YOGA" | "DUMBBELL" | "MIX";
+  difficulty: RoutineDifficulty;
   daysOfWeek: number[];
   /** Index-aligned with `daysOfWeek`, as stored on the routine. */
   dayTypes: RoutineDayType[];
@@ -235,7 +238,7 @@ export function RoutineWeek({
         <p className="text-muted-foreground text-label">
           {pinned > 0
             ? `${pinned} pinned — Regenerate reshuffles the rest.`
-            : `Regenerate draws a fresh week from the ${ROUTINE_EQUIPMENT_LABELS[equipment]} catalog.`}
+            : `Regenerate draws a fresh week from the ${ROUTINE_DIFFICULTY_LABELS[difficulty]} ${ROUTINE_EQUIPMENT_LABELS[equipment]} catalog.`}
         </p>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -288,6 +291,7 @@ export function RoutineWeek({
             name: swapping.exercise.name,
             equipment: swapping.exercise.equipment,
             goal: swapping.exercise.goal,
+            difficulty: swapping.exercise.difficulty,
           }}
           catalog={catalog}
           onClose={() => setSwapping(null)}

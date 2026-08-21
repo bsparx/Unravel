@@ -25,6 +25,7 @@ export default async function ExercisesPage() {
     equipment: exercise.equipment,
     goal: exercise.goal,
     type: exercise.type,
+    difficulty: exercise.difficulty,
     bodyParts: exercise.bodyParts,
     instructions: exercise.instructions,
     prescription: exercise.prescription,
@@ -35,6 +36,7 @@ export default async function ExercisesPage() {
     <ExercisesView
       routineId={routine?.id ?? null}
       equipment={routine?.equipment ?? "MIX"}
+      difficulty={routine?.difficulty ?? "CHALLENGING"}
       daysOfWeek={routine?.daysOfWeek ?? []}
       dayTypes={routine?.dayTypes ?? []}
       slots={
@@ -48,6 +50,7 @@ export default async function ExercisesPage() {
             equipment: slot.exercise.equipment,
             goal: slot.exercise.goal,
             type: slot.exercise.type,
+            difficulty: slot.exercise.difficulty,
             bodyParts: slot.exercise.bodyParts,
             instructions: slot.exercise.instructions,
             prescription: slot.exercise.prescription,

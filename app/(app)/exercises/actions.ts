@@ -34,7 +34,8 @@ export async function createRoutine(
     };
   }
 
-  const { daysPerWeek, days, counts, equipment, dayTypes } = parsed.data;
+  const { daysPerWeek, days, counts, equipment, difficulty, dayTypes } =
+    parsed.data;
   if (days.length !== daysPerWeek) {
     return {
       status: "error",
@@ -45,7 +46,7 @@ export async function createRoutine(
 
   const exercises = await prisma.exercise.findMany({
     where: { active: true },
-    select: { id: true, equipment: true, goal: true, type: true },
+    select: { id: true, equipment: true, goal: true, type: true, difficulty: true },
     orderBy: { sortOrder: "asc" },
   });
 
@@ -55,6 +56,7 @@ export async function createRoutine(
     dayTypes,
     exercises,
     equipment: equipment === "MIX" ? null : equipment,
+    difficulty,
   });
 
   await prisma.exerciseRoutine.create({
@@ -62,6 +64,7 @@ export async function createRoutine(
       userId: user.id,
       name: "Weekly routine",
       equipment,
+      difficulty,
       daysOfWeek: days,
       dayTypes: dayTypes ?? autoDayTypes(days),
       exercises: {
@@ -169,7 +172,7 @@ export async function regenerateRoutine(
   const variant = Math.floor(Math.random() * 1_000_000);
   const exercises = await prisma.exercise.findMany({
     where: { active: true },
-    select: { id: true, equipment: true, goal: true, type: true },
+    select: { id: true, equipment: true, goal: true, type: true, difficulty: true },
     orderBy: { sortOrder: "asc" },
   });
 
@@ -195,6 +198,9 @@ export async function regenerateRoutine(
     dayTypes: routine.dayTypes,
     exercises,
     equipment: routine.equipment === "MIX" ? null : routine.equipment,
+    // The intensity the week was built at is part of the plan: regeneration
+    // keeps drawing at the same level the person chose.
+    difficulty: routine.difficulty,
     variant,
     pinned,
     // Push what's on screen down the ranking, so consecutive clicks walk the

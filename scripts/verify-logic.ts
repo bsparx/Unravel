@@ -127,6 +127,10 @@ import {
   stepProgress,
 } from "@/lib/steps";
 import {
+  startHereHabit,
+  START_HERE_LOOKAHEAD_MINUTES,
+} from "@/lib/habit-timeline";
+import {
   buildTimerHref,
   parseTimerParams,
 } from "@/lib/timer-url";
@@ -1026,11 +1030,11 @@ check("minute-of-day formatting round-trips", () => {
   assert.equal(parseMinuteOfDay("23:59"), 1439);
 });
 
-check("every scheduled block starts at 30 minutes, whatever the estimate", () => {
+check("every scheduled block starts at 15 minutes, whatever the estimate", () => {
   // LOAD-BEARING. The whole point of the scheduling path: estimates inform,
   // they don't constrain, and the person adjusts after it lands.
-  assert.equal(planMinutes(), 30);
-  assert.equal(PLAN_DEFAULT_MINUTES, 30);
+  assert.equal(planMinutes(), 15);
+  assert.equal(PLAN_DEFAULT_MINUTES, 15);
   assert.equal(PLAN_CUE_MINUTES, 15);
 });
 
@@ -1599,63 +1603,71 @@ check("there is no story in a handful of breaks that behaved", () => {
 
 // ---------------------------------------------------------------- routines
 
-/** The 55 seeded exercises, in the shape the generator consumes. */
+/** The 63 seeded exercises, in the shape the generator consumes. */
 const EXERCISES: PoolExercise[] = [
-  { id: "bridge", equipment: "YOGA", goal: "GLUTE_STRENGTH", type: "STRENGTH" },
-  { id: "low-lunge", equipment: "YOGA", goal: "HIP_FLEXOR_MOBILITY", type: "MOBILITY" },
-  { id: "pelvic-tilts", equipment: "YOGA", goal: "POSTURE_AWARENESS", type: "MOBILITY" },
-  { id: "cat-cow", equipment: "YOGA", goal: "LOWER_BACK_RELIEF", type: "MOBILITY" },
-  { id: "bird-dog", equipment: "YOGA", goal: "CORE_STABILITY", type: "STRENGTH" },
-  { id: "locust", equipment: "YOGA", goal: "UPPER_BACK_STRENGTH", type: "STRENGTH" },
-  { id: "boat", equipment: "YOGA", goal: "CORE_STABILITY", type: "STRENGTH" },
-  { id: "reclined-twist", equipment: "YOGA", goal: "LOWER_BACK_RELIEF", type: "MOBILITY" },
-  { id: "childs", equipment: "YOGA", goal: "LOWER_BACK_RELIEF", type: "MOBILITY" },
-  { id: "down-dog", equipment: "YOGA", goal: "HAMSTRING_LENGTH", type: "MOBILITY" },
-  { id: "cobra", equipment: "YOGA", goal: "UPPER_BACK_STRENGTH", type: "STRENGTH" },
-  { id: "thread-needle", equipment: "YOGA", goal: "CHEST_MOBILITY", type: "MOBILITY" },
-  { id: "puppy", equipment: "YOGA", goal: "CHEST_MOBILITY", type: "MOBILITY" },
-  { id: "cow-face", equipment: "YOGA", goal: "CHEST_MOBILITY", type: "MOBILITY" },
-  { id: "eagle", equipment: "YOGA", goal: "UPPER_BACK_STRENGTH", type: "MOBILITY" },
-  { id: "forward-fold", equipment: "YOGA", goal: "HAMSTRING_LENGTH", type: "MOBILITY" },
-  { id: "db-glute-bridge", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH", type: "STRENGTH" },
-  { id: "db-single-bridge", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH", type: "STRENGTH" },
-  { id: "db-hip-thrust", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH", type: "STRENGTH" },
-  { id: "db-rdl", equipment: "DUMBBELL", goal: "HAMSTRING_LENGTH", type: "STRENGTH" },
-  { id: "db-goblet", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH", type: "STRENGTH" },
-  { id: "db-dead-bug", equipment: "DUMBBELL", goal: "CORE_STABILITY", type: "STRENGTH" },
-  { id: "db-hip-ext", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH", type: "STRENGTH" },
-  { id: "db-reverse-lunge", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH", type: "STRENGTH" },
-  { id: "db-farmer", equipment: "DUMBBELL", goal: "POSTURE_AWARENESS", type: "STRENGTH" },
-  { id: "db-row", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH", type: "STRENGTH" },
-  { id: "db-one-arm-row", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH", type: "STRENGTH" },
-  { id: "db-reverse-fly", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH", type: "STRENGTH" },
-  { id: "db-y-raise", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH", type: "STRENGTH" },
-  { id: "db-t-raise", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH", type: "STRENGTH" },
-  { id: "db-ytw", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH", type: "STRENGTH" },
-  { id: "db-pullover", equipment: "DUMBBELL", goal: "CHEST_MOBILITY", type: "MOBILITY" },
-  { id: "chin-tuck", equipment: "YOGA", goal: "NECK_STRENGTH", type: "STRENGTH" },
-  { id: "deep-neck-hold", equipment: "YOGA", goal: "NECK_STRENGTH", type: "STRENGTH" },
-  { id: "upper-trap-stretch", equipment: "YOGA", goal: "NECK_MOBILITY", type: "MOBILITY" },
-  { id: "levator-stretch", equipment: "YOGA", goal: "NECK_MOBILITY", type: "MOBILITY" },
-  { id: "calf-stretch", equipment: "YOGA", goal: "CALF_MOBILITY", type: "MOBILITY" },
-  { id: "soleus-stretch", equipment: "YOGA", goal: "CALF_MOBILITY", type: "MOBILITY" },
-  { id: "wrist-ext-stretch", equipment: "YOGA", goal: "WRIST_MOBILITY", type: "MOBILITY" },
-  { id: "wrist-flex-stretch", equipment: "YOGA", goal: "WRIST_MOBILITY", type: "MOBILITY" },
-  { id: "chair", equipment: "YOGA", goal: "LEG_STRENGTH", type: "STRENGTH" },
-  { id: "warrior-2", equipment: "YOGA", goal: "LEG_STRENGTH", type: "STRENGTH" },
-  { id: "high-lunge", equipment: "YOGA", goal: "LEG_STRENGTH", type: "STRENGTH" },
-  { id: "garland", equipment: "YOGA", goal: "ANKLE_MOBILITY", type: "MOBILITY" },
-  { id: "plank", equipment: "YOGA", goal: "PUSH_STRENGTH", type: "STRENGTH" },
-  { id: "side-plank", equipment: "YOGA", goal: "CORE_STABILITY", type: "STRENGTH" },
-  { id: "chaturanga", equipment: "YOGA", goal: "PUSH_STRENGTH", type: "STRENGTH" },
-  { id: "dolphin", equipment: "YOGA", goal: "PUSH_STRENGTH", type: "STRENGTH" },
-  { id: "tree", equipment: "YOGA", goal: "BALANCE", type: "STRENGTH" },
-  { id: "warrior-3", equipment: "YOGA", goal: "BALANCE", type: "STRENGTH" },
-  { id: "side-leg-raise", equipment: "YOGA", goal: "GLUTE_STRENGTH", type: "STRENGTH" },
-  { id: "wide-fold", equipment: "YOGA", goal: "HIP_MOBILITY", type: "MOBILITY" },
-  { id: "calf-raise", equipment: "YOGA", goal: "CALF_STRENGTH", type: "STRENGTH" },
-  { id: "sun-salutation", equipment: "YOGA", goal: "CARDIO", type: "FLOW" },
-  { id: "bridge-march", equipment: "YOGA", goal: "GLUTE_STRENGTH", type: "STRENGTH" },
+  { id: "bridge", equipment: "YOGA", goal: "GLUTE_STRENGTH", type: "STRENGTH", difficulty: "EASY" },
+  { id: "low-lunge", equipment: "YOGA", goal: "HIP_FLEXOR_MOBILITY", type: "MOBILITY", difficulty: "EASY" },
+  { id: "pelvic-tilts", equipment: "YOGA", goal: "POSTURE_AWARENESS", type: "MOBILITY", difficulty: "EASY" },
+  { id: "cat-cow", equipment: "YOGA", goal: "LOWER_BACK_RELIEF", type: "MOBILITY", difficulty: "EASY" },
+  { id: "bird-dog", equipment: "YOGA", goal: "CORE_STABILITY", type: "STRENGTH", difficulty: "MODERATE" },
+  { id: "locust", equipment: "YOGA", goal: "UPPER_BACK_STRENGTH", type: "STRENGTH", difficulty: "MODERATE" },
+  { id: "boat", equipment: "YOGA", goal: "CORE_STABILITY", type: "STRENGTH", difficulty: "HARD" },
+  { id: "reclined-twist", equipment: "YOGA", goal: "LOWER_BACK_RELIEF", type: "MOBILITY", difficulty: "EASY" },
+  { id: "childs", equipment: "YOGA", goal: "LOWER_BACK_RELIEF", type: "MOBILITY", difficulty: "EASY" },
+  { id: "down-dog", equipment: "YOGA", goal: "HAMSTRING_LENGTH", type: "MOBILITY", difficulty: "MODERATE" },
+  { id: "cobra", equipment: "YOGA", goal: "UPPER_BACK_STRENGTH", type: "STRENGTH", difficulty: "EASY" },
+  { id: "thread-needle", equipment: "YOGA", goal: "CHEST_MOBILITY", type: "MOBILITY", difficulty: "EASY" },
+  { id: "puppy", equipment: "YOGA", goal: "CHEST_MOBILITY", type: "MOBILITY", difficulty: "EASY" },
+  { id: "cow-face", equipment: "YOGA", goal: "CHEST_MOBILITY", type: "MOBILITY", difficulty: "MODERATE" },
+  { id: "eagle", equipment: "YOGA", goal: "UPPER_BACK_STRENGTH", type: "MOBILITY", difficulty: "MODERATE" },
+  { id: "forward-fold", equipment: "YOGA", goal: "HAMSTRING_LENGTH", type: "MOBILITY", difficulty: "EASY" },
+  { id: "db-glute-bridge", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH", type: "STRENGTH", difficulty: "EASY" },
+  { id: "db-single-bridge", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH", type: "STRENGTH", difficulty: "HARD" },
+  { id: "db-hip-thrust", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH", type: "STRENGTH", difficulty: "MODERATE" },
+  { id: "db-rdl", equipment: "DUMBBELL", goal: "HAMSTRING_LENGTH", type: "STRENGTH", difficulty: "MODERATE" },
+  { id: "db-goblet", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH", type: "STRENGTH", difficulty: "MODERATE" },
+  { id: "db-dead-bug", equipment: "DUMBBELL", goal: "CORE_STABILITY", type: "STRENGTH", difficulty: "MODERATE" },
+  { id: "db-hip-ext", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH", type: "STRENGTH", difficulty: "MODERATE" },
+  { id: "db-reverse-lunge", equipment: "DUMBBELL", goal: "GLUTE_STRENGTH", type: "STRENGTH", difficulty: "MODERATE" },
+  { id: "db-farmer", equipment: "DUMBBELL", goal: "POSTURE_AWARENESS", type: "STRENGTH", difficulty: "MODERATE" },
+  { id: "db-row", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH", type: "STRENGTH", difficulty: "MODERATE" },
+  { id: "db-one-arm-row", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH", type: "STRENGTH", difficulty: "MODERATE" },
+  { id: "db-reverse-fly", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH", type: "STRENGTH", difficulty: "MODERATE" },
+  { id: "db-y-raise", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH", type: "STRENGTH", difficulty: "EASY" },
+  { id: "db-t-raise", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH", type: "STRENGTH", difficulty: "EASY" },
+  { id: "db-ytw", equipment: "DUMBBELL", goal: "UPPER_BACK_STRENGTH", type: "STRENGTH", difficulty: "MODERATE" },
+  { id: "db-pullover", equipment: "DUMBBELL", goal: "CHEST_MOBILITY", type: "MOBILITY", difficulty: "EASY" },
+  { id: "chin-tuck", equipment: "YOGA", goal: "NECK_STRENGTH", type: "STRENGTH", difficulty: "EASY" },
+  { id: "deep-neck-hold", equipment: "YOGA", goal: "NECK_STRENGTH", type: "STRENGTH", difficulty: "MODERATE" },
+  { id: "upper-trap-stretch", equipment: "YOGA", goal: "NECK_MOBILITY", type: "MOBILITY", difficulty: "EASY" },
+  { id: "levator-stretch", equipment: "YOGA", goal: "NECK_MOBILITY", type: "MOBILITY", difficulty: "EASY" },
+  { id: "calf-stretch", equipment: "YOGA", goal: "CALF_MOBILITY", type: "MOBILITY", difficulty: "EASY" },
+  { id: "soleus-stretch", equipment: "YOGA", goal: "CALF_MOBILITY", type: "MOBILITY", difficulty: "EASY" },
+  { id: "wrist-ext-stretch", equipment: "YOGA", goal: "WRIST_MOBILITY", type: "MOBILITY", difficulty: "EASY" },
+  { id: "wrist-flex-stretch", equipment: "YOGA", goal: "WRIST_MOBILITY", type: "MOBILITY", difficulty: "EASY" },
+  { id: "chair", equipment: "YOGA", goal: "LEG_STRENGTH", type: "STRENGTH", difficulty: "MODERATE" },
+  { id: "warrior-2", equipment: "YOGA", goal: "LEG_STRENGTH", type: "STRENGTH", difficulty: "MODERATE" },
+  { id: "high-lunge", equipment: "YOGA", goal: "LEG_STRENGTH", type: "STRENGTH", difficulty: "HARD" },
+  { id: "garland", equipment: "YOGA", goal: "ANKLE_MOBILITY", type: "MOBILITY", difficulty: "HARD" },
+  { id: "plank", equipment: "YOGA", goal: "PUSH_STRENGTH", type: "STRENGTH", difficulty: "MODERATE" },
+  { id: "side-plank", equipment: "YOGA", goal: "CORE_STABILITY", type: "STRENGTH", difficulty: "MODERATE" },
+  { id: "chaturanga", equipment: "YOGA", goal: "PUSH_STRENGTH", type: "STRENGTH", difficulty: "HARD" },
+  { id: "dolphin", equipment: "YOGA", goal: "PUSH_STRENGTH", type: "STRENGTH", difficulty: "HARD" },
+  { id: "tree", equipment: "YOGA", goal: "BALANCE", type: "STRENGTH", difficulty: "MODERATE" },
+  { id: "warrior-3", equipment: "YOGA", goal: "BALANCE", type: "STRENGTH", difficulty: "HARD" },
+  { id: "side-leg-raise", equipment: "YOGA", goal: "GLUTE_STRENGTH", type: "STRENGTH", difficulty: "EASY" },
+  { id: "wide-fold", equipment: "YOGA", goal: "HIP_MOBILITY", type: "MOBILITY", difficulty: "MODERATE" },
+  { id: "calf-raise", equipment: "YOGA", goal: "CALF_STRENGTH", type: "STRENGTH", difficulty: "EASY" },
+  { id: "sun-salutation", equipment: "YOGA", goal: "CARDIO", type: "FLOW", difficulty: "MODERATE" },
+  { id: "bridge-march", equipment: "YOGA", goal: "GLUTE_STRENGTH", type: "STRENGTH", difficulty: "MODERATE" },
+  { id: "legs-up-wall", equipment: "YOGA", goal: "LOWER_BACK_RELIEF", type: "MOBILITY", difficulty: "EASY" },
+  { id: "figure-4", equipment: "YOGA", goal: "HIP_MOBILITY", type: "MOBILITY", difficulty: "EASY" },
+  { id: "happy-baby", equipment: "YOGA", goal: "HIP_MOBILITY", type: "MOBILITY", difficulty: "EASY" },
+  { id: "wall-angels", equipment: "YOGA", goal: "POSTURE_AWARENESS", type: "MOBILITY", difficulty: "EASY" },
+  { id: "ankle-circles", equipment: "YOGA", goal: "ANKLE_MOBILITY", type: "MOBILITY", difficulty: "EASY" },
+  { id: "wall-pushup", equipment: "YOGA", goal: "PUSH_STRENGTH", type: "STRENGTH", difficulty: "EASY" },
+  { id: "gentle-flow", equipment: "YOGA", goal: "CARDIO", type: "FLOW", difficulty: "EASY" },
+  { id: "db-chest-opener", equipment: "DUMBBELL", goal: "CHEST_MOBILITY", type: "MOBILITY", difficulty: "EASY" },
 ];
 
 const generated = (
@@ -1667,8 +1679,27 @@ const generated = (
   dayTypes?: RoutineDayType[],
 ) => generateRoutine({ days, counts, dayTypes, exercises: EXERCISES, variant, pinned, avoid });
 
+/** The same, but the gentle week: easy exercises only, moderate fallback. */
+const gentleGenerated = (
+  days: number[],
+  variant = 0,
+  counts?: number[],
+  dayTypes?: RoutineDayType[],
+) =>
+  generateRoutine({
+    days,
+    counts,
+    dayTypes,
+    exercises: EXERCISES,
+    variant,
+    difficulty: "EASY",
+  });
+
 const typeOf = (id: string) =>
   EXERCISES.find((e) => e.id === id)!.type;
+
+const difficultyOf = (id: string) =>
+  EXERCISES.find((e) => e.id === id)!.difficulty;
 
 const WEEK_SHAPES = [
   [1, 3, 5],
@@ -2209,6 +2240,123 @@ check("a handful of variants draws across most of the catalog", () => {
   assert.ok(
     used.size >= 24,
     `6 regenerations of a 5-day week should touch a good slice of the catalog, got ${used.size}`,
+  );
+});
+
+check("a gentle week never places a hard exercise", () => {
+  for (const days of WEEK_SHAPES) {
+    for (let variant = 0; variant < 12; variant++) {
+      const slots = gentleGenerated(days, variant);
+      for (const slot of slots) {
+        assert.notEqual(
+          difficultyOf(slot.exerciseId),
+          "HARD",
+          `gentle week ${days} variant ${variant} placed ${slot.exerciseId}`,
+        );
+      }
+    }
+  }
+});
+
+check("a gentle week stays easy while the easy pool is deep enough", () => {
+  // Up to five days at the default count, every type's easy pool covers the
+  // week's demand outright — so every slot should be an easy exercise.
+  for (const days of WEEK_SHAPES.slice(0, 3)) {
+    for (let variant = 0; variant < 12; variant++) {
+      const slots = gentleGenerated(days, variant);
+      assert.ok(slots.length > 0, `week ${days} generated nothing`);
+      for (const slot of slots) {
+        assert.equal(
+          difficultyOf(slot.exerciseId),
+          "EASY",
+          `gentle week ${days} variant ${variant} placed ${slot.exerciseId}`,
+        );
+      }
+    }
+  }
+});
+
+check("the moderate fallback fills a gentle week when the easy pool runs out", () => {
+  // Six days earns a second flow day (autoDayTypes: last and second-to-last),
+  // and the catalog has exactly one easy flow. The second flow day must still
+  // be filled — by the moderate Sun Salutation, not by a hole and not by
+  // hard exercise.
+  const days = [0, 1, 2, 3, 4, 5];
+  const slots = gentleGenerated(days);
+  const flowDays = [days[days.length - 2], days[days.length - 1]];
+  const flowSlots = slots.filter((slot) => flowDays.includes(slot.dayOfWeek));
+  assert.equal(flowSlots.length, 2, "both flow days should carry a slot");
+  for (const slot of flowSlots) {
+    assert.equal(typeOf(slot.exerciseId), "FLOW");
+    assert.notEqual(difficultyOf(slot.exerciseId), "HARD");
+  }
+  const difficulties = flowSlots
+    .map((slot) => difficultyOf(slot.exerciseId))
+    .sort();
+  assert.deepEqual(
+    difficulties,
+    ["EASY", "MODERATE"],
+    "one flow stays easy, the other falls back to moderate",
+  );
+});
+
+console.log("\nhabit timeline — the when makes it start-here");
+
+const anchored = (id: string, minutes: number) => ({
+  id,
+  timeAnchorMinutes: minutes,
+});
+const unanchored = (id: string) => ({ id, timeAnchorMinutes: null });
+
+check("an empty list has nothing to start", () => {
+  assert.equal(startHereHabit([], 480), null);
+});
+
+check("the moment's habit is the one whose time has most recently arrived", () => {
+  const habits = [
+    anchored("fajr", 280),
+    anchored("quran", 420),
+    anchored("walk", 600),
+  ];
+  assert.equal(startHereHabit(habits, 430)?.id, "quran");
+  // Exactly at the anchor, it is now — not the next one.
+  assert.equal(startHereHabit(habits, 420)?.id, "quran");
+  // Late by minutes: the most recently due one, not the first of the day.
+  assert.equal(startHereHabit(habits, 500)?.id, "quran");
+  // Late by hours: still the most recently due one — the catch-up nudge.
+  assert.equal(startHereHabit(habits, 1180)?.id, "walk");
+});
+
+check("a future anchor is start-here only inside the lookahead", () => {
+  const habits = [anchored("quran", 420), unanchored("pushups")];
+  // 07:00 is 20 minutes away: start here.
+  assert.equal(startHereHabit(habits, 400)?.id, "quran");
+  // 07:00 is 3 hours away: the unanchored habit is the thing to do now.
+  assert.equal(
+    startHereHabit(habits, 400 - START_HERE_LOOKAHEAD_MINUTES - 30)?.id,
+    "pushups",
+  );
+});
+
+check("unanchored habits only win when no anchor is due or near", () => {
+  const habits = [anchored("quran", 420), unanchored("pushups")];
+  // Past the anchor, it stays the answer even though pushups is also there.
+  assert.equal(startHereHabit(habits, 900)?.id, "quran");
+  // And with no anchors at all, the unanchored habit is the answer.
+  assert.equal(startHereHabit([unanchored("pushups")], 480)?.id, "pushups");
+});
+
+check("ordering of the input list never decides the answer", () => {
+  const habits = [
+    anchored("walk", 600),
+    unanchored("pushups"),
+    anchored("quran", 420),
+  ];
+  assert.equal(startHereHabit(habits, 430)?.id, "quran");
+  assert.equal(
+    startHereHabit(habits.reverse(), 430)?.id,
+    "quran",
+    "the anchored subset is sorted internally",
   );
 });
 

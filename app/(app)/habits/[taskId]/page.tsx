@@ -93,6 +93,7 @@ export default async function EditHabitPage({
           unit: habit.recurrence?.unit,
           minimumQuota: habit.recurrence?.minimumQuota,
           optimalQuota: habit.recurrence?.optimalQuota ?? null,
+          timeAnchorMinutes: habit.recurrence?.timeAnchor ?? null,
           cueMode: habit.cue
             ? habit.cue.anchorTaskId
               ? "habit"

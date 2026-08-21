@@ -19,6 +19,7 @@ import { PrismaClient } from "../lib/generated/prisma/client";
 import type {
   BodyPart,
   ExerciseEquipment,
+  ExerciseDifficulty,
   ExerciseGoal,
   ExerciseType,
   TimerMode,
@@ -74,12 +75,18 @@ function random(): number {
  * hold from a stretch (HAMSTRING_LENGTH names both a fold and a deadlift).
  * The routine generator composes days from `type`, so a day is never three
  * stretches wearing a workout's clothes.
+ *
+ * Every entry also carries a `difficulty` — EASY, MODERATE or HARD. A gentle
+ * routine ("easy exercises only") draws strictly from the easy pool, so its
+ * ratings are assigned with pool coverage in mind: every type × equipment
+ * corner has at least one easy exercise to draw from.
  */
 const EXERCISES: Array<{
   name: string;
   equipment: ExerciseEquipment;
   goal: ExerciseGoal;
   type: ExerciseType;
+  difficulty: ExerciseDifficulty;
   bodyParts: BodyPart[];
   instructions: string[];
   prescription: string;
@@ -87,6 +94,7 @@ const EXERCISES: Array<{
   // ------------------------------------------------ yoga — anterior pelvic tilt
   {
     name: "Bridge Pose",
+    difficulty: "EASY",
     equipment: "YOGA",
     goal: "GLUTE_STRENGTH",
     type: "STRENGTH",
@@ -101,6 +109,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Low Lunge (Anjaneyasana)",
+    difficulty: "EASY",
     equipment: "YOGA",
     goal: "HIP_FLEXOR_MOBILITY",
     type: "MOBILITY",
@@ -115,6 +124,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Pelvic Tilts",
+    difficulty: "EASY",
     equipment: "YOGA",
     goal: "POSTURE_AWARENESS",
     type: "MOBILITY",
@@ -129,6 +139,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Cat–Cow",
+    difficulty: "EASY",
     equipment: "YOGA",
     goal: "LOWER_BACK_RELIEF",
     type: "MOBILITY",
@@ -143,6 +154,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Bird Dog",
+    difficulty: "MODERATE",
     equipment: "YOGA",
     goal: "CORE_STABILITY",
     type: "STRENGTH",
@@ -157,6 +169,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Locust Pose",
+    difficulty: "MODERATE",
     equipment: "YOGA",
     goal: "UPPER_BACK_STRENGTH",
     type: "STRENGTH",
@@ -171,6 +184,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Boat Pose",
+    difficulty: "HARD",
     equipment: "YOGA",
     goal: "CORE_STABILITY",
     type: "STRENGTH",
@@ -185,6 +199,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Reclined Spinal Twist",
+    difficulty: "EASY",
     equipment: "YOGA",
     goal: "LOWER_BACK_RELIEF",
     type: "MOBILITY",
@@ -199,6 +214,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Child's Pose",
+    difficulty: "EASY",
     equipment: "YOGA",
     goal: "LOWER_BACK_RELIEF",
     type: "MOBILITY",
@@ -213,6 +229,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Standing Forward Fold",
+    difficulty: "EASY",
     equipment: "YOGA",
     goal: "HAMSTRING_LENGTH",
     type: "MOBILITY",
@@ -227,6 +244,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Downward-Facing Dog",
+    difficulty: "MODERATE",
     equipment: "YOGA",
     goal: "HAMSTRING_LENGTH",
     type: "MOBILITY",
@@ -241,6 +259,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Cobra Pose",
+    difficulty: "EASY",
     equipment: "YOGA",
     goal: "UPPER_BACK_STRENGTH",
     type: "STRENGTH",
@@ -257,6 +276,7 @@ const EXERCISES: Array<{
   // --------------------------------------------- yoga — posture (upper body)
   {
     name: "Thread the Needle",
+    difficulty: "EASY",
     equipment: "YOGA",
     goal: "CHEST_MOBILITY",
     type: "MOBILITY",
@@ -271,6 +291,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Puppy Pose",
+    difficulty: "EASY",
     equipment: "YOGA",
     goal: "CHEST_MOBILITY",
     type: "MOBILITY",
@@ -285,6 +306,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Cow Face Arms",
+    difficulty: "MODERATE",
     equipment: "YOGA",
     goal: "CHEST_MOBILITY",
     type: "MOBILITY",
@@ -299,6 +321,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Eagle Arms",
+    difficulty: "MODERATE",
     equipment: "YOGA",
     goal: "UPPER_BACK_STRENGTH",
     type: "MOBILITY",
@@ -315,6 +338,7 @@ const EXERCISES: Array<{
   // ----------------------------------------------- dumbbells — anterior pelvic tilt
   {
     name: "Dumbbell Glute Bridge",
+    difficulty: "EASY",
     equipment: "DUMBBELL",
     goal: "GLUTE_STRENGTH",
     type: "STRENGTH",
@@ -329,6 +353,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Single-Leg Dumbbell Glute Bridge",
+    difficulty: "HARD",
     equipment: "DUMBBELL",
     goal: "GLUTE_STRENGTH",
     type: "STRENGTH",
@@ -343,6 +368,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Dumbbell Hip Thrust",
+    difficulty: "MODERATE",
     equipment: "DUMBBELL",
     goal: "GLUTE_STRENGTH",
     type: "STRENGTH",
@@ -357,6 +383,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Dumbbell Romanian Deadlift",
+    difficulty: "MODERATE",
     equipment: "DUMBBELL",
     goal: "HAMSTRING_LENGTH",
     type: "STRENGTH",
@@ -371,6 +398,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Goblet Squat",
+    difficulty: "MODERATE",
     equipment: "DUMBBELL",
     goal: "GLUTE_STRENGTH",
     type: "STRENGTH",
@@ -385,6 +413,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Weighted Dead Bug",
+    difficulty: "MODERATE",
     equipment: "DUMBBELL",
     goal: "CORE_STABILITY",
     type: "STRENGTH",
@@ -399,6 +428,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Standing Dumbbell Hip Extension",
+    difficulty: "MODERATE",
     equipment: "DUMBBELL",
     goal: "GLUTE_STRENGTH",
     type: "STRENGTH",
@@ -413,6 +443,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Dumbbell Reverse Lunge",
+    difficulty: "MODERATE",
     equipment: "DUMBBELL",
     goal: "GLUTE_STRENGTH",
     type: "STRENGTH",
@@ -427,6 +458,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Farmer's Carry",
+    difficulty: "MODERATE",
     equipment: "DUMBBELL",
     goal: "POSTURE_AWARENESS",
     type: "STRENGTH",
@@ -443,6 +475,7 @@ const EXERCISES: Array<{
   // ------------------------------------------------ dumbbells — posture (upper body)
   {
     name: "Bent-Over Dumbbell Row",
+    difficulty: "MODERATE",
     equipment: "DUMBBELL",
     goal: "UPPER_BACK_STRENGTH",
     type: "STRENGTH",
@@ -457,6 +490,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Single-Arm Dumbbell Row",
+    difficulty: "MODERATE",
     equipment: "DUMBBELL",
     goal: "UPPER_BACK_STRENGTH",
     type: "STRENGTH",
@@ -471,6 +505,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Dumbbell Reverse Fly",
+    difficulty: "MODERATE",
     equipment: "DUMBBELL",
     goal: "UPPER_BACK_STRENGTH",
     type: "STRENGTH",
@@ -485,6 +520,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Prone Y Raise",
+    difficulty: "EASY",
     equipment: "DUMBBELL",
     goal: "UPPER_BACK_STRENGTH",
     type: "STRENGTH",
@@ -499,6 +535,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Prone T Raise",
+    difficulty: "EASY",
     equipment: "DUMBBELL",
     goal: "UPPER_BACK_STRENGTH",
     type: "STRENGTH",
@@ -513,6 +550,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Dumbbell YTW",
+    difficulty: "MODERATE",
     equipment: "DUMBBELL",
     goal: "UPPER_BACK_STRENGTH",
     type: "STRENGTH",
@@ -527,6 +565,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Dumbbell Pullover",
+    difficulty: "EASY",
     equipment: "DUMBBELL",
     goal: "CHEST_MOBILITY",
     type: "MOBILITY",
@@ -543,6 +582,7 @@ const EXERCISES: Array<{
   // ------------------------------------------------------ yoga — neck (forward head)
   {
     name: "Chin Tucks",
+    difficulty: "EASY",
     equipment: "YOGA",
     goal: "NECK_STRENGTH",
     type: "STRENGTH",
@@ -557,6 +597,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Deep Neck Flexor Hold",
+    difficulty: "MODERATE",
     equipment: "YOGA",
     goal: "NECK_STRENGTH",
     type: "STRENGTH",
@@ -571,6 +612,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Upper Trapezius Stretch",
+    difficulty: "EASY",
     equipment: "YOGA",
     goal: "NECK_MOBILITY",
     type: "MOBILITY",
@@ -585,6 +627,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Levator Scapulae Stretch",
+    difficulty: "EASY",
     equipment: "YOGA",
     goal: "NECK_MOBILITY",
     type: "MOBILITY",
@@ -601,6 +644,7 @@ const EXERCISES: Array<{
   // ------------------------------------------------------ yoga — calves & forearms
   {
     name: "Standing Calf Stretch",
+    difficulty: "EASY",
     equipment: "YOGA",
     goal: "CALF_MOBILITY",
     type: "MOBILITY",
@@ -615,6 +659,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Wall Soleus Stretch",
+    difficulty: "EASY",
     equipment: "YOGA",
     goal: "CALF_MOBILITY",
     type: "MOBILITY",
@@ -629,6 +674,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Wrist Extensor Stretch",
+    difficulty: "EASY",
     equipment: "YOGA",
     goal: "WRIST_MOBILITY",
     type: "MOBILITY",
@@ -643,6 +689,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Wrist Flexor Stretch",
+    difficulty: "EASY",
     equipment: "YOGA",
     goal: "WRIST_MOBILITY",
     type: "MOBILITY",
@@ -659,6 +706,7 @@ const EXERCISES: Array<{
   // ------------------------------------------------------ yoga — leg strength
   {
     name: "Chair Pose",
+    difficulty: "MODERATE",
     equipment: "YOGA",
     goal: "LEG_STRENGTH",
     type: "STRENGTH",
@@ -673,6 +721,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Warrior II",
+    difficulty: "MODERATE",
     equipment: "YOGA",
     goal: "LEG_STRENGTH",
     type: "STRENGTH",
@@ -687,6 +736,7 @@ const EXERCISES: Array<{
   },
   {
     name: "High Lunge",
+    difficulty: "HARD",
     equipment: "YOGA",
     goal: "LEG_STRENGTH",
     type: "STRENGTH",
@@ -701,6 +751,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Garland Pose (Malasana)",
+    difficulty: "HARD",
     equipment: "YOGA",
     goal: "ANKLE_MOBILITY",
     type: "MOBILITY",
@@ -717,6 +768,7 @@ const EXERCISES: Array<{
   // ----------------------------------------------------- yoga — push strength
   {
     name: "Plank",
+    difficulty: "MODERATE",
     equipment: "YOGA",
     goal: "PUSH_STRENGTH",
     type: "STRENGTH",
@@ -731,6 +783,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Side Plank",
+    difficulty: "MODERATE",
     equipment: "YOGA",
     goal: "CORE_STABILITY",
     type: "STRENGTH",
@@ -745,6 +798,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Chaturanga Hold",
+    difficulty: "HARD",
     equipment: "YOGA",
     goal: "PUSH_STRENGTH",
     type: "STRENGTH",
@@ -759,6 +813,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Dolphin Pose",
+    difficulty: "HARD",
     equipment: "YOGA",
     goal: "PUSH_STRENGTH",
     type: "STRENGTH",
@@ -775,6 +830,7 @@ const EXERCISES: Array<{
   // ------------------------------------------------------------- yoga — balance
   {
     name: "Tree Pose",
+    difficulty: "MODERATE",
     equipment: "YOGA",
     goal: "BALANCE",
     type: "STRENGTH",
@@ -789,6 +845,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Warrior III",
+    difficulty: "HARD",
     equipment: "YOGA",
     goal: "BALANCE",
     type: "STRENGTH",
@@ -805,6 +862,7 @@ const EXERCISES: Array<{
   // -------------------------------------------------- yoga — hips (side & deep)
   {
     name: "Side-Lying Leg Raise",
+    difficulty: "EASY",
     equipment: "YOGA",
     goal: "GLUTE_STRENGTH",
     type: "STRENGTH",
@@ -819,6 +877,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Wide-Legged Forward Fold",
+    difficulty: "MODERATE",
     equipment: "YOGA",
     goal: "HIP_MOBILITY",
     type: "MOBILITY",
@@ -835,6 +894,7 @@ const EXERCISES: Array<{
   // -------------------------------------------------- yoga — calves & cardio
   {
     name: "Standing Calf Raise",
+    difficulty: "EASY",
     equipment: "YOGA",
     goal: "CALF_STRENGTH",
     type: "STRENGTH",
@@ -849,6 +909,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Sun Salutation Flow",
+    difficulty: "MODERATE",
     equipment: "YOGA",
     goal: "CARDIO",
     type: "FLOW",
@@ -863,6 +924,7 @@ const EXERCISES: Array<{
   },
   {
     name: "Bridge March",
+    difficulty: "MODERATE",
     equipment: "YOGA",
     goal: "GLUTE_STRENGTH",
     type: "STRENGTH",
@@ -874,6 +936,131 @@ const EXERCISES: Array<{
       "Keep the ribs down and breathe. Progression from the static Bridge you already have.",
     ],
     prescription: "8–10 per side · 2 rounds",
+  },
+
+  // ------------------------------------------ yoga — the gentle week's floor
+  // The easy pool a gentle routine draws from: floor-based release work, a
+  // wall-supported strength pair, and one flow that never touches the mat.
+  // Every entry is doable on a first week or a sore day.
+  {
+    name: "Legs-Up-the-Wall",
+    difficulty: "EASY",
+    equipment: "YOGA",
+    goal: "LOWER_BACK_RELIEF",
+    type: "MOBILITY",
+    bodyParts: ["LOWER_BACK", "HAMSTRINGS"],
+    instructions: [
+      "Sit sideways against a wall, hip touching it. In one movement, swing the legs up the wall as you lie back.",
+      "Rest the arms out to the sides, palms up, and let the shoulders and hips settle into the floor.",
+      "Heels resting on the wall, knees soft. Let the lower back flatten — gravity drains the legs after a day of sitting.",
+      "Stay quiet and breathe. This is decompression, not a stretch to push.",
+    ],
+    prescription: "Hold 2–5 min",
+  },
+  {
+    name: "Supine Figure-4 Stretch",
+    difficulty: "EASY",
+    equipment: "YOGA",
+    goal: "HIP_MOBILITY",
+    type: "MOBILITY",
+    bodyParts: ["GLUTES", "LOWER_BACK"],
+    instructions: [
+      "Lie on your back, knees bent, feet flat. Cross the right ankle over the left knee and flex the right foot.",
+      "Thread the hands behind the left thigh and draw it gently toward the chest.",
+      "Keep the head and shoulders on the mat — the stretch lands in the right glute and deep hip, not the neck.",
+      "Hold and breathe, then switch sides.",
+    ],
+    prescription: "Hold 45–60s per side",
+  },
+  {
+    name: "Happy Baby",
+    difficulty: "EASY",
+    equipment: "YOGA",
+    goal: "HIP_MOBILITY",
+    type: "MOBILITY",
+    bodyParts: ["ADDUCTORS", "GLUTES", "LOWER_BACK"],
+    instructions: [
+      "Lie on your back. Draw the knees toward the chest, then let them fall wide toward the armpits.",
+      "Reach inside the knees and take hold of the outer edges of the feet — or the backs of the thighs if the feet are out of reach.",
+      "Flex the feet and gently pull the knees down toward the floor alongside the ribs. Keep the tailbone heavy on the mat.",
+      "Rock gently side to side if it feels good. Effortless is the point.",
+    ],
+    prescription: "Hold 60–90s",
+  },
+  {
+    name: "Wall Angels",
+    difficulty: "EASY",
+    equipment: "YOGA",
+    goal: "POSTURE_AWARENESS",
+    type: "MOBILITY",
+    bodyParts: ["UPPER_BACK", "SHOULDERS", "CHEST"],
+    instructions: [
+      "Stand with your back against a wall, feet a small step out, knees soft. Rest the back of the head, the upper back and the tailbone gently on the wall.",
+      "Bend the elbows and place the backs of the forearms and hands on the wall, like a goalpost.",
+      "Slowly slide the arms up and over, then back down, keeping the knuckles and forearms in contact with the wall wherever they reach.",
+      "Contact matters more than range — where the arms leave the wall is the tight spot. Keep the ribs down; don't arch the lower back to fake it.",
+    ],
+    prescription: "8–10 slow reps",
+  },
+  {
+    name: "Ankle Circles & Pumps",
+    difficulty: "EASY",
+    equipment: "YOGA",
+    goal: "ANKLE_MOBILITY",
+    type: "MOBILITY",
+    bodyParts: ["ANKLES", "CALVES"],
+    instructions: [
+      "Sit on the floor with the legs extended, hands resting behind you for support.",
+      "Circle the feet at the ankles — ten slow circles each direction, drawing the biggest circle the ankle allows.",
+      "Then pump: pull the toes toward the shin, then point them away, slow and full.",
+      "Keep the knees still the whole time; all the movement is at the ankle. Sitting steals this range quietly.",
+    ],
+    prescription: "10 circles each direction · 10 pumps per foot",
+  },
+  {
+    name: "Wall Push-Up",
+    difficulty: "EASY",
+    equipment: "YOGA",
+    goal: "PUSH_STRENGTH",
+    type: "STRENGTH",
+    bodyParts: ["CHEST", "SHOULDERS", "ARMS", "CORE"],
+    instructions: [
+      "Stand an arm's length from a wall, palms on the wall at shoulder height and width.",
+      "Keep the body in one straight line — glutes on, heels down — as you bend the elbows and bring the chest toward the wall.",
+      "Elbows track back at roughly 45°, not flaring wide.",
+      "Press away until the arms are straight. Deliberately easier than a floor push-up; step the feet further back when it stops being work.",
+    ],
+    prescription: "2 × 10–12",
+  },
+  {
+    name: "Gentle Morning Flow",
+    difficulty: "EASY",
+    equipment: "YOGA",
+    goal: "CARDIO",
+    type: "FLOW",
+    bodyParts: ["FULL_BODY", "SPINE", "SHOULDERS"],
+    instructions: [
+      "A slow continuous sequence, one breath per movement: Mountain → reach up → forward fold → half lift → flat back.",
+      "Roll up through the spine to standing and begin again. No plank, no lowering to the floor.",
+      "Keep the pace conversational — the aim is to move the spine and warm the joints, not to raise the heart rate.",
+      "Continue without pausing for the time prescribed. Continuity, not intensity.",
+    ],
+    prescription: "5–10 min continuous",
+  },
+  {
+    name: "Standing Dumbbell Chest Opener",
+    difficulty: "EASY",
+    equipment: "DUMBBELL",
+    goal: "CHEST_MOBILITY",
+    type: "MOBILITY",
+    bodyParts: ["CHEST", "SHOULDERS"],
+    instructions: [
+      "Stand tall, feet hip-width, holding a light dumbbell in each hand at your sides.",
+      "Raise both arms out to the sides to shoulder height, palms facing up.",
+      "Squeeze the shoulder blades gently together and reach the chest up — feel the openness across the front of the shoulders.",
+      "Hold for two slow breaths, then lower with control. The light weight makes the opening easier to hold, not harder.",
+    ],
+    prescription: "2 × 10 slow reps · hold 5s at the top",
   },
 ];
 

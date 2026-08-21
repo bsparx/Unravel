@@ -15,8 +15,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { goalShort } from "@/lib/exercise-labels";
-import type { ExerciseGoal } from "@/lib/exercise-routine";
+import {
+  EXERCISE_DIFFICULTY_LABELS,
+  goalShort,
+} from "@/lib/exercise-labels";
+import type { ExerciseDifficulty, ExerciseGoal } from "@/lib/exercise-routine";
 import { idleState } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +30,7 @@ export type SwapCatalogExercise = {
   name: string;
   equipment: "YOGA" | "DUMBBELL";
   goal: ExerciseGoal;
+  difficulty: ExerciseDifficulty;
 };
 
 export function SwapDialog({
@@ -129,6 +133,9 @@ export function SwapDialog({
               <span className="text-body">{exercise.name}</span>
               <span className="flex shrink-0 items-center gap-1.5">
                 <Badge variant="secondary">{goalShort(exercise.goal)}</Badge>
+                <Badge variant="outline" className="text-muted-foreground">
+                  {EXERCISE_DIFFICULTY_LABELS[exercise.difficulty]}
+                </Badge>
                 <Badge variant="outline" className="text-muted-foreground">
                   {exercise.equipment === "YOGA" ? "Yoga" : "Dumbbells"}
                 </Badge>

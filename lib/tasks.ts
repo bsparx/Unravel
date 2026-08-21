@@ -56,6 +56,12 @@ export type TodayItem = TaskSummary & {
   /** Negative = overdue by N days. Null for habits and undated todos. */
   daysUntilDue: number | null;
   recurrenceDays: number[] | null;
+  /**
+   * Habits only: the planned time of day, minutes from midnight in
+   * User.timezone. Null means no time plan — the habit sorts below anchored
+   * ones and never becomes the time-aware "Start here" pick.
+   */
+  timeAnchorMinutes: number | null;
   /** Habits only: the thing this one is stacked on. */
   cue: CueSummary | null;
   /**
@@ -168,6 +174,35 @@ function byPriorityThenOrder(
   return priority !== 0 ? priority : a.sortOrder - b.sortOrder;
 }
 
+/**
+ * Habits on /day read as a timeline, not a pile: anchored ones come first in
+ * time order, and only the unanchored ones keep the priority order. A habit
+ * with a when is a plan; a habit without one is a pile member.
+ */
+function byHabitTime(
+  a: {
+    recurrence: { timeAnchor: number | null } | null;
+    priority: Priority;
+    sortOrder: number;
+  },
+  b: {
+    recurrence: { timeAnchor: number | null } | null;
+    priority: Priority;
+    sortOrder: number;
+  },
+) {
+  const aTime = a.recurrence?.timeAnchor ?? null;
+  const bTime = b.recurrence?.timeAnchor ?? null;
+  if (aTime !== null && bTime !== null) {
+    return aTime - bTime;
+  }
+  if (aTime !== null) return -1;
+  if (bTime !== null) return 1;
+  return byPriorityThenOrder(a, b);
+}
+
+export { START_HERE_LOOKAHEAD_MINUTES, startHereHabit } from "@/lib/habit-timeline";
+
 // ---------------------------------------------------------------- today
 
 export type TodayView = {
@@ -246,7 +281,7 @@ export async function getTodayView(user: User): Promise<TodayView> {
       if (!task.recurrence) return false;
       return isDueOn(toRule(task.recurrence), today);
     })
-    .sort(byPriorityThenOrder)
+    .sort(byHabitTime)
     .map((task) => {
       const occurrence = occurrenceByTask.get(task.id);
       return {
@@ -260,6 +295,7 @@ export async function getTodayView(user: User): Promise<TodayView> {
             : 1,
         daysUntilDue: null,
         recurrenceDays: task.recurrence?.daysOfWeek ?? null,
+        timeAnchorMinutes: task.recurrence?.timeAnchor ?? null,
         cue: toCue(task.cue),
         requiresFeedback: task.requiresFeedback,
         feedbackNote: occurrence?.note ?? null,
@@ -292,6 +328,7 @@ export async function getTodayView(user: User): Promise<TodayView> {
           )
         : null,
       recurrenceDays: null,
+      timeAnchorMinutes: null,
       cue: null,
       requiresFeedback: false,
       feedbackNote: null,

@@ -322,7 +322,7 @@ export async function moveBlock(formData: FormData): Promise<void> {
 /**
  * "Put this on the calendar" in one click.
  *
- * Every block lands at 30 minutes — the estimate is information, not a
+ * Every block lands at 15 minutes — the estimate is information, not a
  * constraint, and a task with no estimate gets the same honest block as one
  * with a careful estimate. The length is deliberately coerced here rather than
  * trusted from the wire: a stale drag payload cannot sneak a different length

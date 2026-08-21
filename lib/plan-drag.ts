@@ -22,11 +22,11 @@ export const PLAN_ITEM_MIME = "application/x-plan-item";
 export type PlanDragItem = {
   id: string;
   title: string;
-  /** How the grid sizes its preview: always the 30-minute default. */
+  /** How the grid sizes its preview: always the 15-minute default. */
   minutes: number;
 };
 
-/** How long a block for this thing should be. Always 30 — estimates inform,
+/** How long a block for this thing should be. Always 15 — estimates inform,
  * they don't constrain; the person adjusts after it lands. */
 export function planMinutes(): number {
   return PLAN_DEFAULT_MINUTES;

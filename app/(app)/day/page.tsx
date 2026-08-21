@@ -3,6 +3,7 @@ import { CalendarDays, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth";
+import { formatMinuteOfDay } from "@/lib/block-math";
 import {
   formatDuration,
   formatFullDate,
@@ -10,7 +11,8 @@ import {
   toISODate,
 } from "@/lib/dates";
 import { getPrayerCycle } from "@/lib/prayers";
-import { getTodayView } from "@/lib/tasks";
+import { getTodayView, startHereHabit } from "@/lib/tasks";
+import { buildTimerHref } from "@/lib/timer-url";
 import { getBlocks } from "@/lib/time-blocks";
 import { getWaterToday } from "@/lib/water-data";
 
@@ -29,8 +31,14 @@ export default async function TodayPage() {
 
   const prayers = user.prayerRemindersEnabled ? await getPrayerCycle(user) : null;
 
+  const nowMinute = minuteOfDayLocal(user.timezone);
+
+  // Time-aware: the habit whose moment it is, else the old chain of fallbacks.
   const upNext =
-    view.habits[0] ?? view.overdue[0] ?? view.dueToday[0] ?? view.undated[0];
+    startHereHabit(view.habits, nowMinute) ??
+    view.overdue[0] ??
+    view.dueToday[0] ??
+    view.undated[0];
 
   return (
     <div className="mx-auto w-full max-w-4xl px-5 py-8 md:px-8 md:py-12">
@@ -67,7 +75,7 @@ export default async function TodayPage() {
         <PlanStrip
           blocks={blocks}
           dateISO={todayISO}
-          nowMinute={minuteOfDayLocal(user.timezone)}
+          nowMinute={nowMinute}
         />
       </div>
 
@@ -76,12 +84,22 @@ export default async function TodayPage() {
       {upNext && (
         // One obvious next action. Everything below is optional.
         <Link
-          href={`/timer?taskId=${upNext.id}`}
+          href={buildTimerHref({
+            id: upNext.id,
+            estimatedSeconds: upNext.estimatedSeconds,
+            defaultMode: upNext.defaultMode,
+            plannedIntervals: upNext.plannedIntervals,
+          })}
           className="border-border bg-card hover:border-primary/40 focus-visible:ring-ring group mb-8 flex items-center justify-between gap-4 rounded-lg border px-4 py-3.5 transition-colors focus-visible:ring-2 focus-visible:outline-none"
         >
           <div className="min-w-0">
             <p className="text-micro text-muted-foreground font-medium tracking-wider uppercase">
               Start here
+              {upNext.timeAnchorMinutes !== null && (
+                <span className="text-primary ml-2 normal-case">
+                  · {formatMinuteOfDay(upNext.timeAnchorMinutes)}
+                </span>
+              )}
             </p>
             <p className="font-display mt-0.5 truncate text-title">
               {upNext.title}

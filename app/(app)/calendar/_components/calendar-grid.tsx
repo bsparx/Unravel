@@ -578,12 +578,12 @@ function DayColumn({
     return snap((clientY - rect.top) / MINUTE_PX);
   };
 
-  /**
-   * Google's gesture: press an empty slot and drag down to claim exactly the
-   * stretch you dragged, rather than asking for a length afterwards. A plain
-   * press that never moves is a click, and clicks still open the editor with
-   * the default hour — nothing is lost by dragging.
-   */
+/**
+ * Google's gesture: press an empty slot and drag down to claim exactly the
+ * stretch you dragged, rather than asking for a length afterwards. A plain
+ * press that never moves is a click, and clicks still open the editor with
+ * the default length — nothing is lost by dragging.
+ */
   const beginCreateDrag = (event: React.PointerEvent, minute: number) => {
     const element = event.currentTarget as HTMLElement;
     element.setPointerCapture(event.pointerId);
@@ -746,28 +746,29 @@ function DayColumn({
         />
       ))}
 
-      {/* Click targets, one per half hour. A div with an onClick would swallow
-          block clicks; these sit underneath, at z-0. The dashed inset outline
-          on hover is the affordance — a clickable slot announces itself, so
-          no instructions are needed. Pressing and dragging claims the dragged
-          stretch; pressing without moving opens the editor with an hour. */}
-      {Array.from({ length: 48 }, (_, half) => (
+      {/* Click targets, one per quarter hour. A div with an onClick would
+          swallow block clicks; these sit underneath, at z-0. The dashed inset
+          outline on hover is the affordance — a clickable slot announces
+          itself, so no instructions are needed. Pressing and dragging claims
+          the dragged stretch; pressing without moving opens the editor with
+          the default length. */}
+      {Array.from({ length: MINUTES_PER_DAY / SNAP_MINUTES }, (_, slot) => (
         <button
-          key={half}
+          key={slot}
           type="button"
-          aria-label={`Block out ${formatMinuteOfDay(half * 30)} on ${day.label}`}
-          onPointerDown={(event) => beginCreateDrag(event, half * 30)}
+          aria-label={`Block out ${formatMinuteOfDay(slot * SNAP_MINUTES)} on ${day.label}`}
+          onPointerDown={(event) => beginCreateDrag(event, slot * SNAP_MINUTES)}
           onClick={() => {
             if (skipNextClickRef.current) {
               skipNextClickRef.current = false;
               return;
             }
             // Keyboard and plain mouse presses both land here: create with the
-            // default hour at this slot.
-            onCreate(day.dateISO, spanOfLength(half * 30, 60));
+            // default length at this slot.
+            onCreate(day.dateISO, spanOfLength(slot * SNAP_MINUTES, PLAN_DEFAULT_MINUTES));
           }}
           className="hover:bg-primary/5 focus-visible:bg-primary/10 focus-visible:ring-ring after:border-primary/30 absolute inset-x-0 after:absolute after:inset-x-1 after:inset-y-0.5 after:rounded-md after:border after:border-dashed after:opacity-0 after:transition-opacity hover:after:opacity-100 focus-visible:after:opacity-100 focus-visible:ring-1 focus-visible:outline-none"
-          style={{ top: half * 30 * MINUTE_PX, height: 30 * MINUTE_PX }}
+          style={{ top: slot * SNAP_MINUTES * MINUTE_PX, height: SNAP_MINUTES * MINUTE_PX }}
         />
       ))}
 

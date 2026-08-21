@@ -5,9 +5,11 @@
  */
 
 import type {
+  ExerciseDifficulty,
   ExerciseGoal,
   ExerciseType,
   RoutineDayType,
+  RoutineDifficulty,
 } from "@/lib/exercise-routine";
 
 export const EQUIPMENT_LABELS: Record<"YOGA" | "DUMBBELL", string> = {
@@ -29,6 +31,20 @@ export const EXERCISE_TYPE_LABELS: Record<ExerciseType, string> = {
   STRENGTH: "Strength",
   MOBILITY: "Mobility",
   FLOW: "Flow",
+};
+
+/** How hard one exercise is, as a display string. */
+export const EXERCISE_DIFFICULTY_LABELS: Record<ExerciseDifficulty, string> = {
+  EASY: "Easy",
+  MODERATE: "Moderate",
+  HARD: "Hard",
+};
+
+/** The intensity a routine was built at — lowercase, for composing into
+ * sentences like "a gentle yoga-only catalog". */
+export const ROUTINE_DIFFICULTY_LABELS: Record<RoutineDifficulty, string> = {
+  EASY: "gentle",
+  CHALLENGING: "challenging",
 };
 
 /** What a routine day is for, as a display string. */

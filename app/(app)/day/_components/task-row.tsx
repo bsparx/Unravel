@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   ChevronDown,
   Check,
+  Clock,
   CornerDownRight,
   Link2,
   Pencil,
@@ -17,6 +18,7 @@ import {
 import { StepList } from "@/components/step-list";
 import { TaskCheckbox } from "@/components/task-checkbox";
 import { MissedYesterdayBadge } from "@/components/missed-yesterday-badge";
+import { formatMinuteOfDay } from "@/lib/block-math";
 import { formatDuration, formatMinutes } from "@/lib/dates";
 import { formatQuota, remainingToMinimum, tierFor, type Quota } from "@/lib/quota";
 import { nextStep, stepProgress } from "@/lib/steps";
@@ -124,6 +126,13 @@ export function TaskRow({
               <span className="inline-flex items-center gap-1">
                 <Repeat className="size-3" aria-hidden />
                 Habit
+              </span>
+            )}
+
+            {item.type === "HABIT" && item.timeAnchorMinutes !== null && (
+              <span className="inline-flex items-center gap-1 tabular-nums">
+                <Clock className="size-3" aria-hidden />
+                {formatMinuteOfDay(item.timeAnchorMinutes)}
               </span>
             )}
 

@@ -123,6 +123,22 @@ export const createTodoSchema = z.object({
 
 const quotaValue = z.coerce.number().int().min(1).max(MAX_QUOTA);
 
+/**
+ * "When will you do it" — the implementation intention's time half. The form
+ * collects HH:MM because that's how people think about time; the database
+ * stores minutes from midnight, in User.timezone.
+ */
+const timeAnchor = emptyToUndefined(
+  z
+    .string()
+    .trim()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use a HH:MM time.")
+    .transform((value) => {
+      const [hours, minutes] = value.split(":").map(Number);
+      return hours * 60 + minutes;
+    }),
+);
+
 export const createHabitSchema = createTodoSchema
   .omit({ dueDate: true })
   .extend({
@@ -136,6 +152,7 @@ export const createHabitSchema = createTodoSchema
     unit: z.enum(["MINUTES", "COUNT"]).default("MINUTES"),
     minimumQuota: quotaValue.default(1),
     optimalQuota: emptyToUndefined(quotaValue),
+    timeAnchor,
 
     // When on, the day isn't DONE until a written note lands on the
     // occurrence. Not `z.coerce.boolean()` — `Boolean("false")` is true — see
@@ -702,6 +719,9 @@ export const routineDaysSchema = z
       .transform((days) => [...new Set(days)].sort((a, b) => a - b)),
     counts: z.array(z.coerce.number().int().min(1).max(MAX_EXERCISES_PER_DAY)),
     equipment: z.enum(["YOGA", "DUMBBELL", "MIX"]).default("MIX"),
+    /** The intensity the week is built at. Defaults gentle — the safer week
+     * for a crafted POST that never answered the question. */
+    difficulty: z.enum(["EASY", "CHALLENGING"]).default("EASY"),
     dayTypes: z.array(z.enum(["STANDARD", "FLOW", "RECOVERY"])).optional(),
   })
   .superRefine((value, ctx) => {

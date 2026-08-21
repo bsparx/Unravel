@@ -14,7 +14,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { GOAL_LABELS, GOAL_ORDER, bodyPartLabel } from "@/lib/exercise-labels";
+import {
+  EXERCISE_DIFFICULTY_LABELS,
+  GOAL_LABELS,
+  GOAL_ORDER,
+  bodyPartLabel,
+} from "@/lib/exercise-labels";
+import type { ExerciseDifficulty } from "@/lib/exercise-routine";
 
 import type { HoveredExercise } from "./body-map";
 import {
@@ -24,6 +30,7 @@ import {
 
 type Equipment = "YOGA" | "DUMBBELL";
 type Goal = ExerciseDetail["goal"];
+type Difficulty = ExerciseDifficulty;
 
 /**
  * The results panel beside the figures: whatever muscle is selected, narrowed
@@ -46,6 +53,7 @@ export function CatalogSection({
 }) {
   const [equipment, setEquipment] = useState<Equipment | "ALL">("ALL");
   const [goal, setGoal] = useState<Goal | "ALL">("ALL");
+  const [difficulty, setDifficulty] = useState<Difficulty | "ALL">("ALL");
   const [query, setQuery] = useState("");
 
   const filtered = useMemo(() => {
@@ -56,18 +64,26 @@ export function CatalogSection({
       }
       if (equipment !== "ALL" && exercise.equipment !== equipment) return false;
       if (goal !== "ALL" && exercise.goal !== goal) return false;
+      if (difficulty !== "ALL" && exercise.difficulty !== difficulty) {
+        return false;
+      }
       if (needle !== "" && !exercise.name.toLowerCase().includes(needle)) return false;
       return true;
     });
-  }, [exercises, selectedPart, equipment, goal, query]);
+  }, [exercises, selectedPart, equipment, goal, difficulty, query]);
 
   const narrowed =
-    selectedPart !== null || equipment !== "ALL" || goal !== "ALL" || query !== "";
+    selectedPart !== null ||
+    equipment !== "ALL" ||
+    goal !== "ALL" ||
+    difficulty !== "ALL" ||
+    query !== "";
 
   const clearEverything = () => {
     onClearPart();
     setEquipment("ALL");
     setGoal("ALL");
+    setDifficulty("ALL");
     setQuery("");
   };
 
@@ -136,6 +152,23 @@ export function CatalogSection({
             ))}
           </SelectContent>
         </Select>
+
+        <Select
+          value={difficulty}
+          onValueChange={(value) => setDifficulty(value as Difficulty | "ALL")}
+        >
+          <SelectTrigger className="h-9 w-36" aria-label="Filter by difficulty">
+            <SelectValue placeholder="Difficulty" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">Every difficulty</SelectItem>
+            {(Object.keys(EXERCISE_DIFFICULTY_LABELS) as Difficulty[]).map((d) => (
+              <SelectItem key={d} value={d}>
+                {EXERCISE_DIFFICULTY_LABELS[d]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {filtered.length === 0 ? (
@@ -192,6 +225,9 @@ export function CatalogSection({
                     <span className="flex flex-wrap gap-1 pt-1">
                       <Badge variant="secondary" className="text-[0.625rem]">
                         {GOAL_LABELS[exercise.goal]}
+                      </Badge>
+                      <Badge variant="outline" className="text-[0.625rem]">
+                        {EXERCISE_DIFFICULTY_LABELS[exercise.difficulty]}
                       </Badge>
                       {exercise.bodyParts.slice(0, 2).map((part) => (
                         <Badge

@@ -171,6 +171,7 @@ export async function createHabit(
           unit: input.unit,
           minimumQuota: input.minimumQuota,
           optimalQuota: input.optimalQuota ?? null,
+          timeAnchor: input.timeAnchor ?? null,
         },
       },
       cue: cue.cue ? { create: cue.cue } : undefined,
@@ -246,6 +247,7 @@ export async function updateHabit(
             unit: input.unit,
             minimumQuota: input.minimumQuota,
             optimalQuota: input.optimalQuota ?? null,
+            timeAnchor: input.timeAnchor ?? null,
           },
           update: {
             kind: isEveryDay(input.daysOfWeek) ? "DAILY" : "SPECIFIC_DAYS",
@@ -255,6 +257,7 @@ export async function updateHabit(
             unit: input.unit,
             minimumQuota: input.minimumQuota,
             optimalQuota: input.optimalQuota ?? null,
+            timeAnchor: input.timeAnchor ?? null,
           },
         },
       },

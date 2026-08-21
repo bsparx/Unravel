@@ -78,6 +78,7 @@ export function TaskList({
                       )
                     : null,
                   recurrenceDays: null,
+                  timeAnchorMinutes: null,
                   cue: null,
                   missedYesterday: false,
                   requiresFeedback: false,

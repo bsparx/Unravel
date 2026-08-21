@@ -1,7 +1,15 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, Dumbbell, Shuffle, Sparkles } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Dumbbell,
+  Feather,
+  Flame,
+  Shuffle,
+  Sparkles,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +30,7 @@ import {
   generateRoutine,
   ROUTINE_DAY_TYPES,
   type RoutineDayType,
+  type RoutineDifficulty,
 } from "@/lib/exercise-routine";
 import { idleState, ROUTINE_DAY_OPTIONS } from "@/lib/validation";
 import { cn } from "@/lib/utils";
@@ -53,6 +62,7 @@ export function BuildRoutineDialog({
   const [equipment, setEquipment] = useState<"YOGA" | "DUMBBELL" | "MIX">(
     "MIX",
   );
+  const [difficulty, setDifficulty] = useState<RoutineDifficulty>("EASY");
 
   const [state, formAction, pending] = useActionState(createRoutine, idleState);
 
@@ -108,8 +118,9 @@ export function BuildRoutineDialog({
       dayTypes: sortedDays.map((day) => dayTypes[day] ?? "STANDARD"),
       exercises: catalog,
       equipment: equipment === "MIX" ? null : equipment,
+      difficulty,
     });
-  }, [step, sortedDays, counts, dayTypes, catalog, equipment]);
+  }, [step, sortedDays, counts, dayTypes, catalog, equipment, difficulty]);
 
   const toggleDay = (value: number) => {
     if (days.includes(value)) {
@@ -186,6 +197,45 @@ export function BuildRoutineDialog({
                 >
                   <Icon className="size-4" aria-hidden />
                   <span className="text-label">{label}</span>
+                </button>
+              ))}
+            </div>
+
+            <p className="text-label text-muted-foreground">
+              How hard should it be?
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  {
+                    value: "EASY",
+                    label: "Gentle",
+                    hint: "Easy exercises only",
+                    icon: Feather,
+                  },
+                  {
+                    value: "CHALLENGING",
+                    label: "Challenging",
+                    hint: "I can handle hard ones",
+                    icon: Flame,
+                  },
+                ] as const
+              ).map(({ value, label, hint, icon: Icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setDifficulty(value)}
+                  aria-pressed={difficulty === value}
+                  className={cn(
+                    "border-border hover:bg-accent flex flex-col items-center gap-1 rounded-lg border px-2 py-3 transition-colors",
+                    difficulty === value && "border-primary bg-accent",
+                  )}
+                >
+                  <Icon className="size-4" aria-hidden />
+                  <span className="text-label">{label}</span>
+                  <span className="text-muted-foreground text-micro text-center">
+                    {hint}
+                  </span>
                 </button>
               ))}
             </div>
@@ -426,6 +476,7 @@ export function BuildRoutineDialog({
               </Button>
               <input type="hidden" name="daysPerWeek" value={daysPerWeek} />
               <input type="hidden" name="equipment" value={equipment} />
+              <input type="hidden" name="difficulty" value={difficulty} />
               {sortedDays.map((day) => (
                 <input key={day} type="hidden" name="days[]" value={day} />
               ))}

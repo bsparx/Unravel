@@ -23,11 +23,20 @@
  *   - no exercise repeats across the week while the pool allows it
  *   - equipment balances near 50/50 across the week
  *   - pinned (user-swapped) slots are left untouched by regeneration
+ *   - a gentle week (difficulty EASY) draws from the easy pool only,
+ *     relaxing toward moderate when an easy pool runs out — hard is never
+ *     reached while anything gentler exists in the catalog
  */
 
 export type ExerciseEquipment = "YOGA" | "DUMBBELL";
 
 export type ExerciseType = "STRENGTH" | "MOBILITY" | "FLOW";
+
+/** How hard an exercise is to do well — the gentle-week pool filter. */
+export type ExerciseDifficulty = "EASY" | "MODERATE" | "HARD";
+
+/** The intensity the person asked the builder for. */
+export type RoutineDifficulty = "EASY" | "CHALLENGING";
 
 export type RoutineDayType = "STANDARD" | "FLOW" | "RECOVERY";
 
@@ -58,6 +67,7 @@ export interface PoolExercise {
   equipment: ExerciseEquipment;
   goal: ExerciseGoal;
   type: ExerciseType;
+  difficulty: ExerciseDifficulty;
 }
 
 /** One slot of the week being produced. `position` is 0..4 within the day. */
@@ -141,6 +151,11 @@ function shuffle<T>(items: T[], random: () => number): T[] {
   return copy;
 }
 
+/** The first non-empty candidate set; the last set if every one is empty. */
+function firstNonEmpty<T>(...sets: T[][]): T[] {
+  return sets.find((set) => set.length > 0) ?? sets[sets.length - 1];
+}
+
 export interface GenerateOptions {
   /** 0 = Sunday .. 6 = Saturday. Any length 1..7; the builder offers all of them. */
   days: number[];
@@ -163,6 +178,13 @@ export interface GenerateOptions {
    * balanced against the other. Null (the default) mixes both near 50/50.
    */
   equipment?: ExerciseEquipment | null;
+  /**
+   * The intensity the person asked for. EASY restricts the week to easy
+   * exercises, relaxing toward moderate only when an easy pool runs out —
+   * never reaching hard while the catalog offers anything gentler.
+   * CHALLENGING (the default) draws from the whole catalog.
+   */
+  difficulty?: RoutineDifficulty;
   /** 0 = the canonical routine; higher variants reshuffle the week. */
   variant?: number;
   /** User-swapped slots: regenerated around, never over. */
@@ -192,18 +214,32 @@ export function generateRoutine({
   dayTypes,
   exercises: allExercises,
   equipment = null,
+  difficulty = "CHALLENGING",
   variant = 0,
   pinned = [],
   avoid = [],
 }: GenerateOptions): GeneratedSlot[] {
-  // The preference is a pool filter, not a second balancing rule: with only
-  // one equipment in the pool, every supply-derived floor and cap below
-  // collapses onto it, and the 50/50 pass finds no room to move. Scarcity
-  // still clamps (a dumbbell-only week has exactly one mobility exercise to
-  // draw from), and repeats stay allowed once a pool is genuinely spent.
-  const exercises = equipment
+  // Equipment and difficulty are both pool filters, not second balancing
+  // rules: with only one equipment in the pool, every supply-derived floor
+  // and cap below collapses onto it, and the 50/50 pass finds no room to
+  // move. Scarcity still clamps (a dumbbell-only week has exactly one
+  // mobility exercise to draw from), and repeats stay allowed once a pool is
+  // genuinely spent.
+  //
+  // Difficulty filters one step softer than equipment: a gentle week's pools
+  // are the easy exercises alone, but the pick step below may still relax to
+  // the soft pool (easy + moderate) when an easy pool runs out. Hard is only
+  // ever reached as the never-leave-a-hole last resort.
+  const afterEquipment = equipment
     ? allExercises.filter((e) => e.equipment === equipment)
     : allExercises;
+  const gentle = difficulty === "EASY";
+  const exercises = gentle
+    ? afterEquipment.filter((e) => e.difficulty === "EASY")
+    : afterEquipment;
+  const softExercises = gentle
+    ? afterEquipment.filter((e) => e.difficulty !== "HARD")
+    : afterEquipment;
 
   const random = mulberry32(variant + 1);
   const countByDay = new Map<number, number>();
@@ -221,9 +257,18 @@ export function generateRoutine({
   };
 
   const pools = {} as Record<ExerciseType, PoolExercise[]>;
+  const softPools = {} as Record<ExerciseType, PoolExercise[]>;
+  const fullPools = {} as Record<ExerciseType, PoolExercise[]>;
   for (const type of Object.keys(TYPE_RANK) as ExerciseType[]) {
     pools[type] = exercises.filter((e) => e.type === type);
+    softPools[type] = softExercises.filter((e) => e.type === type);
+    fullPools[type] = afterEquipment.filter((e) => e.type === type);
   }
+
+  // Pinned slots may hold exercises the pool filters out (a manual swap is a
+  // deliberate override), so their types are looked up in the unfiltered
+  // catalog — never in the pools the week is drawing from.
+  const typeById = new Map(allExercises.map((e) => [e.id, e.type]));
 
   // Pinned slots hold their exact place; composition only fills what's left.
   const pinnedByDay = new Map<number, PinnedSlot[]>();
@@ -280,12 +325,10 @@ export function generateRoutine({
     } else {
       const [strength, mobility] = STANDARD_MIX[openings] ?? [0, 0];
       const pinnedStrength = pinnedSlots.filter(
-        (slot) =>
-          exercises.find((e) => e.id === slot.exerciseId)?.type === "STRENGTH",
+        (slot) => typeById.get(slot.exerciseId) === "STRENGTH",
       ).length;
       const pinnedMobility = pinnedSlots.filter(
-        (slot) =>
-          exercises.find((e) => e.id === slot.exerciseId)?.type !== "STRENGTH",
+        (slot) => typeById.get(slot.exerciseId) !== "STRENGTH",
       ).length;
       for (let i = 0; i < Math.max(0, strength - pinnedStrength); i++) {
         types.push("STRENGTH");
@@ -379,21 +422,44 @@ export function generateRoutine({
 
   for (const slot of order) {
     const pool = pools[slot.type];
-    if (pool.length === 0) continue;
+    const softPool = softPools[slot.type];
+    const fullPool = fullPools[slot.type];
+    if (fullPool.length === 0) continue;
 
-    const allotted = pool.filter((e) => e.equipment === slot.equipment);
-    const fresh = allotted.filter((e) => !used.has(e.id));
-    // Relax step by step, so a hole is never left in the week: the allotted
-    // side first, then the whole type, then (only when the week is huge and
-    // the type is genuinely exhausted) repeats.
-    const candidates =
-      fresh.length > 0
-        ? fresh
-        : allotted.length > 0
-          ? allotted
-          : pool.filter((e) => !used.has(e.id)).length > 0
-            ? pool.filter((e) => !used.has(e.id))
-            : pool;
+    const fresh = (list: PoolExercise[]) =>
+      list.filter((e) => !used.has(e.id));
+    const onSide = (list: PoolExercise[]) =>
+      list.filter((e) => e.equipment === slot.equipment);
+
+    let candidates: PoolExercise[];
+    if (gentle) {
+      // The gentle cascade: fresh easy on the allotted side, then fresh easy
+      // anywhere, then the moderate fallback through the same two steps —
+      // variety across the week outranks repeating an easy pick, and hard
+      // is never reached while anything gentler exists. Repeats begin only
+      // once the soft pool is spent (easy ones first), and the full catalog
+      // is the never-leave-a-hole last resort.
+      candidates = firstNonEmpty(
+        fresh(onSide(pool)),
+        fresh(pool),
+        fresh(onSide(softPool)),
+        fresh(softPool),
+        onSide(pool),
+        onSide(softPool),
+        softPool,
+        fullPool,
+      );
+    } else {
+      // Relax step by step, so a hole is never left in the week: the allotted
+      // side first, then the whole type, then (only when the week is huge and
+      // the type is genuinely exhausted) repeats.
+      candidates = firstNonEmpty(
+        fresh(onSide(pool)),
+        onSide(pool),
+        fresh(pool),
+        pool,
+      );
+    }
 
     let best: PoolExercise | null = null;
     let bestScore = -Infinity;

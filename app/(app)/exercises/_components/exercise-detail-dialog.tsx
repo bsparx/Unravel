@@ -7,11 +7,16 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import {
+  EXERCISE_DIFFICULTY_LABELS,
   EXERCISE_TYPE_LABELS,
   GOAL_LABELS,
   goalShort,
 } from "@/lib/exercise-labels";
-import type { ExerciseGoal, ExerciseType } from "@/lib/exercise-routine";
+import type {
+  ExerciseDifficulty,
+  ExerciseGoal,
+  ExerciseType,
+} from "@/lib/exercise-routine";
 
 import { ExerciseFigure } from "./exercise-figure";
 
@@ -21,6 +26,7 @@ export type ExerciseDetail = {
   equipment: "YOGA" | "DUMBBELL";
   goal: ExerciseGoal;
   type: ExerciseType;
+  difficulty: ExerciseDifficulty;
   bodyParts: string[];
   instructions: string[];
   prescription: string;
@@ -59,7 +65,8 @@ export function ExerciseDetailDialog({
               </DialogTitle>
               <p className="text-muted-foreground mt-1 text-label">
                 {exercise.equipment === "YOGA" ? "Yoga · mat only" : "Dumbbells · light"} ·{" "}
-                {goalShort(exercise.goal)}
+                {goalShort(exercise.goal)} ·{" "}
+                {EXERCISE_DIFFICULTY_LABELS[exercise.difficulty]}
               </p>
             </div>
             <Badge
@@ -93,6 +100,9 @@ export function ExerciseDetailDialog({
               <Badge variant="secondary">{GOAL_LABELS[exercise.goal]}</Badge>
               <Badge variant="outline">
                 {EXERCISE_TYPE_LABELS[exercise.type]}
+              </Badge>
+              <Badge variant="outline">
+                {EXERCISE_DIFFICULTY_LABELS[exercise.difficulty]}
               </Badge>
             </div>
           </div>

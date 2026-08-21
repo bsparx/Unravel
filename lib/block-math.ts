@@ -21,11 +21,11 @@ export const SNAP_MINUTES = 15;
 
 /**
  * The length every scheduled block starts at. Dragging a task onto the
- * calendar or pressing "fit it in" always lands at 30 minutes, whatever the
+ * calendar or pressing "fit it in" always lands at 15 minutes, whatever the
  * task's estimate says — the estimate is information, not a constraint. The
  * resize handle and the editor are how it moves afterwards.
  */
-export const PLAN_DEFAULT_MINUTES = 30;
+export const PLAN_DEFAULT_MINUTES = 15;
 
 /** The length every cue block starts at when its habit gets scheduled. */
 export const PLAN_CUE_MINUTES = 15;
