@@ -47,7 +47,7 @@ export type BlockDraft = {
   taskId: string | null;
   /** The linked task's calendar hue, so the picker opens on it. */
   taskColor: CalendarColor | null;
-  kind: "WORK" | "RECOVERY" | "BUFFER";
+  kind: "WORK" | "RECOVERY" | "BUFFER" | "DAYDREAM";
   /** This block already has a cue in front of it, so don't offer to add one. */
   hasCue: boolean;
 };
@@ -56,6 +56,11 @@ const KINDS: { value: BlockDraft["kind"]; label: string; hint: string }[] = [
   { value: "WORK", label: "Work", hint: "Something you're going to do." },
   { value: "RECOVERY", label: "Recovery", hint: "Deliberate rest. It counts." },
   { value: "BUFFER", label: "Buffer", hint: "Left empty on purpose." },
+  {
+    value: "DAYDREAM",
+    label: "Daydreaming",
+    hint: "Imaginary time. Doesn't count toward anything.",
+  },
 ];
 
 /** Quick lengths, in minutes. Long enough a list, short enough to scan. */

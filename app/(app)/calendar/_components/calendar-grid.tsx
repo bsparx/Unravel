@@ -67,6 +67,9 @@ const STRIP_FILL = {
   WORK: "bg-primary/70",
   RECOVERY: "bg-rest/70",
   BUFFER: "bg-muted-foreground/25",
+  // Filtered out before this map is read — here so the vocabulary stays
+  // exhaustive; a dream that ever reached a strip would show as its violet.
+  DAYDREAM: "bg-violet-400/40",
 } as const;
 
 /**
@@ -399,8 +402,11 @@ function DayStrip({
   const position = (minute: number) =>
     `${((Math.min(Math.max(minute, STRIP_FROM), STRIP_TO) - STRIP_FROM) / span) * 100}%`;
 
+  // A daydream is not time claimed, so it does not make a day look fuller.
+  const committed = blocks.filter((block) => block.kind !== "DAYDREAM");
+
   const switches = transitionsForDay(
-    blocks.map((block) => ({
+    committed.map((block) => ({
       id: block.id,
       title: block.title,
       startMinute: block.startMinute,
@@ -417,7 +423,7 @@ function DayStrip({
       style={{ animationDelay: `${index * 40}ms` }}
     >
       <div className="bg-muted/60 absolute inset-0 rounded-full" />
-      {mergedSegments(blocks).map((segment) => (
+      {mergedSegments(committed).map((segment) => (
         <div
           key={`${segment.startMinute}-${segment.endMinute}`}
           className={cn(
@@ -920,6 +926,8 @@ const KIND_STYLES = {
   WORK: "bg-primary/12 border-primary/45 text-foreground",
   RECOVERY: "bg-rest-muted border-rest/45 text-foreground",
   BUFFER: "bg-muted border-border text-muted-foreground border-dashed",
+  DAYDREAM:
+    "bg-violet-400/10 border-violet-400/40 text-muted-foreground border-dashed",
 } as const;
 
 function BlockChip({
@@ -1050,6 +1058,7 @@ function BlockChip({
               // readable at a glance.
               compact ? "truncate" : "line-clamp-2",
               done && "line-through",
+              block.kind === "DAYDREAM" && "italic",
             )}
           >
             {block.title}

@@ -1215,8 +1215,8 @@ async function main() {
   );
 
   // A planned day, so the calendar isn't empty on first open — including a
-  // buffer block and a recovery block, because a demo day that is wall-to-wall
-  // work would teach exactly the wrong lesson.
+  // buffer block, a recovery block and a daydream, because a demo day that is
+  // wall-to-wall work would teach exactly the wrong lesson.
   await prisma.timeBlock.createMany({
     data: [
       {
@@ -1261,6 +1261,14 @@ async function main() {
         startMinute: 10 * 60,
         endMinute: 11 * 60,
         kind: "WORK" as const,
+      },
+      {
+        userId: user.id,
+        title: "Stare out the window",
+        date: localDate(0),
+        startMinute: 16 * 60,
+        endMinute: 16 * 60 + 45,
+        kind: "DAYDREAM" as const,
       },
     ],
   });

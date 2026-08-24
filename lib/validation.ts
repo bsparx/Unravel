@@ -336,7 +336,7 @@ const blockShape = {
   date: isoDate,
   startMinute: minuteOfDay,
   endMinute: minuteOfDay,
-  kind: z.enum(["WORK", "RECOVERY", "BUFFER"]).default("WORK"),
+  kind: z.enum(["WORK", "RECOVERY", "BUFFER", "DAYDREAM"]).default("WORK"),
   includeCue,
 };
 

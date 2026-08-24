@@ -100,8 +100,11 @@ export default async function CalendarPage({
   // actually most of an evening.
   const anchorISO = toISODate(anchor);
   const anchorBlocks = blocks.filter((block) => block.dateISO === anchorISO);
-  const claimed = claimedMinutes(anchorBlocks);
-  const open = freeSlots(anchorBlocks, WAKING_START, WAKING_END);
+  // A daydream is imaginary time — it claims nothing, so every number below
+  // reads the day without it. The grid still renders it (see `blocks`).
+  const committed = anchorBlocks.filter((block) => block.kind !== "DAYDREAM");
+  const claimed = claimedMinutes(committed);
+  const open = freeSlots(committed, WAKING_START, WAKING_END);
   const longestFree = open.reduce(
     (best, slot) => Math.max(best, slot.endMinute - slot.startMinute),
     0,
@@ -111,7 +114,7 @@ export default async function CalendarPage({
   // much room is left to work in; neither says anything about the switches
   // between, which is where a day with no slack actually comes apart.
   const switches = transitionsForDay(
-    anchorBlocks.map((block) => ({
+    committed.map((block) => ({
       id: block.id,
       title: block.title,
       startMinute: block.startMinute,
@@ -128,7 +131,7 @@ export default async function CalendarPage({
   const nowMinute = minuteOfDayLocal(user.timezone);
   const anchorIsToday = anchor.getTime() === today.getTime();
   const nextUp = anchorIsToday
-    ? anchorBlocks
+    ? committed
         // `>=`: a block starting at the exact current minute is next up, not
         // behind you.
         .filter((block) => block.startMinute >= nowMinute)
@@ -155,15 +158,15 @@ export default async function CalendarPage({
       );
     }
     if (anchorIsToday) {
-      return anchorBlocks.length > 0
+      return committed.length > 0
         ? "All planned time is behind you."
         : "Nothing planned yet — click anywhere on today to open a slot.";
     }
-    if (anchorBlocks.length === 0) return "Nothing planned yet.";
+    if (committed.length === 0) return "Nothing planned yet.";
     return (
       <>
         <span className="tabular-nums">{formatMinuteLength(claimed)}</span> planned
-        across {anchorBlocks.length} block{anchorBlocks.length === 1 ? "" : "s"}
+        across {committed.length} block{committed.length === 1 ? "" : "s"}
         {longestFree > 0 && (
           <>
             {" · longest open stretch "}

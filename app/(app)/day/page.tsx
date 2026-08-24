@@ -26,6 +26,8 @@ export default async function TodayPage() {
   const user = await requireUser();
   const view = await getTodayView(user);
   const blocks = await getBlocks(user, view.date, 1);
+  // Daydream blocks live on /calendar only — /day never sees them.
+  const plannedBlocks = blocks.filter((block) => block.kind !== "DAYDREAM");
   const water = await getWaterToday(user, view.date);
   const todayISO = toISODate(view.date);
 
@@ -73,7 +75,7 @@ export default async function TodayPage() {
 
       <div className="mb-6">
         <PlanStrip
-          blocks={blocks}
+          blocks={plannedBlocks}
           dateISO={todayISO}
           nowMinute={nowMinute}
         />

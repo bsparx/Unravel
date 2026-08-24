@@ -86,7 +86,7 @@ type BlockCreate = {
   date: Date;
   startMinute: number;
   endMinute: number;
-  kind: "WORK" | "RECOVERY" | "BUFFER";
+  kind: "WORK" | "RECOVERY" | "BUFFER" | "DAYDREAM";
 };
 
 /**
@@ -365,11 +365,17 @@ export async function scheduleTask(
   const cue = await plannedCueFor(user.id, task.id, input.includeCue);
   const cueMinutes = cue?.minutes ?? 0;
 
-  const existing = await prisma.timeBlock.findMany({
-    where: { userId: user.id, date },
-    select: { startMinute: true, endMinute: true },
-    orderBy: { startMinute: "asc" },
-  });
+  // Daydream blocks claim nothing, so they don't shrink the gaps a real
+  // block can land in — "Fit it in" may place a task on top of one.
+  const existing = (
+    await prisma.timeBlock.findMany({
+      where: { userId: user.id, date },
+      select: { startMinute: true, endMinute: true, kind: true },
+      orderBy: { startMinute: "asc" },
+    })
+  )
+    .filter((block) => block.kind !== "DAYDREAM")
+    .map(({ startMinute, endMinute }) => ({ startMinute, endMinute }));
 
   let span: Span | null;
 

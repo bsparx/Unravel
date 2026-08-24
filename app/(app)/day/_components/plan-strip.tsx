@@ -18,6 +18,8 @@ const KIND_FILL = {
   WORK: "bg-primary/70",
   RECOVERY: "bg-rest/70",
   BUFFER: "bg-muted-foreground/25",
+  // Filtered out before /day ever sees one — kept so the map stays exhaustive.
+  DAYDREAM: "bg-violet-400/40",
 } as const;
 
 /**

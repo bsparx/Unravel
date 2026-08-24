@@ -105,7 +105,7 @@ enum JournalKind {
   GRATITUDE
 }
 
-/// What a block of time on the calendar is *for*. Deliberately only three:
+/// What a block of time on the calendar is *for*. Deliberately short:
 /// more kinds would turn planning the day into a taxonomy exercise.
 enum BlockKind {
   WORK
@@ -114,6 +114,10 @@ enum BlockKind {
   /// — planning back-to-back is the single most reliable way to plan a day you
   /// then abandon by 11am.
   BUFFER
+  /// Imaginary time. Lives on /calendar only — excluded from claimed minutes,
+  /// free-slot math, transitions and /day's strip. An output for daydreaming,
+  /// not a plan anyone is accountable for.
+  DAYDREAM
 }
 
 /// Which side of the ledger a category and its transactions sit on.
