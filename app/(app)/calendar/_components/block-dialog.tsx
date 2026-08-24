@@ -58,8 +58,8 @@ const KINDS: { value: BlockDraft["kind"]; label: string; hint: string }[] = [
   { value: "BUFFER", label: "Buffer", hint: "Left empty on purpose." },
   {
     value: "DAYDREAM",
-    label: "Daydreaming",
-    hint: "Imaginary time. Doesn't count toward anything.",
+    label: "Break",
+    hint: "A pause that doesn't count toward anything.",
   },
 ];
 
