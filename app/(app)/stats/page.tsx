@@ -35,7 +35,7 @@ export default async function StatsPage({
 
   const stats = await getStats(user, range);
   const hasData =
-    stats.totals.sessions > 0 || stats.balance.recoverySessions > 0;
+    stats.totals.seconds > 0 || stats.balance.recoverySessions > 0;
 
   return (
     <div className="mx-auto w-full max-w-7xl px-5 py-8 md:px-8 md:py-12">
@@ -70,7 +70,7 @@ export default async function StatsPage({
         <EmptyState
           icon={BarChart3}
           title="Nothing on the clock yet"
-          description="Run a timer on anything and this fills in: how long things really take, which days you get traction, and how far off your estimates are."
+          description="Run a timer on anything — or tick a task done and log how long it took — and this fills in: how long things really take, which days you get traction, and how far off your estimates are."
           action={
             <Button asChild size="sm">
               <Link href="/day">Go to your day</Link>

@@ -58,6 +58,9 @@ export async function getStats(user: User, range: StatsRange) {
     sessionTimes,
     intervalCounts,
     breakIntervals,
+    occurrenceDays,
+    attachedSessionDays,
+    occurrenceTasks,
   ] = await Promise.all([
     prisma.focusSession.aggregate({
       where: { ...scope, ...workOnly },
@@ -165,6 +168,51 @@ export async function getStats(user: User, range: StatsRange) {
         },
       },
     }),
+
+    // ---- the manual half of the log --------------------------------------
+    //
+    // Every day's `loggedSeconds` is a superset: session time is incremented
+    // into it at endSession *and* lives on the session row, while time logged
+    // by hand — "I did 25 minutes but the clock never ran" — exists only on
+    // the occurrence. Subtracting the session side from the occurrence side
+    // per bucket isolates exactly the manual minutes, and doing it as two
+    // groupBys means any future drift between the two tables can't inflate
+    // /stats: the maximum it can produce is zero.
+    prisma.taskOccurrence.groupBy({
+      by: ["date"],
+      where: {
+        userId: user.id,
+        date: { gte: from, lte: today },
+      },
+      _sum: { loggedSeconds: true },
+      orderBy: { date: "asc" },
+    }),
+
+    prisma.focusSession.groupBy({
+      by: ["localDate"],
+      where: {
+        userId: user.id,
+        status: "COMPLETED",
+        localDate: { gte: from, lte: today },
+        // Only sessions that were rolled into an occurrence — untethered and
+        // recovery sessions never touch `loggedSeconds`.
+        occurrenceId: { not: null },
+      },
+      _sum: { elapsedSeconds: true },
+      orderBy: { localDate: "asc" },
+    }),
+
+    // Manual time by task, so a task that was only ever logged by hand still
+    // shows up in "where the time went".
+    prisma.taskOccurrence.groupBy({
+      by: ["taskId"],
+      where: {
+        userId: user.id,
+        date: { gte: from, lte: today },
+        loggedSeconds: { gt: 0 },
+      },
+      _sum: { loggedSeconds: true },
+    }),
   ]);
 
   const breaks = summariseBreaks(
@@ -179,11 +227,50 @@ export async function getStats(user: User, range: StatsRange) {
     })),
   );
 
+  // ---- manually logged time ----------------------------------------------
+
+  const occurrenceSecondsByDate = new Map(
+    occurrenceDays.map((row) => [toISODate(row.date), row._sum.loggedSeconds ?? 0]),
+  );
+
+  const attachedSecondsByDate = new Map(
+    attachedSessionDays.map((row) => [
+      toISODate(row.localDate),
+      row._sum.elapsedSeconds ?? 0,
+    ]),
+  );
+
+  const manualByDate = (iso: string) =>
+    Math.max(
+      0,
+      (occurrenceSecondsByDate.get(iso) ?? 0) - (attachedSecondsByDate.get(iso) ?? 0),
+    );
+
+  // The per-task counterpart. `byTask` already sums every session against the
+  // task (a task-attached session always carries its occurrenceId), so the
+  // occurrence total minus that is the manual total.
+  const sessionSecondsByTask = new Map(
+    byTask.map((row) => [row.taskId, row._sum.elapsedSeconds ?? 0]),
+  );
+
+  const manualSecondsByTask = new Map<string, number>();
+  for (const row of occurrenceTasks) {
+    const taskId = row.taskId;
+    if (!taskId) continue;
+    manualSecondsByTask.set(
+      taskId,
+      Math.max(0, (row._sum.loggedSeconds ?? 0) - (sessionSecondsByTask.get(taskId) ?? 0)),
+    );
+  }
+
   // ---- hydrate task names for the "where did the time go" table ------------
 
-  const taskIds = byTask
-    .map((row) => row.taskId)
-    .filter((id): id is string => id !== null);
+  const taskIds = [
+    ...new Set([
+      ...byTask.map((row) => row.taskId),
+      ...occurrenceTasks.map((row) => row.taskId),
+    ]),
+  ].filter((id): id is string => id !== null);
 
   const tasks = taskIds.length
     ? await prisma.task.findMany({
@@ -210,11 +297,35 @@ export async function getStats(user: User, range: StatsRange) {
         type: task.type,
         project: task.project,
         estimatedSeconds: task.estimatedSeconds,
-        seconds: row._sum.elapsedSeconds ?? 0,
+        seconds:
+          (row._sum.elapsedSeconds ?? 0) +
+          (row.taskId ? manualSecondsByTask.get(row.taskId) ?? 0 : 0),
         sessions: row._count._all,
       };
     })
     .filter((row): row is NonNullable<typeof row> => row !== null);
+
+  // Tasks that were only ever logged by hand never produced a session row, so
+  // they can't come from `byTask` — they have to be added whole.
+  const manualOnlyTaskRows = [...manualSecondsByTask]
+    .filter(([taskId, seconds]) => seconds > 0 && !sessionSecondsByTask.has(taskId))
+    .map(([taskId, seconds]) => {
+      const task = taskById.get(taskId);
+      if (!task) return null;
+      return {
+        id: task.id,
+        title: task.title,
+        type: task.type,
+        project: task.project,
+        estimatedSeconds: task.estimatedSeconds,
+        seconds,
+        sessions: 0,
+      };
+    })
+    .filter((row): row is NonNullable<typeof row> => row !== null);
+
+  timeByTask.push(...manualOnlyTaskRows);
+  timeByTask.sort((a, b) => b.seconds - a.seconds);
 
   // Folded into projects in JS rather than denormalizing projectId onto every
   // session, which would then need keeping in sync when a task moves list.
@@ -350,20 +461,27 @@ export async function getStats(user: User, range: StatsRange) {
     const iso = toISODate(date);
     const workSeconds = workByDate.get(iso) ?? 0;
     const recoverySeconds = restByDate.get(iso) ?? 0;
+    const manualSeconds = manualByDate(iso);
 
     return {
       date,
       iso,
       workSeconds,
       recoverySeconds,
+      manualSeconds,
       // The heatmap is about focus, so `seconds` stays work-only and that
       // component needs no change.
-      seconds: workSeconds,
+      seconds: workSeconds + manualSeconds,
       completions: completionsByDate.get(iso) ?? 0,
     };
   });
 
-  const workSeconds = totals._sum.elapsedSeconds ?? 0;
+  const manualTotal = daily.reduce(
+    (sum, day) => sum + day.manualSeconds,
+    0,
+  );
+
+  const workSeconds = (totals._sum.elapsedSeconds ?? 0) + manualTotal;
   const recoverySeconds = recoveryTotals._sum.elapsedSeconds ?? 0;
 
   return {
@@ -393,9 +511,14 @@ export async function getStats(user: User, range: StatsRange) {
       ).length,
     },
     breaks,
-    todaySeconds: todayTotals._sum.elapsedSeconds ?? 0,
+    todaySeconds:
+      (todayTotals._sum.elapsedSeconds ?? 0) + manualByDate(toISODate(today)),
     todaySessions: todayTotals._count._all,
-    weekSeconds: weekTotals._sum.elapsedSeconds ?? 0,
+    weekSeconds:
+      (weekTotals._sum.elapsedSeconds ?? 0) +
+      daily
+        .filter((day) => day.date >= weekStart)
+        .reduce((sum, day) => sum + day.manualSeconds, 0),
     daily,
     timeByTask: timeByTask.slice(0, 8),
     timeByProject: [...projectTotals.values()].sort(
