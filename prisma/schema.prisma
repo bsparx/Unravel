@@ -88,6 +88,21 @@ enum HabitUnit {
   COUNT
 }
 
+/// Which stretches of the waking day a habit belongs to. Drives visibility,
+/// not due-ness: a habit is still due on its days — /day and /calendar just
+/// stop offering it outside its windows, so the morning list doesn't carry the
+/// evening's plans.
+///
+/// ALWAYS is a value of its own, not shorthand for all three: the windows cover
+/// 5:00–21:00, and an "always" habit stays visible at 23:00 while a habit with
+/// all three windows selected does not.
+enum HabitSlot {
+  MORNING
+  AFTERNOON
+  EVENING
+  ALWAYS
+}
+
 /// How far into a day's quota you got.
 ///
 /// Stored on the occurrence rather than recomputed at read time, because the
@@ -525,6 +540,11 @@ model HabitRecurrence {
   /// midnight in User.timezone. Null means no time plan yet — the habit
   /// sorts after anchored ones and is never the time-aware "Start here" pick.
   timeAnchor   Int?
+
+  /// Which parts of the day this habit belongs to. [ALWAYS] by default so
+  /// existing habits stay visible everywhere; a habit shows on /day and the
+  /// calendar's scheduling panel only inside a selected window.
+  slots        HabitSlot[] @default([ALWAYS])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

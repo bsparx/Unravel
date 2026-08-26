@@ -179,7 +179,7 @@ export default async function CalendarPage({
   })();
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-5 py-8 md:px-8 md:py-12">
+    <div className="w-full px-2 py-4 md:px-3">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-display">Calendar</h1>

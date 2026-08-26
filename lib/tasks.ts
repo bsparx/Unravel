@@ -8,8 +8,9 @@
  */
 
 import { prisma } from "@/lib/db";
-import { addDays, toISODate, todayLocal } from "@/lib/dates";
+import { addDays, minuteOfDayLocal, toISODate, todayLocal } from "@/lib/dates";
 import type {
+  HabitSlot,
   OccurrenceStatus,
   Priority,
   TaskOccurrence,
@@ -17,6 +18,7 @@ import type {
   User,
 } from "@/lib/generated/prisma/client";
 import { anchorTitleOf } from "@/lib/habit-cue";
+import { isActiveInSlot } from "@/lib/habit-slots";
 import type { HabitUnit, Quota, QuotaTier } from "@/lib/quota";
 import {
   isDueOn,
@@ -279,7 +281,12 @@ export async function getTodayView(user: User): Promise<TodayView> {
   const habits: TodayItem[] = habitTasks
     .filter((task) => {
       if (!task.recurrence) return false;
-      return isDueOn(toRule(task.recurrence), today);
+      // Due on the calendar, visible only in the part of the day the habit
+      // belongs to — the morning list doesn't carry the evening's plans.
+      return (
+        isDueOn(toRule(task.recurrence), today) &&
+        isActiveInSlot(task.recurrence.slots, minuteOfDayLocal(user.timezone))
+      );
     })
     .sort(byHabitTime)
     .map((task) => {
@@ -400,6 +407,8 @@ export type HabitWithHistory = TaskSummary & {
   archivedAt: Date | null;
   /** The thing this habit is stacked on, if any. */
   cue: CueSummary | null;
+  /** Which parts of the day it belongs to — see lib/habit-slots. */
+  slots: HabitSlot[];
 };
 
 export async function getHabits(
@@ -479,6 +488,7 @@ export async function getHabits(
       requiresFeedback: habit.requiresFeedback,
       feedbackPrompt: habit.feedbackPrompt,
       cue: toCue(habit.cue),
+      slots: habit.recurrence!.slots,
     }));
 }
 

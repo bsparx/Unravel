@@ -9,10 +9,11 @@
  */
 
 import { prisma } from "@/lib/db";
-import { addDays, toISODate } from "@/lib/dates";
+import { addDays, minuteOfDayLocal, toISODate } from "@/lib/dates";
 import type { BlockKind, User } from "@/lib/generated/prisma/client";
 import { claimedMinutes, type Span } from "@/lib/block-math";
 import { anchorTitleOf } from "@/lib/habit-cue";
+import { isActiveInSlot } from "@/lib/habit-slots";
 import { isDueOn, wasMissedOn } from "@/lib/recurrence";
 
 export type CalendarBlock = {
@@ -286,7 +287,7 @@ export async function getSchedulableItems(
         estimatedSeconds: true,
         project: { select: { name: true } },
         recurrence: {
-          select: { daysOfWeek: true, startDate: true, endDate: true },
+          select: { daysOfWeek: true, startDate: true, endDate: true, slots: true },
         },
         cue: {
           select: {
@@ -336,12 +337,18 @@ export async function getSchedulableItems(
     return status ? new Map([[priorISO, status]]) : new Map();
   };
 
+  // Slot-filtered against *now*, not the day being planned: at 9am you plan
+  // for the moment you're in, so a morning habit is offerable for any day and
+  // an evening one is out of sight until its window arrives.
+  const nowMinute = minuteOfDayLocal(user.timezone);
+
   const dueHabits: SchedulableItem[] = habits
     .filter(
       (habit) =>
         habit.recurrence !== null &&
         !settled.has(habit.id) &&
-        isDueOn(habit.recurrence, date),
+        isDueOn(habit.recurrence, date) &&
+        isActiveInSlot(habit.recurrence.slots, nowMinute),
     )
     .map((habit) => ({
       id: habit.id,

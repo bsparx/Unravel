@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth";
 import { addDays, formatMinutes, toISODate, todayLocal } from "@/lib/dates";
 import { chainOf, cueEdges } from "@/lib/habit-cue";
+import { describeSlots } from "@/lib/habit-slots";
 import { describeQuota } from "@/lib/quota";
 import { getHabits } from "@/lib/tasks";
 import {
@@ -200,6 +201,7 @@ export default async function HabitsPage() {
                     <HabitStackTrail steps={stackTrail(habit.id)} />
                     <p className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-label">
                       <span>{describeRecurrence(habit.daysOfWeek)}</span>
+                      <span>{describeSlots(habit.slots)}</span>
                       <span>{describeQuota(habit.quota)}</span>
                       {habit.estimatedSeconds ? (
                         <span className="inline-flex items-center gap-1 tabular-nums">

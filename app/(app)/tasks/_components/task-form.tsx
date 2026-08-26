@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { CalendarColor } from "@/lib/calendar-colors";
 import { EVERY_DAY, WEEKDAYS } from "@/lib/dates";
+import type { HabitSlot } from "@/lib/generated/prisma/client";
 import { describeRecurrence } from "@/lib/recurrence";
 import {
   MODE_DESCRIPTIONS,
@@ -57,6 +58,8 @@ export type TaskFormValues = {
   optimalQuota?: number | null;
   /** Minutes from midnight. The implementation intention's time half. */
   timeAnchorMinutes?: number | null;
+  /** Which parts of the day the habit belongs to. Defaults to [ALWAYS]. */
+  slots?: HabitSlot[];
   cueMode?: CueMode;
   cueTaskId?: string | null;
   cueLabel?: string | null;
@@ -85,6 +88,28 @@ const DAY_PRESETS = [
   { label: "Weekdays", days: [1, 2, 3, 4, 5] },
   { label: "Weekends", days: [0, 6] },
 ];
+
+const SLOT_OPTIONS: { value: HabitSlot; label: string }[] = [
+  { value: "MORNING", label: "Morning" },
+  { value: "AFTERNOON", label: "Afternoon" },
+  { value: "EVENING", label: "Evening" },
+  { value: "ALWAYS", label: "Always" },
+];
+
+/**
+ * Always is exclusive of the windows, both ways: selecting Always clears the
+ * windows, and selecting a window clears Always. Deselecting everything snaps
+ * back to Always rather than a habit that can never appear.
+ */
+function toggleSlots(prev: HabitSlot[], next: string[]): HabitSlot[] {
+  const chosen = next as HabitSlot[];
+  if (chosen.includes("ALWAYS")) {
+    return prev.includes("ALWAYS")
+      ? chosen.filter((slot) => slot !== "ALWAYS")
+      : ["ALWAYS"];
+  }
+  return chosen.length === 0 ? ["ALWAYS"] : chosen;
+}
 
 export function TaskForm({
   kind,
@@ -134,6 +159,7 @@ export function TaskForm({
   });
 
   const [days, setDays] = useState<number[]>(values.daysOfWeek ?? EVERY_DAY);
+  const [slots, setSlots] = useState<HabitSlot[]>(values.slots ?? ["ALWAYS"]);
   const [mode, setMode] = useState<WorkMode>(values.defaultMode ?? "POMODORO");
   const [color, setColor] = useState<CalendarColor>(values.color ?? "teal");
   // Mirrored, not controlled: the title input keeps its defaultValue and this
@@ -192,6 +218,10 @@ export function TaskForm({
       {kind === "HABIT" &&
         days.map((day) => (
           <input key={day} type="hidden" name="daysOfWeek[]" value={day} />
+        ))}
+      {kind === "HABIT" &&
+        slots.map((slot) => (
+          <input key={slot} type="hidden" name="slots[]" value={slot} />
         ))}
       <input type="hidden" name="defaultMode" value={mode} />
       <input type="hidden" name="color" value={color} />
@@ -296,6 +326,38 @@ export function TaskForm({
             >
               Clear
             </button>
+          </div>
+        </Field>
+      ) : null}
+
+      {kind === "HABIT" ? (
+        <Field
+          label="When in the day"
+          hint="/day and the calendar's scheduling panel only offer this habit inside its windows — the morning list doesn't carry the evening's plans."
+          error={error("slots")}
+        >
+          <div className="space-y-3">
+            <ToggleGroup
+              type="multiple"
+              value={slots}
+              onValueChange={(next) =>
+                setSlots((prev) => toggleSlots(prev, next))
+              }
+              className="justify-start gap-1.5"
+            >
+              {SLOT_OPTIONS.map((option) => (
+                <ToggleGroupItem
+                  key={option.value}
+                  value={option.value}
+                  className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground rounded-full border px-3.5"
+                >
+                  {option.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+            <p className="text-muted-foreground text-label">
+              Morning 05:00–12:00 · Afternoon 12:00–17:00 · Evening 17:00–21:00
+            </p>
           </div>
         </Field>
       ) : null}

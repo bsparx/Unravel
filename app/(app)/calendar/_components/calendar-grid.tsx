@@ -48,11 +48,11 @@ import { PrayerBands } from "./prayer-bands";
 import { TransitionStrip } from "./transition-strip";
 
 /**
- * Vertical scale. One pixel per minute makes an hour 60px — tall enough that a
- * 15-minute block is a real object you can hit with a finger, short enough
- * that a working day fits on a laptop screen without scrolling to find lunch.
+ * Vertical scale. Two pixels per minute makes an hour 120px — a 15-minute
+ * block is 30px tall, a real target instead of a sliver, at the cost of
+ * seeing fewer hours per screen.
  */
-const MINUTE_PX = 1;
+const MINUTE_PX = 2;
 /** Anything shorter renders its label on one line instead of two. */
 const COMPACT_MINUTES = 45;
 

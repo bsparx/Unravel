@@ -11,6 +11,7 @@ import { z } from "zod";
 import { MINUTES_PER_DAY, MIN_BLOCK_MINUTES } from "@/lib/block-math";
 import { CALENDAR_COLOR_NAMES } from "@/lib/calendar-colors";
 import { MAX_FEEDBACK_LENGTH } from "@/lib/feedback";
+import type { HabitSlot } from "@/lib/generated/prisma/client";
 import { MONEY_COLOR_NAMES } from "@/lib/money-palette";
 import { parseMoneyToCents } from "@/lib/money";
 import { MAX_QUOTA } from "@/lib/quota";
@@ -153,6 +154,23 @@ export const createHabitSchema = createTodoSchema
     minimumQuota: quotaValue.default(1),
     optimalQuota: emptyToUndefined(quotaValue),
     timeAnchor,
+
+    /**
+     * Which parts of the day the habit belongs to — the windows the habit is
+     * *offered* in. ALWAYS is exclusive of the other three and stored alone,
+     * so the database never holds a row that says both "always" and "5–9".
+     * Absent (e.g. a hand-written POST) reads as ALWAYS rather than as a habit
+     * that can never show anywhere.
+     */
+    slots: z
+      .array(z.enum(["MORNING", "AFTERNOON", "EVENING", "ALWAYS"]))
+      .default(["ALWAYS"])
+      .transform((slots): HabitSlot[] =>
+        slots.includes("ALWAYS") ? ["ALWAYS"] : [...new Set(slots)],
+      )
+      .refine((slots) => slots.length > 0, {
+        message: "Pick at least one part of the day.",
+      }),
 
     // When on, the day isn't DONE until a written note lands on the
     // occurrence. Not `z.coerce.boolean()` — `Boolean("false")` is true — see
