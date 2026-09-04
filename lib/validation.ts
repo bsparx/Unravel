@@ -579,6 +579,8 @@ export const moneyAccountSchema = z.object({
 
 export const archiveMoneyAccountSchema = z.object({ id: cuid });
 
+export const deleteMoneyAccountSchema = z.object({ id: cuid });
+
 /** Moving money between two of the user's own accounts. */
 export const logTransferSchema = z.object({
   amount: moneyAmount,

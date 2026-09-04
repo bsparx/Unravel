@@ -12,6 +12,7 @@ import {
   archiveMoneyAccountSchema,
   archiveMoneyCategorySchema,
   deleteDebtSchema,
+  deleteMoneyAccountSchema,
   deleteMoneyBudgetSchema,
   deleteMoneyTransactionSchema,
   fieldErrorsFrom,
@@ -579,6 +580,47 @@ export async function archiveAccount(formData: FormData): Promise<void> {
   revalidateBudgetViews();
 }
 
+/**
+ * Hard delete, the one-way door the sheet only opens behind a typed
+ * confirmation. Archive is for an account whose history should stay; this is
+ * for one that should never have existed, or whose past the user has decided
+ * they don't want. The entries in it and the transfers that touched it go
+ * with it — the account is where that money lived, and keeping the rows would
+ * leave history pointing at a place that no longer exists.
+ *
+ * The delete order satisfies the `Restrict` relations: entries and transfers
+ * reference the account, so they go first. Deleting the last live account is
+ * allowed — the /budget loader re-creates the default one on the next visit.
+ */
+export async function deleteAccount(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const parsed = deleteMoneyAccountSchema.safeParse(formValues(formData));
+  if (!parsed.success) return;
+
+  await prisma.$transaction(
+    [
+      prisma.moneyTransaction.deleteMany({
+        where: { accountId: parsed.data.id, userId: user.id },
+      }),
+      prisma.accountTransfer.deleteMany({
+        where: {
+          userId: user.id,
+          OR: [
+            { fromAccountId: parsed.data.id },
+            { toAccountId: parsed.data.id },
+          ],
+        },
+      }),
+      prisma.moneyAccount.deleteMany({
+        where: { id: parsed.data.id, userId: user.id },
+      }),
+    ],
+    { timeout: 20_000 },
+  );
+
+  revalidateBudgetViews();
+}
+
 // ---------------------------------------------------------------- transfers
 
 /**
@@ -874,5 +916,42 @@ export async function deleteDebt(formData: FormData): Promise<void> {
   await prisma.moneyDebt.deleteMany({
     where: { id: parsed.data.id, userId: user.id },
   });
+  revalidateBudgetViews();
+}
+
+// ---------------------------------------------------------------- reset
+
+/**
+ * The whole feature back to day zero: every entry, transfer, IOU, envelope,
+ * account and custom category for this user, gone in one transaction. The
+ * delete order respects the `Restrict` relations — transactions and transfers
+ * reference accounts, entries reference categories — so the dependents go
+ * first. The built-in categories (`ownerKey: "global"`) are not the user's to
+ * delete and stay; the /budget loader re-creates the default account and
+ * re-seeds the globals on the next visit, both idempotent no-ops.
+ *
+ * The typed confirmation in the UI is friction, not security. The guard here
+ * is the same one every action in this file trusts: the user's own session,
+ * and `userId` scoping on every delete.
+ *
+ * The raised timeout is the Neon reality: six deletes over the HTTP pooler
+ * can spend ~400ms each, and a cold compute start on top would bust Prisma's
+ * default 5s transaction budget (P2028) halfway through the wipe.
+ */
+export async function resetMoneyData(): Promise<void> {
+  const user = await requireUser();
+
+  await prisma.$transaction(
+    [
+      prisma.moneyTransaction.deleteMany({ where: { userId: user.id } }),
+      prisma.accountTransfer.deleteMany({ where: { userId: user.id } }),
+      prisma.moneyDebt.deleteMany({ where: { userId: user.id } }),
+      prisma.moneyBudget.deleteMany({ where: { userId: user.id } }),
+      prisma.moneyAccount.deleteMany({ where: { userId: user.id } }),
+      prisma.moneyCategory.deleteMany({ where: { ownerKey: user.id } }),
+    ],
+    { timeout: 20_000 },
+  );
+
   revalidateBudgetViews();
 }

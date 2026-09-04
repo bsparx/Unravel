@@ -25,12 +25,14 @@ function BalanceBar({ accounts }: { accounts: Account[] }) {
 
   if (nonArchived.length === 0) return null;
 
+  // The bar is the picture, the legend is the data: a screen reader gets
+  // every account's name and amount from the list, and the bar itself stays
+  // decorative — proportions, not information.
   return (
     <div className="space-y-2">
       <div
+        aria-hidden
         className="flex h-3 w-full gap-px overflow-hidden rounded-full"
-        role="img"
-        aria-label="Where your money sits, by share of the total"
       >
         {nonArchived.map((account) => {
           const share = total > 0 ? account.balanceCents / total : 0;
@@ -39,7 +41,6 @@ function BalanceBar({ accounts }: { accounts: Account[] }) {
           return (
             <div
               key={account.id}
-              title={`${account.name} — ${formatMoneyCompact(account.balanceCents)}`}
               className="h-3"
               style={{ width: `${share * 100}%`, backgroundColor: color }}
             />
@@ -57,7 +58,10 @@ function BalanceBar({ accounts }: { accounts: Account[] }) {
               className="size-2 rounded-full"
               style={{ backgroundColor: CATEGORY_COLORS[account.color] }}
             />
-            {account.name}
+            <span className="truncate">{account.name}</span>
+            <span className="font-mono tabular-nums">
+              {formatMoneyCompact(account.balanceCents)}
+            </span>
           </li>
         ))}
       </ul>
@@ -151,15 +155,17 @@ export function AccountManager({
                     </span>
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setTransferFrom(account)}
-                    aria-label={`Move money out of ${account.name}`}
-                    title="Move money to another account"
-                    className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded-md p-1.5 transition-colors focus-visible:ring-2 focus-visible:outline-none"
-                  >
-                    <ArrowLeftRight className="size-4" aria-hidden />
-                  </button>
+                  {nonArchived.length >= 2 && (
+                    <button
+                      type="button"
+                      onClick={() => setTransferFrom(account)}
+                      aria-label={`Move money out of ${account.name}`}
+                      title="Move money to another account"
+                      className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded-md p-1.5 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                    >
+                      <ArrowLeftRight className="size-4" aria-hidden />
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setOpened(account)}
@@ -213,7 +219,8 @@ export function AccountManager({
 
       <AccountSheet
         account={opened}
-        monthISO={monthISO}
+        initialMonthISO={monthISO}
+        todayISO={todayISO}
         onClose={() => setOpened(null)}
       />
 

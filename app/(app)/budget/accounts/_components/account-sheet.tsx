@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Archive, Pencil } from "lucide-react";
+import { Archive, ChevronLeft, ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -15,27 +15,33 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { CATEGORY_COLORS } from "@/lib/money-palette";
-import { formatDate } from "@/lib/dates";
+import { addMonths, formatDate, formatMonthLabel, parseLocalDate } from "@/lib/dates";
 import { formatMoneyCompact } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
-import { archiveAccount, getAccountDetailAction } from "../../actions";
+import { archiveAccount, deleteAccount, getAccountDetailAction } from "../../actions";
 import { AccountForm } from "./account-form";
 import type { Account, AccountDetail } from "../../_lib/queries";
 
 /**
  * The drill-in for one account: what moved in it over the shown month — the
  * ledger entries and the transfers — and the running balance they trace. The
- * body is keyed by account id so opening another account starts fresh.
+ * body is keyed by account id so opening another account starts fresh, and
+ * the month itself lives here as state: the ‹ › in the header is the only
+ * month control on the page, because the month is this sheet's, not the
+ * list's.
  */
 export function AccountSheet({
   account,
-  monthISO,
+  initialMonthISO,
+  todayISO,
   onClose,
 }: {
   account: Account | null;
-  /** YYYY-MM — the month the drill-in is scoped to. */
-  monthISO: string;
+  /** YYYY-MM — the month the drill-in starts on (the page's ?m=, or now). */
+  initialMonthISO: string;
+  /** YYYY-MM-DD — the wall the forward nav stops at. */
+  todayISO: string;
   onClose: () => void;
 }) {
   return (
@@ -45,7 +51,8 @@ export function AccountSheet({
           <AccountSheetBody
             key={account.id}
             account={account}
-            monthISO={monthISO}
+            initialMonthISO={initialMonthISO}
+            todayISO={todayISO}
             onClose={onClose}
           />
         )}
@@ -76,12 +83,18 @@ function RunningBalance({
     .join(" ");
   const baselineY = min < 0 && max > 0 ? y(0) : null;
 
+  // The shape is the picture; the numbers are the data. A screen reader gets
+  // where the line started and where it ended — the two numbers the eye
+  // takes from the same squiggle.
+  const first = points[0].cents;
+  const last = points[points.length - 1].cents;
+
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
       className="h-16 w-full overflow-visible"
       role="img"
-      aria-label="The account's running balance across the month"
+      aria-label={`Running balance across ${detail.monthLabel}: started at ${formatMoneyCompact(first)}, ended at ${formatMoneyCompact(last)}`}
     >
       {baselineY !== null && (
         <line
@@ -133,25 +146,50 @@ function Stat({
 
 function AccountSheetBody({
   account,
-  monthISO,
+  initialMonthISO,
+  todayISO,
   onClose,
 }: {
   account: Account;
-  monthISO: string;
+  initialMonthISO: string;
+  todayISO: string;
   onClose: () => void;
 }) {
+  const [monthISO, setMonthISO] = useState(initialMonthISO);
   const [detail, setDetail] = useState<AccountDetail | null>(null);
   const [editing, setEditing] = useState(false);
+
+  const anchor = parseLocalDate(`${monthISO}-01`)!;
+  const prevISO = addMonths(anchor, -1).toISOString().slice(0, 7);
+  const nextISO = addMonths(anchor, 1).toISOString().slice(0, 7);
+  // YYYY-MM strings compare correctly as plain text — next month can't step
+  // past the one today is in.
+  const canGoForward = nextISO <= todayISO.slice(0, 7);
+
+  /** Swap months: drop the old detail so the refetch reads as loading, not
+   * as an empty month that hasn't arrived yet. */
+  const goMonth = (iso: string) => {
+    setDetail(null);
+    setMonthISO(iso);
+  };
 
   useEffect(() => {
     void getAccountDetailAction(account.id, monthISO).then(setDetail);
   }, [account.id, monthISO]);
 
-  const remove = async () => {
+  const archive = async () => {
     const formData = new FormData();
     formData.set("id", account.id);
     await archiveAccount(formData);
     toast.success("Account archived — its entries stay on the ledger.");
+    onClose();
+  };
+
+  const remove = async () => {
+    const formData = new FormData();
+    formData.set("id", account.id);
+    await deleteAccount(formData);
+    toast.success("Account deleted — its entries went with it.");
     onClose();
   };
 
@@ -221,8 +259,36 @@ function AccountSheetBody({
           />
           <SheetTitle className="font-display">{account.name}</SheetTitle>
         </div>
-        <SheetDescription>
-          {detail ? detail.monthLabel : "…"}
+        <SheetDescription asChild>
+          <span className="flex items-center justify-between gap-2">
+            <span className="text-title min-w-28 tabular-nums">
+              {formatMonthLabel(anchor)}
+            </span>
+            <span className="flex items-center gap-1">
+              <button
+                type="button"
+                aria-label="Previous month"
+                onClick={() => goMonth(prevISO)}
+                className="focus-visible:ring-ring text-muted-foreground hover:text-foreground rounded-md p-1 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+              >
+                <ChevronLeft className="size-4" aria-hidden />
+              </button>
+              {canGoForward ? (
+                <button
+                  type="button"
+                  aria-label="Next month"
+                  onClick={() => goMonth(nextISO)}
+                  className="focus-visible:ring-ring text-muted-foreground hover:text-foreground rounded-md p-1 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                >
+                  <ChevronRight className="size-4" aria-hidden />
+                </button>
+              ) : (
+                <span className="text-muted-foreground/40 p-1" aria-hidden>
+                  <ChevronRight className="size-4" />
+                </span>
+              )}
+            </span>
+          </span>
         </SheetDescription>
       </SheetHeader>
 
@@ -242,7 +308,7 @@ function AccountSheetBody({
             <RunningBalance detail={detail} color={accountColor} />
           </div>
 
-          <div className="grid grid-cols-4 gap-2 border-t pt-3">
+          <div className="grid grid-cols-2 gap-2 border-t pt-3 sm:grid-cols-4">
             <Stat label="In" cents={detail.incomeCents} tone="in" />
             <Stat label="Out" cents={detail.expenseCents} tone="out" />
             <Stat label="Moved in" cents={detail.transferredInCents} />
@@ -252,7 +318,11 @@ function AccountSheetBody({
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto border-t">
-        {detail && movements.length > 0 ? (
+        {!detail ? (
+          <p className="text-muted-foreground px-4 pt-6 pb-2 text-center text-label">
+            Reading {formatMonthLabel(anchor)}…
+          </p>
+        ) : movements.length > 0 ? (
           <ul className="divide-y">
             {movements.map((movement) => (
               <li
@@ -293,7 +363,7 @@ function AccountSheetBody({
           </ul>
         ) : (
           <p className="text-muted-foreground px-4 pt-6 pb-2 text-center text-label">
-            Nothing moved in this account during {detail?.monthLabel ?? "this month"}.
+            Nothing moved in this account during {formatMonthLabel(anchor)}.
             Money in, money out, or a transfer from another account all land here.
           </p>
         )}
@@ -315,6 +385,26 @@ function AccountSheetBody({
               title="Archive this account?"
               description="It leaves the picker — the money already in it stays on the ledger."
               confirmLabel="Archive it"
+              onConfirm={archive}
+              trigger={(open) => (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={open}
+                >
+                  <Archive className="size-4" aria-hidden />
+                  Archive
+                </Button>
+              )}
+            />
+            <ConfirmDialog
+              title="Delete this account?"
+              description={`Every entry and transfer in ${account.name} goes with it. There is no undo — archive instead if you want the history kept.`}
+              confirmPhrase={account.name}
+              confirmLabel="Delete for good"
+              pendingLabel="Deleting…"
+              cancelLabel="Keep it"
               onConfirm={remove}
               trigger={(open) => (
                 <Button
@@ -324,8 +414,8 @@ function AccountSheetBody({
                   onClick={open}
                   className="text-destructive"
                 >
-                  <Archive className="size-4" aria-hidden />
-                  Archive
+                  <Trash2 className="size-4" aria-hidden />
+                  Delete
                 </Button>
               )}
             />

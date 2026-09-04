@@ -19,6 +19,7 @@ import { BudgetsSection } from "./_components/budgets-section";
 import { CategoryDonut } from "./_components/category-donut";
 import { DebtsSection } from "./_components/debts-section";
 import { FlowChart } from "./_components/flow-chart";
+import { ResetBudgetsButton } from "./_components/reset-budgets-button";
 import { TransactionsSection } from "./_components/transactions-section";
 import {
   getAccounts,
@@ -249,6 +250,7 @@ export default async function BudgetPage({
           <SlidersHorizontal className="size-4" aria-hidden />
           Manage categories
         </Link>
+        <ResetBudgetsButton />
       </div>
     </div>
   );

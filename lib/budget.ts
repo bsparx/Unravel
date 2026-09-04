@@ -58,8 +58,30 @@ export const GLOBAL_CATEGORIES: {
  * page loader and the seed, so a fresh database and an account that existed
  * before the budget did both get the same starting set. The update re-applies
  * the colour, so a palette change recovers rows seeded under an older one.
+ *
+ * The steady state is one query, not fourteen: the globals are seeded once and
+ * never change, so a single findMany that finds them all — names and colours
+ * intact — returns without opening a transaction at all. Only a first run (or
+ * a palette change) pays for the upserts, and that pass carries a raised
+ * timeout: Neon over HTTP spends ~400ms per round-trip, and fourteen of those
+ * bust Prisma's default 5s transaction budget (P2028).
  */
 export async function ensureGlobalCategories(): Promise<void> {
+  const existing = await prisma.moneyCategory.findMany({
+    where: { ownerKey: GLOBAL_OWNER },
+    select: { kind: true, name: true, color: true },
+  });
+
+  const seededColor = new Map(
+    existing.map((row) => [`${row.kind}:${row.name}`, row.color]),
+  );
+  const allSeeded = GLOBAL_CATEGORIES.every(
+    (category) =>
+      seededColor.get(`${category.kind}:${category.name}`) ===
+      category.color,
+  );
+  if (allSeeded) return;
+
   await prisma.$transaction(
     GLOBAL_CATEGORIES.map((category, index) =>
       prisma.moneyCategory.upsert({
@@ -80,5 +102,6 @@ export async function ensureGlobalCategories(): Promise<void> {
         update: { color: category.color },
       }),
     ),
+    { timeout: 20_000 },
   );
 }
