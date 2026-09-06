@@ -142,8 +142,12 @@ export function DayList({
               }`}
             >
               {section.heading}
+              {/* Overdue counts what's wrong; the rest count the decisions
+                  remaining — a small number that only goes down. */}
               <span className="ml-2 tabular-nums opacity-60">
-                {section.items.length}
+                {section.tone === "overdue"
+                  ? section.items.length
+                  : `${section.items.length} left`}
               </span>
             </h2>
 

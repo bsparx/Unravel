@@ -40,6 +40,7 @@ export function ExercisesView({
   dayTypes,
   slots,
   catalog,
+  todayDow,
 }: {
   routineId: string | null;
   equipment: "YOGA" | "DUMBBELL" | "MIX";
@@ -48,6 +49,8 @@ export function ExercisesView({
   dayTypes: RoutineDayType[];
   slots: RoutineSlot[];
   catalog: BuildCatalogExercise[];
+  /** Today's weekday (0–6, Sunday first), for the chip on the week. */
+  todayDow: number;
 }) {
   const [building, setBuilding] = useState(false);
   const [hovered, setHovered] = useState<HoveredExercise>(null);
@@ -99,6 +102,7 @@ export function ExercisesView({
             dayTypes={dayTypes}
             slots={slots}
             catalog={catalog}
+            todayDow={todayDow}
             onHover={setHovered}
           />
         ) : (

@@ -353,6 +353,7 @@ export function CalendarGrid({
               blocks={shown.filter((block) => block.dateISO === day.dateISO)}
               prayerBands={prayerBands[day.dateISO] ?? []}
               isToday={day.dateISO === todayISO}
+              dayView={days.length === 1}
               drag={drag}
               setDrag={setDrag}
               commit={commit}
@@ -517,6 +518,7 @@ function DayColumn({
   blocks,
   prayerBands,
   isToday,
+  dayView,
   drag,
   setDrag,
   commit,
@@ -530,6 +532,8 @@ function DayColumn({
   blocks: CalendarBlock[];
   prayerBands: PrayerBand[];
   isToday: boolean;
+  /** The grid is showing exactly one day — the invitation may speak. */
+  dayView: boolean;
   drag: {
     id: string;
     mode: "move" | "resize";
@@ -752,6 +756,25 @@ function DayColumn({
         />
       ))}
 
+      {/* The hours you don't plan in, dimmed. The grid runs the full 24 but the
+          day's waking window (07–22, the same one the header strips measure
+          against) is where a plan can actually live — shading the rest makes
+          the usable day visible without a single word. Opaque enough to read,
+          quiet enough to ignore; a hairline marks each edge. */}
+      <div
+        aria-hidden
+        className="bg-background/70 pointer-events-none absolute inset-x-0 top-0 border-border/40 border-b"
+        style={{ height: STRIP_FROM * MINUTE_PX }}
+      />
+      <div
+        aria-hidden
+        className="bg-background/70 pointer-events-none absolute inset-x-0 border-border/40 border-t"
+        style={{
+          top: STRIP_TO * MINUTE_PX,
+          height: (MINUTES_PER_DAY - STRIP_TO) * MINUTE_PX,
+        }}
+      />
+
       {/* Click targets, one per quarter hour. A div with an onClick would
           swallow block clicks; these sit underneath, at z-0. The dashed inset
           outline on hover is the affordance — a clickable slot announces
@@ -808,11 +831,36 @@ function DayColumn({
               >
                 <div className="bg-running relative h-px">
                   <span className="bg-running absolute -top-1 -left-1 size-2 rounded-full" />
+                  {/* The one number the line could never speak: what time it
+                      actually is. Riding the line, in the line's own colours —
+                      it is a clock, which is what the reservation permits. */}
+                  <span className="bg-running text-running-foreground absolute -top-2.5 right-1 rounded-full px-1.5 py-0.5 font-mono text-[0.625rem] leading-none tabular-nums">
+                    {formatMinuteOfDay(nowMinute)}
+                  </span>
                 </div>
               </div>
             )
           }
         </NowPosition>
+      )}
+
+      {/* The empty day speaks once, in the grid, where the hands go. The
+          header sentence names the fact; this names the gesture. Drawn in the
+          middle of the waking window and pointer-safe, so every slot under it
+          stays clickable. */}
+      {dayView && positioned.length === 0 && (
+        <div
+          aria-hidden
+          className="border-border pointer-events-none absolute inset-x-4 rounded-xl border border-dashed px-6 py-5 text-center"
+          style={{ top: 12 * 60 * MINUTE_PX }}
+        >
+          <p className="text-label text-muted-foreground">
+            Press and drag anywhere to claim a stretch of the day.
+          </p>
+          <p className="text-muted-foreground/70 mt-1 text-micro">
+            Or pull a habit or task in from the panel.
+          </p>
+        </div>
       )}
 
       {/* Where it would land, at the length it would be. A drop indicator that

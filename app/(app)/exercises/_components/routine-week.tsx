@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Dumbbell, Pin, RefreshCw, Shuffle, Sparkles, Trash2 } from "lucide-react";
+import { Dumbbell, Pin, RefreshCw, Shuffle, Sparkles, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -23,6 +23,7 @@ import {
   ExerciseDetailDialog,
   type ExerciseDetail,
 } from "./exercise-detail-dialog";
+import { ExerciseMiniFigure } from "./exercise-mini-figure";
 import { SwapDialog, type SwapCatalogExercise } from "./swap-dialog";
 
 /** One row of the week: a slot of one workout day. */
@@ -35,9 +36,14 @@ export type RoutineSlot = {
 };
 
 /**
- * The week, as a grid of day strips — the plan-first layout. Workout days are
- * raised and carry their slots; the off days are quiet, staying in the grid
- * so the rhythm of the week is visible at a glance.
+ * The week as columns — the plan-first layout. The week's rhythm is the thing
+ * worth seeing: training days raised and carrying their slots, rest days
+ * recessed and dashed, today wearing a chip so the plan and the day you're
+ * actually in meet in one glance. Seven stacked rows said the same words one
+ * day at a time; columns say the week.
+ *
+ * Down to phone width the columns stack back into days, and the layout reads
+ * as the row list it replaced.
  */
 export function RoutineWeek({
   routineId,
@@ -47,6 +53,7 @@ export function RoutineWeek({
   dayTypes,
   slots,
   catalog,
+  todayDow,
   onHover,
 }: {
   routineId: string;
@@ -57,6 +64,8 @@ export function RoutineWeek({
   dayTypes: RoutineDayType[];
   slots: RoutineSlot[];
   catalog: SwapCatalogExercise[];
+  /** Today's weekday (0–6, Sunday first) — the chip on the grid. */
+  todayDow: number;
   /** Lights the parts this exercise works on the figures below. */
   onHover: (hovered: HoveredExercise) => void;
 }) {
@@ -107,132 +116,67 @@ export function RoutineWeek({
 
   return (
     <div className="space-y-2">
-      {WEEKDAYS.map((day) => {
-        const training = daysOfWeek.includes(day.value);
-        const daySlots = slotsByDay(day.value);
-        const dayType = dayTypeByDay.get(day.value);
-        return (
-          <div
-            key={day.value}
-            className={cn(
-              "border-border rounded-lg border transition-colors",
-              training ? "bg-card" : "border-dashed opacity-50",
-            )}
-          >
-            <div className="flex items-baseline justify-between px-4 pt-3">
-              <p
-                className={cn(
-                  "font-display text-title",
-                  !training && "text-muted-foreground",
-                )}
-              >
-                {day.long}
-              </p>
-              <p className="text-micro text-muted-foreground tracking-wide uppercase">
-                {training
-                  ? `${ROUTINE_DAY_TYPE_LABELS[dayType ?? "STANDARD"]} · ${daySlots.length} ${daySlots.length === 1 ? "exercise" : "exercises"}`
-                  : "Rest day"}
-              </p>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+        {WEEKDAYS.map((day) => {
+          const training = daysOfWeek.includes(day.value);
+          const daySlots = slotsByDay(day.value);
+          const dayType = dayTypeByDay.get(day.value);
+          const isToday = day.value === todayDow;
+
+          return (
+            <div
+              key={day.value}
+              className={cn(
+                "flex flex-col rounded-lg border transition-colors",
+                training
+                  ? "border-border bg-card"
+                  : "border-border/70 border-dashed opacity-60",
+                isToday && training && "border-primary/50 ring-primary/15 ring-1",
+              )}
+            >
+              <div className="flex items-baseline justify-between gap-1 px-2.5 pt-2.5 pb-1.5">
+                <p
+                  className={cn(
+                    "font-display text-title",
+                    !training && "text-muted-foreground",
+                  )}
+                >
+                  {day.short}
+                </p>
+                {isToday ? (
+                  <span className="bg-accent text-accent-foreground inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-micro font-medium">
+                    <Star className="size-2.5 fill-current" aria-hidden />
+                    Today
+                  </span>
+                ) : training ? (
+                  <span className="text-micro text-muted-foreground truncate tracking-wide uppercase">
+                    {ROUTINE_DAY_TYPE_LABELS[dayType ?? "STANDARD"]}
+                  </span>
+                ) : null}
+              </div>
+
+              {training ? (
+                <ol className="flex-1 space-y-1.5 px-1.5 pb-1.5">
+                  {daySlots.map((slot) => (
+                    <SlotCard
+                      key={slot.position}
+                      slot={slot}
+                      routineId={routineId}
+                      unpinAction={unpinAction}
+                      onSwap={() => setSwapping(slot)}
+                      onHover={onHover}
+                    />
+                  ))}
+                </ol>
+              ) : (
+                <p className="text-muted-foreground px-2.5 pb-3 text-label">
+                  Rest
+                </p>
+              )}
             </div>
-
-            {training ? (
-              <ol className="divide-y p-0">
-                {daySlots.map((slot) => (
-                  <li
-                    key={slot.position}
-                    className="flex items-center gap-3 px-4 py-3"
-                    onMouseEnter={() =>
-                      onHover({
-                        name: slot.exercise.name,
-                        parts: slot.exercise.bodyParts,
-                      })
-                    }
-                    onMouseLeave={() => onHover(null)}
-                  >
-                    <span
-                      className="text-muted-foreground tnum w-5 shrink-0 text-center text-label"
-                      aria-hidden
-                    >
-                      {slot.position + 1}
-                    </span>
-
-                    <ExerciseDetailDialog exercise={slot.exercise}>
-                      {(open) => (
-                        <button
-                          type="button"
-                          onClick={open}
-                          onFocus={() =>
-                            onHover({
-                              name: slot.exercise.name,
-                              parts: slot.exercise.bodyParts,
-                            })
-                          }
-                          onBlur={() => onHover(null)}
-                          className="min-w-0 flex-1 text-left"
-                        >
-                          <span className="text-body hover:text-primary block truncate font-medium">
-                            {slot.exercise.name}
-                          </span>
-                          <span className="text-muted-foreground text-micro tracking-wide uppercase">
-                            {slot.exercise.prescription}
-                          </span>
-                        </button>
-                      )}
-                    </ExerciseDetailDialog>
-
-                    {slot.swapped && (
-                      <form action={unpinAction} className="shrink-0">
-                        <input type="hidden" name="routineId" value={routineId} />
-                        <input type="hidden" name="dayOfWeek" value={slot.dayOfWeek} />
-                        <input type="hidden" name="position" value={slot.position} />
-                        <Button
-                          type="submit"
-                          variant="ghost"
-                          size="sm"
-                          className="text-primary"
-                          title="Pinned — Regenerate leaves this one alone. Click to release it."
-                        >
-                          <Pin className="size-3.5 fill-current" aria-hidden />
-                          <span className="sr-only">
-                            Unpin {slot.exercise.name}
-                          </span>
-                        </Button>
-                      </form>
-                    )}
-
-                    <span
-                      className="text-muted-foreground shrink-0"
-                      aria-label={slot.exercise.equipment}
-                      title={slot.exercise.equipment === "YOGA" ? "Yoga" : "Dumbbells"}
-                    >
-                      {slot.exercise.equipment === "YOGA" ? (
-                        <Sparkles className="size-4" aria-hidden />
-                      ) : (
-                        <Dumbbell className="size-4" aria-hidden />
-                      )}
-                    </span>
-
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="shrink-0"
-                      onClick={() => setSwapping(slot)}
-                    >
-                      <Shuffle className="size-3.5" aria-hidden />
-                      <span className="sr-only">Swap {slot.exercise.name}</span>
-                    </Button>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="text-muted-foreground px-4 pb-4 text-label">
-                Nothing scheduled — your chosen rest.
-              </p>
-            )}
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
         <p className="text-muted-foreground text-label">
@@ -298,5 +242,103 @@ export function RoutineWeek({
         />
       )}
     </div>
+  );
+}
+
+/**
+ * One exercise in a day column: the thumbnail figure above the fold of the
+ * card, the name and prescription beside it, and its two actions always
+ * visible — a hover-revealed control is invisible on a phone, and "swap this
+ * exercise" is exactly the decision a column exists to invite.
+ */
+function SlotCard({
+  slot,
+  routineId,
+  unpinAction,
+  onSwap,
+  onHover,
+}: {
+  slot: RoutineSlot;
+  routineId: string;
+  unpinAction: (formData: FormData) => void;
+  onSwap: () => void;
+  onHover: (hovered: HoveredExercise) => void;
+}) {
+  const hoverThis = () =>
+    onHover({
+      name: slot.exercise.name,
+      parts: slot.exercise.bodyParts,
+    });
+
+  return (
+    <li className="border-border/60 hover:border-primary/40 focus-within:border-primary/40 rounded-md border bg-background/50 transition-colors">
+      <ExerciseDetailDialog exercise={slot.exercise}>
+        {(open) => (
+          <button
+            type="button"
+            onClick={open}
+            onMouseEnter={hoverThis}
+            onMouseLeave={() => onHover(null)}
+            onFocus={hoverThis}
+            onBlur={() => onHover(null)}
+            title={`${slot.exercise.name} — ${slot.exercise.prescription}`}
+            className="focus-visible:ring-ring flex w-full items-start gap-2 rounded-md p-1.5 text-left focus-visible:ring-2 focus-visible:outline-none"
+          >
+            <ExerciseMiniFigure parts={slot.exercise.bodyParts} />
+            <span className="min-w-0 flex-1 self-center">
+              <span className="flex items-baseline gap-1">
+                <span
+                  className="text-muted-foreground tnum shrink-0 text-micro"
+                  aria-hidden
+                >
+                  {slot.position + 1}
+                </span>
+                <span className="hover:text-primary truncate text-label leading-4 font-medium">
+                  {slot.exercise.name}
+                </span>
+              </span>
+              <span className="text-muted-foreground mt-0.5 flex items-center gap-1 text-micro">
+                {slot.exercise.equipment === "YOGA" ? (
+                  <Sparkles className="size-3 shrink-0" aria-hidden />
+                ) : (
+                  <Dumbbell className="size-3 shrink-0" aria-hidden />
+                )}
+                <span className="truncate">{slot.exercise.prescription}</span>
+              </span>
+            </span>
+          </button>
+        )}
+      </ExerciseDetailDialog>
+
+      <div className="flex items-center justify-end gap-0.5 pb-1 pr-1">
+        {slot.swapped && (
+          <form action={unpinAction}>
+            <input type="hidden" name="routineId" value={routineId} />
+            <input type="hidden" name="dayOfWeek" value={slot.dayOfWeek} />
+            <input type="hidden" name="position" value={slot.position} />
+            <Button
+              type="submit"
+              variant="ghost"
+              size="icon"
+              className="text-primary size-6"
+              title="Pinned — Regenerate leaves this one alone. Click to release it."
+            >
+              <span className="sr-only">Unpin {slot.exercise.name}</span>
+              <Pin className="size-3 fill-current" aria-hidden />
+            </Button>
+          </form>
+        )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="text-muted-foreground hover:text-foreground size-6"
+          onClick={onSwap}
+        >
+          <Shuffle className="size-3" aria-hidden />
+          <span className="sr-only">Swap {slot.exercise.name}</span>
+        </Button>
+      </div>
+    </li>
   );
 }

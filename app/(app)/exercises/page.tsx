@@ -1,5 +1,6 @@
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { todayLocal } from "@/lib/dates";
 
 import { ExercisesView } from "./_components/exercises-view";
 
@@ -34,6 +35,9 @@ export default async function ExercisesPage() {
 
   return (
     <ExercisesView
+      // The week's "today" chip. Server-computed because a weekday doesn't
+      // change mid-session, so there's nothing to hydrate-mismatch.
+      todayDow={todayLocal(user.timezone).getUTCDay()}
       routineId={routine?.id ?? null}
       equipment={routine?.equipment ?? "MIX"}
       difficulty={routine?.difficulty ?? "CHALLENGING"}

@@ -237,7 +237,10 @@ export function TimerScreen({
         <ResumeBanner onDiscard={discard} />
       )}
 
-      <header className="mb-8 text-center">
+      {/* The page arrives in three small steps — header, face, controls — all
+          "content settling in" rather than anything that moves on its own. The
+          face's own motion stays exactly what it was: the depletion itself. */}
+      <header className="animate-rise mb-8 text-center">
         {recovery ? (
           <>
             <p className="text-micro text-rest font-medium tracking-wider uppercase">
@@ -273,7 +276,11 @@ export function TimerScreen({
         )}
       </header>
 
-      {(() => {
+      {/* The face is sized by its own w-full, so this wrapper must hand it a
+          definite width — a bare flex item here would shrink-wrap it to its
+          digits and collapse the whole face. */}
+      <div className="animate-rise flex w-full flex-col items-center" style={{ animationDelay: "60ms" }}>
+        {(() => {
         const face = (
           <div className="text-center">
             <p
@@ -351,6 +358,7 @@ export function TimerScreen({
           </TimerFace>
         );
       })()}
+      </div>
 
       {/* Live region kept separate from the ticking digits so screen readers
           aren't read a new number four times a second. */}
@@ -371,57 +379,72 @@ export function TimerScreen({
           onExtend={extendInterval}
         />
       ) : (
-        <div className="mt-8 flex items-center gap-2">
-          <Button
-            size="lg"
-            onClick={toggle}
-            className={cn(
-              "min-w-36",
-              running &&
-              (recovery
-                ? "bg-rest text-rest-foreground hover:bg-rest/90"
-                : "bg-running text-running-foreground hover:bg-running/90"),
-            )}
+        <div className="flex flex-col items-center">
+          <div
+            className="animate-rise mt-8 flex items-center gap-2"
+            style={{ animationDelay: "120ms" }}
           >
-            {running ? (
-              <>
-                <Pause className="size-4" aria-hidden />
-                Pause
-              </>
-            ) : (
-              <>
-                <Play className="size-4" aria-hidden />
-                {idle
-                  ? recovery
-                    ? "Start recovery"
-                    : "Start focus"
-                  : "Resume"}
-              </>
-            )}
-          </Button>
+            <Button
+              size="lg"
+              onClick={toggle}
+              className={cn(
+                "min-w-36",
+                running &&
+                (recovery
+                  ? "bg-rest text-rest-foreground hover:bg-rest/90"
+                  : "bg-running text-running-foreground hover:bg-running/90"),
+              )}
+            >
+              {running ? (
+                <>
+                  <Pause className="size-4" aria-hidden />
+                  Pause
+                </>
+              ) : (
+                <>
+                  <Play className="size-4" aria-hidden />
+                  {idle
+                    ? recovery
+                      ? "Start recovery"
+                      : "Start focus"
+                    : "Resume"}
+                </>
+              )}
+            </Button>
 
-          {!idle && (
-            <>
-              {plan.length > 1 && (
+            {!idle && (
+              <>
+                {plan.length > 1 && (
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={skipInterval}
+                    aria-label="Skip to the next block"
+                  >
+                    <SkipForward className="size-4" aria-hidden />
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="lg"
-                  onClick={skipInterval}
-                  aria-label="Skip to the next block"
+                  onClick={() => void stop()}
+                  aria-label="Stop and log this session"
                 >
-                  <SkipForward className="size-4" aria-hidden />
+                  <Square className="size-4" aria-hidden />
                 </Button>
-              )}
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={() => void stop()}
-                aria-label="Stop and log this session"
-              >
-                <Square className="size-4" aria-hidden />
-              </Button>
-            </>
-          )}
+              </>
+            )}
+          </div>
+
+          {/* For the hands on the keyboard. The one gesture this screen has
+              is worth naming once, quietly, on the only screen where it
+              exists. */}
+          <p className="text-muted-foreground/70 mt-3 hidden text-micro md:block">
+            <kbd className="border-border bg-muted rounded border px-1.5 py-0.5 font-mono text-[0.625rem]">
+              Space
+            </kbd>{" "}
+            starts and pauses
+          </p>
         </div>
       )}
 
@@ -560,7 +583,9 @@ function SessionSummary({
   const delta = logged - targetSeconds;
 
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col items-center px-5 py-16 text-center">
+    // The same arrival the running screen gets — one settling motion, then
+    // stillness. A summary is a landing, not a launch.
+    <div className="animate-rise mx-auto flex w-full max-w-md flex-col items-center px-5 py-16 text-center">
       <p className="text-micro text-muted-foreground font-medium tracking-wider uppercase">
         {recovery ? "Recovery logged" : "Session logged"}
       </p>

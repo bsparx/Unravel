@@ -3,7 +3,6 @@ import { CalendarDays, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth";
-import { formatMinuteOfDay } from "@/lib/block-math";
 import {
   formatDuration,
   formatFullDate,
@@ -12,13 +11,13 @@ import {
 } from "@/lib/dates";
 import { getPrayerCycle } from "@/lib/prayers";
 import { getTodayView, startHereHabit } from "@/lib/tasks";
-import { buildTimerHref } from "@/lib/timer-url";
 import { getBlocks } from "@/lib/time-blocks";
 import { getWaterToday } from "@/lib/water-data";
 
 import { DayList } from "./_components/day-list";
-import { PlanStrip } from "./_components/plan-strip";
+import { DayRail } from "./_components/day-rail";
 import { PrayerSection } from "./_components/prayer-section";
+import { StartHere } from "./_components/start-here";
 
 export const metadata = { title: "Your day" };
 
@@ -73,45 +72,20 @@ export default async function TodayPage() {
         </p>
       </header>
 
-      <div className="mb-6">
-        <PlanStrip
-          blocks={plannedBlocks}
-          dateISO={todayISO}
-          nowMinute={nowMinute}
-        />
-      </div>
+      {/* One obvious next action, then the day's shape. Everything below is
+          optional. */}
+      {upNext && (
+        <StartHere item={upNext} timezone={user.timezone} />
+      )}
+
+      <DayRail
+        blocks={plannedBlocks}
+        dateISO={todayISO}
+        upNextMinute={upNext?.timeAnchorMinutes ?? null}
+        timezone={user.timezone}
+      />
 
       {user.prayerRemindersEnabled && <PrayerSection view={prayers} />}
-
-      {upNext && (
-        // One obvious next action. Everything below is optional.
-        <Link
-          href={buildTimerHref({
-            id: upNext.id,
-            estimatedSeconds: upNext.estimatedSeconds,
-            defaultMode: upNext.defaultMode,
-            plannedIntervals: upNext.plannedIntervals,
-          })}
-          className="border-border bg-card hover:border-primary/40 focus-visible:ring-ring group mb-8 flex items-center justify-between gap-4 rounded-lg border px-4 py-3.5 transition-colors focus-visible:ring-2 focus-visible:outline-none"
-        >
-          <div className="min-w-0">
-            <p className="text-micro text-muted-foreground font-medium tracking-wider uppercase">
-              Start here
-              {upNext.timeAnchorMinutes !== null && (
-                <span className="text-primary ml-2 normal-case">
-                  · {formatMinuteOfDay(upNext.timeAnchorMinutes)}
-                </span>
-              )}
-            </p>
-            <p className="font-display mt-0.5 truncate text-title">
-              {upNext.title}
-            </p>
-          </div>
-          <span className="text-primary shrink-0 text-label font-medium">
-            Set a timer →
-          </span>
-        </Link>
-      )}
 
       <DayList
         view={view}

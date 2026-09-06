@@ -79,12 +79,16 @@ export function BodyPlate({
   side,
   lit,
   annotated,
+  caption = true,
 }: {
   side: "front" | "back";
   /** The `BodyPart` codes this exercise works. */
   lit: string[];
   /** Draw the leader lines and names, or just the figure. */
   annotated: boolean;
+  /** The "Front" / "Back" caption. The mini figures on the week drop it —
+      at thumbnail size it's texture, and the side is legible without it. */
+  caption?: boolean;
 }) {
   const front = side === "front";
   const regions = front ? FRONT_REGIONS : BACK_REGIONS;
@@ -209,9 +213,11 @@ export function BodyPlate({
         )}
       </svg>
 
-      <span className="text-micro text-muted-foreground tracking-wider uppercase">
-        {front ? "Front" : "Back"}
-      </span>
+      {caption && (
+        <span className="text-micro text-muted-foreground tracking-wider uppercase">
+          {front ? "Front" : "Back"}
+        </span>
+      )}
     </div>
   );
 }
