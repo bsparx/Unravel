@@ -30,23 +30,31 @@ function revalidateWaterViews() {
  * be logged at any earlier minute today, but never in the future — that would
  * silently push the pace line forward and turn "last glass was 3h ago" into
  * a lie the app told about the day.
+ *
+ * Returns the row as written — id and the minute actually stamped — so the
+ * vessel can offer an honest Undo ("Logged 14:32") rather than one that
+ * guesses. Null when the write didn't happen, which callers treat as silence.
  */
-export async function logGlass(formData: FormData): Promise<void> {
+export async function logGlass(
+  formData: FormData,
+): Promise<{ id: string; timeMinute: number } | null> {
   const user = await requireUser();
   const parsed = logGlassSchema.safeParse(formValues(formData));
-  if (!parsed.success) return;
+  if (!parsed.success) return null;
 
   const date = parseLocalDate(parsed.data.date);
-  if (!date) return;
+  if (!date) return null;
 
   const nowMinute = minuteOfDayLocal(user.timezone);
   const timeMinute = Math.min(parsed.data.timeMinute ?? nowMinute, nowMinute);
 
-  await prisma.waterGlass.create({
+  const glass = await prisma.waterGlass.create({
     data: { userId: user.id, date, timeMinute },
+    select: { id: true, timeMinute: true },
   });
 
   revalidateWaterViews();
+  return glass;
 }
 
 /** Remove a glass from the day — the "I logged two extra" path. */

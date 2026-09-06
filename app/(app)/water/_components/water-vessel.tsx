@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
+import { toast } from "sonner";
 
-import { logGlass } from "../actions";
+import { logGlass, removeGlass } from "../actions";
 import {
   expectedByNow,
   formatMinuteOfDay,
@@ -31,7 +32,18 @@ import { cn } from "@/lib/utils";
  * money-rose — so the palette gains no fish colour and dark mode is free.
  *
  * The dashed line is the pace line, unchanged in meaning: where the day
- * *should* be by now, with the clock time that belongs to it.
+ * *should* be by now, with the clock time that belongs to it — and the hour
+ * strip beneath the glass is the schedule that time lives in, the reminder
+ * window with a tick at now. The vessel is about volume, so time's axis
+ * stays outside it.
+ *
+ * A mis-tap is a matter of when, not whether — the whole tank is a button —
+ * so every logged glass offers an Undo on the toast, riding the same
+ * optimistic path as every other correction in the app.
+ *
+ * A met day settles rather than celebrates: the water tint deepens, the
+ * surface calms, and the pace line fades — there is no "should" left to
+ * measure against.
  *
  * The motion licence is the same narrow one the timer face holds: the
  * swimming *is* the signal. `prefers-reduced-motion` collapses the tank to a
@@ -47,8 +59,8 @@ const REDUCED_MOTION =
 const TANK_TOP = 12;
 const TANK_BOTTOM = 308;
 const WATER_DEPTH = TANK_BOTTOM - TANK_TOP;
-/** The dry floor: where a slumped fish comes to rest. */
-const FLOOR_Y = 284;
+/** The gravel's surface line — a resting body sits on it, not in it. */
+const GRAVEL_Y = 292;
 
 const FISH = [
   {
@@ -145,9 +157,32 @@ export function WaterVessel({
   const log = () => {
     startTransition(async () => {
       applyDelta(1);
-      const formData = new FormData();
-      formData.set("date", dateISO);
-      await logGlass(formData);
+      const logged = await logGlass(
+        (() => {
+          const formData = new FormData();
+          formData.set("date", dateISO);
+          return formData;
+        })(),
+      );
+      if (!logged) return;
+
+      // The whole tank is a button, so a mis-tap is a matter of when, not
+      // whether. The undo rides the same optimistic path as every other
+      // correction in the app: the level drops at once, the server confirms.
+      toast.success(`Logged ${formatMinuteOfDay(logged.timeMinute)}`, {
+        duration: 6000,
+        action: {
+          label: "Undo",
+          onClick: () => {
+            startTransition(async () => {
+              applyDelta(-1);
+              const formData = new FormData();
+              formData.set("glassId", logged.id);
+              await removeGlass(formData);
+            });
+          },
+        },
+      });
     });
   };
 
@@ -205,6 +240,7 @@ export function WaterVessel({
     const surface = svg.querySelector<SVGPathElement>("#wt-surface");
     const cracks = svg.querySelector<SVGGElement>("#wt-cracks");
     const bubblesEl = svg.querySelector<SVGGElement>("#wt-bubbles");
+    const pace = svg.querySelector<SVGGElement>("#wt-pace");
     if (!waterRect || !surface || !cracks || !bubblesEl) return;
 
     const bubbleCircles = Array.from(bubblesEl.querySelectorAll("circle"));
@@ -245,9 +281,11 @@ export function WaterVessel({
     let splash = splashRef.current;
     let wavePhase = 0.6;
     let tick = 0;
+    let paceOpacity = 1;
 
     const draw = (dt: number) => {
       const target = ratioRef.current;
+      const met = target >= 1;
       if (REDUCED_MOTION) {
         level = target;
       } else {
@@ -267,9 +305,12 @@ export function WaterVessel({
 
       waterRect.setAttribute("y", String(waterTop));
       waterRect.setAttribute("height", String(Math.max(0, waterH)));
+      // Goal met: the tank settles. A deeper tint and a calmer surface are
+      // parameter changes on the state that already exists — no new motion.
+      waterRect.setAttribute("opacity", met ? "0.34" : "0.26");
 
       if (waterH > 2) {
-        const amp = (1 + splash * 2.2) * 2.2;
+        const amp = (1 + splash * 2.2) * 2.2 * (met ? 0.55 : 1);
         let d = `M 12 ${waterTop.toFixed(1)}`;
         for (let x = 12; x <= 988; x += 16) {
           d += ` L ${x} ${(waterTop + Math.sin(x * 0.013 + wavePhase) * amp).toFixed(1)}`;
@@ -278,6 +319,14 @@ export function WaterVessel({
       } else {
         surface.setAttribute("d", "");
       }
+
+      // The pace line has one job — say where the day should be — and a met
+      // day has no "should" left. It fades; its label leaves with it.
+      const paceTarget = met ? 0 : 1;
+      paceOpacity = REDUCED_MOTION
+        ? paceTarget
+        : paceOpacity + (paceTarget - paceOpacity) * Math.min(1, 0.12 * dt * 60);
+      pace?.setAttribute("opacity", paceOpacity.toFixed(2));
 
       fishEls.forEach((els, i) => {
         const cfg = FISH[i];
@@ -293,13 +342,18 @@ export function WaterVessel({
         }
 
         let y = waterTop + cfg.lane * waterH;
-        y += (FLOOR_Y - y) * slump;
+        // The dry pose is a fish lying on the gravel, not sunk through it:
+        // a 35° nose-down tilt, rested so the body's lowest edge sits on the
+        // floor line. The mirrored scale of a left-swimming fish flips the
+        // tilt's x, but the nose still points down either way.
+        const restY = GRAVEL_Y - 13 * cfg.scale;
+        y += (restY - y) * slump;
         y += Math.sin(tick * 1.2 + f.phase) * 2.6 * energy;
         f.tailPhase += 9 * energy * dt;
 
         els.g?.setAttribute(
           "transform",
-          `translate(${f.x.toFixed(1)} ${y.toFixed(1)}) rotate(${(slump * 82).toFixed(1)}) scale(${(cfg.scale * f.dir).toFixed(2)})`,
+          `translate(${f.x.toFixed(1)} ${y.toFixed(1)}) rotate(${(slump * 35).toFixed(1)}) scale(${(cfg.scale * f.dir).toFixed(2)})`,
         );
         els.tail?.setAttribute(
           "transform",
@@ -310,8 +364,13 @@ export function WaterVessel({
       });
 
       plantEls.forEach((g) => {
-        g?.setAttribute("transform", `rotate(${(slump * 30).toFixed(1)} 0 0)`);
-        g?.setAttribute("opacity", String(1 - slump * 0.4));
+        // Wilt to one side and droop — the whole plant sags toward its base
+        // instead of shedding leaves at random angles.
+        g?.setAttribute(
+          "transform",
+          `rotate(${(slump * 36).toFixed(1)} 0 0) scale(1 ${(1 - slump * 0.3).toFixed(2)})`,
+        );
+        g?.setAttribute("opacity", String(1 - slump * 0.45));
       });
 
       cracks.setAttribute("opacity", String((slump * 0.9).toFixed(2)));
@@ -372,6 +431,25 @@ export function WaterVessel({
   for (let k = 1; k < goal; k++) notches.push(k);
   const paceY =
     TANK_BOTTOM - (Math.min(1, Math.max(0, expected / goal))) * WATER_DEPTH;
+  const dayMet = shown >= goal;
+
+  // The reminder window as a strip of hours. Labels every four hours from
+  // the window's own start (so they never drift off the pace line's grid),
+  // plus the window's end — and any label that would land on the now-tick
+  // stands down, because one of the two numbers is enough.
+  const windowSpan = Math.max(1, settings.endMin - settings.startMin);
+  const rulerPos = (minute: number) =>
+    (Math.min(1, Math.max(0, (minute - settings.startMin) / windowSpan)) * 100);
+  const rulerHours: number[] = [];
+  for (let m = settings.startMin; m < settings.endMin; m += 240) {
+    rulerHours.push(m);
+  }
+  if (rulerHours[rulerHours.length - 1] !== settings.endMin) {
+    rulerHours.push(settings.endMin);
+  }
+  const nowInWindow =
+    nowMinute >= settings.startMin && nowMinute < settings.endMin;
+  const nowPos = nowInWindow ? rulerPos(nowMinute) : null;
 
   return (
     <div className="space-y-4">
@@ -423,19 +501,22 @@ export function WaterVessel({
               />
             ))}
 
-            {/* The pace line, and the clock time it belongs to. */}
+            {/* The pace line, and the clock time it belongs to. Wrapped so
+                the frame loop can fade the whole idea out on a met day. */}
             {paceMinute !== null && (
-              <line
-                x1={12}
-                x2={988}
-                y1={paceY}
-                y2={paceY}
-                stroke="var(--muted-foreground)"
-                strokeOpacity={0.5}
-                strokeWidth={1.5}
-                strokeDasharray="8 7"
-                vectorEffect="non-scaling-stroke"
-              />
+              <g id="wt-pace">
+                <line
+                  x1={12}
+                  x2={988}
+                  y1={paceY}
+                  y2={paceY}
+                  stroke="var(--muted-foreground)"
+                  strokeOpacity={0.5}
+                  strokeWidth={1.5}
+                  strokeDasharray="8 7"
+                  vectorEffect="non-scaling-stroke"
+                />
+              </g>
             )}
 
             {/* Gravel, and the cracks that appear when the tank goes dry. */}
@@ -466,8 +547,8 @@ export function WaterVessel({
                   d={d}
                   fill="none"
                   stroke="var(--muted-foreground)"
-                  strokeOpacity={0.55}
-                  strokeWidth={1.5}
+                  strokeOpacity={0.7}
+                  strokeWidth={2}
                   vectorEffect="non-scaling-stroke"
                 />
               ))}
@@ -662,11 +743,15 @@ export function WaterVessel({
           </g>
         </svg>
 
-        {/* The pace line's label, in real type rather than SVG text. */}
+        {/* The pace line's label, in real type rather than SVG text. It
+            leaves with the line on a met day. */}
         {paceMinute !== null && (
           <span
             aria-hidden
-            className="bg-background/90 text-muted-foreground absolute right-2 rounded-sm px-1 font-mono text-micro tabular-nums"
+            className={cn(
+              "bg-background/90 text-muted-foreground absolute right-2 rounded-sm px-1 font-mono text-micro tabular-nums transition-opacity duration-500",
+              dayMet && "opacity-0",
+            )}
             style={{
               top: `${(paceY / 320) * 100}%`,
               transform: "translateY(-120%)",
@@ -675,7 +760,65 @@ export function WaterVessel({
             {formatMinuteOfDay(paceMinute)}
           </span>
         )}
+
+        {/* The invitation. The glass is a button the size of the page's
+            hero, and the hover wash is the only "pressable" it wears — the
+            hint does the rest, but only while the tank has nothing to show. */}
+        <span
+          aria-hidden
+          className="bg-foreground/0 group-hover:bg-foreground/[0.045] pointer-events-none absolute inset-0 rounded-xl transition-colors duration-150"
+        />
+        {shown === 0 && (
+          <span
+            aria-hidden
+            className="animate-rise pointer-events-none absolute inset-x-0 top-[36%] flex justify-center"
+          >
+            <span className="bg-background/85 border-border/60 text-muted-foreground rounded-full border px-3 py-1 text-label backdrop-blur-[2px]">
+              Tap anywhere to pour the first glass
+            </span>
+          </span>
+        )}
       </button>
+
+      {/* The day's time, under the glass. The pace line's label says a clock
+          time; this is the schedule that time lives in — the reminder window
+          as a strip of hours, with a tick at now. The vessel is about volume,
+          so the axis lives outside it. */}
+      <div aria-hidden className="relative h-5">
+        <div className="border-border/70 absolute inset-x-0 top-0 border-t" />
+        {rulerHours.map((minute, index) => {
+          const pos = rulerPos(minute);
+          if (nowPos !== null && Math.abs(pos - nowPos) < 5) return null;
+          const first = index === 0;
+          const last = index === rulerHours.length - 1;
+          return (
+            <span
+              key={minute}
+              className={cn(
+                "text-muted-foreground/70 absolute top-1 font-mono text-[0.625rem] tabular-nums",
+                first ? "left-0" : last ? "right-0" : "-translate-x-1/2",
+              )}
+              style={first || last ? undefined : { left: `${pos}%` }}
+            >
+              {formatMinuteOfDay(minute)}
+            </span>
+          );
+        })}
+        {nowPos !== null && (
+          <>
+            <div
+              className="bg-primary absolute top-0 h-2 w-px"
+              style={{ left: `${nowPos}%` }}
+            />
+            <span
+              className="text-primary absolute top-1 -translate-x-1/2 font-mono text-[0.625rem] font-medium tabular-nums"
+              style={{ left: `${nowPos}%` }}
+            >
+              {formatMinuteOfDay(nowMinute)}
+            </span>
+          </>
+        )}
+      </div>
 
       <div className="flex flex-col items-center gap-1">
         <p
