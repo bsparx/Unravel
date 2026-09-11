@@ -33,7 +33,8 @@ import type { TodayLog as TodayLogData } from "../_lib/today-log";
 import { useTimer, type TimerTask } from "../_hooks/timer-provider";
 import { useThresholdHaptics } from "../_hooks/use-threshold-haptics";
 import { useWakeLock } from "../_hooks/use-wake-lock";
-import { ModeSwitcher } from "./mode-switcher";
+import { IntervalDotTrack } from "./interval-dot-track";
+import { DurationDial, ModePills } from "./mode-switcher";
 import { OverrunPanel } from "./overrun-panel";
 import { RecoveryFace } from "./recovery-face";
 import { ReturnNote } from "./return-note";
@@ -110,6 +111,7 @@ export function TimerScreen({
   const recovery = state.config.mode === "RECOVERY";
   const isBreak = !recovery && onBreak;
   const isFlow = state.config.mode === "FLOW";
+  const isPomodoro = state.config.mode === "POMODORO";
   const isOvertime = !recovery && elapsedSeconds > state.config.targetSeconds;
   const running = state.phase === "RUNNING";
   const idle = state.phase === "IDLE";
@@ -276,16 +278,39 @@ export function TimerScreen({
         )}
       </header>
 
+      {/* Top Mode Selector (idle only) */}
+      {idle && (
+        <div className="animate-rise mb-6" style={{ animationDelay: "30ms" }}>
+          <ModePills
+            config={state.config}
+            onChange={(next) => configure(next)}
+          />
+        </div>
+      )}
+
       {/* The face is sized by its own w-full, so this wrapper must hand it a
           definite width — a bare flex item here would shrink-wrap it to its
           digits and collapse the whole face. */}
-      <div className="animate-rise flex w-full flex-col items-center" style={{ animationDelay: "60ms" }}>
+      <div className="animate-rise relative flex w-full flex-col items-center justify-center" style={{ animationDelay: "60ms" }}>
+        {/* Soft ambient stage glow */}
+        <div
+          className={cn(
+            "pointer-events-none absolute aspect-square w-full max-w-[340px] rounded-full blur-3xl transition-opacity duration-700",
+            running
+              ? recovery
+                ? "bg-rest/10 opacity-70"
+                : "bg-running/10 opacity-70"
+              : "bg-primary/5 opacity-40",
+          )}
+          aria-hidden
+        />
+
         {(() => {
         const face = (
-          <div className="text-center">
+          <div className="relative z-10 text-center select-none">
             <p
               className={cn(
-                "font-mono tabular-nums transition-colors",
+                "font-mono tabular-nums tracking-tight transition-colors",
                 readoutSize,
                 // Clay, not the running blue and not rest: this is neither work
                 // on the clock nor rest any more. Reusing either colour would
@@ -307,9 +332,9 @@ export function TimerScreen({
 
             <p
               className={cn(
-                "mt-1 text-label",
+                "mt-1.5 text-label font-medium tracking-wide transition-colors",
                 isOverrunning
-                  ? "text-destructive font-medium"
+                  ? "text-destructive font-semibold"
                   : "text-muted-foreground",
               )}
             >
@@ -360,6 +385,32 @@ export function TimerScreen({
       })()}
       </div>
 
+      {/* Interval Dot Track for multi-block Pomodoro sessions */}
+      {isPomodoro && focusBlocks.length > 1 && (
+        <div className="animate-rise mt-5" style={{ animationDelay: "70ms" }}>
+          <IntervalDotTrack
+            plan={plan}
+            intervalIndex={state.intervalIndex}
+            running={running}
+            idle={idle}
+            onBreak={onBreak}
+          />
+        </div>
+      )}
+
+      {/* Compact Horizontal Dial for choosing duration & intervals (idle only) */}
+      {idle && (
+        <div
+          className="animate-rise mt-6 flex w-full flex-col items-center"
+          style={{ animationDelay: "90ms" }}
+        >
+          <DurationDial
+            config={state.config}
+            onChange={(next) => configure(next)}
+          />
+        </div>
+      )}
+
       {/* Live region kept separate from the ticking digits so screen readers
           aren't read a new number four times a second. */}
       <p className="sr-only" aria-live="polite">
@@ -381,53 +432,65 @@ export function TimerScreen({
       ) : (
         <div className="flex flex-col items-center">
           <div
-            className="animate-rise mt-8 flex items-center gap-2"
-            style={{ animationDelay: "120ms" }}
+            className="animate-rise mt-6 flex items-center gap-2 rounded-full border border-border/80 bg-card/90 p-1.5 shadow-md shadow-foreground/5 backdrop-blur-sm transition-all"
+            style={{ animationDelay: "110ms" }}
           >
-            <Button
-              size="lg"
-              onClick={toggle}
-              className={cn(
-                "min-w-36",
-                running &&
-                (recovery
-                  ? "bg-rest text-rest-foreground hover:bg-rest/90"
-                  : "bg-running text-running-foreground hover:bg-running/90"),
-              )}
-            >
-              {running ? (
-                <>
-                  <Pause className="size-4" aria-hidden />
-                  Pause
-                </>
-              ) : (
-                <>
-                  <Play className="size-4" aria-hidden />
-                  {idle
-                    ? recovery
-                      ? "Start recovery"
-                      : "Start focus"
-                    : "Resume"}
-                </>
-              )}
-            </Button>
-
-            {!idle && (
+            {idle ? (
+              <Button
+                size="lg"
+                onClick={toggle}
+                className={cn(
+                  "h-12 rounded-full px-8 text-title font-medium shadow-none transition-all active:scale-[0.98]",
+                  recovery
+                    ? "bg-rest text-rest-foreground hover:bg-rest/90"
+                    : "bg-primary text-primary-foreground hover:bg-primary/90",
+                )}
+              >
+                <Play className="mr-2 size-4 fill-current" aria-hidden />
+                {recovery ? "Start recovery" : "Start focus"}
+              </Button>
+            ) : (
               <>
                 {plan.length > 1 && (
                   <Button
-                    variant="outline"
-                    size="lg"
+                    variant="ghost"
+                    size="icon"
                     onClick={skipInterval}
+                    className="size-11 rounded-full text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
                     aria-label="Skip to the next block"
                   >
                     <SkipForward className="size-4" aria-hidden />
                   </Button>
                 )}
+
                 <Button
-                  variant="outline"
                   size="lg"
+                  onClick={toggle}
+                  className={cn(
+                    "h-12 rounded-full px-8 text-title font-medium shadow-none transition-all active:scale-[0.98]",
+                    recovery
+                      ? "bg-rest text-rest-foreground hover:bg-rest/90"
+                      : "bg-running text-running-foreground hover:bg-running/90",
+                  )}
+                >
+                  {running ? (
+                    <>
+                      <Pause className="mr-2 size-4 fill-current" aria-hidden />
+                      Pause
+                    </>
+                  ) : (
+                    <>
+                      <Play className="mr-2 size-4 fill-current" aria-hidden />
+                      Resume
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => void stop()}
+                  className="size-11 rounded-full text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
                   aria-label="Stop and log this session"
                 >
                   <Square className="size-4" aria-hidden />
@@ -495,22 +558,6 @@ export function TimerScreen({
           <Check className="size-4" aria-hidden />
           Stop and mark it done
         </Button>
-      )}
-
-      {idle && (
-        <div className="mt-10 w-full space-y-6">
-          <ModeSwitcher
-            config={state.config}
-            onChange={(next) => configure(next)}
-          />
-
-          <p className="text-muted-foreground text-center text-label">
-            {plan.filter((interval) => interval.kind === "FOCUS").length > 1
-              ? `${formatDuration(state.config.targetSeconds)} split into ${plan.filter((interval) => interval.kind === "FOCUS").length
-              } sessions, with breaks between them.`
-              : `${formatDuration(state.config.targetSeconds)} in one go.`}
-          </p>
-        </div>
       )}
 
       {state.task && (
@@ -644,10 +691,19 @@ function SessionSummary({
         )}
       </p>
 
-      <div className="mt-8 flex gap-2">
-        <Button onClick={() => void onDone()}>Back to today</Button>
-        <Button variant="outline" onClick={onAgain}>
-          <RotateCcw className="size-4" aria-hidden />
+      <div className="mt-8 flex items-center gap-3">
+        <Button
+          onClick={() => void onDone()}
+          className="rounded-full px-6 shadow-sm"
+        >
+          Back to today
+        </Button>
+        <Button
+          variant="outline"
+          onClick={onAgain}
+          className="rounded-full px-6"
+        >
+          <RotateCcw className="mr-1.5 size-4" aria-hidden />
           Go again
         </Button>
       </div>

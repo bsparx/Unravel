@@ -33,30 +33,31 @@ export function OverrunPanel({
   onExtend: (seconds: number) => void;
 }) {
   return (
-    <div className="mt-8 flex w-full max-w-sm flex-col items-center gap-3">
+    <div className="animate-rise mt-6 flex w-full max-w-sm flex-col items-center gap-3">
       {returnLabel && (
         <p className="text-center text-label text-balance">
           <span className="text-muted-foreground">You&apos;re on </span>
-          {returnLabel}
+          <span className="font-medium text-foreground">{returnLabel}</span>
         </p>
       )}
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 rounded-full border border-destructive/30 bg-destructive/5 p-1.5 shadow-md shadow-destructive/5 backdrop-blur-xs">
         <Button
           size="lg"
-          className="bg-destructive text-background hover:bg-destructive/90 min-w-36"
+          className="bg-destructive text-destructive-foreground hover:bg-destructive/90 min-w-36 rounded-full px-6 shadow-none active:scale-[0.98] transition-all"
           onClick={onBack}
         >
-          <ArrowRight className="size-4" aria-hidden />
+          <ArrowRight className="mr-2 size-4" aria-hidden />
           Back to it
         </Button>
 
         <Button
           variant="outline"
           size="lg"
+          className="rounded-full px-5 border-destructive/30 hover:border-destructive hover:bg-destructive/10 text-foreground transition-all"
           onClick={() => onExtend(EXTENSION_SECONDS)}
         >
-          <Plus className="size-4" aria-hidden />5 more min
+          <Plus className="mr-1.5 size-4" aria-hidden />5 more min
         </Button>
       </div>
     </div>

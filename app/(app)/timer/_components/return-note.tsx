@@ -47,7 +47,7 @@ export function ReturnNote({
         }}
         placeholder={placeholder ?? "what you're in the middle of"}
         maxLength={140}
-        className="mt-2 text-center"
+        className="mt-2 text-center rounded-full border-border/80 bg-card/60 px-4 text-label shadow-xs focus-visible:ring-primary/40"
       />
     </label>
   );
