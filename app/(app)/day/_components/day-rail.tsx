@@ -5,6 +5,8 @@ import { CalendarDays } from "lucide-react";
 
 import { useNowMinute } from "@/hooks/use-now-minute";
 import {
+  blockLabel,
+  blockTaskSummary,
   claimedMinutes,
   formatMinuteOfDay,
   formatMinuteLength,
@@ -115,7 +117,10 @@ export function DayRail({
           {blocks.map((block) => (
             <div
               key={block.id}
-              title={`${formatMinuteOfDay(block.startMinute)} ${block.title}`}
+              title={[
+                formatMinuteOfDay(block.startMinute),
+                blockTaskSummary(block) || blockLabel(block),
+              ].join(" ")}
               className={cn(
                 "absolute inset-y-0 rounded-full",
                 KIND_FILL[block.kind],

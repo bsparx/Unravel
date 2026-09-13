@@ -16,8 +16,24 @@ import { anchorTitleOf } from "@/lib/habit-cue";
 import { isActiveInSlot } from "@/lib/habit-slots";
 import { isDueOn, wasMissedOn } from "@/lib/recurrence";
 
+/** One task inside a block, with the block's own tick for it. */
+export type BlockTask = {
+  id: string;
+  title: string;
+  /** The calendar hue this task wears; a single-task block inherits it. */
+  color: string;
+  estimatedSeconds: number | null;
+  defaultMode: "POMODORO" | "BASIC" | "FLOW" | "RECOVERY";
+  plannedIntervals: number | null;
+  /** The *task's* terminal completion, which is a different fact. */
+  completedAt: Date | null;
+  /** Ticked off inside this block. Block-scoped — see TimeBlockTask.doneAt. */
+  doneAt: Date | null;
+};
+
 export type CalendarBlock = {
   id: string;
+  /** May be empty: a block that is for its tasks needs no invented name. */
   title: string;
   notes: string | null;
   dateISO: string;
@@ -33,16 +49,12 @@ export type CalendarBlock = {
   cueForId: string | null;
   /** This block has a cue in front of it — so moving it has to move two things. */
   hasCue: boolean;
-  task: {
-    id: string;
-    title: string;
-    /** The calendar hue this task wears; blocks inherit it. */
-    color: string;
-    estimatedSeconds: number | null;
-    defaultMode: "POMODORO" | "BASIC" | "FLOW" | "RECOVERY";
-    plannedIntervals: number | null;
-    completedAt: Date | null;
-  } | null;
+  /**
+   * What the stretch of time is for. Usually one thing; sometimes three, in no
+   * particular order — "in these two hours you need to do these three things".
+   * Empty for a block that is a named claim on time and nothing more.
+   */
+  tasks: BlockTask[];
 };
 
 const blockSelect = {
@@ -56,15 +68,21 @@ const blockSelect = {
   completedAt: true,
   cueForId: true,
   cue: { select: { id: true } },
-  task: {
+  tasks: {
+    orderBy: { position: "asc" },
     select: {
-      id: true,
-      title: true,
-      color: true,
-      estimatedSeconds: true,
-      defaultMode: true,
-      plannedIntervals: true,
-      completedAt: true,
+      doneAt: true,
+      task: {
+        select: {
+          id: true,
+          title: true,
+          color: true,
+          estimatedSeconds: true,
+          defaultMode: true,
+          plannedIntervals: true,
+          completedAt: true,
+        },
+      },
     },
   },
 } as const;
@@ -80,7 +98,8 @@ type BlockRow = {
   completedAt: Date | null;
   cueForId: string | null;
   cue: { id: string } | null;
-  task: CalendarBlock["task"];
+  /** The join row's own tick, plus the task it points at. */
+  tasks: { doneAt: Date | null; task: Omit<BlockTask, "doneAt"> }[];
 };
 
 const toCalendarBlock = (row: BlockRow): CalendarBlock => ({
@@ -94,7 +113,7 @@ const toCalendarBlock = (row: BlockRow): CalendarBlock => ({
   completedAt: row.completedAt,
   cueForId: row.cueForId,
   hasCue: row.cue !== null,
-  task: row.task,
+  tasks: row.tasks.map((link) => ({ ...link.task, doneAt: link.doneAt })),
 });
 
 /**
@@ -231,14 +250,15 @@ export async function getSchedulableItems(
   date: Date,
   limit = 12,
 ): Promise<SchedulableItem[]> {
-  const alreadyBlocked = await prisma.timeBlock.findMany({
-    where: { userId: user.id, date, taskId: { not: null } },
+  // Reached through the block rather than a `taskId` column on it: a task is
+  // spoken for once it sits *inside* any of the day's blocks, whether that
+  // block holds one task or four.
+  const alreadyBlocked = await prisma.timeBlockTask.findMany({
+    where: { block: { userId: user.id, date } },
     select: { taskId: true },
   });
 
-  const excluded = alreadyBlocked
-    .map((block) => block.taskId)
-    .filter((id): id is string => id !== null);
+  const excluded = alreadyBlocked.map((link) => link.taskId);
 
   const notBlocked = excluded.length > 0 ? { id: { notIn: excluded } } : {};
 

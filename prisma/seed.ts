@@ -1217,61 +1217,80 @@ async function main() {
   // A planned day, so the calendar isn't empty on first open — including a
   // buffer block, a recovery block and a daydream, because a demo day that is
   // wall-to-wall work would teach exactly the wrong lesson.
-  await prisma.timeBlock.createMany({
-    data: [
-      {
+  //
+  // The first stretch is deliberately a *group*: two hours holding three
+  // unrelated things, in no order. That is the shape most real planning takes,
+  // and a demo day made only of one-task blocks would hide it.
+  const plan: {
+    startMinute: number;
+    endMinute: number;
+    kind: "WORK" | "RECOVERY" | "BUFFER" | "DAYDREAM";
+    /** Omitted for a block that is a named claim on time and nothing more. */
+    title?: string;
+    /** Indexes into `todos`, in the order they were put in. */
+    tasks?: number[];
+    day?: number;
+  }[] = [
+    {
+      startMinute: 9 * 60,
+      endMinute: 11 * 60,
+      kind: "WORK" as const,
+      title: "The two hours that matter",
+      tasks: [0, 1, 2],
+    },
+    {
+      startMinute: 11 * 60,
+      endMinute: 11 * 60 + 30,
+      kind: "BUFFER" as const,
+      title: "Buffer",
+    },
+    {
+      startMinute: 14 * 60,
+      endMinute: 14 * 60 + 30,
+      kind: "RECOVERY" as const,
+      title: "Read something that isn't a screen",
+    },
+    {
+      startMinute: 16 * 60,
+      endMinute: 16 * 60 + 45,
+      kind: "DAYDREAM" as const,
+      title: "Stare out the window",
+    },
+    {
+      day: 1,
+      startMinute: 10 * 60,
+      endMinute: 11 * 60,
+      kind: "WORK" as const,
+      tasks: [4],
+    },
+  ];
+
+  for (const entry of plan) {
+    const block = await prisma.timeBlock.create({
+      data: {
         userId: user.id,
-        taskId: todos[0].id,
-        title: todos[0].title,
-        date: localDate(0),
-        startMinute: 9 * 60,
-        endMinute: 10 * 60 + 30,
-        kind: "WORK" as const,
+        // A block that is for its tasks carries no invented name; the grid
+        // falls back to the tasks themselves. See `blockLabel` in lib/block-math.
+        title: entry.title ?? "",
+        date: localDate(entry.day ?? 0),
+        startMinute: entry.startMinute,
+        endMinute: entry.endMinute,
+        kind: entry.kind,
       },
-      {
-        userId: user.id,
-        title: "Buffer",
-        date: localDate(0),
-        startMinute: 10 * 60 + 30,
-        endMinute: 11 * 60,
-        kind: "BUFFER" as const,
-      },
-      {
-        userId: user.id,
-        taskId: todos[1].id,
-        title: todos[1].title,
-        date: localDate(0),
-        startMinute: 11 * 60,
-        endMinute: 11 * 60 + 45,
-        kind: "WORK" as const,
-      },
-      {
-        userId: user.id,
-        title: "Read something that isn't a screen",
-        date: localDate(0),
-        startMinute: 14 * 60,
-        endMinute: 14 * 60 + 30,
-        kind: "RECOVERY" as const,
-      },
-      {
-        userId: user.id,
-        taskId: todos[4].id,
-        title: todos[4].title,
-        date: localDate(1),
-        startMinute: 10 * 60,
-        endMinute: 11 * 60,
-        kind: "WORK" as const,
-      },
-      {
-        userId: user.id,
-        title: "Stare out the window",
-        date: localDate(0),
-        startMinute: 16 * 60,
-        endMinute: 16 * 60 + 45,
-        kind: "DAYDREAM" as const,
-      },
-    ],
-  });
+      select: { id: true },
+    });
+
+    const linked = entry.tasks ?? [];
+    if (linked.length > 0) {
+      await prisma.timeBlockTask.createMany({
+        data: linked.map((index, position) => ({
+          blockId: block.id,
+          taskId: todos[index].id,
+          position,
+        })),
+      });
+    }
+  }
 
   const habits = await Promise.all(
     [

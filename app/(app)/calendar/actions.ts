@@ -13,16 +13,20 @@ import {
   spanOfLength,
 } from "@/lib/block-math";
 import { prisma } from "@/lib/db";
+import type { Prisma } from "@/lib/generated/prisma/client";
 import { parseLocalDate } from "@/lib/dates";
 import { anchorTitleOf, cueSpanFor } from "@/lib/habit-cue";
 import {
   type ActionState,
+  addTaskToBlockSchema,
   createBlockSchema,
   deleteBlockSchema,
   fieldErrorsFrom,
   formValues,
+  MAX_BLOCK_TASKS,
   moveBlockSchema,
   scheduleTaskSchema,
+  toggleBlockTaskSchema,
   updateBlockSchema,
 } from "@/lib/validation";
 
@@ -78,9 +82,34 @@ async function plannedCueFor(
   };
 }
 
+/**
+ * The cue for a whole task list.
+ *
+ * A block can hold several tasks, and more than one of them may be a stacked
+ * habit. Only one precursor can be prepended — the schema allows a block one
+ * `cueForId` — so the first one wins, in the order the tasks were picked. Two
+ * cues on one block would mean two blocks "immediately before" the same thing,
+ * and adjacency stops meaning anything at that point.
+ */
+async function plannedCueForAny(
+  userId: string,
+  taskIds: string[],
+  includeCue: boolean,
+): Promise<PlannedCue | null> {
+  if (!includeCue) return null;
+
+  for (const taskId of taskIds) {
+    const cue = await plannedCueFor(userId, taskId, includeCue);
+    if (cue) return cue;
+  }
+
+  return null;
+}
+
 type BlockCreate = {
   userId: string;
-  taskId: string | null;
+  /** The tasks the stretch is for. Empty for "lunch", "gym" and other named claims. */
+  taskIds: string[];
   title: string;
   notes?: string | null;
   date: Date;
@@ -90,7 +119,8 @@ type BlockCreate = {
 };
 
 /**
- * Write a block and, if it has one, the cue block immediately before it.
+ * Write a block, its task list, and — if it has one — the cue block immediately
+ * before it.
  *
  * One transaction: a habit whose cue silently failed to land is worse than
  * neither, because the recipe is the thing that makes the habit happen and a
@@ -100,27 +130,131 @@ async function createBlockWithCue(
   data: BlockCreate,
   cue: PlannedCue | null,
 ): Promise<void> {
+  const { taskIds, ...block } = data;
+
   await prisma.$transaction(async (tx) => {
-    const block = await tx.timeBlock.create({ data });
+    const created = await tx.timeBlock.create({ data: block });
+    await linkTasks(tx, created.id, taskIds);
     if (!cue) return;
 
-    const span = cueSpanFor(block, cue.minutes);
+    const span = cueSpanFor(created, cue.minutes);
     // Null only when the habit starts at 00:00 — there is no "before" to put it
     // in, and moving the habit to make room would be answering a question
     // nobody asked.
     if (!span) return;
 
-    await tx.timeBlock.create({
-      data: {
-        userId: data.userId,
-        taskId: cue.taskId,
-        title: cue.title,
-        date: data.date,
-        ...span,
-        kind: "WORK",
-        cueForId: block.id,
-      },
+    await createCueBlock(tx, cue, {
+      userId: data.userId,
+      date: data.date,
+      span,
+      cueForId: created.id,
     });
+  });
+}
+
+/**
+ * The precursor half of a habit stack: a block glued to the front of the one it
+ * cues, carrying the anchor habit's task when there is one.
+ *
+ * A cue with no task behind it is the "drinking tea" case — a label and nothing
+ * more, deliberately untracked, because it was never a goal.
+ */
+async function createCueBlock(
+  tx: Prisma.TransactionClient,
+  cue: PlannedCue,
+  data: { userId: string; date: Date; span: Span; cueForId: string },
+): Promise<void> {
+  const block = await tx.timeBlock.create({
+    data: {
+      userId: data.userId,
+      title: cue.title,
+      date: data.date,
+      ...data.span,
+      kind: "WORK",
+      cueForId: data.cueForId,
+    },
+  });
+
+  if (cue.taskId) await linkTasks(tx, block.id, [cue.taskId]);
+}
+
+/**
+ * The only writer of `TimeBlockTask` rows on create.
+ *
+ * `position` is the index it went in at — display order, not a priority. The
+ * product promises no order between a block's tasks; this exists so a re-render
+ * doesn't reshuffle the lines under the person's cursor.
+ */
+async function linkTasks(
+  tx: Prisma.TransactionClient,
+  blockId: string,
+  taskIds: string[],
+): Promise<void> {
+  if (taskIds.length === 0) return;
+
+  await tx.timeBlockTask.createMany({
+    data: taskIds.map((taskId, position) => ({ blockId, taskId, position })),
+    skipDuplicates: true,
+  });
+}
+
+/**
+ * Make the block's task list exactly `taskIds`, keeping the ticks.
+ *
+ * A diff rather than delete-and-recreate: a tick inside the block is a real
+ * thing someone did, and saving the block after adding a fourth task must not
+ * silently un-tick the three already done. A task that leaves the block loses
+ * its tick — that tick belonged to this stretch of time, not to the task.
+ */
+async function syncBlockTasks(
+  userId: string,
+  blockId: string,
+  taskIds: string[],
+): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    // `notIn: []` matches everything in Prisma, which is exactly right here:
+    // an empty list means the block no longer holds anything.
+    await tx.timeBlockTask.deleteMany({
+      where: { blockId, taskId: { notIn: taskIds } },
+    });
+
+    for (const [position, taskId] of taskIds.entries()) {
+      await tx.timeBlockTask.upsert({
+        where: { blockId_taskId: { blockId, taskId } },
+        update: { position },
+        create: { blockId, taskId, position },
+      });
+    }
+  });
+
+  await reconcileBlockCompletion(userId, blockId);
+}
+
+/**
+ * Keep the block's own tick agreeing with the tasks inside it.
+ *
+ * One rule, three states: a block with tasks is done exactly when all of them
+ * are ticked. Ticking the last one closes the block; un-ticking one reopens it.
+ * A block with no tasks is left alone — its tick is the only thing that can
+ * speak for it, and "lunch" has no lines to tally.
+ */
+async function reconcileBlockCompletion(
+  userId: string,
+  blockId: string,
+): Promise<void> {
+  const block = await prisma.timeBlock.findFirst({
+    where: { id: blockId, userId },
+    select: { completedAt: true, tasks: { select: { doneAt: true } } },
+  });
+
+  if (!block || block.tasks.length === 0) return;
+
+  const allDone = block.tasks.every((link) => link.doneAt !== null);
+  if (allDone === (block.completedAt !== null)) return;
+
+  await prisma.timeBlock.update({
+    where: { id: blockId },
+    data: { completedAt: allDone ? new Date() : null },
   });
 }
 
@@ -176,13 +310,13 @@ export async function createBlock(
   if (!date) return { status: "error", message: "That date didn't parse." };
 
   const span = clampSpan(input.startMinute, input.endMinute);
-  const taskId = await resolveTaskId(user.id, input.taskId);
-  const cue = await plannedCueFor(user.id, taskId, input.includeCue);
+  const taskIds = await resolveTaskIds(user.id, input.taskIds);
+  const cue = await plannedCueForAny(user.id, taskIds, input.includeCue);
 
   await createBlockWithCue(
     {
       userId: user.id,
-      taskId,
+      taskIds,
       title: input.title,
       notes: input.notes || null,
       date,
@@ -216,12 +350,11 @@ export async function updateBlock(
   if (!date) return { status: "error", message: "That date didn't parse." };
 
   const span = clampSpan(input.startMinute, input.endMinute);
-  const taskId = await resolveTaskId(user.id, input.taskId);
+  const taskIds = await resolveTaskIds(user.id, input.taskIds);
 
   const { count } = await prisma.timeBlock.updateMany({
     where: { id: input.id, userId: user.id },
     data: {
-      taskId,
       title: input.title,
       notes: input.notes || null,
       date,
@@ -233,6 +366,10 @@ export async function updateBlock(
   if (count === 0) {
     return { status: "error", message: "That block is already gone." };
   }
+
+  // Ownership is established by that update, so the list can be rewritten on
+  // the block id alone. Kept ticks survive — see syncBlockTasks.
+  await syncBlockTasks(user.id, input.id, taskIds);
 
   // An existing cue follows the block it cues. A missing one is only added when
   // asked for — a cue dropped for the day should stay dropped, and re-editing
@@ -247,20 +384,15 @@ export async function updateBlock(
   if (existing) {
     await reflowCue(user.id, input.id, date, span);
   } else {
-    cue = await plannedCueFor(user.id, taskId, input.includeCue);
+    cue = await plannedCueForAny(user.id, taskIds, input.includeCue);
     if (cue) {
       const cueSpan = cueSpanFor(span, cue.minutes);
       if (cueSpan) {
-        await prisma.timeBlock.create({
-          data: {
-            userId: user.id,
-            taskId: cue.taskId,
-            title: cue.title,
-            date,
-            ...cueSpan,
-            kind: "WORK",
-            cueForId: input.id,
-          },
+        await createCueBlock(prisma, cue, {
+          userId: user.id,
+          date,
+          span: cueSpan,
+          cueForId: input.id,
         });
       }
     }
@@ -410,7 +542,9 @@ export async function scheduleTask(
   await createBlockWithCue(
     {
       userId: user.id,
-      taskId: task.id,
+      taskIds: [task.id],
+      // Named after the task it is for. The block is a snapshot: renaming the
+      // task later leaves the calendar as it was planned.
       title: task.title,
       date,
       ...clampSpan(span.startMinute, span.endMinute),
@@ -424,6 +558,103 @@ export async function scheduleTask(
     status: "success",
     message: withCueNote("On the calendar.", cue),
   };
+}
+
+/**
+ * "This belongs in that two hours."
+ *
+ * The counterpart to `scheduleTask`: the time is already claimed, so dropping a
+ * task onto an existing block adds it to the list rather than making a second
+ * block on the same minutes. Idempotent — dropping the same task twice is a
+ * no-op, not a duplicate line.
+ *
+ * The block's own tick is reconciled afterwards, because a block that was
+ * ticked off and has just been given another task is, by its own rule, no
+ * longer done.
+ */
+export async function addTaskToBlock(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const parsed = addTaskToBlockSchema.safeParse(formValues(formData));
+  if (!parsed.success) {
+    revalidateCalendar();
+    return;
+  }
+
+  // One read establishes ownership of both ends: the block through its owner,
+  // the task through its own userId. Neither id is trusted on its own.
+  const [block, task] = await Promise.all([
+    prisma.timeBlock.findFirst({
+      where: { id: parsed.data.blockId, userId: user.id },
+      select: { id: true, tasks: { select: { position: true } } },
+    }),
+    prisma.task.findFirst({
+      where: { id: parsed.data.taskId, userId: user.id },
+      select: { id: true },
+    }),
+  ]);
+
+  if (!block || !task) {
+    revalidateCalendar();
+    return;
+  }
+
+  // The cap holds on this path too, not only in the editor: a block is a
+  // stretch of time you are going to spend, and a drag is not a reason to let
+  // it grow into a backlog.
+  if (block.tasks.length >= MAX_BLOCK_TASKS) {
+    revalidateCalendar();
+    return;
+  }
+
+  const next = block.tasks.reduce((max, link) => Math.max(max, link.position), -1) + 1;
+
+  await prisma.timeBlockTask.upsert({
+    where: { blockId_taskId: { blockId: block.id, taskId: task.id } },
+    update: {},
+    create: { blockId: block.id, taskId: task.id, position: next },
+  });
+
+  await reconcileBlockCompletion(user.id, block.id);
+
+  revalidateCalendar();
+}
+
+/**
+ * Tick one task off inside its block.
+ *
+ * Block-scoped by design: the write lands on the join row and never on the
+ * task. Finishing "pull the charts" inside the 9am block is evidence about the
+ * morning; whether the task itself is done is a separate claim the person makes
+ * on /tasks. Conflating them would either lie about the task or make you afraid
+ * to tick.
+ */
+export async function toggleBlockTask(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const parsed = toggleBlockTaskSchema.safeParse(formValues(formData));
+  if (!parsed.success) {
+    // Same reasoning as moveBlock and toggleBlockDone: the tick was already
+    // flipped on screen, so the cache still has to agree with what is drawn.
+    revalidateCalendar();
+    return;
+  }
+
+  const { blockId, taskId, done } = parsed.data;
+
+  const { count } = await prisma.timeBlockTask.updateMany({
+    // Ownership through the block, so the pair of ids can't address a row on
+    // someone else's calendar.
+    where: { blockId, taskId, block: { userId: user.id } },
+    data: { doneAt: done ? new Date() : null },
+  });
+
+  if (count === 0) {
+    revalidateCalendar();
+    return;
+  }
+
+  await reconcileBlockCompletion(user.id, blockId);
+
+  revalidateCalendar();
 }
 
 // ---------------------------------------------------------------- lifecycle
@@ -452,6 +683,11 @@ export async function deleteBlock(formData: FormData): Promise<void> {
  * Deliberately does NOT complete the underlying task: finishing the 9am block
  * on "write the report" is not finishing the report, and conflating them would
  * either lie about the task or make you afraid to tick the block.
+ *
+ * It *does* carry the whole task list with it, in both directions. "This
+ * stretch is done" cannot leave a line inside it unticked — that would be the
+ * block disagreeing with itself — and re-opening the block has to give the
+ * lines back, or un-ticking would be a one-way door.
  */
 export async function toggleBlockDone(formData: FormData): Promise<void> {
   const user = await requireUser();
@@ -463,22 +699,45 @@ export async function toggleBlockDone(formData: FormData): Promise<void> {
     return;
   }
 
-  await prisma.timeBlock.updateMany({
-    where: { id, userId: user.id },
-    data: { completedAt: done ? new Date() : null },
+  await prisma.$transaction(async (tx) => {
+    const { count } = await tx.timeBlock.updateMany({
+      where: { id, userId: user.id },
+      data: { completedAt: done ? new Date() : null },
+    });
+
+    // Ownership is established by that update, so the lines can be written on
+    // the block id alone.
+    if (count === 0) return;
+
+    await tx.timeBlockTask.updateMany({
+      where: { blockId: id },
+      data: { doneAt: done ? new Date() : null },
+    });
   });
 
   revalidateCalendar();
 }
 
-async function resolveTaskId(
+/**
+ * Turn ids off the wire into ids that are really this user's.
+ *
+ * Silently drops the ones that aren't rather than refusing the whole write: a
+ * task deleted in another tab while the editor was open should cost you that
+ * one line, not the block. Order is preserved for the same reason `position`
+ * exists at all — stable rendering, not priority.
+ */
+async function resolveTaskIds(
   userId: string,
-  taskId: string | undefined,
-): Promise<string | null> {
-  if (!taskId) return null;
-  const task = await prisma.task.findFirst({
-    where: { id: taskId, userId },
+  taskIds: string[],
+): Promise<string[]> {
+  const wanted = [...new Set(taskIds)];
+  if (wanted.length === 0) return [];
+
+  const owned = await prisma.task.findMany({
+    where: { id: { in: wanted }, userId },
     select: { id: true },
   });
-  return task?.id ?? null;
+
+  const allowed = new Set(owned.map((task) => task.id));
+  return wanted.filter((id) => allowed.has(id));
 }

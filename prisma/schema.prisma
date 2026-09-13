@@ -465,9 +465,11 @@ model Task {
 
   // Named relations: Task now has several nullable FKs pointing at it from
   // different models, so Prisma can't disambiguate them positionally.
-  promotedFrom     Capture[]   @relation("CapturePromotion")
-  dayLogSelections DayLog[]    @relation("DayLogSelection")
-  blocks           TimeBlock[] @relation("TaskBlocks")
+  promotedFrom     Capture[]       @relation("CapturePromotion")
+  dayLogSelections DayLog[]        @relation("DayLogSelection")
+  /// The blocks this task is planned into. Many-to-many: a two-hour block is
+  /// routinely "these three things", in no particular order.
+  blocks           TimeBlockTask[]
 
   /// The one thing that precedes this habit. `cuedBy` is the other direction:
   /// the habits stacked on top of this one.
@@ -953,14 +955,12 @@ model TimeBlock {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  /// Nullable: blocking "lunch" or "gym" is a legitimate use, and a block with
-  /// no task is not a broken block. SetNull rather than Cascade — deleting a
-  /// task shouldn't silently punch a hole in a day you already planned.
-  taskId String?
-  task   Task?   @relation("TaskBlocks", fields: [taskId], references: [id], onDelete: SetNull)
-
   /// Snapshotted from the task at create time, so renaming or deleting the task
   /// leaves the calendar readable.
+  ///
+  /// May be empty: a block whose identity *is* its task list needs no second
+  /// name invented for it. Empty falls back to the tasks — see `blockLabel` in
+  /// lib/block-math.ts. "Block out lunch" still names itself.
   title String
   notes String?
 
@@ -975,7 +975,9 @@ model TimeBlock {
   kind BlockKind @default(WORK)
 
   /// Ticked off from the calendar. Distinct from Task.completedAt: finishing
-  /// the 9am block on a task is not finishing the task.
+  /// the 9am block on a task is not finishing the task. Ticking it also ticks
+  /// every task inside it, because "the whole stretch is done" can't leave a
+  /// task inside it unticked.
   completedAt DateTime?
 
   /// Set when this block was auto-prepended as another block's precursor — the
@@ -992,10 +994,45 @@ model TimeBlock {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  /// What this stretch of time is for. Usually one thing; sometimes three.
+  tasks TimeBlockTask[]
+
   /// Serves both "one day's blocks in order" and the week fetch (a date range
   /// scan), which are the only two reads.
   @@index([userId, date, startMinute])
-  @@index([taskId, date])
+}
+
+/// One task on one block. The block is the time; these are the things the time
+/// is for, and there is deliberately no ordering between them that the product
+/// promises — "in these two hours you need to do these three things".
+///
+/// A join table rather than a `taskIds String[]` column, for two reasons the
+/// old single `TimeBlock.taskId` already cared about: deleting a task must
+/// leave the block standing (so the SetNull intent survives as a cascade on
+/// this row, not the block), and the database enforces it instead of a nightly
+/// sweep. `position` exists only so the row order is stable between renders;
+/// nothing reorders it and no surface offers to.
+model TimeBlockTask {
+  blockId String
+  block   TimeBlock @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  taskId  String
+  task    Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  /// Ticked off *inside this block*. Deliberately not `Task.completedAt`:
+  /// finishing the 9am slot on "write the report" is not finishing the report,
+  /// and conflating them would either lie about the task or make you afraid to
+  /// tick. The task's own completion lives on the task, as it always did.
+  doneAt DateTime?
+
+  /// Display order only, set to the index it was added at.
+  position Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@id([blockId, taskId])
+  /// "Which blocks is this task on" — the reverse read, used when a task or a
+  /// habit is deleted and its join rows have to go first.
+  @@index([taskId, blockId])
 }
 
 /// Journal, not inbox.

@@ -1,11 +1,12 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ColorSwatches } from "@/components/color-swatches";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -26,16 +27,19 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { CalendarColor } from "@/lib/calendar-colors";
+import { calendarDotStyle, isCalendarColor } from "@/lib/calendar-colors";
 import {
   formatMinuteOfDay,
   parseMinuteOfDay,
   spanOfLength,
 } from "@/lib/block-math";
-import { idleState } from "@/lib/validation";
+import { idleState, MAX_BLOCK_TASKS } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 
 import { createBlock, deleteBlock, updateBlock } from "../actions";
 import { updateTaskColor } from "@/app/(app)/tasks/actions";
+
+export type BlockTaskDraft = { id: string; title: string; color: string };
 
 export type BlockDraft = {
   id?: string;
@@ -44,8 +48,22 @@ export type BlockDraft = {
   endMinute: number;
   title: string;
   notes: string;
-  taskId: string | null;
-  /** The linked task's calendar hue, so the picker opens on it. */
+  /**
+   * The tasks this stretch of time is for. A list, in no promised order — the
+   * one invariant is that a block is *for* these, and two hours is often three
+   * things rather than one.
+   */
+  taskIds: string[];
+  /**
+   * The block's own tasks, as they already are.
+   *
+   * They have to travel with the draft because the panel beside the grid only
+   * lists what is *not* on the day yet — a saved block's tasks are excluded
+   * from it by construction, and an editor that resolves its chips from the
+   * panel alone would silently drop every task the moment you opened it.
+   */
+  tasks: BlockTaskDraft[];
+  /** The first linked task's calendar hue, so the picker opens on it. */
   taskColor: CalendarColor | null;
   kind: "WORK" | "RECOVERY" | "BUFFER" | "DAYDREAM";
   /** This block already has a cue in front of it, so don't offer to add one. */
@@ -92,26 +110,53 @@ export function BlockDialog({
   const [start, setStart] = useState(draft.startMinute);
   const [end, setEnd] = useState(draft.endMinute);
   const [kind, setKind] = useState<BlockDraft["kind"]>(draft.kind);
+  const [title, setTitle] = useState(draft.title);
   // Controlled, unlike the other Selects here, because the cue offer below has
-  // to react to which task is picked.
-  const [taskId, setTaskId] = useState(draft.taskId ?? "none");
+  // to react to which tasks are in.
+  const [taskIds, setTaskIds] = useState<string[]>(draft.taskIds);
   const [taskColor, setTaskColor] = useState<CalendarColor>(
     draft.taskColor ?? "teal",
   );
   const [includeCue, setIncludeCue] = useState(true);
 
+  const linked = taskIds
+    .map(
+      (id) =>
+        draft.tasks.find((task) => task.id === id) ??
+        tasks.find((task) => task.id === id) ??
+        null,
+    )
+    .filter((task): task is BlockTaskDraft => task !== null);
+
+  // Only one block can be one habit's precursor, so only the first task that
+  // has a cue can bring it. See `plannedCueForAny`.
   const cueTitle = draft.hasCue
     ? null
-    : (tasks.find((task) => task.id === taskId)?.cueTitle ?? null);
+    : (tasks.find((task) => taskIds.includes(task.id) && task.cueTitle)
+        ?.cueTitle ?? null);
 
-  const linkedTask = tasks.find((task) => task.id === taskId) ?? null;
+  // The swatch row edits a task's own hue, so it only means something when
+  // there is exactly one task to edit. A block holding three stays the kind's
+  // colour: it is a container, not any one of the things in it.
+  const soleTask = taskIds.length === 1 ? linked[0] : null;
+
+  // And the block's own name is optional when its tasks already say what it is.
+  const namedOrStaffed = title.trim().length > 0 || taskIds.length > 0;
+
+  const addTask = (id: string) => {
+    setTaskIds((current) => (current.includes(id) ? current : [...current, id]));
+  };
+
+  const removeTask = (id: string) => {
+    setTaskIds((current) => current.filter((taskId) => taskId !== id));
+  };
 
   /** Re-colour the linked task — the block re-tints with it on revalidate. */
   const pickTaskColor = (color: CalendarColor) => {
     setTaskColor(color);
-    if (!linkedTask) return;
+    if (!soleTask) return;
     const formData = new FormData();
-    formData.set("taskId", linkedTask.id);
+    formData.set("taskId", soleTask.id);
     formData.set("color", color);
     updateTaskColor(formData);
     toast.success("Colour updated.");
@@ -157,15 +202,23 @@ export function BlockDialog({
           <input type="hidden" name="kind" value={kind} />
 
           <div className="space-y-1.5">
-            <Label htmlFor="block-title">What</Label>
+            <Label htmlFor="block-title">
+              What
+              <span className="text-muted-foreground font-normal">
+                {" "}
+                · optional if you add tasks below
+              </span>
+            </Label>
             <Input
               id="block-title"
               name="title"
-              required
               autoFocus
               maxLength={200}
-              defaultValue={draft.title}
-              placeholder="Draft the intro"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder={
+                taskIds.length > 0 ? "Two hours of the report" : "Deep work"
+              }
             />
             {error("title") && (
               <p role="alert" className="text-destructive text-label">
@@ -261,28 +314,88 @@ export function BlockDialog({
             </p>
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="block-task">Against a task</Label>
-            <Select name="taskId" value={taskId} onValueChange={setTaskId}>
+          <div className="space-y-2">
+            <Label htmlFor="block-task">
+              In this block
+              {taskIds.length > 0 && (
+                <span className="text-muted-foreground font-normal">
+                  {" "}
+                  · <span className="tabular-nums">{taskIds.length}</span>
+                </span>
+              )}
+            </Label>
+
+            {/* What's in it. A stack of chips rather than a list, because the
+                point of the feature is that the order between them doesn't
+                mean anything — a numbered list would imply one. */}
+            {linked.length > 0 && (
+              <ul className="flex flex-wrap gap-1.5">
+                {linked.map((task) => (
+                  <li key={task.id} className="flex">
+                    <Badge variant="outline" className="gap-1.5 pr-1">
+                      <span
+                        aria-hidden
+                        className="size-2 rounded-full"
+                        style={
+                          isCalendarColor(task.color)
+                            ? calendarDotStyle(task.color)
+                            : undefined
+                        }
+                      />
+                      <span className="max-w-44 truncate">{task.title}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeTask(task.id)}
+                        aria-label={`Take ${task.title} out of this block`}
+                        className="text-muted-foreground hover:text-destructive focus-visible:ring-ring rounded-full transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                      >
+                        <X className="size-3" aria-hidden />
+                      </button>
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {/* Add-only, and it resets to the placeholder after each pick, so
+                the control never claims to be showing the current value. */}
+            <Select value="" onValueChange={addTask} disabled={taskIds.length >= MAX_BLOCK_TASKS}>
               <SelectTrigger id="block-task">
-                <SelectValue placeholder="Nothing in particular" />
+                <SelectValue
+                  placeholder={
+                    linked.length === 0
+                      ? "Pick the tasks this time is for"
+                      : taskIds.length >= MAX_BLOCK_TASKS
+                        ? "That's as many as one block holds"
+                        : "Add another"
+                  }
+                />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">Nothing in particular</SelectItem>
-                {tasks.map((task) => (
-                  <SelectItem key={task.id} value={task.id}>
-                    {task.title}
-                  </SelectItem>
-                ))}
+                {tasks
+                  .filter((task) => !taskIds.includes(task.id))
+                  .map((task) => (
+                    <SelectItem key={task.id} value={task.id}>
+                      {task.title}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
+
+            {/* The ids the server actually reads. Absent when the list is
+                empty, which is how "name it, put nothing in it" is expressed. */}
+            {taskIds.map((id) => (
+              <input key={id} type="hidden" name="taskIds[]" value={id} />
+            ))}
+
             <p className="text-muted-foreground text-label">
-              Linking it means the timer opens on the right thing, and the time
-              lands against that task.
+              {linked.length > 1
+                ? "No order between them — the two hours are for all of these."
+                : "A block is what the time is for. Add as many as it takes, or none at all."}
             </p>
           </div>
 
-          {linkedTask && (
+          {soleTask && (
             <div className="space-y-1.5">
               <Label>Colour</Label>
               <ColorSwatches value={taskColor} onChange={pickTaskColor} />
@@ -370,7 +483,7 @@ export function BlockDialog({
               <Button type="button" variant="ghost" onClick={onClose}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={pending}>
+              <Button type="submit" disabled={pending || !namedOrStaffed}>
                 {pending ? "Saving…" : editing ? "Save" : "Block it out"}
               </Button>
             </div>

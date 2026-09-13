@@ -8,7 +8,7 @@ import type { PrayerBand } from "@/lib/prayers";
 import type { CalendarBlock } from "@/lib/time-blocks";
 import { idleState } from "@/lib/validation";
 
-import { scheduleTask } from "../actions";
+import { addTaskToBlock, scheduleTask } from "../actions";
 import { BlockDialog, type BlockDraft } from "./block-dialog";
 import { CalendarGrid, NowProvider, type GridDay } from "./calendar-grid";
 
@@ -80,7 +80,8 @@ export function CalendarView({
             ...span,
             title: "",
             notes: "",
-            taskId: null,
+            taskIds: [],
+            tasks: [],
             taskColor: null,
             kind: "WORK",
             hasCue: false,
@@ -94,15 +95,48 @@ export function CalendarView({
             endMinute: block.endMinute,
             title: block.title,
             notes: block.notes ?? "",
-            taskId: block.task?.id ?? null,
+            taskIds: block.tasks.map((task) => task.id),
+            // Carried, not re-looked-up: the panel beside the grid deliberately
+            // omits whatever is already on the day, so the editor cannot ask it
+            // what a saved block holds.
+            tasks: block.tasks.map((task) => ({
+              id: task.id,
+              title: task.title,
+              color: task.color,
+            })),
             taskColor:
-              block.task && isCalendarColor(block.task.color)
-                ? block.task.color
+              block.tasks.length === 1 &&
+              isCalendarColor(block.tasks[0].color)
+                ? block.tasks[0].color
                 : null,
             kind: block.kind,
             hasCue: block.hasCue,
           })
         }
+        onDropOnBlock={(item, block) => {
+          // Dropping onto a block that is already there means "this belongs in
+          // that time", not "put a second block on the same minutes". Only a
+          // drop on empty grid still makes a new one.
+          const already = block.tasks.some((task) => task.id === item.id);
+          if (already) {
+            toast.info(`${item.title} is already in that block.`);
+            return;
+          }
+
+          startTransition(async () => {
+            const formData = new FormData();
+            formData.set("blockId", block.id);
+            formData.set("taskId", item.id);
+            await addTaskToBlock(formData);
+            // The block's own name when it has one, otherwise "that block" —
+            // "Added to 3 tasks" would be counting the old list back at you.
+            toast.success(
+              block.title
+                ? `Added to ${block.title}.`
+                : `Added to that block — ${block.tasks.length + 1} in it now.`,
+            );
+          });
+        }}
       />
       </NowProvider>
 

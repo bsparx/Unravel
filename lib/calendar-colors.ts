@@ -66,3 +66,17 @@ export function calendarDotStyle(color: CalendarColor): {
 } {
   return { backgroundColor: CALENDAR_COLORS[color] };
 }
+
+/**
+ * The ink a small mark wears in the task's own hue — the checkbox beside a task
+ * inside a block it shares with two others.
+ *
+ * Alpha `b3` ≈ 70%: enough to read as that task's colour, not so much that a
+ * 12px square becomes a second full-strength object on a chip that is itself
+ * only a wash of the kind's colour.
+ */
+export function calendarInkStyle(color: CalendarColor): {
+  borderColor: string;
+} {
+  return { borderColor: `${CALENDAR_COLORS[color]}b3` };
+}

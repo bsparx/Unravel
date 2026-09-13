@@ -336,7 +336,33 @@ export async function deleteHabit(formData: FormData): Promise<void> {
     if (!habit) return;
 
     await tx.focusSession.deleteMany({ where: { taskId: habit.id } });
-    await tx.timeBlock.deleteMany({ where: { taskId: habit.id } });
+
+    // A block this habit was the *only* thing in goes with it, the way it
+    // always did. A block it merely shared — the two-hour stretch that holds
+    // three things — stays, minus this one task. Deleting a habit must not
+    // punch a hole in a day that was planned around two other things.
+    const hosting = await tx.timeBlockTask.findMany({
+      where: { taskId: habit.id },
+      select: { blockId: true },
+    });
+    const blockIds = hosting.map((link) => link.blockId);
+
+    await tx.timeBlockTask.deleteMany({ where: { taskId: habit.id } });
+
+    if (blockIds.length > 0) {
+      const sharing = await tx.timeBlockTask.findMany({
+        where: { blockId: { in: blockIds } },
+        select: { blockId: true },
+      });
+      const stillUsed = new Set(sharing.map((link) => link.blockId));
+      const orphaned = blockIds.filter((id) => !stillUsed.has(id));
+
+      if (orphaned.length > 0) {
+        // Cue blocks hanging off these follow via the `cueForId` cascade.
+        await tx.timeBlock.deleteMany({ where: { id: { in: orphaned } } });
+      }
+    }
+
     await tx.task.delete({ where: { id: habit.id } });
   });
 

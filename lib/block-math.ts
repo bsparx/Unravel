@@ -258,6 +258,204 @@ export function formatMinuteLength(total: number): string {
 export const formatSpanLength = (span: Span): string =>
   formatMinuteLength(spanMinutes(span));
 
+// ---------------------------------------------------------------- naming
+
+/**
+ * The least a block needs to be nameable: what it was called, and what is in
+ * it. Structural rather than importing `CalendarBlock` — this file is pure and
+ * has to stay importable from a client component without dragging Prisma in
+ * with it.
+ */
+export type BlockNaming = {
+  title: string;
+  tasks: { title: string }[];
+};
+
+/**
+ * What to call a block when something has to print one string.
+ *
+ * A named block keeps its name — "gym" is a better label than the three things
+ * you happen to do there. Only when nobody named it does it fall back to its
+ * contents: one task reads as the task (so a block with a single task is
+ * indistinguishable from the way it always looked), several read as a count.
+ */
+export function blockLabel(block: BlockNaming): string {
+  if (block.title.trim().length > 0) return block.title;
+
+  const [first, ...rest] = block.tasks;
+  if (!first) return "Untitled block";
+  if (rest.length === 0) return first.title;
+  return `${block.tasks.length} tasks`;
+}
+
+/**
+ * The block's contents spelled out — "Draft outline, Pull the charts +1".
+ *
+ * The long form, for a tooltip or a line of prose. Ordered exactly as the block
+ * holds them, which is the order they were added and not a priority claim.
+ */
+export function blockTaskSummary(block: BlockNaming, max = 2): string {
+  const names = block.tasks.map((task) => task.title);
+  if (names.length === 0) return "";
+  const shown = names.slice(0, max).join(", ");
+  return names.length > max ? `${shown} +${names.length - max}` : shown;
+}
+
+/**
+ * How much of the block is done, as a fraction of what is in it.
+ *
+ * The one number a group has that a single-task block doesn't, which is why it
+ * is what an unnamed group is *called* on the grid. It counts the block's own
+ * ticks, not `Task.completedAt` — those are different claims, and a block only
+ * ever speaks for its own.
+ *
+ * Returns null for a block with nothing in it: "0 of 0" is not a fact, it is a
+ * placeholder, and a named block has a name to print instead.
+ */
+export function blockProgressParts(block: {
+  tasks: { doneAt: Date | null }[];
+}): { done: number; total: number } | null {
+  if (block.tasks.length === 0) return null;
+
+  return {
+    done: block.tasks.filter((task) => task.doneAt !== null).length,
+    total: block.tasks.length,
+  };
+}
+
+// ---------------------------------------------------------------- fitting
+
+/**
+ * The vertical metrics a block's body is laid out in.
+ *
+ * Here rather than in the grid because two callers need them and they have to
+ * agree: the component draws to them, and `scripts/verify-logic.ts` checks that
+ * what it draws fits. A second copy is a second truth.
+ */
+
+// Measured off the classes the chip actually wears, not guessed: `py-1` is 8px,
+// the heading is one `leading-4`, and so on. A claim on the height that is
+// wrong by 4px is invisible until it is a task line that doesn't fit.
+
+/** One task line inside a block. */
+export const TASK_LINE_PX = 16;
+/** The heading row — one `leading-4`, whichever density it is set at. */
+export const HEADER_PX = 16;
+/** The "09:00 · 2h" stamp. */
+export const META_PX = 14;
+/** The breath between the heading and the list it introduces. */
+export const LIST_GAP_PX = 4;
+/** A row grows into a tall block up to here, and no further. */
+export const TASK_ROW_MAX_PX = 30;
+/** The chip's own vertical padding: `py-1`. */
+export const CHIP_PAD_Y_PX = 8;
+/** …and `py-0` below this, where 8px of air is the difference between a heading
+ *  and a heading half-clipped by its own border. */
+export const TIGHT_CHIP_PAD_Y_PX = 0;
+/** The stamp's own top padding: `pt-0.5`. */
+export const FOOTER_PAD_PX = 2;
+/** Nothing shorter than this is worth drawing, so short blocks fall back. */
+export const BLOCK_MIN_HEIGHT_PX = 18;
+/** Under this many minutes a block drops its padding rather than its heading.
+ *  Five minutes is the shortest block the grid will make, and it is 18px. */
+export const TIGHT_MINUTES = 15;
+
+export type TaskLineFit = {
+  /** Whether to draw the checklist at all. */
+  showList: boolean;
+  /** Task lines that fit. */
+  visible: number;
+  /** Left over, drawn as a single "+N more" line. Zero when everything fits. */
+  hidden: number;
+  /** Raw line capacity, so a caller can decide on a count line instead. */
+  room: number;
+};
+
+/**
+ * How much of a block's task list fits in the space the block actually has.
+ *
+ * Its own pixels are the only thing that knows: the grid runs at 2px per minute,
+ * so a 40-minute block and a 2-hour one are the same component at different
+ * heights, and a breakpoint list would be a second, drifting copy of the truth.
+ *
+ * Two rules, both about honesty rather than tidiness. A list needs at least two
+ * spare lines, because the summary takes one of them and "1 task, +2 more" is a
+ * list that teases rather than helps — below that the caller says how many there
+ * are instead. And nothing is ever drawn clipped: a half-line at the bottom is
+ * a task you would read as absent.
+ */
+export function fitTaskLines(
+  availablePx: number,
+  taskCount: number,
+  linePx = TASK_LINE_PX,
+): TaskLineFit {
+  const room = Math.max(0, Math.floor(availablePx / linePx));
+
+  if (taskCount <= room) {
+    return { showList: taskCount > 0, visible: taskCount, hidden: 0, room };
+  }
+
+  if (room < 2) return { showList: false, visible: 0, hidden: taskCount, room };
+
+  const visible = room - 1;
+  return { showList: true, visible, hidden: taskCount - visible, room };
+}
+
+export type BlockBodyLayout = {
+  fit: TaskLineFit;
+  /** Draw the "09:00 · 2h" stamp. It yields to the list when a line depends on it. */
+  showMeta: boolean;
+};
+
+/**
+ * The whole body decision for one block: what fits, and what has to give.
+ *
+ * One function rather than arithmetic in the component, because the budget is
+ * exact and easy to get subtly wrong — a missing 8px of chip padding is
+ * invisible until a 45-minute block with three tasks is 8px too short and the
+ * stamp lands on top of the last row. Every claim on the height is named here.
+ *
+ * `taskCount` must be 0 for a block whose list will not be drawn at all (a
+ * single-task block): there is no list to make room for, and letting one
+ * pretend otherwise would trade the stamp away for a line that never appears.
+ */
+export function layoutBlockBody({
+  heightPx,
+  taskCount,
+  isCue,
+  compact,
+  tight,
+}: {
+  /** The chip's full height, as drawn. */
+  heightPx: number;
+  /** Tasks that would be listed, or 0 when no list is drawn. */
+  taskCount: number;
+  isCue: boolean;
+  compact: boolean;
+  /** Under `TIGHT_MINUTES`: no padding, so the heading still fits. */
+  tight: boolean;
+}): BlockBodyLayout {
+  // A cue is one line borrowed from the habit below it. It has no body.
+  if (isCue) return { fit: fitTaskLines(0, 0), showMeta: false };
+
+  const padY = tight ? TIGHT_CHIP_PAD_Y_PX : CHIP_PAD_Y_PX;
+  const budget = heightPx - padY - HEADER_PX - LIST_GAP_PX;
+
+  if (compact) return { fit: fitTaskLines(budget, taskCount), showMeta: false };
+
+  const withMeta = fitTaskLines(budget - META_PX - FOOTER_PAD_PX, taskCount);
+
+  // The stamp is the least load-bearing thing in a block: if it is costing a
+  // task line, it goes. "What is in these two hours" beats "when they are",
+  // and a 45-minute block with three things in it is exactly that trade.
+  const withoutMeta = fitTaskLines(budget, taskCount);
+  if (withoutMeta.hidden < withMeta.hidden) {
+    return { fit: withoutMeta, showMeta: false };
+  }
+
+  return { fit: withMeta, showMeta: true };
+}
+
 /** "09:05" -> 545. Null on anything malformed, so a bad input can't shift a day. */
 export function parseMinuteOfDay(value: string): number | null {
   const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());

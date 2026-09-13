@@ -80,11 +80,22 @@ import {
   parseCloseStep,
 } from "@/lib/close-ritual";
 import {
+  blockLabel,
+  blockProgressParts,
+  blockTaskSummary,
   claimedMinutes,
+  CHIP_PAD_Y_PX,
   clampSpan,
+  TIGHT_CHIP_PAD_Y_PX,
   conflictsWith,
   findFreeSlot,
+  FOOTER_PAD_PX,
   formatMinuteOfDay,
+  fitTaskLines,
+  HEADER_PX,
+  layoutBlockBody,
+  LIST_GAP_PX,
+  META_PX,
   freeSlots,
   layoutColumns,
   mergeSpans,
@@ -95,6 +106,7 @@ import {
   PLAN_DEFAULT_MINUTES,
   snap,
   spanOfLength,
+  TASK_LINE_PX,
 } from "@/lib/block-math";
 import { planMinutes } from "@/lib/plan-drag";
 import { resolveTheme, systemTheme, THEMES } from "@/lib/theme";
@@ -1053,6 +1065,241 @@ check("a malformed time is rejected rather than coerced to midnight", () => {
   assert.equal(parseMinuteOfDay("25:00"), null);
   assert.equal(parseMinuteOfDay("9:5"), null);
   assert.equal(parseMinuteOfDay(""), null);
+});
+
+console.log("\nblocks that hold several tasks");
+
+/**
+ * The grid's own arithmetic, restated: 2px a minute, floored at one line so a
+ * 5-minute block is still a target. Restated here rather than imported so that
+ * a change to the grid's scale fails these checks loudly, instead of quietly
+ * passing against a number the component no longer uses.
+ */
+const blockHeightPx = (minutes: number) => Math.max(18, minutes * 2 - 2);
+
+/** The grid's density steps, restated: compact under 45m, tight under 15m. */
+const layoutAt = (minutes: number, taskCount: number) =>
+  layoutBlockBody({
+    heightPx: blockHeightPx(minutes),
+    taskCount,
+    isCue: false,
+    compact: minutes < 45,
+    tight: minutes < 15,
+  });
+
+check("an unnamed group is called by its progress, not by its count", () => {
+  // "3 tasks" said the same thing twice — once as a heading, once as the three
+  // lines directly beneath it. The fraction is the one fact the list can't say.
+  assert.deepEqual(
+    blockProgressParts({ tasks: [{ doneAt: null }, { doneAt: null }] }),
+    { done: 0, total: 2 },
+  );
+  assert.deepEqual(
+    blockProgressParts({
+      tasks: [{ doneAt: new Date() }, { doneAt: null }, { doneAt: null }],
+    }),
+    { done: 1, total: 3 },
+  );
+});
+
+check("a block with nothing in it has no progress to report", () => {
+  // "0 of 0" is not a fact, it is a placeholder, and a named block has a name.
+  assert.equal(blockProgressParts({ tasks: [] }), null);
+});
+
+check("progress counts the block's own ticks, never the task's completion", () => {
+  // LOAD-BEARING. These are different claims: a task finished inside a two-hour
+  // block is evidence about the block, and the task is a separate record.
+  const link = { doneAt: null } as { doneAt: Date | null };
+  assert.deepEqual(blockProgressParts({ tasks: [link, link] }), {
+    done: 0,
+    total: 2,
+  });
+});
+
+check("a named block keeps its name, whatever is inside it", () => {
+  // "Gym" reads better than the three exercises you happen to do there.
+  assert.equal(
+    blockLabel({
+      title: "Gym",
+      tasks: [{ title: "Squats" }, { title: "Rows" }],
+    }),
+    "Gym",
+  );
+});
+
+check("an unnamed block with one task reads as that task", () => {
+  // LOAD-BEARING for continuity: this is what makes a one-task block
+  // indistinguishable from the way every block looked before grouping existed.
+  assert.equal(
+    blockLabel({ title: "", tasks: [{ title: "Draft intro" }] }),
+    "Draft intro",
+  );
+});
+
+check("an unnamed block with several counts them rather than picking one", () => {
+  // Naming it after its first task would invent a priority the feature
+  // deliberately does not have.
+  const label = blockLabel({
+    title: "",
+    tasks: [{ title: "A" }, { title: "B" }, { title: "C" }],
+  });
+  assert.equal(label, "3 tasks");
+  assert.notEqual(label, "A");
+});
+
+check("whitespace is not a name", () => {
+  assert.equal(
+    blockLabel({ title: "   ", tasks: [{ title: "Draft" }] }),
+    "Draft",
+  );
+});
+
+check("a block with neither a name nor tasks still says something", () => {
+  // Reachable only from a row written before the validation rule, but a label
+  // of "undefined" on the grid is worse than an honest fallback.
+  assert.equal(blockLabel({ title: "", tasks: [] }), "Untitled block");
+});
+
+check("the long form truncates with a count, never silently", () => {
+  const block = {
+    title: "",
+    tasks: [
+      { title: "A" },
+      { title: "B" },
+      { title: "C" },
+      { title: "D" },
+    ],
+  };
+  assert.equal(blockTaskSummary(block, 2), "A, B +2");
+  assert.equal(blockTaskSummary(block, 9), "A, B, C, D");
+  assert.equal(blockTaskSummary({ title: "x", tasks: [] }, 2), "");
+});
+
+check("a block with room for its tasks draws all of them", () => {
+  // The case the whole feature exists for: two hours, three unrelated things.
+  const { fit, showMeta } = layoutAt(120, 3);
+  assert.equal(fit.showList, true);
+  assert.equal(fit.visible, 3);
+  assert.equal(fit.hidden, 0);
+  assert.equal(showMeta, true, "there is room for the stamp too");
+});
+
+check("a 45-minute block trades its time stamp for the third task", () => {
+  // LOAD-BEARING, and the bug this check exists for: the budget used to forget
+  // the chip's own 8px of padding, so three rows and a stamp were promised more
+  // height than the block had and the stamp landed on the last row.
+  const withMeta = layoutAt(45, 3);
+  assert.equal(withMeta.fit.visible, 3, "all three fit once the stamp yields");
+  assert.equal(withMeta.fit.hidden, 0);
+  assert.equal(withMeta.showMeta, false, "the stamp gave way, not the task");
+
+  // And the arithmetic that decides it: everything drawn still fits the block.
+  const drawn = CHIP_PAD_Y_PX + HEADER_PX + LIST_GAP_PX + 3 * TASK_LINE_PX;
+  assert.ok(drawn <= blockHeightPx(45), `${drawn} > ${blockHeightPx(45)}`);
+});
+
+check("a short block summarises rather than drawing a clipped list", () => {
+  // A half-line at the bottom is a task the reader would take for absent, which
+  // is worse than being told how many there are.
+  const { fit } = layoutAt(30, 4);
+  assert.equal(fit.showList, false);
+  assert.equal(fit.visible, 0);
+  assert.equal(fit.hidden, 4);
+});
+
+check("a list is never one task and a '+N more'", () => {
+  // Two spare lines is the floor: one is the summary, so one task plus a
+  // summary is a list that teases rather than helps.
+  const narrow = fitTaskLines(TASK_LINE_PX, 5);
+  assert.equal(narrow.showList, false);
+  assert.equal(narrow.hidden, 5);
+
+  const wider = fitTaskLines(TASK_LINE_PX * 3, 5);
+  assert.equal(wider.showList, true);
+  assert.equal(wider.visible, 2, "one line of the room is the summary");
+  assert.equal(wider.hidden, 3);
+  assert.equal(wider.visible + wider.hidden, 5, "nothing is lost in the count");
+});
+
+check("a single-task block never gives up its stamp for a list it won't draw", () => {
+  // The trap in the yield rule: a single-task block passes taskCount 0, so
+  // there is no list to make room for and the stamp must survive. Swept,
+  // because the bug would only show at the heights where the room is tight.
+  for (const minutes of [46, 60, 90, 120, 240]) {
+    const { fit, showMeta } = layoutAt(minutes, 0);
+    assert.equal(fit.showList, false, `${minutes}m`);
+    assert.equal(showMeta, true, `${minutes}m lost its stamp`);
+  }
+});
+
+check("a compact block carries no stamp, and that is the whole of it", () => {
+  // Under 45 minutes the stamp goes regardless of what would fit — a 40-minute
+  // block is a slice of a morning, and its start time is already written on the
+  // grid beside it.
+  for (const minutes of [5, 15, 30, 44]) {
+    assert.equal(layoutAt(minutes, 0).showMeta, false, `${minutes}m should be compact`);
+  }
+});
+
+check("nothing is ever drawn past the bottom of its block", () => {
+  // The invariant the whole budget exists for, swept across every block length
+  // the grid can draw and every task count a block may hold.
+  for (let minutes = 5; minutes <= 8 * 60; minutes += 5) {
+    const heightPx = blockHeightPx(minutes);
+    for (const taskCount of [2, 3, 5, 8]) {
+      const { fit, showMeta } = layoutAt(minutes, taskCount);
+      const where = `${minutes}m with ${taskCount}`;
+
+      const padY = minutes < 15 ? TIGHT_CHIP_PAD_Y_PX : CHIP_PAD_Y_PX;
+      const rows = fit.showList ? fit.visible + (fit.hidden > 0 ? 1 : 0) : 0;
+      const drawn =
+        padY +
+        HEADER_PX +
+        (rows > 0 ? LIST_GAP_PX + rows * TASK_LINE_PX : 0) +
+        (showMeta ? META_PX + FOOTER_PAD_PX : 0);
+
+      assert.ok(drawn <= heightPx, `${where} draws ${drawn}px in ${heightPx}px`);
+      if (fit.showList) assert.ok(fit.visible >= 1, `${where} drew an empty list`);
+    }
+  }
+});
+
+check("a two-line single-task heading still leaves room for its stamp", () => {
+  // A tall single-task block clamps its title to two lines, so its heading is
+  // twice HEADER_PX — more than the budget reserves for it. That is safe only
+  // because exactly this case draws no list, so the heights are never tight;
+  // the shortest block allowed a stamp is 46 minutes.
+  const twoLineHeading = HEADER_PX * 2;
+  for (const minutes of [46, 60, 90, 240]) {
+    const heightPx = blockHeightPx(minutes);
+    const drawn = CHIP_PAD_Y_PX + twoLineHeading + META_PX + FOOTER_PAD_PX;
+    assert.ok(drawn <= heightPx, `${minutes}m: draws ${drawn}px in ${heightPx}px`);
+  }
+});
+
+check("the drawn lines and the summary always add back up", () => {
+  for (const room of [0, 1, 2, 3, 4, 6, 9]) {
+    for (const count of [0, 1, 2, 3, 5, 8]) {
+      const fit = fitTaskLines(room * TASK_LINE_PX, count);
+      const where = `room ${room}, count ${count}`;
+
+      assert.equal(fit.visible + fit.hidden, count, `${where} lost a task`);
+      assert.equal(fit.room, room, `${where} miscounted its own capacity`);
+
+      if (!fit.showList) {
+        // Nothing is drawn, so nothing may be counted as drawn.
+        assert.equal(fit.visible, 0, where);
+        continue;
+      }
+
+      // What is drawn, plus the summary line when one is needed, has to fit.
+      assert.ok(
+        fit.visible + (fit.hidden > 0 ? 1 : 0) <= fit.room,
+        `${where} drew past the bottom of the block`,
+      );
+    }
+  }
 });
 
 console.log("\nhabit stacking — cues and chains");

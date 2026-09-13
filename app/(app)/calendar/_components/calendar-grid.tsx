@@ -14,10 +14,15 @@ import Link from "next/link";
 import { Check, CornerDownRight, GripHorizontal, Play, X } from "lucide-react";
 
 import {
+  BLOCK_MIN_HEIGHT_PX,
+  blockLabel,
+  blockProgressParts,
   clampSpan,
   formatMinuteOfDay,
   formatSpanLength,
+  layoutBlockBody,
   layoutColumns,
+  LIST_GAP_PX,
   MIN_BLOCK_MINUTES,
   MINUTES_PER_DAY,
   PLAN_DEFAULT_MINUTES,
@@ -25,9 +30,13 @@ import {
   SNAP_MINUTES,
   spanMinutes,
   spanOfLength,
+  TASK_LINE_PX,
+  TASK_ROW_MAX_PX,
+  TIGHT_MINUTES,
 } from "@/lib/block-math";
 import {
   calendarChipStyle,
+  calendarInkStyle,
   isCalendarColor,
 } from "@/lib/calendar-colors";
 import {
@@ -36,14 +45,14 @@ import {
   readPlanItem,
   type PlanDragItem,
 } from "@/lib/plan-drag";
-import type { CalendarBlock } from "@/lib/time-blocks";
+import type { CalendarBlock, BlockTask } from "@/lib/time-blocks";
 import type { PrayerBand } from "@/lib/prayers";
 import { buildTimerHref } from "@/lib/timer-url";
 import { toWorkMode } from "@/lib/timer-math";
 import { abutsNeighbour, transitionsForDay } from "@/lib/transitions";
 import { cn } from "@/lib/utils";
 
-import { deleteBlock, moveBlock, toggleBlockDone } from "../actions";
+import { deleteBlock, moveBlock, toggleBlockDone, toggleBlockTask } from "../actions";
 import { PrayerBands } from "./prayer-bands";
 import { TransitionStrip } from "./transition-strip";
 
@@ -139,7 +148,36 @@ type BlockPatch =
       startMinute: number;
       endMinute: number;
     }
-  | { kind: "remove"; id: string };
+  | { kind: "remove"; id: string }
+  | { kind: "toggleBlock"; id: string }
+  | { kind: "toggleTask"; blockId: string; taskId: string };
+
+/**
+ * The block's tick, restated from its task list.
+ *
+ * A block with tasks is done exactly when all of them are — the server says the
+ * same in `reconcileBlockCompletion`, and the two have to agree or the tick
+ * flickers back on the round trip.
+ */
+function withDerivedCompletion(block: CalendarBlock): CalendarBlock {
+  if (block.tasks.length === 0) return block;
+  const allDone = block.tasks.every((task) => task.doneAt !== null);
+  return { ...block, completedAt: allDone ? block.completedAt ?? new Date() : null };
+}
+
+function applyToggleTask(
+  block: CalendarBlock,
+  taskId: string,
+): CalendarBlock {
+  return withDerivedCompletion({
+    ...block,
+    tasks: block.tasks.map((task) =>
+      task.id === taskId
+        ? { ...task, doneAt: task.doneAt === null ? new Date() : null }
+        : task,
+    ),
+  });
+}
 
 export function CalendarGrid({
   days,
@@ -149,6 +187,7 @@ export function CalendarGrid({
   onCreate,
   onEdit,
   onDropItem,
+  onDropOnBlock,
 }: {
   days: GridDay[];
   blocks: CalendarBlock[];
@@ -163,6 +202,8 @@ export function CalendarGrid({
   onEdit: (block: CalendarBlock) => void;
   /** Something was dragged in from the panel and let go at `startMinute`. */
   onDropItem: (item: PlanDragItem, dateISO: string, startMinute: number) => void;
+  /** …and let go *on* a block that already exists: add it to that time. */
+  onDropOnBlock: (item: PlanDragItem, block: CalendarBlock) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrolledRef = useRef(false);
@@ -178,30 +219,47 @@ export function CalendarGrid({
     }
 
     return current.map((block) => {
-      if (block.id === patch.id) {
+      if (patch.kind === "toggleTask") {
+        return block.id === patch.blockId
+          ? applyToggleTask(block, patch.taskId)
+          : block;
+      }
+
+      if (patch.kind === "toggleBlock" && block.id === patch.id) {
+        const done = block.completedAt === null;
         return {
           ...block,
-          dateISO: patch.dateISO,
-          startMinute: patch.startMinute,
-          endMinute: patch.endMinute,
+          completedAt: done ? new Date() : null,
+          tasks: block.tasks.map((task) => ({
+            ...task,
+            doneAt: done ? task.doneAt ?? new Date() : null,
+          })),
         };
       }
 
-      // A cue keeps its place at the front of the block it cues. `moveBlock`
-      // does the same on the server; doing it here too is what stops the cue
-      // visibly lagging a frame behind the thing it's glued to.
-      if (block.cueForId === patch.id) {
-        const length = spanMinutes(block);
-        const end = patch.startMinute;
-        return {
-          ...block,
-          dateISO: patch.dateISO,
-          startMinute: Math.max(0, end - length),
-          endMinute: end,
-        };
+      if (patch.kind !== "move" || block.id !== patch.id) {
+        // A cue keeps its place at the front of the block it cues. `moveBlock`
+        // does the same on the server; doing it here too is what stops the cue
+        // visibly lagging a frame behind the thing it's glued to.
+        if (patch.kind === "move" && block.cueForId === patch.id) {
+          const length = spanMinutes(block);
+          const end = patch.startMinute;
+          return {
+            ...block,
+            dateISO: patch.dateISO,
+            startMinute: Math.max(0, end - length),
+            endMinute: end,
+          };
+        }
+        return block;
       }
 
-      return block;
+      return {
+        ...block,
+        dateISO: patch.dateISO,
+        startMinute: patch.startMinute,
+        endMinute: patch.endMinute,
+      };
     });
   });
 
@@ -259,10 +317,30 @@ export function CalendarGrid({
 
   const toggleDone = (block: CalendarBlock) => {
     startTransition(async () => {
+      applyPatch({ kind: "toggleBlock", id: block.id });
       const formData = new FormData();
       formData.set("id", block.id);
       formData.set("done", String(block.completedAt === null));
       await toggleBlockDone(formData);
+    });
+  };
+
+  /**
+   * One line inside a block.
+   *
+   * The tick is block-scoped and the write lands on the join row — the task
+   * itself is untouched. Same rule as the block's own tick: a plan is not the
+   * thing, and `toggleBlockDone` would not have it any other way.
+   */
+  const toggleTask = (block: CalendarBlock, taskId: string) => {
+    const done = block.tasks.find((task) => task.id === taskId)?.doneAt === null;
+    startTransition(async () => {
+      applyPatch({ kind: "toggleTask", blockId: block.id, taskId });
+      const formData = new FormData();
+      formData.set("blockId", block.id);
+      formData.set("taskId", taskId);
+      formData.set("done", String(done));
+      await toggleBlockTask(formData);
     });
   };
 
@@ -360,8 +438,10 @@ export function CalendarGrid({
               onCreate={onCreate}
               onEdit={onEdit}
               onToggleDone={toggleDone}
+              onToggleTask={toggleTask}
               onDropCue={dropCue}
               onDropItem={onDropItem}
+              onDropOnBlock={onDropOnBlock}
             />
           ))}
         </div>
@@ -525,8 +605,10 @@ function DayColumn({
   onCreate,
   onEdit,
   onToggleDone,
+  onToggleTask,
   onDropCue,
   onDropItem,
+  onDropOnBlock,
 }: {
   day: GridDay;
   blocks: CalendarBlock[];
@@ -563,8 +645,10 @@ function DayColumn({
   ) => void;
   onEdit: (block: CalendarBlock) => void;
   onToggleDone: (block: CalendarBlock) => void;
+  onToggleTask: (block: CalendarBlock, taskId: string) => void;
   onDropCue: (block: CalendarBlock) => void;
   onDropItem: (item: PlanDragItem, dateISO: string, startMinute: number) => void;
+  onDropOnBlock: (item: PlanDragItem, block: CalendarBlock) => void;
 }) {
   const columnRef = useRef<HTMLDivElement>(null);
 
@@ -700,6 +784,23 @@ function DayColumn({
 
   const laid = layoutColumns(positioned);
 
+  /**
+   * The block the pointer is currently over, if any.
+   *
+   * A drop on empty grid makes a new block; a drop *on* a block adds to it.
+   * Without this the two gestures are indistinguishable, and the only way to
+   * put a third task into a two-hour stretch would be to open the editor and
+   * hunt for it — which is exactly the friction the grouping is supposed to
+   * remove.
+   */
+  const dropBlock =
+    dropMinute === null
+      ? null
+      : (positioned.find(
+          (block) =>
+            dropMinute >= block.startMinute && dropMinute < block.endMinute,
+        ) ?? null);
+
   // Recomputed mid-drag on purpose: watching the gap close as you drag is the
   // point. Told after the fact, you have already made the plan that fails.
   const transitions = transitionsForDay(
@@ -738,9 +839,14 @@ function DayColumn({
       }}
       onDrop={(event) => {
         const item = readPlanItem(event.dataTransfer);
+        const target = dropBlock;
         setDropMinute(null);
         if (!item) return;
         event.preventDefault();
+        if (target) {
+          onDropOnBlock(item, target);
+          return;
+        }
         onDropItem(item, day.dateISO, minuteAt(event.clientY));
       }}
     >
@@ -867,6 +973,7 @@ function DayColumn({
           only marks the start minute leaves you guessing whether a 90-minute
           task clears the thing below it — which is the actual question. */}
       {dropMinute !== null &&
+        dropBlock === null &&
         (() => {
           const minutes = activePlanItem()?.minutes ?? PLAN_DEFAULT_MINUTES;
           return (
@@ -910,8 +1017,11 @@ function DayColumn({
           column={column}
           columns={columns}
           dragging={drag?.id === block.id}
+          /** The drop would land *in* this block rather than beside it. */
+          receiving={dropBlock?.id === block.id}
           onPointerDown={(event, mode) => beginDrag(event, block, mode)}
           onToggleDone={() => onToggleDone(block)}
+          onToggleTask={(taskId) => onToggleTask(block, taskId)}
           onDropCue={() => onDropCue(block)}
         />
       ))}
@@ -978,36 +1088,224 @@ const KIND_STYLES = {
     "bg-violet-400/10 border-violet-400/40 text-muted-foreground border-dashed",
 } as const;
 
+/**
+ * The play button on a task, wherever it sits — the block's heading row or one
+ * of the lines in its list.
+ *
+ * It opens the timer *on that task*, which is the whole reason a block carries
+ * a task at all. The estimate offered is the block's own length: the time you
+ * claimed is the time you have, and it is the same number for every task in a
+ * group because a group is one stretch, not three budgets.
+ *
+ * Idle at half strength rather than hidden. A group's whole point is that it is
+ * a set of things you are going to *do*, and an affordance that exists only on
+ * hover does not exist on a touch screen, in a screenshot, or to anyone
+ * scanning the week for where to start. It now answers to its own row's hover
+ * instead of the whole chip's, so three rows don't light up at once.
+ */
+function TaskTimerLink({
+  task,
+  minutes,
+  done,
+}: {
+  task: BlockTask;
+  minutes: number;
+  done: boolean;
+}) {
+  if (done) return null;
+
+  return (
+    <Link
+      href={buildTimerHref({
+        id: task.id,
+        estimatedSeconds: minutes * 60,
+        defaultMode: toWorkMode(task.defaultMode),
+        plannedIntervals: task.plannedIntervals,
+      })}
+      aria-label={`Start a timer for ${task.title}`}
+      onPointerDown={(event) => event.stopPropagation()}
+      className="text-muted-foreground/45 group-hover/row:text-primary focus-visible:text-primary shrink-0 transition-colors group-hover/row:opacity-100 focus-visible:opacity-100"
+    >
+      <Play className="size-3" aria-hidden />
+    </Link>
+  );
+}
+
+/**
+ * One line inside a block: the mark, the name, the way in.
+ *
+ * The mark is a **square**, and that is exactly why the block's own tick can
+ * stay a circle. Three hollow circles stacked read as a set of radio buttons —
+ * *choose one* — which is the opposite of what a block holding three things
+ * means. A square says "any number of these"; the circle a level up says "all
+ * of it".
+ *
+ * Its outline wears the task's own hue, because a task's colour is its identity
+ * everywhere else in the app and inside a shared block this is the only place
+ * left to carry it. Done fills it with the primary, matching every other
+ * finished mark on the calendar: the hue is identity, the teal is state, and
+ * the two never have to compete.
+ *
+ * The row is `flex-1` up to a cap, so a group's lines spread down the height it
+ * claims instead of huddling at the top of it. Vertical space *is* time on this
+ * grid, and a two-hour block with three things in it should not look like a
+ * forty-minute one with three things in it.
+ */
+function BlockTaskRow({
+  task,
+  minutes,
+  onToggle,
+}: {
+  task: BlockTask;
+  minutes: number;
+  onToggle: () => void;
+}) {
+  const done = task.doneAt !== null;
+
+  return (
+    <li
+      className="group/row hover:bg-foreground/[0.05] -mx-1 flex min-w-0 flex-1 items-center gap-2 rounded-sm px-1 transition-colors"
+      style={{ minHeight: TASK_LINE_PX, maxHeight: TASK_ROW_MAX_PX }}
+    >
+      <button
+        type="button"
+        aria-label={
+          done
+            ? `Untick ${task.title} in this block`
+            : `Tick ${task.title} off in this block`
+        }
+        title="Done in this block — the task itself stays open"
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggle();
+        }}
+        className={cn(
+          "grid size-3 shrink-0 place-items-center rounded-[3px] border transition-colors",
+          done
+            ? "border-primary bg-primary text-primary-foreground animate-pop"
+            : "hover:border-current",
+        )}
+        style={
+          done || !isCalendarColor(task.color)
+            ? undefined
+            : calendarInkStyle(task.color)
+        }
+      >
+        <Check
+          className={cn(
+            "size-2 transition-opacity",
+            done ? "opacity-100" : "opacity-0 group-hover/row:opacity-45",
+          )}
+          strokeWidth={3}
+          aria-hidden
+        />
+      </button>
+
+      <span
+        className={cn(
+          "min-w-0 flex-1 truncate text-label",
+          done && "text-muted-foreground line-through",
+        )}
+      >
+        {task.title}
+      </span>
+
+      <TaskTimerLink task={task} minutes={minutes} done={done} />
+    </li>
+  );
+}
+
 function BlockChip({
   block,
   column,
   columns,
   dragging,
+  receiving,
   onPointerDown,
   onToggleDone,
+  onToggleTask,
   onDropCue,
 }: {
   block: CalendarBlock;
   column: number;
   columns: number;
   dragging: boolean;
+  /** A dragged task is hovering this block: dropping adds it here. */
+  receiving: boolean;
   onPointerDown: (event: React.PointerEvent, mode: "move" | "resize") => void;
   onToggleDone: () => void;
+  onToggleTask: (taskId: string) => void;
   onDropCue: () => void;
 }) {
   const minutes = spanMinutes(block);
   const compact = minutes < COMPACT_MINUTES;
+  /** Shorter than a heading plus its own padding: air is the first thing to go. */
+  const tight = minutes < TIGHT_MINUTES;
   const done = block.completedAt !== null;
   /** This block is the cue in front of another one. */
   const isCue = block.cueForId !== null;
+
   /**
-   * The task's hue, when there is one. A cue stays quiet — it is part of
-   * something else, not a thing with an identity of its own.
+   * One task reads exactly as it always did — the block *is* that task, so its
+   * title is the block's title and there is no list to draw. Several turn the
+   * body into a short checklist.
+   */
+  const multi = block.tasks.length > 1;
+  const label = blockLabel(block);
+  const named = block.title.trim().length > 0;
+  const progress = blockProgressParts(block);
+
+  /**
+   * The heading.
+   *
+   * An unnamed group is **called by its progress** — "0 of 3" — which is the
+   * one fact a group has that a single-task block doesn't, and the only one
+   * worth printing where a title would go. "3 tasks" said the same thing twice:
+   * once as a heading, once as the three lines directly beneath it. The
+   * fraction says it once, and says something the list cannot.
+   *
+   * A named group keeps its name; every block that was ever titled reads
+   * exactly as it did before.
+   */
+  const heading = named
+    ? block.title
+    : multi
+      ? null
+      : (block.tasks[0]?.title ?? "Untitled block");
+
+  /** A name and a fraction are two facts, so a named group shows both. */
+  const showProgress = multi && named && progress !== null;
+
+  /**
+   * The task's hue, when there is exactly one task to inherit it from. A block
+   * holding three stays the kind's colour: it is a container, not any one of
+   * the things inside it, and picking a winner would be inventing a ranking the
+   * product doesn't have. Each line carries its own hue on its mark instead.
+   *
+   * A cue stays quiet — it is part of something else, not a thing with an
+   * identity of its own.
    */
   const tint =
-    !isCue && block.task && isCalendarColor(block.task.color)
-      ? calendarChipStyle(block.task.color)
+    !isCue && block.tasks.length === 1 && isCalendarColor(block.tasks[0].color)
+      ? calendarChipStyle(block.tasks[0].color)
       : null;
+
+  // How much of the body fits at this height, decided in one place. Drawn from
+  // the block's real pixel height, because the grid's scale is the only thing
+  // that knows what fits — a 40-minute block and a 2-hour one are the same
+  // component at different heights.
+  const heightPx = Math.max(BLOCK_MIN_HEIGHT_PX, minutes * MINUTE_PX - 2);
+  const { fit, showMeta } = layoutBlockBody({
+    heightPx,
+    // A single-task block draws no list, so it must not make room for one.
+    taskCount: multi ? block.tasks.length : 0,
+    isCue,
+    compact,
+    tight,
+  });
+  const showList = multi && fit.showList;
+  const visible = block.tasks.slice(0, fit.visible);
 
   const width = `calc(${100 / columns}% - 4px)`;
   const left = `calc(${(column * 100) / columns}% + 2px)`;
@@ -1015,7 +1313,8 @@ function BlockChip({
   return (
     <div
       className={cn(
-        "group absolute z-10 overflow-hidden rounded-md border px-2 py-1 select-none",
+        "group absolute z-10 flex flex-col overflow-hidden rounded-md border px-2 select-none",
+        tight ? "py-0" : "py-1",
         "transition-shadow duration-150 hover:shadow-sm",
         // A task-coloured block sheds the kind's tint and the buffer's
         // dashed "empty on purpose" reading — it has a thing behind it now.
@@ -1029,10 +1328,11 @@ function BlockChip({
           "rounded-b-none border-b-transparent border-dashed bg-transparent",
         dragging && "z-30 cursor-grabbing shadow-md",
         !dragging && "cursor-grab",
+        receiving && "ring-primary/70 z-20 ring-2",
       )}
       style={{
         top: block.startMinute * MINUTE_PX,
-        height: Math.max(18, minutes * MINUTE_PX - 2),
+        height: heightPx,
         width,
         left,
         ...tint,
@@ -1046,11 +1346,11 @@ function BlockChip({
             aria-hidden
           />
           <p className="text-muted-foreground min-w-0 flex-1 truncate text-micro leading-4 normal-case tracking-normal">
-            {block.title}
+            {label}
           </p>
           <button
             type="button"
-            aria-label={`Skip ${block.title} today`}
+            aria-label={`Skip ${label} today`}
             title="Not today"
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => {
@@ -1063,75 +1363,143 @@ function BlockChip({
           </button>
         </div>
       ) : (
-        <div
-          className={cn(
-            "flex min-w-0 items-start gap-1.5",
-            compact && "items-center",
-          )}
-        >
-          <button
-            type="button"
-            aria-label={
-              done ? `Untick ${block.title}` : `Tick off ${block.title}`
-            }
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={(event) => {
-              event.stopPropagation();
-              onToggleDone();
-            }}
+        <>
+          <div
             className={cn(
-              "mt-0.5 grid size-3.5 shrink-0 place-items-center rounded-full border transition-colors",
-              done
-                ? "border-primary bg-primary text-primary-foreground animate-pop"
-                : "border-current/40 hover:border-current",
+              // `group/row` as well as the chip's own `group`: a single-task
+              // block's play button lives here rather than on a list row, and
+              // without this it would never brighten.
+              "group/row flex shrink-0 min-w-0 items-start gap-1.5",
+              compact && "items-center",
             )}
           >
-            {/* Hidden until ticked or hovered. A check drawn faintly inside every
-                block makes a freshly planned day read as one you already did. */}
-            <Check
-              className={cn(
-                "size-2.5 transition-opacity",
-                done ? "opacity-100" : "opacity-0 group-hover:opacity-45",
-              )}
-              strokeWidth={3}
-              aria-hidden
-            />
-          </button>
-
-          <p
-            className={cn(
-              "min-w-0 flex-1 text-label leading-4 font-medium",
-              // A tall block has the room for two lines, and "Write…" in a
-              // 90-minute box is throwing away the space that makes a week view
-              // readable at a glance.
-              compact ? "truncate" : "line-clamp-2",
-              done && "line-through",
-              block.kind === "DAYDREAM" && "italic",
-            )}
-          >
-            {block.title}
-          </p>
-
-          {block.task && !done && (
-            <Link
-              href={buildTimerHref({
-                id: block.task.id,
-                estimatedSeconds: minutes * 60,
-                defaultMode: toWorkMode(block.task.defaultMode),
-                plannedIntervals: block.task.plannedIntervals,
-              })}
-              aria-label={`Start a timer for ${block.title}`}
+            <button
+              type="button"
+              aria-label={done ? `Untick ${label}` : `Tick off ${label}`}
               onPointerDown={(event) => event.stopPropagation()}
-              className="text-muted-foreground hover:text-primary shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleDone();
+              }}
+              className={cn(
+                "mt-0.5 grid size-3.5 shrink-0 place-items-center rounded-full border transition-colors",
+                compact && "mt-0",
+                done
+                  ? "border-primary bg-primary text-primary-foreground animate-pop"
+                  : "border-current/40 hover:border-current",
+              )}
             >
-              <Play className="size-3" aria-hidden />
-            </Link>
+              {/* Hidden until ticked or hovered. A check drawn faintly inside every
+                  block makes a freshly planned day read as one you already did. */}
+              <Check
+                className={cn(
+                  "size-2.5 transition-opacity",
+                  done ? "opacity-100" : "opacity-0 group-hover:opacity-45",
+                )}
+                strokeWidth={3}
+                aria-hidden
+              />
+            </button>
+
+            {/* An unnamed group's heading *is* its progress, set in the mono
+                face this app keeps for numerals. Two reasons it reads as a
+                heading rather than as a fourth row: it is mono where the rows
+                are the body face, and the list hangs off a rule beneath it. */}
+            {heading === null && progress ? (
+              // No colour on the parent, deliberately: the number inherits the
+              // block's own ink and only the tail is dimmed, so nothing depends
+              // on which of two colour utilities Tailwind happens to emit last.
+              <p className="min-w-0 flex-1 truncate font-mono text-label leading-4 tracking-tight">
+                <span className="font-medium tabular-nums">{progress.done}</span>{" "}
+                <span className="text-muted-foreground tabular-nums">
+                  of {progress.total}
+                </span>
+              </p>
+            ) : (
+              <p
+                className={cn(
+                  "min-w-0 flex-1 text-label leading-4 font-medium",
+                  // A tall single-task block has room for two lines, and "Write…"
+                  // in a 90-minute box throws away the space that makes a week
+                  // view readable at a glance. A block with a list under it keeps
+                  // to one line, because the list is the thing worth reading.
+                  compact || multi ? "truncate" : "line-clamp-2",
+                  done && "line-through",
+                  block.kind === "DAYDREAM" && "italic",
+                )}
+              >
+                {heading}
+              </p>
+            )}
+
+            {/* A name and a fraction are different facts; a named group shows
+                both, and the fraction is the one that moves, so it is the one
+                set loudest. */}
+            {showProgress && progress && (
+              <span className="shrink-0 font-mono text-micro tabular-nums">
+                <span className="font-medium">{progress.done}</span>
+                <span className="text-muted-foreground">
+                  /{progress.total}
+                </span>
+              </span>
+            )}
+
+            {/* The block's own task. A group's play buttons live on its lines. */}
+            {!multi && block.tasks[0] && (
+              <TaskTimerLink
+                task={block.tasks[0]}
+                minutes={minutes}
+                done={done}
+              />
+            )}
+          </div>
+
+          {/* The group, as a checklist. No order between the lines beyond the
+              order they were added — nothing here is a sequence.
+
+              The rule down the left is what stops the heading reading as the
+              first item in its own list: the heading sits on the block's edge,
+              the contents are visibly hung inside it. It is the same hairline
+              the calendar already uses for the space between two blocks, doing
+              the one other job it is good at. */}
+          {showList && (
+            <ul
+              className="border-current/20 flex min-h-0 flex-1 flex-col border-l pl-2.5"
+              style={{ marginTop: LIST_GAP_PX }}
+            >
+              {visible.map((task) => (
+                <BlockTaskRow
+                  key={task.id}
+                  task={task}
+                  minutes={minutes}
+                  onToggle={() => onToggleTask(task.id)}
+                />
+              ))}
+
+              {fit.hidden > 0 && (
+                // Indented past the mark column, so it lines up with the task
+                // names above it rather than reading as another mark.
+                <li
+                  className="text-muted-foreground flex shrink-0 items-center pl-5 font-mono text-micro"
+                  style={{ minHeight: TASK_LINE_PX }}
+                >
+                  <span className="tabular-nums">+{fit.hidden} more</span>
+                </li>
+              )}
+            </ul>
           )}
-        </div>
+        </>
       )}
 
-      {!compact && !isCue && (
-        <p className="text-muted-foreground mt-0.5 text-micro tabular-nums">
+      {/* The footer. `mt-auto` pins it to the block's bottom edge, so the space
+          a group doesn't use collects *above* it rather than pushing the stamp
+          up under the last task — where it read as one more thing to do.
+
+          The slack is not a bug to hide. Vertical space is time on this grid,
+          and a two-hour block holding two things genuinely has room left in it;
+          the pinned stamp is what turns that from an accident into a fact. */}
+      {showMeta && (
+        <p className="text-muted-foreground mt-auto shrink-0 pt-0.5 text-micro tabular-nums">
           {formatMinuteOfDay(block.startMinute)} · {formatSpanLength(block)}
         </p>
       )}
@@ -1146,7 +1514,7 @@ function BlockChip({
       {!isCue && (
         <button
           type="button"
-          aria-label={`Change the length of ${block.title}`}
+          aria-label={`Change the length of ${label}`}
           onPointerDown={(event) => onPointerDown(event, "resize")}
           className="absolute inset-x-0 bottom-0 flex h-2 cursor-ns-resize items-center justify-center opacity-0 transition-opacity group-hover:opacity-60 focus-visible:opacity-100"
         >

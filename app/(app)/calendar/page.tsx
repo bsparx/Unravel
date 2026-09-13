@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth";
 import {
+  blockLabel,
   claimedMinutes,
   formatMinuteLength,
   formatMinuteOfDay,
@@ -144,7 +145,10 @@ export default async function CalendarPage({
       return (
         <>
           Next up:{" "}
-          <span className="text-foreground font-medium">{nextUp.title}</span> at{" "}
+          <span className="text-foreground font-medium">
+            {blockLabel(nextUp)}
+          </span>{" "}
+          at{" "}
           <span className="tabular-nums">{formatMinuteOfDay(nextUp.startMinute)}</span>
           {open > 0 && (
             <>

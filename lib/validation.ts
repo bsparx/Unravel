@@ -347,10 +347,28 @@ const includeCue = z
   .default("true")
   .transform((value) => value === "true");
 
+/**
+ * How many tasks one block may hold.
+ *
+ * Eight, not unlimited: a block is a stretch of time you are actually going to
+ * spend, and a list longer than this is a project wearing a calendar block's
+ * clothes. Low enough, too, that the grid can still render every one of them.
+ */
+export const MAX_BLOCK_TASKS = 8;
+
 const blockShape = {
-  title: z.string().trim().min(1, "Give the block a name.").max(200),
+  /**
+   * Optional, because a block that is *for* its tasks needs no second name
+   * invented for it. The rule that keeps "lunch" honest is `isNamedOrStaffed`:
+   * a block is either named, or it has something in it.
+   */
+  title: z.string().trim().max(200).default(""),
   notes: emptyToUndefined(notes),
-  taskId: emptyToUndefined(cuid),
+  /** `taskIds[]`, repeated — a set, deliberately in no promised order. */
+  taskIds: z
+    .array(cuid)
+    .max(MAX_BLOCK_TASKS, `A block holds at most ${MAX_BLOCK_TASKS} tasks.`)
+    .default([]),
   date: isoDate,
   startMinute: minuteOfDay,
   endMinute: minuteOfDay,
@@ -372,13 +390,30 @@ const longEnough = {
 const isLongEnough = (value: { startMinute: number; endMinute: number }) =>
   value.endMinute - value.startMinute >= MIN_BLOCK_MINUTES;
 
+type BlockShape = z.infer<z.ZodObject<typeof blockShape>>;
+
+/**
+ * A block with no tasks is a named claim on time ("gym", "lunch") and has to
+ * say what it is. A block with tasks already says what it is — the tasks are
+ * the answer, so an empty title is complete rather than unfinished.
+ */
+const isNamedOrStaffed = (value: BlockShape) =>
+  value.title.length > 0 || value.taskIds.length > 0;
+
+const namedOrStaffed = {
+  message: "Name the block, or put a task in it.",
+  path: ["title"],
+};
+
 export const createBlockSchema = z
   .object(blockShape)
-  .refine(isLongEnough, longEnough);
+  .refine(isLongEnough, longEnough)
+  .refine(isNamedOrStaffed, namedOrStaffed);
 
 export const updateBlockSchema = z
   .object({ ...blockShape, id: cuid })
-  .refine(isLongEnough, longEnough);
+  .refine(isLongEnough, longEnough)
+  .refine(isNamedOrStaffed, namedOrStaffed);
 
 /** Drag-to-move and drag-to-resize. Coerced, never rejected — see clampSpan. */
 export const moveBlockSchema = z.object({
@@ -386,6 +421,32 @@ export const moveBlockSchema = z.object({
   date: isoDate,
   startMinute: minuteOfDay,
   endMinute: minuteOfDay,
+});
+
+/**
+ * Ticking one task inside a block.
+ *
+ * Block-scoped: `doneAt` lands on the join row, never on the task. It is the
+ * block's own question, asked one line at a time.
+ */
+export const toggleBlockTaskSchema = z.object({
+  blockId: cuid,
+  taskId: cuid,
+  done: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true"),
+});
+
+/**
+ * Dragging a task from the panel straight onto a block that already exists —
+ * "this belongs in that two hours". The counterpart to `scheduleTask`, which
+ * makes a new block: here the time is already claimed and only the workload
+ * changes.
+ */
+export const addTaskToBlockSchema = z.object({
+  blockId: cuid,
+  taskId: cuid,
 });
 
 /** "Put this task somewhere sensible today" — the one-click scheduling path. */
