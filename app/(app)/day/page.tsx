@@ -10,14 +10,14 @@ import {
   toISODate,
 } from "@/lib/dates";
 import { getPrayerCycle } from "@/lib/prayers";
-import { getTodayView, startHereHabit } from "@/lib/tasks";
+import { getTodayView } from "@/lib/tasks";
 import { getBlocks } from "@/lib/time-blocks";
 import { getWaterToday } from "@/lib/water-data";
 
 import { DayList } from "./_components/day-list";
-import { DayRail } from "./_components/day-rail";
 import { PrayerSection } from "./_components/prayer-section";
-import { StartHere } from "./_components/start-here";
+import { QuestHero } from "./_components/quest-hero";
+import { QuestLog } from "./_components/quest-log";
 
 export const metadata = { title: "Your day" };
 
@@ -31,15 +31,6 @@ export default async function TodayPage() {
   const todayISO = toISODate(view.date);
 
   const prayers = user.prayerRemindersEnabled ? await getPrayerCycle(user) : null;
-
-  const nowMinute = minuteOfDayLocal(user.timezone);
-
-  // Time-aware: the habit whose moment it is, else the old chain of fallbacks.
-  const upNext =
-    startHereHabit(view.habits, nowMinute) ??
-    view.overdue[0] ??
-    view.dueToday[0] ??
-    view.undated[0];
 
   return (
     <div className="mx-auto w-full max-w-4xl px-5 py-8 md:px-8 md:py-12">
@@ -72,17 +63,33 @@ export default async function TodayPage() {
         </p>
       </header>
 
-      {/* One obvious next action, then the day's shape. Everything below is
-          optional. */}
-      {upNext && (
-        <StartHere item={upNext} timezone={user.timezone} />
-      )}
-
-      <DayRail
+      {/* One obvious quest, then the day's shape. Everything below is
+          optional. The hero reads the calendar's blocks and the anchored
+          habits as one timeline: in progress, about to unlock, or available
+          right now. */}
+      <QuestHero
         blocks={plannedBlocks}
-        dateISO={todayISO}
-        upNextMinute={upNext?.timeAnchorMinutes ?? null}
+        habits={view.habits}
+        available={{
+          overdue: view.overdue,
+          dueToday: view.dueToday,
+          undated: view.undated,
+          unanchored: view.habits.filter(
+            (habit) => habit.timeAnchorMinutes === null,
+          ),
+          completedCount: view.completedToday.length,
+        }}
+        serverNowMinute={minuteOfDayLocal(user.timezone)}
         timezone={user.timezone}
+        dateISO={todayISO}
+      />
+
+      <QuestLog
+        blocks={plannedBlocks}
+        habits={view.habits}
+        serverNowMinute={minuteOfDayLocal(user.timezone)}
+        timezone={user.timezone}
+        dateISO={todayISO}
       />
 
       {user.prayerRemindersEnabled && <PrayerSection view={prayers} />}

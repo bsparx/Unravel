@@ -10,25 +10,37 @@ export default function Loading() {
           <Skeleton className="h-4 w-56 rounded-md" />
         </header>
 
-        <div className="rounded-lg border p-4">
+        {/* The quest hero: eyebrow, title, a couple of objectives, a bar. */}
+        <div className="rounded-xl border p-5">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <Skeleton className="h-4 w-28 rounded-md" />
-            <Skeleton className="h-4 w-20 rounded-md" />
+            <Skeleton className="h-3.5 w-24 rounded-md" />
+            <Skeleton className="h-3.5 w-32 rounded-md" />
           </div>
-          <Skeleton className="h-3 w-full rounded-full" />
-          <div className="mt-1.5 flex justify-between">
-            <Skeleton className="h-3 w-8 rounded-md" />
-            <Skeleton className="h-3 w-8 rounded-md" />
-            <Skeleton className="h-3 w-8 rounded-md" />
+          <Skeleton className="h-6 w-3/5 rounded-lg" />
+          <div className="mt-4 space-y-2">
+            <Skeleton className="h-4 w-2/3 rounded-md" />
+            <Skeleton className="h-4 w-1/2 rounded-md" />
           </div>
+          <Skeleton className="mt-4 h-0.5 w-full rounded-full" />
         </div>
 
-        <div className="flex items-center justify-between gap-4 rounded-lg border px-4 py-3.5">
-          <div className="space-y-2">
-            <Skeleton className="h-3 w-16 rounded-md" />
-            <Skeleton className="h-5 w-48 rounded-md" />
+        {/* The quest log. */}
+        <div className="rounded-xl border px-4 py-1.5">
+          <div className="flex items-center justify-between py-2">
+            <Skeleton className="h-3.5 w-32 rounded-md" />
+            <Skeleton className="h-3.5 w-24 rounded-md" />
           </div>
-          <Skeleton className="h-4 w-20 rounded-md" />
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 py-2.5">
+              <Skeleton className="size-2.5 shrink-0 rounded-full" />
+              <Skeleton className="h-4 w-[6.75rem] shrink-0 rounded-md" />
+              <Skeleton
+                className="h-4 rounded-md"
+                style={{ width: `${52 - (i % 3) * 12}%` }}
+              />
+              <Skeleton className="ml-auto h-3.5 w-12 shrink-0 rounded-md" />
+            </div>
+          ))}
         </div>
 
         <div className="space-y-1">

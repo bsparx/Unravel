@@ -80,6 +80,14 @@ import {
   parseCloseStep,
 } from "@/lib/close-ritual";
 import {
+  buildQuestTimeline,
+  pickHeroQuest,
+  questProgress,
+  type AvailablePool,
+} from "@/lib/day-quests";
+import type { TodayItem } from "@/lib/tasks";
+import type { CalendarBlock } from "@/lib/time-blocks";
+import {
   blockLabel,
   blockProgressParts,
   blockTaskSummary,
@@ -2693,6 +2701,272 @@ check("non-canonical clock strings are rejected", () => {
     parseTimings({ timings: { ...PRAYER_HHMM, Fajr: "25:00" } }),
     null,
   );
+});
+
+// ---------------------------------------------------------------- day quests
+
+const questBlock = (
+  overrides: Partial<CalendarBlock> & { startMinute: number; endMinute: number },
+): CalendarBlock => ({
+  id: overrides.id ?? `block-${overrides.startMinute}`,
+  title: overrides.title ?? "",
+  notes: null,
+  dateISO: "2026-09-21",
+  startMinute: overrides.startMinute,
+  endMinute: overrides.endMinute,
+  kind: overrides.kind ?? "WORK",
+  completedAt: overrides.completedAt ?? null,
+  cueForId: overrides.cueForId ?? null,
+  hasCue: overrides.hasCue ?? false,
+  tasks: overrides.tasks ?? [],
+});
+
+const questHabit = (
+  overrides: Partial<TodayItem> & { id: string; timeAnchorMinutes: number | null },
+): TodayItem => ({
+  type: "HABIT",
+  title: `habit ${overrides.id}`,
+  notes: null,
+  priority: "P3",
+  estimatedSeconds: null,
+  defaultMode: "BASIC",
+  plannedIntervals: null,
+  dueDate: null,
+  completedAt: null,
+  project: null,
+  steps: [],
+  occurrenceStatus: null,
+  loggedSeconds: 0,
+  done: false,
+  minimumMinutes: 1,
+  daysUntilDue: null,
+  recurrenceDays: null,
+  cue: null,
+  missedYesterday: false,
+  requiresFeedback: false,
+  feedbackNote: null,
+  feedbackPrompt: null,
+  quota: null,
+  progress: 0,
+  ...overrides,
+});
+
+const questAvailable = (
+  overrides: Partial<AvailablePool> = {},
+): AvailablePool => ({
+  overdue: [],
+  dueToday: [],
+  undated: [],
+  unanchored: [],
+  completedCount: 0,
+  ...overrides,
+});
+
+const questTodo = (id: string, daysUntilDue: number | null): TodayItem => ({
+  id,
+  type: "TODO",
+  title: `todo ${id}`,
+  notes: null,
+  priority: "P2",
+  estimatedSeconds: null,
+  defaultMode: "BASIC",
+  plannedIntervals: null,
+  dueDate: null,
+  completedAt: null,
+  project: null,
+  steps: [],
+  occurrenceStatus: null,
+  loggedSeconds: 0,
+  done: false,
+  minimumMinutes: 1,
+  daysUntilDue: daysUntilDue,
+  recurrenceDays: null,
+  timeAnchorMinutes: null,
+  cue: null,
+  missedYesterday: false,
+  requiresFeedback: false,
+  feedbackNote: null,
+  feedbackPrompt: null,
+  quota: null,
+  progress: 0,
+});
+
+check("the active work quest outranks everything else in its window", () => {
+  const quests = buildQuestTimeline({
+    blocks: [
+      questBlock({ startMinute: 9 * 60, endMinute: 10 * 60, tasks: [] }),
+      questBlock({ startMinute: 9 * 60 + 15, endMinute: 9 * 60 + 45, kind: "RECOVERY" }),
+      questBlock({ startMinute: 9 * 60 + 30, endMinute: 9 * 60 + 50, kind: "BUFFER" }),
+    ],
+    habits: [questHabit({ id: "walk", timeAnchorMinutes: 9 * 60 + 20 })],
+    nowMinute: 9 * 60 + 30,
+  });
+
+  const hero = pickHeroQuest(quests, questAvailable(), 9 * 60 + 30);
+  assert.equal(hero.kind, "ACTIVE_QUEST");
+  if (hero.kind === "ACTIVE_QUEST") {
+    assert.equal(hero.quest.kind, "WORK");
+    // Overlapping actives are counted, not hidden: the recovery block and
+    // the arrived habit are both live behind the hero quest.
+    assert.equal(hero.moreActive, 2);
+  }
+});
+
+check("recovery is the hero when only rest is in its window", () => {
+  const quests = buildQuestTimeline({
+    blocks: [questBlock({ startMinute: 13 * 60, endMinute: 13 * 60 + 30, kind: "RECOVERY" })],
+    habits: [questHabit({ id: "walk", timeAnchorMinutes: 9 * 60 })],
+    nowMinute: 13 * 60 + 10,
+  });
+
+  const hero = pickHeroQuest(quests, questAvailable(), 13 * 60 + 10);
+  assert.equal(hero.kind, "REST_ACTIVE");
+  if (hero.kind === "REST_ACTIVE") {
+    assert.equal(hero.quest.kind, "RECOVERY");
+  }
+});
+
+check("the arrived habit is the hero when no block is active", () => {
+  const quests = buildQuestTimeline({
+    blocks: [questBlock({ startMinute: 15 * 60, endMinute: 15 * 60 + 45 })],
+    habits: [questHabit({ id: "walk", timeAnchorMinutes: 9 * 60 })],
+    nowMinute: 10 * 60,
+  });
+
+  const hero = pickHeroQuest(quests, questAvailable(), 10 * 60);
+  assert.equal(hero.kind, "ACTIVE_QUEST");
+  if (hero.kind === "ACTIVE_QUEST") {
+    assert.equal(hero.quest.kind, "HABIT");
+    assert.equal(hero.quest.habit?.id, "walk");
+  }
+});
+
+check("buffer-only time is free roam that names the next quest", () => {
+  const quests = buildQuestTimeline({
+    blocks: [
+      questBlock({ startMinute: 13 * 60, endMinute: 14 * 60, kind: "BUFFER" }),
+      questBlock({ startMinute: 15 * 60, endMinute: 15 * 60 + 45 }),
+    ],
+    habits: [],
+    nowMinute: 13 * 60 + 30,
+  });
+
+  const hero = pickHeroQuest(quests, questAvailable(), 13 * 60 + 30);
+  assert.equal(hero.kind, "FREE_ROAM");
+  if (hero.kind === "FREE_ROAM") {
+    assert.equal(hero.untilMinute, 14 * 60);
+    assert.equal(hero.next?.startMinute, 15 * 60);
+  }
+});
+
+check("a quest unlocking soon outranks the backlog; one hours away yields", () => {
+  const soon = buildQuestTimeline({
+    blocks: [questBlock({ startMinute: 10 * 60 + 30, endMinute: 11 * 60 + 15 })],
+    habits: [],
+    nowMinute: 10 * 60,
+  });
+  const soonHero = pickHeroQuest(
+    soon,
+    questAvailable({ dueToday: [questTodo("sam", 0)] }),
+    10 * 60,
+  );
+  assert.equal(soonHero.kind, "NEXT_QUEST");
+
+  const far = buildQuestTimeline({
+    blocks: [questBlock({ startMinute: 18 * 60, endMinute: 18 * 60 + 45 })],
+    habits: [],
+    nowMinute: 10 * 60,
+  });
+  const farHero = pickHeroQuest(
+    far,
+    questAvailable({ dueToday: [questTodo("sam", 0)] }),
+    10 * 60,
+  );
+  assert.equal(farHero.kind, "AVAILABLE");
+  if (farHero.kind === "AVAILABLE") {
+    assert.equal(farHero.item.title, "todo sam");
+  }
+});
+
+check("the fallback pool is overdue, then due today, then anytime, then unanchored", () => {
+  const quests = buildQuestTimeline({ blocks: [], habits: [], nowMinute: 10 * 60 });
+  const hero = pickHeroQuest(
+    quests,
+    questAvailable({
+      overdue: [questTodo("old", -3)],
+      dueToday: [questTodo("sam", 0)],
+      undated: [questTodo("someday", null)],
+      unanchored: [questHabit({ id: "journal", timeAnchorMinutes: null })],
+    }),
+    10 * 60,
+  );
+  assert.equal(hero.kind, "AVAILABLE");
+  if (hero.kind === "AVAILABLE") {
+    assert.equal(hero.item.title, "todo old");
+  }
+});
+
+check("block states read the half-open window: touching blocks are not active", () => {
+  const quests = buildQuestTimeline({
+    blocks: [
+      questBlock({ id: "past", startMinute: 8 * 60, endMinute: 9 * 60 }),
+      questBlock({ id: "touch", startMinute: 9 * 60, endMinute: 10 * 60 }),
+      questBlock({ id: "done", startMinute: 10 * 60, endMinute: 10 * 60 + 30, completedAt: new Date() }),
+    ],
+    habits: [],
+    nowMinute: 9 * 60,
+  });
+
+  const byId = new Map(quests.map((q) => [q.id, q]));
+  assert.equal(byId.get("past")?.state, "PAST");
+  assert.equal(byId.get("touch")?.state, "ACTIVE");
+  assert.equal(byId.get("done")?.state, "COMPLETE");
+
+  // A completed block is never the hero even while its window is open. The
+  // timeline is rebuilt at the pick minute — states are baked at build time.
+  const later = buildQuestTimeline({
+    blocks: [
+      questBlock({ id: "past", startMinute: 8 * 60, endMinute: 9 * 60 }),
+      questBlock({ id: "touch", startMinute: 9 * 60, endMinute: 10 * 60 }),
+      questBlock({ id: "done", startMinute: 10 * 60, endMinute: 10 * 60 + 30, completedAt: new Date() }),
+    ],
+    habits: [],
+    nowMinute: 10 * 60 + 10,
+  });
+  const hero = pickHeroQuest(later, questAvailable(), 10 * 60 + 10);
+  assert.equal(hero.kind, "NOTHING_PLANNED");
+});
+
+check("a habit scheduled into a block is spoken for by the block alone", () => {
+  const walk = questHabit({ id: "walk", timeAnchorMinutes: 9 * 60 });
+  const quests = buildQuestTimeline({
+    blocks: [
+      questBlock({
+        startMinute: 9 * 60,
+        endMinute: 9 * 60 + 30,
+        tasks: [{ id: "walk", title: "Morning walk", color: "#2f6f6a", estimatedSeconds: null, defaultMode: "BASIC", plannedIntervals: null, completedAt: null, doneAt: null }],
+      }),
+    ],
+    habits: [walk],
+    nowMinute: 10 * 60,
+  });
+
+  assert.equal(quests.filter((q) => q.kind === "HABIT").length, 0);
+  assert.equal(questProgress(quests).total, 1);
+});
+
+check("a day of completed quests reads as all done, not as nothing planned", () => {
+  const quests = buildQuestTimeline({
+    blocks: [questBlock({ startMinute: 8 * 60, endMinute: 8 * 60 + 30, completedAt: new Date() })],
+    habits: [],
+    nowMinute: 10 * 60,
+  });
+
+  const hero = pickHeroQuest(quests, questAvailable({ completedCount: 2 }), 10 * 60);
+  assert.equal(hero.kind, "ALL_DONE");
+  if (hero.kind === "ALL_DONE") {
+    assert.equal(hero.completedCount, 2);
+  }
 });
 
 console.log(`\n${passed} checks passed.\n`);

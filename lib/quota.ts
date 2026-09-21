@@ -16,6 +16,8 @@
  * Statistics show both. The streak only ever asks about the minimum.
  */
 
+import { clampTarget } from "@/lib/timer-math";
+
 export type HabitUnit = "MINUTES" | "COUNT";
 export type QuotaTier = "NONE" | "MINIMUM" | "OPTIMAL";
 
@@ -186,3 +188,24 @@ export const TIER_LABELS: Record<QuotaTier, string> = {
   MINIMUM: "Minimum",
   OPTIMAL: "Optimal",
 };
+
+// ---------------------------------------------------------------- timer handoff
+
+/**
+ * The timer target for a habit, or null when its quota is not measured in
+ * time. The minimum is the bar that matters — the optimal only covers rows
+ * with a missing or zero minimum. Clamped so a very large quota can't exceed
+ * the URL schema's ceiling and invalidate the whole query string.
+ *
+ * Lives here rather than beside any one row component, because every surface
+ * that links a habit to the timer — rows, the quest hero — has to agree on
+ * what the clock should be set to.
+ */
+export function habitTimerTargetSeconds(quota: Quota): number | null {
+  if (quota.unit !== "MINUTES") return null;
+  if (quota.minimum > 0) return clampTarget(quota.minimum * 60);
+  if (quota.optimal !== null && quota.optimal > 0) {
+    return clampTarget(quota.optimal * 60);
+  }
+  return null;
+}

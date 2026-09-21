@@ -83,16 +83,31 @@ export function DayList({
     await logAndComplete(formData);
   };
 
+  // The quest counters: done over done-and-still-open, per section. Done
+  // items live in `completedToday` alongside their section's open ones, so
+  // the pair is assembled here — "2/4" reads as progress, not as debt.
+  const doneHabits = view.completedToday.filter(
+    (item) => item.type === "HABIT",
+  ).length;
+  const doneDueToday = view.completedToday.filter(
+    (item) => item.type === "TODO" && item.daysUntilDue === 0,
+  ).length;
+  const doneUndated = view.completedToday.filter(
+    (item) => item.type === "TODO" && item.daysUntilDue === null,
+  ).length;
+
   const sections: {
     key: string;
     heading: string;
     items: TodayItem[];
     tone?: "overdue";
+    /** Done today, for the section's "2/4" counter. */
+    done?: number;
   }[] = [
     { key: "overdue", heading: "Overdue", items: view.overdue, tone: "overdue" },
-    { key: "habits", heading: "Habits", items: view.habits },
-    { key: "due", heading: "Due today", items: view.dueToday },
-    { key: "undated", heading: "Anytime", items: view.undated },
+    { key: "habits", heading: "Dailies", items: view.habits, done: doneHabits },
+    { key: "due", heading: "Quests", items: view.dueToday, done: doneDueToday },
+    { key: "undated", heading: "Side quests", items: view.undated, done: doneUndated },
   ];
 
   const hasAnything = sections.some((section) => section.items.length > 0);
@@ -110,8 +125,8 @@ export function DayList({
         </section>
         <EmptyState
           icon={Sun}
-          title="Nothing on today"
-          description="Add the first thing that's on your mind above. One line is enough — you can add a time estimate later."
+          title="No quests yet"
+          description="Add the first thing on your mind above, or claim time for it on the calendar. One line is enough."
         />
       </div>
     );
@@ -142,12 +157,13 @@ export function DayList({
               }`}
             >
               {section.heading}
-              {/* Overdue counts what's wrong; the rest count the decisions
-                  remaining — a small number that only goes down. */}
+              {/* Overdue counts what's wrong; the quest sections read as a
+                  game's counter — done over total, a number that only climbs
+                  until the section empties out. */}
               <span className="ml-2 tabular-nums opacity-60">
                 {section.tone === "overdue"
                   ? section.items.length
-                  : `${section.items.length} left`}
+                  : `${section.done ?? 0}/${(section.done ?? 0) + section.items.length}`}
               </span>
             </h2>
 
@@ -175,7 +191,7 @@ export function DayList({
         <section>
           <h2 className="text-micro text-muted-foreground mb-1 flex items-center gap-1.5 font-sans font-medium tracking-wider uppercase">
             <CheckCircle2 className="text-primary size-3.5" aria-hidden />
-            Done today
+            Completed
             <span className="tabular-nums opacity-60">
               {view.completedToday.length}
             </span>
