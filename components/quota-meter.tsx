@@ -32,12 +32,19 @@ export function QuotaMeter({
   dateISO,
   quota,
   progress,
+  identities,
   compact = false,
 }: {
   taskId: string;
   dateISO: string;
   quota: Quota;
   progress: number;
+  /**
+   * Names of the identities this habit votes for. When today's minimum is met,
+   * the quiet line under the meter names them — the reinforcement loop, said
+   * once and without ceremony. No confetti: the sentence is the reward.
+   */
+  identities?: string[];
   compact?: boolean;
 }) {
   const [, startTransition] = useTransition();
@@ -120,30 +127,41 @@ export function QuotaMeter({
       </div>
 
       {!compact && (
-        <p className="text-muted-foreground text-label">
-          {toMinimum > 0 ? (
-            <>
-              <span className="text-foreground tabular-nums">
-                {formatQuota(toMinimum, quota.unit)}
-              </span>{" "}
-              to today&apos;s minimum
-            </>
-          ) : (
-            <span
-              className={cn(
-                "inline-flex items-center gap-1",
-                tier === "OPTIMAL" ? "text-primary" : "text-foreground",
-              )}
-            >
-              <Check className="size-3" aria-hidden />
-              {tier === "OPTIMAL"
-                ? "A good day."
-                : toOptimal !== null && toOptimal > 0
-                  ? `Minimum met — ${formatQuota(toOptimal, quota.unit)} to a good day`
-                  : "Minimum met."}
-            </span>
+        <>
+          <p className="text-muted-foreground text-label">
+            {toMinimum > 0 ? (
+              <>
+                <span className="text-foreground tabular-nums">
+                  {formatQuota(toMinimum, quota.unit)}
+                </span>{" "}
+                to today&apos;s minimum
+              </>
+            ) : (
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1",
+                  tier === "OPTIMAL" ? "text-primary" : "text-foreground",
+                )}
+              >
+                <Check className="size-3" aria-hidden />
+                {tier === "OPTIMAL"
+                  ? "A good day."
+                  : toOptimal !== null && toOptimal > 0
+                    ? `Minimum met — ${formatQuota(toOptimal, quota.unit)} to a good day`
+                    : "Minimum met."}
+              </span>
+            )}
+          </p>
+
+          {/* The vote line: only once the minimum is met, and only when the
+              habit actually stands for something. Identity is reinforced by
+              naming the evidence — quietly, once. */}
+          {toMinimum === 0 && identities && identities.length > 0 && (
+            <p className="text-muted-foreground text-micro">
+              That&apos;s a vote for {identities.join(" · ")}.
+            </p>
           )}
-        </p>
+        </>
       )}
     </div>
   );

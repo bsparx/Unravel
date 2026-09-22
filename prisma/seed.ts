@@ -1098,6 +1098,7 @@ async function main() {
   await prisma.focusSession.deleteMany({ where: { userId: user.id } });
   await prisma.taskOccurrence.deleteMany({ where: { userId: user.id } });
   await prisma.task.deleteMany({ where: { userId: user.id } });
+  await prisma.identity.deleteMany({ where: { userId: user.id } });
   await prisma.project.deleteMany({ where: { userId: user.id } });
   await prisma.moneyBudget.deleteMany({ where: { userId: user.id } });
   await prisma.moneyTransaction.deleteMany({ where: { userId: user.id } });
@@ -1363,6 +1364,57 @@ async function main() {
       return { task, ...habit };
     }),
   );
+
+  // ---- identities -----------------------------------------------------------
+  // Who the demo user is becoming, and which habits are the votes. "Morning
+  // pages" votes for two selves at once (the multi-link case), and "Stretch"
+  // runs at 50% reliability — so /identities opens with one identity thriving
+  // and one sitting in needs-focus, which is the interesting state.
+  const [writer, calm, athlete] = await Promise.all([
+    prisma.identity.create({
+      data: {
+        userId: user.id,
+        name: "Writer",
+        statement: "I am someone who writes every day.",
+        sortOrder: 0,
+      },
+    }),
+    prisma.identity.create({
+      data: {
+        userId: user.id,
+        name: "Someone calm",
+        statement: "I am someone who starts the day quietly.",
+        sortOrder: 1,
+      },
+    }),
+    prisma.identity.create({
+      data: {
+        userId: user.id,
+        name: "Athlete",
+        statement: "I am someone who moves.",
+        sortOrder: 2,
+      },
+    }),
+  ]);
+
+  const idOf = (title: string): string => {
+    const found = habits.find((habit) => habit.title === title);
+    if (!found) throw new Error(`Seed habit missing: ${title}`);
+    return found.task.id;
+  };
+
+  await prisma.habitIdentity.createMany({
+    data: [
+      // The multi-link case: one habit, two selves.
+      { taskId: idOf("Morning pages"), identityId: writer.id },
+      { taskId: idOf("Morning pages"), identityId: calm.id },
+      { taskId: idOf("Read something long"), identityId: writer.id },
+      { taskId: idOf("Inbox to zero"), identityId: calm.id },
+      // The unreliable one — Athlete lands in needs-focus on purpose.
+      { taskId: idOf("Stretch"), identityId: athlete.id },
+    ],
+    skipDuplicates: true,
+  });
 
   // ---- back-dated history ------------------------------------------------
 

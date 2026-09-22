@@ -105,6 +105,7 @@ export default async function EditHabitPage({
           cueMinutes: habit.cue?.anchorMinutes,
           requiresFeedback: habit.requiresFeedback,
           feedbackPrompt: habit.feedbackPrompt,
+          identityIds: habit.identities.map((link) => link.identityId),
         }}
       />
 

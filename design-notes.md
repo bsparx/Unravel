@@ -546,3 +546,38 @@ Reserved colours are
 untouched: running stays the clock's blue, rest the recovery slate, charts
 and money keep their own palettes. Applied by `lib/theme.ts` and the
 before-paint script, toggled from Settings → Appearance.
+
+## Identities — the why layer
+
+`/identities`, `Identity`/`HabitIdentity`, `lib/identity-reinforcement.ts`.
+
+Habits answered "what did you do"; identities answer "who are you becoming".
+Every habit kept is a **vote** for an identity ("Writer", "Athlete"), and the
+tally per identity is the reinforcement: votes over opportunities, where a
+vote is a due day whose minimum was met.
+
+Decisions, so they don't get re-derived:
+
+- **Votes are derived from tiers, never stored.** A vote *is* an OPTIMAL or
+  MINIMUM day. No event log, nothing to drift — the same rule as `tierFor`.
+- **One habit serving two identities casts one full vote for each.** A vote
+  for *each* self, never split — the denominator is that identity's due-days,
+  so nothing double counts within one tally.
+- **Links are a lens, not a snapshot.** Unlike `TaskOccurrence.tier`, which
+  freezes history against quota edits, `HabitIdentity` is read as it stands:
+  relinking is almost always a correction ("this always counted"). The schema
+  comment says why, so nobody "fixes" it into a snapshot later.
+- **SKIPPED is neither a vote nor a miss** — a deliberate rest is its own
+  number — and today is PENDING, never MISSED.
+- **Cold means due days without a vote.** Gaps in the schedule don't extend a
+  cold spell (a Friday-only habit isn't going cold all week), and a vote today
+  ends one.
+- **Tone: "needs focus", not "failing".** The needs-focus list is a pointer at
+  the hungriest identity, naming the habits that missed. Clay reuses the habit
+  grid's low-opacity miss segment — no new colours, no alarm.
+- **The vote line** ("That's a vote for Writer.") on the quota meter is the
+  whole in-the-moment reinforcement: one quiet sentence when the minimum is
+  met. No confetti, no sound — the brief's one-decision rule holds.
+- **The habit form can create an identity inline with just a name.** The
+  statement can wait until /identities; stopping mid-form to write an essay is
+  the wrong trade for this audience.

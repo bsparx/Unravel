@@ -409,6 +409,8 @@ export type HabitWithHistory = TaskSummary & {
   cue: CueSummary | null;
   /** Which parts of the day it belongs to — see lib/habit-slots. */
   slots: HabitSlot[];
+  /** The identities this habit is a vote for — see `HabitIdentity`. */
+  identities: { id: string; name: string }[];
 };
 
 export async function getHabits(
@@ -428,6 +430,9 @@ export async function getHabits(
         requiresFeedback: true,
         feedbackPrompt: true,
         cue: cueSelect,
+        identities: {
+          select: { identity: { select: { id: true, name: true } } },
+        },
       },
       orderBy: [{ archivedAt: "asc" }, { sortOrder: "asc" }],
     }),
@@ -489,6 +494,7 @@ export async function getHabits(
       feedbackPrompt: habit.feedbackPrompt,
       cue: toCue(habit.cue),
       slots: habit.recurrence!.slots,
+      identities: habit.identities.map((link) => link.identity),
     }));
 }
 
@@ -579,6 +585,7 @@ export async function getTask(user: User, taskId: string) {
       recurrence: true,
       cue: true,
       steps: { orderBy: { position: "asc" } },
+      identities: { select: { identityId: true } },
     },
   });
 }

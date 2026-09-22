@@ -181,6 +181,7 @@ export default async function HabitsPage() {
                       dateISO={toISODate(today)}
                       quota={habit.quota}
                       progress={habit.todayProgress}
+                      identities={habit.identities.map((identity) => identity.name)}
                     />
                     {habit.requiresFeedback &&
                       isDueOn(habit.rule, today) &&
@@ -200,6 +201,14 @@ export default async function HabitsPage() {
                   <>
                     <HabitStackTrail steps={stackTrail(habit.id)} />
                     <p className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-label">
+                      {habit.identities.map((identity) => (
+                        <span
+                          key={identity.id}
+                          className="border-border rounded-full border px-2 py-0.5 text-micro"
+                        >
+                          {identity.name}
+                        </span>
+                      ))}
                       <span>{describeRecurrence(habit.daysOfWeek)}</span>
                       <span>{describeSlots(habit.slots)}</span>
                       <span>{describeQuota(habit.quota)}</span>

@@ -33,6 +33,7 @@ import type { ActionState } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 
 import { HabitCueFields, type CueMode } from "./habit-cue-fields";
+import { IdentityPicker } from "./identity-picker";
 import { QuotaFields } from "./quota-fields";
 import { StepsEditor, type StepDraft } from "./steps-editor";
 
@@ -66,6 +67,8 @@ export type TaskFormValues = {
   cueMinutes?: number;
   requiresFeedback?: boolean;
   feedbackPrompt?: string | null;
+  /** The identities this habit is a vote for. */
+  identityIds?: string[];
 };
 
 const PRIORITIES: { value: "P1" | "P2" | "P3" | "P4"; label: string }[] = [
@@ -160,6 +163,9 @@ export function TaskForm({
 
   const [days, setDays] = useState<number[]>(values.daysOfWeek ?? EVERY_DAY);
   const [slots, setSlots] = useState<HabitSlot[]>(values.slots ?? ["ALWAYS"]);
+  const [identityIds, setIdentityIds] = useState<string[]>(
+    values.identityIds ?? [],
+  );
   const [mode, setMode] = useState<WorkMode>(values.defaultMode ?? "POMODORO");
   const [color, setColor] = useState<CalendarColor>(values.color ?? "teal");
   // Mirrored, not controlled: the title input keeps its defaultValue and this
@@ -222,6 +228,15 @@ export function TaskForm({
       {kind === "HABIT" &&
         slots.map((slot) => (
           <input key={slot} type="hidden" name="slots[]" value={slot} />
+        ))}
+      {kind === "HABIT" &&
+        identityIds.map((identityId) => (
+          <input
+            key={identityId}
+            type="hidden"
+            name="identityIds[]"
+            value={identityId}
+          />
         ))}
       <input type="hidden" name="defaultMode" value={mode} />
       <input type="hidden" name="color" value={color} />
@@ -377,6 +392,16 @@ export function TaskForm({
             taskIdError={error("cueTaskId")}
             labelError={error("cueLabel")}
           />
+        </Field>
+      ) : null}
+
+      {kind === "HABIT" ? (
+        <Field
+          label="Who does this vote for?"
+          hint="Every habit kept is a vote for the kind of person you want to become. Link the identities this habit is evidence for — one habit can serve several."
+          error={error("identityIds")}
+        >
+          <IdentityPicker value={identityIds} onChange={setIdentityIds} />
         </Field>
       ) : null}
 

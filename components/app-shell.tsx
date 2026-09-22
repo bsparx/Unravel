@@ -18,6 +18,7 @@ import {
   Settings,
   Sun,
   Timer,
+  UserRound,
   Wallet,
 } from "lucide-react";
 
@@ -70,6 +71,7 @@ const RAIL_EXTRA = [
   { href: "/behavior", label: "Behavior", icon: Inbox },
   { href: "/tasks", label: "Tasks", icon: ListTodo },
   { href: "/habits", label: "Habits", icon: Repeat },
+  { href: "/identities", label: "Identities", icon: UserRound },
   { href: "/stats", label: "Statistics", icon: BarChart3 },
   { href: "/water", label: "Water", icon: Droplets },
   { href: "/budget", label: "Budget", icon: Wallet },

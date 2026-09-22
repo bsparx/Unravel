@@ -29,6 +29,11 @@ day, and a ritual that ends it properly.
   the minimum/optimal split per day, and time spent per habit and in total.
   Filter by range and by habit; the filters live in the URL, so a view is a
   link.
+- **Identities, and the votes habits cast for them** — `/identities`. Name who
+  you are becoming ("a writer", "an athlete"), link the habits that are
+  evidence for it (one habit can serve several selves), and read the tally:
+  how much each identity was reinforced, what was missed, and which one needs
+  focus next. Every kept habit is a vote — the quota meter says so, quietly.
 - **Work and recovery** — one timer, two peers. Work takes one of three shapes
   (pomodoro, a plain countdown, or a flow timer that runs past your goal).
   Recovery has no target, no countdown and no progress ring at all: it counts

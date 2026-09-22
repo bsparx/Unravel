@@ -321,6 +321,12 @@ model User {
 
   tags Tag[]
 
+  /// Who this user is becoming — the aspirational identities, below. Not to be
+  /// confused with this model: `User` is the auth identity (who is signed in);
+  /// `Identity` is who they are trying to become. Two different questions that
+  /// unfortunately share a word.
+  identities Identity[]
+
   // Timer defaults. Inlined rather than a 1-1 Settings model because they are
   // always read together with the user.
   pomodoroSeconds     Int     @default(1500)
@@ -476,6 +482,12 @@ model Task {
   cue    HabitCue?  @relation("HabitCueOwner")
   cuedBy HabitCue[] @relation("HabitCueAnchor")
 
+  /// The identities this habit is a vote for. A join table: one habit can
+  /// serve several selves ("the walk" is both Athlete and Someone calm), and
+  /// one self is served by several habits. Habits only — a todo is a one-off
+  /// and casts no standing vote.
+  identities HabitIdentity[]
+
   @@index([userId, type, completedAt, archivedAt, dueDate])
   @@index([userId, projectId, sortOrder])
 }
@@ -593,6 +605,71 @@ model HabitCue {
   /// "Which habits are stacked on this one" — the chain walk, and the cycle
   /// check's edge map.
   @@index([anchorTaskId])
+}
+
+// ---------------------------------------------------------------- identities
+
+/// Who you are becoming.
+///
+/// The identity loop this exists to feed: every habit kept is a vote for the
+/// type of person you want to become, and an identity is the name of that
+/// person. `name` is the noun you'd put after "I am a…" ("Writer");
+/// `statement` is the full sentence the habits are evidence for ("I am someone
+/// who writes every day") — it is what the reinforcement reads back at you, so
+/// it is worth the user's own words.
+///
+/// User-owned, unlike behavior Tags: there is no universal set of identities,
+/// so nothing here is `userId = null` and everything can be edited or deleted.
+/// Deleting one takes only its links (HabitIdentity cascades) — the habits and
+/// their history stand, exactly like deleting a custom behavior tag keeps the
+/// entries it labelled.
+model Identity {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name      String
+  statement String?
+  /// Why this one matters, in the user's own words. Optional, and fine empty.
+  note String?
+
+  sortOrder Float @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  habits HabitIdentity[]
+
+  /// One name per user. Two "Writer"s would each hold half the votes and both
+  /// would read as neglected — a worse failure than refusing the second name.
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+/// The vote: which identities a habit is evidence for.
+///
+/// A join table in the `TimeBlockTask` mould — both directions are real reads
+/// ("what does this habit vote for" on the habit form; "what votes for this
+/// identity" on the identity page and in every tally), and both FKs cascade,
+/// so deleting either side takes the link and only the link.
+///
+/// Links are deliberately NOT snapshotted per day. Identity statistics read
+/// history through the links as they stand today: relinking is almost always a
+/// correction ("this always counted"), and a per-day link snapshot would turn
+/// corrections into rewrites. This is the opposite of `TaskOccurrence.tier`,
+/// and on purpose — a tier is a measurement of a day, a link is an opinion
+/// about a habit.
+model HabitIdentity {
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  identityId String
+  identity   Identity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@id([taskId, identityId])
+  /// The tally read: "every habit voting for this identity".
+  @@index([identityId, taskId])
 }
 
 /// SPARSE. One row per (task, local calendar day) that the user actually

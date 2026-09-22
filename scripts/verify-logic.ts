@@ -71,6 +71,13 @@ import {
 } from "@/lib/exercise-routine";
 import { parseQuickAdd } from "@/lib/quick-parse";
 import {
+  needsFocus,
+  reinforceIdentities,
+  type IdentitySeed,
+  type VoteDay,
+  type VoteHabit,
+} from "@/lib/identity-reinforcement";
+import {
   parseTimings,
   prayerWindows,
 } from "@/lib/prayer-math";
@@ -2967,6 +2974,201 @@ check("a day of completed quests reads as all done, not as nothing planned", () 
   if (hero.kind === "ALL_DONE") {
     assert.equal(hero.completedCount, 2);
   }
+});
+
+console.log("\nidentity reinforcement — votes, misses and cold identities");
+
+// Fixtures speak `VoteHabit`'s shape: due days only, in date order, the way
+// getHabitStats hands them to the tally. The shared range is one Mon..Sun week
+// with "today" the last day.
+const identitySeed = (id: string, name: string): IdentitySeed => ({
+  id,
+  name,
+  statement: null,
+  note: null,
+});
+
+const voteHabit = (
+  id: string,
+  title: string,
+  days: [string, VoteDay["outcome"]][],
+): VoteHabit => ({
+  id,
+  title,
+  days: days.map(([dateISO, outcome]) => ({ dateISO, outcome })),
+});
+
+const week = {
+  fromISO: "2026-03-02",
+  toISO: "2026-03-08",
+  todayISO: "2026-03-08",
+};
+
+check("a kept habit-day is one full vote for every identity it serves", () => {
+  const walk = voteHabit("walk", "Walk", [
+    ["2026-03-02", "MINIMUM"],
+    ["2026-03-03", "OPTIMAL"],
+  ]);
+  const tallies = reinforceIdentities(
+    [identitySeed("a", "Athlete"), identitySeed("b", "Someone calm")],
+    [
+      { identityId: "a", taskId: "walk" },
+      { identityId: "b", taskId: "walk" },
+    ],
+    [walk],
+    week,
+  );
+
+  assert.equal(tallies.length, 2);
+  for (const tally of tallies) {
+    // Split votes would show 1 here. A vote is for *each* self.
+    assert.equal(tally.expected, 2);
+    assert.equal(tally.votes, 2);
+    assert.equal(tally.optimalVotes, 1);
+    assert.equal(tally.reinforcement, 100);
+    assert.equal(tally.optimalShare, 50);
+  }
+});
+
+check("a miss is a missed opportunity; a skip is neither vote nor miss", () => {
+  const pages = voteHabit("pages", "Pages", [
+    ["2026-03-02", "MISSED"],
+    ["2026-03-03", "SKIPPED"],
+    ["2026-03-04", "MINIMUM"],
+  ]);
+  const [tally] = reinforceIdentities(
+    [identitySeed("w", "Writer")],
+    [{ identityId: "w", taskId: "pages" }],
+    [pages],
+    week,
+  );
+
+  assert.equal(tally.expected, 3);
+  assert.equal(tally.votes, 1);
+  assert.equal(tally.missed, 1);
+  assert.equal(tally.skipped, 1);
+  assert.equal(tally.starving.length, 1);
+  assert.equal(tally.starving[0].title, "Pages");
+  assert.equal(tally.starving[0].missed, 1);
+});
+
+check("today is pending and never cold — the day is still in progress", () => {
+  const pages = voteHabit("pages", "Pages", [
+    ["2026-03-06", "MISSED"],
+    ["2026-03-08", "PENDING"],
+  ]);
+  const [tally] = reinforceIdentities(
+    [identitySeed("w", "Writer")],
+    [{ identityId: "w", taskId: "pages" }],
+    [pages],
+    week,
+  );
+
+  assert.equal(tally.missed, 1);
+  assert.equal(tally.pending, 1);
+  // Friday missed, but today's opportunity is unspent, not lapsed: one due
+  // day behind, not two.
+  assert.equal(tally.coldDueDays, 1);
+});
+
+check("a Friday-only habit is not going cold all week", () => {
+  // Due Monday (kept) and Friday (missed) only. The four empty days between
+  // are schedule gaps, not a four-day cold spell.
+  const stretch = voteHabit("stretch", "Stretch", [
+    ["2026-03-02", "MINIMUM"],
+    ["2026-03-06", "MISSED"],
+  ]);
+  const [tally] = reinforceIdentities(
+    [identitySeed("a", "Athlete")],
+    [{ identityId: "a", taskId: "stretch" }],
+    [stretch],
+    week,
+  );
+
+  assert.equal(tally.coldDueDays, 1);
+});
+
+check("a vote today ends the cold spell", () => {
+  const stretch = voteHabit("stretch", "Stretch", [
+    ["2026-03-06", "MISSED"],
+    ["2026-03-08", "MINIMUM"],
+  ]);
+  const [tally] = reinforceIdentities(
+    [identitySeed("a", "Athlete")],
+    [{ identityId: "a", taskId: "stretch" }],
+    [stretch],
+    week,
+  );
+
+  assert.equal(tally.coldDueDays, 0);
+});
+
+check("needs focus lists the hungry, sorts worst first, skips the thriving", () => {
+  const walk = voteHabit("walk", "Walk", [
+    ["2026-03-02", "MISSED"],
+    ["2026-03-03", "MISSED"],
+    ["2026-03-04", "MINIMUM"],
+  ]);
+  const pages = voteHabit("pages", "Pages", [
+    ["2026-03-02", "MINIMUM"],
+    ["2026-03-03", "OPTIMAL"],
+  ]);
+  const meditate = voteHabit("meditate", "Meditate", []);
+
+  const tallies = reinforceIdentities(
+    [
+      identitySeed("a", "Athlete"),
+      identitySeed("w", "Writer"),
+      identitySeed("c", "Someone calm"),
+    ],
+    [
+      { identityId: "a", taskId: "walk" },
+      { identityId: "w", taskId: "pages" },
+      { identityId: "c", taskId: "meditate" },
+    ],
+    [walk, pages, meditate],
+    week,
+  );
+
+  const focus = needsFocus(tallies);
+  // Writer is thriving (2 of 2); calm has a link but nothing due — neither
+  // belongs on a list of things to worry about.
+  assert.equal(focus.length, 1);
+  assert.equal(focus[0].name, "Athlete");
+  assert.equal(focus[0].reinforcement, 33);
+});
+
+check("an identity nobody votes for still exists — and is not 'starved'", () => {
+  const tallies = reinforceIdentities(
+    [identitySeed("d", "Dreamer")],
+    [],
+    [],
+    week,
+  );
+
+  assert.equal(tallies.length, 1);
+  assert.equal(tallies[0].expected, 0);
+  assert.equal(tallies[0].reinforcement, 0);
+  // "No evidence yet" and "going hungry" are different sentences.
+  assert.equal(needsFocus(tallies).length, 0);
+});
+
+check("the daily strip keeps its columns even on days nothing is due", () => {
+  const pages = voteHabit("pages", "Pages", [["2026-03-03", "MINIMUM"]]);
+  const [tally] = reinforceIdentities(
+    [identitySeed("w", "Writer")],
+    [{ identityId: "w", taskId: "pages" }],
+    [pages],
+    week,
+  );
+
+  assert.equal(tally.daily.length, 7); // the whole week, not just due days
+  const voted = tally.daily.find((day) => day.dateISO === "2026-03-03");
+  assert.equal(voted?.touched, true);
+  assert.equal(voted?.due, 1);
+  const gap = tally.daily.find((day) => day.dateISO === "2026-03-07");
+  assert.equal(gap?.due, 0);
+  assert.equal(gap?.touched, false);
 });
 
 console.log(`\n${passed} checks passed.\n`);

@@ -61,6 +61,11 @@ const emptyToUndefined = <T extends z.ZodTypeAny>(schema: T) =>
 /** The most steps a task can have. Past this it isn't a task, it's a project. */
 export const MAX_STEPS = 20;
 
+/** The most selves one habit can plausibly be evidence for. */
+export const MAX_IDENTITIES_PER_HABIT = 6;
+/** The most habits one identity can draw votes from. */
+export const MAX_HABITS_PER_IDENTITY = 50;
+
 const stepInput = z.object({
   /**
    * Present for steps that already exist. Carrying it is what makes editing a
@@ -191,6 +196,14 @@ export const createHabitSchema = createTodoSchema
     cueTaskId: emptyToUndefined(cuid),
     cueLabel: emptyToUndefined(z.string().trim().min(1).max(120)),
     cueMinutes: z.coerce.number().int().min(1).max(240).default(5),
+
+    /**
+     * Who this habit is a vote for. Links only — a habit can serve several
+     * selves and a self is served by several habits, so this is the `HabitIdentity`
+     * join table's business, not a column. Absent reads as "no identities yet"
+     * rather than an error: an unlinked habit is a normal habit.
+     */
+    identityIds: z.array(cuid).max(MAX_IDENTITIES_PER_HABIT).default([]),
   })
   .refine(
     (value) =>
@@ -217,6 +230,32 @@ export const createHabitSchema = createTodoSchema
 
 export const updateTodoSchema = createTodoSchema.extend({ id: cuid });
 export const updateHabitSchema = createHabitSchema.extend({ id: cuid });
+
+// ---------------------------------------------------------------- identities
+
+/**
+ * Who you are becoming. The name is the noun ("Writer") and the statement is
+ * the sentence the habits are evidence for ("I am someone who writes every
+ * day") — the reinforcement reads the statement back at you, so it is capped
+ * short enough to actually be worth reading aloud.
+ */
+export const identitySchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Name it — the noun, like \"Writer\".")
+    .max(24, "Keep the name to a word or two."),
+  statement: emptyToUndefined(z.string().trim().max(200)),
+  note: emptyToUndefined(z.string().trim().max(500)),
+});
+
+export const updateIdentitySchema = identitySchema.extend({ id: cuid });
+
+/** The identity-side setter: which habits vote for this identity. */
+export const setIdentityHabitsSchema = z.object({
+  identityId: cuid,
+  taskIds: z.array(cuid).max(MAX_HABITS_PER_IDENTITY),
+});
 
 /** The dump box. Text plus the tag that names the moment — both required. */
 export const captureSchema = z.object({
