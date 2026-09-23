@@ -14,7 +14,7 @@ export type IdentityRecord = {
   id: string;
   name: string;
   statement: string | null;
-  note: string | null;
+  characteristics: string | null;
 };
 
 /**
@@ -37,7 +37,7 @@ export async function listIdentities(): Promise<IdentityRecord[]> {
   const identities = await prisma.identity.findMany({
     where: { userId: user.id },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-    select: { id: true, name: true, statement: true, note: true },
+    select: { id: true, name: true, statement: true, characteristics: true },
   });
   return identities;
 }
@@ -50,10 +50,10 @@ export async function listIdentities(): Promise<IdentityRecord[]> {
 export async function createIdentity(
   name: string,
   statement?: string | null,
-  note?: string | null,
+  characteristics?: string | null,
 ): Promise<{ ok: true; identity: IdentityRecord } | { ok: false; message: string }> {
   const user = await requireUser();
-  const parsed = identitySchema.safeParse({ name, statement, note });
+  const parsed = identitySchema.safeParse({ name, statement, characteristics });
   if (!parsed.success) {
     return { ok: false, message: "Name it in a few words." };
   }
@@ -77,10 +77,10 @@ export async function createIdentity(
       userId: user.id,
       name: parsed.data.name,
       statement: parsed.data.statement ?? null,
-      note: parsed.data.note ?? null,
+      characteristics: parsed.data.characteristics ?? null,
       sortOrder: Date.now(),
     },
-    select: { id: true, name: true, statement: true, note: true },
+    select: { id: true, name: true, statement: true, characteristics: true },
   });
 
   revalidateIdentityViews();
@@ -91,7 +91,7 @@ export async function updateIdentity(input: {
   id: string;
   name: string;
   statement?: string | null;
-  note?: string | null;
+  characteristics?: string | null;
 }): Promise<Result> {
   const user = await requireUser();
   const parsed = updateIdentitySchema.safeParse(input);
@@ -126,7 +126,7 @@ export async function updateIdentity(input: {
     data: {
       name: parsed.data.name,
       statement: parsed.data.statement ?? null,
-      note: parsed.data.note ?? null,
+      characteristics: parsed.data.characteristics ?? null,
     },
   });
 

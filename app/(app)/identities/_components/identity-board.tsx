@@ -98,8 +98,10 @@ function IdentityCard({
         <div className="min-w-0">
           <h2 className="font-display text-title">{identity.name}</h2>
           {identity.statement && <p className="mt-0.5 text-label">{identity.statement}</p>}
-          {identity.note && (
-            <p className="text-muted-foreground mt-0.5 text-micro">{identity.note}</p>
+          {identity.characteristics && (
+            <p className="text-muted-foreground mt-1 line-clamp-3 whitespace-pre-wrap text-label">
+              {identity.characteristics}
+            </p>
           )}
         </div>
         <Button variant="ghost" size="sm" onClick={onEdit}>

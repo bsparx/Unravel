@@ -2985,7 +2985,7 @@ const identitySeed = (id: string, name: string): IdentitySeed => ({
   id,
   name,
   statement: null,
-  note: null,
+  characteristics: null,
 });
 
 const voteHabit = (

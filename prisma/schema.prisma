@@ -616,7 +616,9 @@ model HabitCue {
 /// person. `name` is the noun you'd put after "I am a…" ("Writer");
 /// `statement` is the full sentence the habits are evidence for ("I am someone
 /// who writes every day") — it is what the reinforcement reads back at you, so
-/// it is worth the user's own words.
+/// it is worth the user's own words. `characteristics` is the archetype's
+/// portrait: what it looks like, how it moves, what it does that none of the
+/// others do.
 ///
 /// User-owned, unlike behavior Tags: there is no universal set of identities,
 /// so nothing here is `userId = null` and everything can be edited or deleted.
@@ -630,8 +632,9 @@ model Identity {
 
   name      String
   statement String?
-  /// Why this one matters, in the user's own words. Optional, and fine empty.
-  note String?
+  /// What this one looks like. How it moves, speaks, decides. What it does
+  /// that none of the others do. Optional, and fine empty.
+  characteristics String?
 
   sortOrder Float @default(0)
 

@@ -46,7 +46,7 @@ export type IdentitySeed = {
   id: string;
   name: string;
   statement: string | null;
-  note: string | null;
+  characteristics: string | null;
 };
 
 /** One "this habit votes for this identity" claim. */

@@ -237,7 +237,9 @@ export const updateHabitSchema = createHabitSchema.extend({ id: cuid });
  * Who you are becoming. The name is the noun ("Writer") and the statement is
  * the sentence the habits are evidence for ("I am someone who writes every
  * day") — the reinforcement reads the statement back at you, so it is capped
- * short enough to actually be worth reading aloud.
+ * short enough to actually be worth reading aloud. `characteristics` is the
+ * archetype's portrait and can run long: look, movement, what it does that
+ * none of the others do.
  */
 export const identitySchema = z.object({
   name: z
@@ -246,7 +248,7 @@ export const identitySchema = z.object({
     .min(1, "Name it — the noun, like \"Writer\".")
     .max(24, "Keep the name to a word or two."),
   statement: emptyToUndefined(z.string().trim().max(200)),
-  note: emptyToUndefined(z.string().trim().max(500)),
+  characteristics: emptyToUndefined(z.string().trim().max(5000)),
 });
 
 export const updateIdentitySchema = identitySchema.extend({ id: cuid });

@@ -26,9 +26,10 @@ import type { IdentityReinforcement } from "@/lib/identity-reinforcement";
 import { cn } from "@/lib/utils";
 
 /**
- * Add or edit one identity: its name, its statement, and the habits that vote
- * for it. Mounted fresh for each open (the board keys it), so every field can
- * stay uncontrolled and the habit chips only need the selection in state.
+ * Add or edit one identity: its name, its statement, its characteristics, and
+ * the habits that vote for it. Mounted fresh for each open (the board keys it),
+ * so every field can stay uncontrolled and the habit chips only need the
+ * selection in state.
  */
 export function IdentityDialog({
   identity,
@@ -57,7 +58,7 @@ export function IdentityDialog({
     const form = new FormData(event.currentTarget);
     const name = String(form.get("name") ?? "").trim();
     const statement = String(form.get("statement") ?? "").trim();
-    const note = String(form.get("note") ?? "").trim();
+    const characteristics = String(form.get("characteristics") ?? "").trim();
 
     if (!name) {
       toast.error("Name it — the noun, like \"Writer\".");
@@ -72,14 +73,18 @@ export function IdentityDialog({
           id: identity.id,
           name,
           statement: statement || null,
-          note: note || null,
+          characteristics: characteristics || null,
         });
         if (!result.ok) {
           toast.error(result.message);
           return;
         }
       } else {
-        const result = await createIdentity(name, statement || null, note || null);
+        const result = await createIdentity(
+          name,
+          statement || null,
+          characteristics || null,
+        );
         if (!result.ok) {
           toast.error(result.message);
           return;
@@ -148,17 +153,21 @@ export function IdentityDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="identity-note" className="text-label font-medium">
-              Why it matters
+            <Label htmlFor="identity-characteristics" className="text-label font-medium">
+              Characteristics of this identity
             </Label>
             <Textarea
-              id="identity-note"
-              name="note"
-              rows={2}
-              maxLength={500}
-              defaultValue={identity?.note ?? ""}
-              placeholder="Optional, and fine empty."
+              id="identity-characteristics"
+              name="characteristics"
+              rows={5}
+              maxLength={5000}
+              defaultValue={identity?.characteristics ?? ""}
+              placeholder="What this one looks like. How it moves, speaks, decides. What it does that none of the others do."
+              className="resize-none text-body"
             />
+            <p className="text-muted-foreground text-micro">
+              The archetype&apos;s portrait. Optional, and fine empty.
+            </p>
           </div>
 
           <div className="space-y-2">

@@ -1376,6 +1376,8 @@ async function main() {
         userId: user.id,
         name: "Writer",
         statement: "I am someone who writes every day.",
+        characteristics:
+          "Sits down before the day has opinions. Slow, exact, unhurried by the blank page. Finishes sentences. Reaches for the specific noun instead of the easy one. Protects the morning hour the way other people protect a meeting.",
         sortOrder: 0,
       },
     }),
@@ -1384,6 +1386,8 @@ async function main() {
         userId: user.id,
         name: "Someone calm",
         statement: "I am someone who starts the day quietly.",
+        characteristics:
+          "Moves at half speed before nine. Does not reach for the phone. Lets a question hang instead of snatching at it. Voice drops a register when the room tightens. Leaves the table quieter than it found it.",
         sortOrder: 1,
       },
     }),
@@ -1392,6 +1396,8 @@ async function main() {
         userId: user.id,
         name: "Athlete",
         statement: "I am someone who moves.",
+        characteristics:
+          "Trains on the days it is inconvenient. Treats rest as part of the program, not a lapse. Chooses the stairs without making it a story. Recovers fast. Is recognisable by the shoes by the door.",
         sortOrder: 2,
       },
     }),

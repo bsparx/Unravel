@@ -41,7 +41,7 @@ export async function getIdentityReinforcements(
       id: true,
       name: true,
       statement: true,
-      note: true,
+      characteristics: true,
       habits: { select: { taskId: true } },
     },
   });
@@ -50,7 +50,7 @@ export async function getIdentityReinforcements(
     id: record.id,
     name: record.name,
     statement: record.statement,
-    note: record.note,
+    characteristics: record.characteristics,
   }));
   const links: IdentityLink[] = records.flatMap((record) =>
     record.habits.map((link) => ({ identityId: record.id, taskId: link.taskId })),
