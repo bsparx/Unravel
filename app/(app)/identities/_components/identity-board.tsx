@@ -15,19 +15,22 @@ import { IdentityDialog } from "./identity-dialog";
 type HabitOption = { id: string; title: string; archived: boolean };
 
 /**
- * The identities, their tallies, and the one panel that says who to worry
- * about. All management happens in the dialog — one screen, one decision at a
- * time — and every mutation refreshes the server props rather than keeping a
- * second copy of the tally in client state that could disagree with the page.
+ * The identities, their tallies, and the two panels that say who to worry
+ * about: habits that are nobody's evidence yet, and identities going hungry.
+ * All management happens in the dialog — one screen, one decision at a time —
+ * and every mutation refreshes the server props rather than keeping a second
+ * copy of the tally in client state that could disagree with the page.
  */
 export function IdentityBoard({
   identities,
   focus,
   habits,
+  unlinked,
 }: {
   identities: IdentityReinforcement[];
   focus: IdentityReinforcement[];
   habits: HabitOption[];
+  unlinked: { id: string; title: string }[];
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState<IdentityReinforcement | null>(null);
@@ -66,6 +69,8 @@ export function IdentityBoard({
           ))}
         </ul>
       )}
+
+      {unlinked.length > 0 && <UnlinkedHabitsSection habits={unlinked} />}
 
       {focus.length > 0 && <NeedsFocusSection focus={focus} />}
 
@@ -192,6 +197,42 @@ function Strip({ daily }: { daily: IdentityReinforcement["daily"] }) {
         />
       ))}
     </div>
+  );
+}
+
+/**
+ * Habits that are nobody's evidence yet. A setup gap, not a verdict: the
+ * habit exists, it just isn't counted for any self until it is linked. Each
+ * name goes to the habit form, where the identity chips already live.
+ */
+function UnlinkedHabitsSection({
+  habits,
+}: {
+  habits: { id: string; title: string }[];
+}) {
+  return (
+    <section>
+      <h2 className="font-display text-title">Not voting yet</h2>
+      <p className="text-muted-foreground mt-0.5 mb-3 max-w-prose text-label">
+        These habits are nobody&apos;s evidence yet. Link one and its kept
+        days start counting as votes.
+      </p>
+      <ul className="space-y-3">
+        {habits.map((habit) => (
+          <li
+            key={habit.id}
+            className="border-border bg-card rounded-lg border p-4"
+          >
+            <Link
+              href={`/habits/${habit.id}`}
+              className="text-foreground hover:text-primary underline underline-offset-4"
+            >
+              {habit.title}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

@@ -24,6 +24,19 @@ export default async function IdentitiesPage() {
     "month",
   );
 
+  // Habits nobody is evidence for. Derived here rather than in the board so
+  // the rule ("a habit counts only if some identity lists it") lives next to
+  // the queries that produce both sides. Archived habits are retired, not
+  // missing votes — they stay out.
+  const linkedIds = new Set(
+    identities.flatMap((identity) =>
+      identity.linked.map((habit) => habit.habitId),
+    ),
+  );
+  const unlinked = stats.allHabits.filter(
+    (habit) => !habit.archived && !linkedIds.has(habit.id),
+  );
+
   return (
     <div className="mx-auto w-full max-w-4xl px-5 py-8 md:px-8 md:py-12">
       <header className="mb-8">
@@ -39,6 +52,7 @@ export default async function IdentitiesPage() {
         identities={identities}
         focus={focus}
         habits={stats.allHabits}
+        unlinked={unlinked}
       />
     </div>
   );

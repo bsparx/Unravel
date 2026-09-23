@@ -99,3 +99,43 @@ export async function adoptBrowserTimezone(timezone: string): Promise<void> {
 
   revalidatePath("/", "layout");
 }
+
+type ResetResult = { ok: true } | { ok: false; message: string };
+
+/**
+ * Reset all progress: every logged day and every minute on the clock, and
+ * nothing else. Habits, identities, schedules, quotas, projects, tags, money,
+ * water and the rest of the structure stand exactly as they are.
+ *
+ * The blast radius is exactly two tables. Every tally, streak, identity vote
+ * and "missed day" is derived from these rows at read time — there are no
+ * counters anywhere to rewrite — so deleting the history zeroes the numbers.
+ *
+ * FocusSession goes first on purpose: its `occurrenceId` is SetNull, so
+ * deleting occurrences alone would orphan sessions that still bill time on
+ * /stats (the trap `deleteHabit` documents). SessionInterval cascades from
+ * the sessions, so two deletes are the whole job.
+ *
+ * The typed confirmation in the UI is friction, not security. The guard here
+ * is the user's own session and the userId on every delete.
+ */
+export async function resetAllProgress(): Promise<ResetResult> {
+  const user = await requireUser();
+
+  try {
+    await prisma.$transaction(
+      [
+        prisma.focusSession.deleteMany({ where: { userId: user.id } }),
+        prisma.taskOccurrence.deleteMany({ where: { userId: user.id } }),
+      ],
+      // Two bulk deletes over the HTTP pooler can spend ~400ms each; the
+      // default 5s budget is tight enough to trip P2028.
+      { timeout: 20_000 },
+    );
+  } catch {
+    return { ok: false, message: "Nothing was reset. Try again." };
+  }
+
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
