@@ -34,7 +34,7 @@ import { cn } from "@/lib/utils";
 
 import { HabitCueFields, type CueMode } from "./habit-cue-fields";
 import { IdentityPicker } from "./identity-picker";
-import { QuotaFields } from "./quota-fields";
+import { MinimalTaskFields } from "./minimal-task-fields";
 import { StepsEditor, type StepDraft } from "./steps-editor";
 
 export type TaskFormValues = {
@@ -55,8 +55,8 @@ export type TaskFormValues = {
   endDate?: string | null;
   steps?: StepDraft[];
   unit?: "MINUTES" | "COUNT";
-  minimumQuota?: number;
-  optimalQuota?: number | null;
+  /** The one bar: the smallest version that counts. */
+  minimalTask?: string;
   /** Minutes from midnight. The implementation intention's time half. */
   timeAnchorMinutes?: number | null;
   /** Which parts of the day the habit belongs to. Defaults to [ALWAYS]. */
@@ -407,15 +407,13 @@ export function TaskForm({
 
       {kind === "HABIT" ? (
         <Field
-          label="How much counts as doing it?"
-          hint="Two bars, and only the first one settles the day."
+          label="What counts as doing it?"
+          hint="One bar — the smallest version that counts. Anything past it is just for you."
         >
-          <QuotaFields
+          <MinimalTaskFields
             defaultUnit={values.unit}
-            defaultMinimum={values.minimumQuota}
-            defaultOptimal={values.optimalQuota}
-            minimumError={error("minimumQuota")}
-            optimalError={error("optimalQuota")}
+            defaultMinimalTask={values.minimalTask}
+            minimalTaskError={error("minimalTask")}
           />
         </Field>
       ) : showDeadline ? (

@@ -3,46 +3,47 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import type { TaskOccurrence } from "@/lib/generated/prisma/client";
 import {
+  dayStatus,
   minutesFromSeconds,
   recreditedProgress,
-  statusForTier,
-  tierFor,
-  type Quota,
-} from "@/lib/quota";
+  type HabitBar,
+  type HabitUnit,
+} from "@/lib/habit-bar";
 
 /**
- * Every write that can change a habit's daily progress goes through here.
+ * Every write that can change a habit's day goes through here.
  *
- * The reason it's one function: `progress`, `tier` and `status` must never
- * disagree. `tier` is derived from `progress` against the quota, and `status`
- * is derived from `tier` — so a second code path that set any one of them
- * directly would eventually produce an occurrence that is DONE with tier NONE,
- * or a broken streak on a day the quota was actually met. Both are the kind of
- * bug you find a month later in a chart.
+ * The reason it's one function: `minimalTaskDone`, `progress` and `status`
+ * must never disagree. `status` is derived from the first two — DONE exactly
+ * when the claim is ticked or the log is non-empty — so a second code path
+ * that set any one of them directly would eventually produce a day that is
+ * DONE with nothing behind it, or a broken streak on a day the minimal task
+ * was actually done. Both are the kind of bug you find a month later in a
+ * chart.
  *
  * A plain module rather than an export from a `"use server"` file: everything
  * exported from an actions file is a POST endpoint, and these take `userId` as
  * an argument.
  */
 
-export type HabitQuotaRow = Quota & {
+export type HabitBarRow = HabitBar & {
   taskId: string;
   /** The day isn't DONE until a written note lands on the occurrence. */
   requiresFeedback: boolean;
 };
 
-/** The quota for a habit, or null if it isn't one (or isn't yours). */
-export async function getHabitQuota(
+/** The bar for a habit, or null if it isn't one (or isn't yours). */
+export async function getHabitBar(
   userId: string,
   taskId: string,
-): Promise<HabitQuotaRow | null> {
+): Promise<HabitBarRow | null> {
   const task = await prisma.task.findFirst({
     where: { id: taskId, userId, type: "HABIT" },
     select: {
       id: true,
       requiresFeedback: true,
       recurrence: {
-        select: { unit: true, minimumQuota: true, optimalQuota: true },
+        select: { unit: true, minimalTask: true },
       },
     },
   });
@@ -52,42 +53,51 @@ export async function getHabitQuota(
   return {
     taskId: task.id,
     requiresFeedback: task.requiresFeedback,
-    unit: task.recurrence.unit,
-    minimum: task.recurrence.minimumQuota,
-    optimal: task.recurrence.optimalQuota,
+    unit: task.recurrence.unit as HabitUnit,
+    minimalTask: task.recurrence.minimalTask,
   };
 }
 
 type ProgressChange =
-  /** Absolute — "I did 12". */
+  /** Absolute — "I logged 12". */
   | { set: number }
   /** Relative — the +1 button, and the only safe shape under a double tap. */
   | { increment: number };
 
 /**
- * Move a habit's progress for one day, and re-derive everything from it.
+ * Move a habit's optional log for one day, and re-derive the day from it.
  *
- * `increment` is resolved against the row read inside the same call rather than
- * against a number the client sent, so two quick taps add two, not one.
+ * The claim is left alone: logging is not ticking. A non-empty log still marks
+ * the day done — logging anything means you showed up — but it never *claims*
+ * the minimal task, so correcting a log back to zero can still honestly leave
+ * the day unclaimed.
+ *
+ * `increment` is resolved against the row read inside the same call rather
+ * than against a number the client sent, so two quick taps add two, not one.
  */
 export async function setHabitProgress(
   userId: string,
-  quota: HabitQuotaRow,
+  bar: HabitBarRow,
   date: Date,
   change: ProgressChange,
 ): Promise<TaskOccurrence> {
   const existing = await prisma.taskOccurrence.findUnique({
-    where: { taskId_date: { taskId: quota.taskId, date } },
-    select: { progress: true },
+    where: { taskId_date: { taskId: bar.taskId, date } },
+    select: { progress: true, minimalTaskDone: true },
   });
 
   const current = existing?.progress ?? 0;
   const next = Math.max(
     0,
-    "set" in change ? Math.round(change.set) : current + Math.round(change.increment),
+    "set" in change
+      ? Math.round(change.set)
+      : current + Math.round(change.increment),
   );
 
-  return writeProgress(userId, quota, date, next);
+  return writeProgress(userId, bar, date, {
+    minimalTaskDone: existing?.minimalTaskDone ?? false,
+    progress: next,
+  });
 }
 
 /**
@@ -95,10 +105,12 @@ export async function setHabitProgress(
  *
  * Called from `endSession`. Deliberately a **floor against the day's total
  * logged time**, not an increment of this session's minutes: `endSession` can
- * be retried, and an increment would double-credit on a retry, which would show
- * up as a habit that hit its optimal on a day you didn't. Taking the max also
- * means a manually entered number is never clobbered downwards by a short
+ * be retried, and an increment would double-credit on a retry. Taking the max
+ * also means a hand-entered number is never clobbered downwards by a short
  * session.
+ *
+ * The claim is left alone, exactly as `setHabitProgress` leaves it: the clock
+ * records what happened, the tick records what it meant.
  *
  * COUNT habits are untouched — the clock genuinely cannot see how many pages
  * you read, and guessing would be worse than asking.
@@ -109,12 +121,12 @@ export async function creditLoggedTime(
   date: Date,
   totalLoggedSeconds: number,
 ): Promise<void> {
-  const quota = await getHabitQuota(userId, taskId);
-  if (!quota || quota.unit !== "MINUTES") return;
+  const bar = await getHabitBar(userId, taskId);
+  if (!bar || bar.unit !== "MINUTES") return;
 
   const existing = await prisma.taskOccurrence.findUnique({
     where: { taskId_date: { taskId, date } },
-    select: { progress: true },
+    select: { progress: true, minimalTaskDone: true },
   });
 
   const earned = minutesFromSeconds(totalLoggedSeconds);
@@ -122,16 +134,19 @@ export async function creditLoggedTime(
 
   if (next === (existing?.progress ?? 0)) return;
 
-  await writeProgress(userId, quota, date, next);
+  await writeProgress(userId, bar, date, {
+    minimalTaskDone: existing?.minimalTaskDone ?? false,
+    progress: next,
+  });
 }
 
 /**
  * Re-credit a MINUTES habit after a day's logged time has been *corrected*.
  *
- * The counterpart to `creditLoggedTime`, and the only path allowed to move
- * habit progress **down**. See `recreditedProgress` for why that is safe: the
- * hand-entered part of the figure is kept as a floor, so correcting a runaway
- * session cannot take away a day someone explicitly claimed.
+ * The counterpart to `creditLoggedTime`, and the only path allowed to move the
+ * log **down**. See `recreditedProgress` for why that is safe: the hand-entered
+ * part of the figure is kept as a floor. The claim is never touched —
+ * correcting a runaway session cannot take back the warmup.
  *
  * A no-op for COUNT habits, exactly as crediting is — the clock never had an
  * opinion about pages read, so correcting it has nothing to say either.
@@ -143,88 +158,92 @@ export async function recreditLoggedTime(
   oldLoggedSeconds: number,
   newLoggedSeconds: number,
 ): Promise<void> {
-  const quota = await getHabitQuota(userId, taskId);
-  if (!quota || quota.unit !== "MINUTES") return;
+  const bar = await getHabitBar(userId, taskId);
+  if (!bar || bar.unit !== "MINUTES") return;
 
   const existing = await prisma.taskOccurrence.findUnique({
     where: { taskId_date: { taskId, date } },
-    select: { progress: true },
+    select: { progress: true, minimalTaskDone: true },
   });
 
   const current = existing?.progress ?? 0;
   const next = recreditedProgress(current, oldLoggedSeconds, newLoggedSeconds);
   if (next === current) return;
 
-  await writeProgress(userId, quota, date, next);
+  await writeProgress(userId, bar, date, {
+    minimalTaskDone: existing?.minimalTaskDone ?? false,
+    progress: next,
+  });
 }
 
 /**
- * Ticking a habit by hand means "I did it" — so it books exactly the minimum,
- * never more. Someone who genuinely hit the optimal can say so; inferring it
- * from a checkbox would put a day in the optimal column that nobody claimed.
+ * Ticking a habit by hand means "I did the minimal task" — the claim, and the
+ * whole bar. It books **no number**: the log stays exactly as it was, because
+ * a tick is a claim about the named act, not a measurement of it. Someone who
+ * kept going has the log to say so; inferring a log from a checkbox would put
+ * numbers in the chart that nobody entered.
  *
- * Unticking clears the day back to zero rather than to "minimum minus one",
- * because the intent is "I hadn't actually done this".
+ * Unticking is "I hadn't actually done this" — so it clears the claim *and*
+ * the log. A half-undo would leave the record of a day you just said didn't
+ * happen.
  */
 export async function toggleHabitDone(
   userId: string,
-  quota: HabitQuotaRow,
+  bar: HabitBarRow,
   date: Date,
   done: boolean,
 ): Promise<TaskOccurrence> {
-  if (!done) return writeProgress(userId, quota, date, 0);
-
   const existing = await prisma.taskOccurrence.findUnique({
-    where: { taskId_date: { taskId: quota.taskId, date } },
+    where: { taskId_date: { taskId: bar.taskId, date } },
     select: { progress: true },
   });
 
-  return writeProgress(
-    userId,
-    quota,
-    date,
-    Math.max(existing?.progress ?? 0, quota.minimum),
-  );
+  return writeProgress(userId, bar, date, {
+    minimalTaskDone: done,
+    progress: done ? (existing?.progress ?? 0) : 0,
+  });
 }
 
 async function writeProgress(
   userId: string,
-  quota: HabitQuotaRow,
+  bar: HabitBarRow,
   date: Date,
-  progress: number,
+  day: { minimalTaskDone: boolean; progress: number },
 ): Promise<TaskOccurrence> {
-  const tier = tierFor(progress, quota);
-  let status = statusForTier(tier);
-  let completedAt = status === "DONE" ? new Date() : null;
-
   // A feedback habit's day is only *accepted* once a written note exists on
-  // the occurrence. The progress and tier still record what happened — the
-  // timer's minutes, the +1 taps — but the streak and the DONE state wait.
-  // This is the one gate for every path: the timer's creditLoggedTime, the
-  // +1 buttons, and the checkbox all converge here, so none of them can mark
-  // the day done behind the note's back.
-  if (quota.requiresFeedback) {
+  // the occurrence. The claim and the log still record what happened — the
+  // tick, the timer's minutes, the +1 taps — but the streak and the DONE
+  // state wait. This is the one gate for every path: the timer's
+  // creditLoggedTime, the +1 buttons and the checkbox all converge here, so
+  // none of them can mark the day done behind the note's back.
+  let noteOk = true;
+  if (bar.requiresFeedback) {
     const existing = await prisma.taskOccurrence.findUnique({
-      where: { taskId_date: { taskId: quota.taskId, date } },
+      where: { taskId_date: { taskId: bar.taskId, date } },
       select: { note: true },
     });
-    if (!existing?.note?.trim()) {
-      status = "PENDING";
-      completedAt = null;
-    }
+    noteOk = Boolean(existing?.note?.trim());
   }
 
+  const status = dayStatus(day, noteOk);
+  const completedAt = status === "DONE" ? new Date() : null;
+
   return prisma.taskOccurrence.upsert({
-    where: { taskId_date: { taskId: quota.taskId, date } },
+    where: { taskId_date: { taskId: bar.taskId, date } },
     create: {
       userId,
-      taskId: quota.taskId,
+      taskId: bar.taskId,
       date,
-      progress,
-      tier,
+      minimalTaskDone: day.minimalTaskDone,
+      progress: day.progress,
       status,
       completedAt,
     },
-    update: { progress, tier, status, completedAt },
+    update: {
+      minimalTaskDone: day.minimalTaskDone,
+      progress: day.progress,
+      status,
+      completedAt,
+    },
   });
 }

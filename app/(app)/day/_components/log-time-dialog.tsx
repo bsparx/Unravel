@@ -25,14 +25,15 @@ import { cn } from "@/lib/utils";
 const PRESETS = [10, 15, 25, 45, 60];
 
 /**
- * The tick's other half. A checkbox can't answer "how long did it take" or
- * "what did you actually get out of it", so this dialog asks whichever the
- * habit is missing:
+ * The tick's other half, and the optional log's only door. A checkbox can't
+ * answer "how long did that take" or "what did you actually get out of it",
+ * so this dialog asks whichever is missing:
  *
- * - **Time** (when nothing was logged): booking the honest figure before the
- *   tick lands, floored at the habit's own minimum and capped at ten hours —
- *   otherwise a DONE day with zero minutes behind it is a hole in every
- *   average and habit tier downstream.
+ * - **Time** (`needsTime`, decided by the caller): the honest figure beside
+ *   the day's claim. For a todo it is the honesty ask at tick time — a DONE
+ *   day with zero minutes behind it is a hole in every average. For a habit
+ *   it is "log the rest": purely optional, because the claim alone is the day
+ *   and nothing is measured against a target any more.
  * - **Feedback** (when the habit requires it and no note exists): the written
  *   note is the *condition* of completion, and the custom prompt is the
  *   reminder of what to write.
@@ -43,18 +44,20 @@ const PRESETS = [10, 15, 25, 45, 60];
  */
 export function LogTimeDialog({
   item,
+  needsTime,
   onConfirm,
   onCancel,
 }: {
   item: TodayItem;
+  /** Ask for the optional (or honesty) time figure. False = notes only. */
+  needsTime: boolean;
   onConfirm: (result: { minutes?: number; note?: string }) => void;
   onCancel: () => void;
 }) {
-  const needsTime = item.loggedSeconds === 0 && !item.done;
   const needsFeedback = item.requiresFeedback && !item.feedbackNote;
   const prompt = item.feedbackPrompt || DEFAULT_FEEDBACK_PROMPT;
 
-  const floor = item.minimumMinutes;
+  const floor = 1;
   const max = MAX_MANUAL_LOG_MINUTES;
 
   const [raw, setRaw] = useState<string>(String(floor));
@@ -85,7 +88,9 @@ export function LogTimeDialog({
 
   const heading = needsFeedback
     ? "Close it with a note"
-    : "How long did that take?";
+    : item.type === "HABIT"
+      ? "Log the rest"
+      : "How long did that take?";
 
   return (
     <Dialog open onOpenChange={(open) => !open && onCancel()}>
@@ -97,6 +102,11 @@ export function LogTimeDialog({
               <>
                 Ticking off &ldquo;{item.title}&rdquo; waits on the note — the
                 day only counts once it&apos;s written.
+              </>
+            ) : item.type === "HABIT" ? (
+              <>
+                Just for you: the optional log beside today&apos;s claim. The
+                day already counts — this never changes that.
               </>
             ) : (
               <>

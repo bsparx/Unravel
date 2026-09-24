@@ -14,7 +14,7 @@ import { MAX_FEEDBACK_LENGTH } from "@/lib/feedback";
 import type { HabitSlot } from "@/lib/generated/prisma/client";
 import { MONEY_COLOR_NAMES } from "@/lib/money-palette";
 import { parseMoneyToCents } from "@/lib/money";
-import { MAX_QUOTA } from "@/lib/quota";
+import { MAX_LOG } from "@/lib/habit-bar";
 import {
   MAX_INTERVALS,
   MAX_LOGGED_SECONDS,
@@ -127,8 +127,6 @@ export const createTodoSchema = z.object({
   color: z.enum(CALENDAR_COLOR_NAMES).default("teal"),
 });
 
-const quotaValue = z.coerce.number().int().min(1).max(MAX_QUOTA);
-
 /**
  * "When will you do it" — the implementation intention's time half. The form
  * collects HH:MM because that's how people think about time; the database
@@ -156,8 +154,17 @@ export const createHabitSchema = createTodoSchema
     startDate: emptyToUndefined(isoDate),
     endDate: emptyToUndefined(isoDate),
     unit: z.enum(["MINUTES", "COUNT"]).default("MINUTES"),
-    minimumQuota: quotaValue.default(1),
-    optimalQuota: emptyToUndefined(quotaValue),
+    /**
+     * The one bar: the smallest version that counts. Required, because a
+     * habit with no named act has no definition of done — a default here
+     * would be a lie the form tells on the user's behalf. 120 characters is a
+     * sentence, not a paragraph: "Do the warmup", "One push-up", "Read a page".
+     */
+    minimalTask: z
+      .string()
+      .trim()
+      .min(1, "Name the smallest version that counts.")
+      .max(120, "Keep it to a sentence — that is the point of it."),
     timeAnchor,
 
     /**
@@ -205,18 +212,6 @@ export const createHabitSchema = createTodoSchema
      */
     identityIds: z.array(cuid).max(MAX_IDENTITIES_PER_HABIT).default([]),
   })
-  .refine(
-    (value) =>
-      value.optimalQuota === undefined ||
-      value.optimalQuota > value.minimumQuota,
-    {
-      // Not a clamp. An optimal at or below the minimum means the two bars have
-      // collapsed into one, and silently "fixing" it would leave someone
-      // believing they had a stretch goal they don't.
-      message: "A good day has to be more than the minimum.",
-      path: ["optimalQuota"],
-    },
-  )
   .refine((value) => value.cueMode !== "habit" || Boolean(value.cueTaskId), {
     message: "Pick the habit this one comes after.",
     path: ["cueTaskId"],
@@ -359,8 +354,8 @@ export const habitProgressSchema = z
   .object({
     taskId: cuid,
     date: isoDate,
-    set: emptyToUndefined(z.coerce.number().int().min(0).max(MAX_QUOTA)),
-    increment: emptyToUndefined(z.coerce.number().int().min(-MAX_QUOTA).max(MAX_QUOTA)),
+    set: emptyToUndefined(z.coerce.number().int().min(0).max(MAX_LOG)),
+    increment: emptyToUndefined(z.coerce.number().int().min(-MAX_LOG).max(MAX_LOG)),
   })
   .refine((value) => value.set !== undefined || value.increment !== undefined, {
     message: "Nothing to change.",

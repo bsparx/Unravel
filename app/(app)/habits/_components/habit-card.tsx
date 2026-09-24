@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * A habit, collapsed to the two things you can act on: its name, and today's
- * quota. Everything else — the schedule, the streak, eight weeks of adherence
+ * day. Everything else — the schedule, the streak, eight weeks of adherence
  * — is reference material, and reference material you haven't asked for is
  * just a tax on scanning the list.
  *
@@ -20,7 +20,7 @@ export function HabitCard({
   name,
   cue,
   actions,
-  quota,
+  day,
   meta,
   adherence,
   children,
@@ -37,8 +37,8 @@ export function HabitCard({
   name: string;
   /** Edit and archive controls, pinned to the header. */
   actions: ReactNode;
-  /** Today's quota meter — always visible, it's the actionable bit. */
-  quota: ReactNode;
+  /** Today's day control — always visible, it's the actionable bit. */
+  day: ReactNode;
   /** Schedule, quota description, estimate, streak. */
   meta: ReactNode;
   adherence: number;
@@ -75,7 +75,7 @@ export function HabitCard({
         </div>
       </div>
 
-      <div className="mt-2">{quota}</div>
+      <div className="mt-2">{day}</div>
 
       {expanded && (
         <div className="mt-3 space-y-3">

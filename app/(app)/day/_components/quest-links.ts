@@ -3,10 +3,9 @@
  *
  * One place so a quest never opens two different timers: an objective's
  * handle is the first line still standing, and a habit's clock is set from
- * its quota exactly the way the task rows do it.
+ * its estimate exactly the way the task rows do it.
  */
 
-import { habitTimerTargetSeconds } from "@/lib/quota";
 import { DEFAULTS } from "@/lib/timer-math";
 import type { TodayItem } from "@/lib/tasks";
 import { buildTimerHref, RECOVERY_HREF } from "@/lib/timer-url";
@@ -25,10 +24,8 @@ export const habitHref = (item: TodayItem) =>
   buildTimerHref({
     id: item.id,
     estimatedSeconds:
-      item.type === "HABIT" && item.quota
-        ? (habitTimerTargetSeconds(item.quota) ??
-          item.estimatedSeconds ??
-          DEFAULTS.targetSeconds)
+      item.type === "HABIT"
+        ? (item.estimatedSeconds ?? DEFAULTS.targetSeconds)
         : item.estimatedSeconds,
     defaultMode: item.defaultMode,
     plannedIntervals: item.plannedIntervals,

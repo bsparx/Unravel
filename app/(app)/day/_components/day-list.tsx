@@ -30,18 +30,23 @@ export function DayList({
   water: WaterToday;
   timezone: string;
 }) {
-  const [logTarget, setLogTarget] = useState<TodayItem | null>(null);
+  const [logTarget, setLogTarget] = useState<{
+    item: TodayItem;
+    askTime: boolean;
+  } | null>(null);
 
   // Ticking done with a question hanging over it is gated in TaskRow: the
-  // transition is never started, so the box stays idle. The question is either
-  // "how long did that take" (nothing logged) or, for feedback habits, "write
-  // the note" (no note yet). This is where we open the dialog — nothing is
-  // written until the dialog answers.
+  // transition is never started, so the box stays idle. The question is
+  // "write the note" for feedback habits (no note yet) and "how long did that
+  // take" for todos with nothing on the clock. A habit's tick is never gated
+  // on time — the minimal task is a claim, and a claim needs no clock. This
+  // is where we open the dialog — nothing is written until it answers.
   const toggle = async (item: TodayItem, next: boolean) => {
-    const needsTime = item.loggedSeconds === 0 && !item.done;
+    const needsTime =
+      item.type !== "HABIT" && item.loggedSeconds === 0 && !item.done;
     const needsFeedback = item.requiresFeedback && !item.feedbackNote;
     if (next && (needsTime || needsFeedback)) {
-      setLogTarget(item);
+      setLogTarget({ item, askTime: needsTime });
       return;
     }
 
@@ -64,9 +69,9 @@ export function DayList({
     setLogTarget(null);
     if (!target) return;
 
-    if (target.type === "HABIT") {
+    if (target.item.type === "HABIT") {
       const formData = new FormData();
-      formData.set("taskId", target.id);
+      formData.set("taskId", target.item.id);
       formData.set("date", todayISO);
       if (result.minutes) formData.set("minutes", String(result.minutes));
       if (result.note) formData.set("note", result.note);
@@ -77,7 +82,7 @@ export function DayList({
 
     if (result.minutes === undefined) return;
     const formData = new FormData();
-    formData.set("taskId", target.id);
+    formData.set("taskId", target.item.id);
     formData.set("date", todayISO);
     formData.set("minutes", String(result.minutes));
     await logAndComplete(formData);
@@ -174,8 +179,11 @@ export function DayList({
                   item={item}
                   onToggle={(next) => toggle(item, next)}
                   onEditNote={
-                    item.requiresFeedback ? () => setLogTarget(item) : undefined
+                    item.requiresFeedback
+                      ? () => setLogTarget({ item, askTime: false })
+                      : undefined
                   }
+                  onLogTime={() => setLogTarget({ item, askTime: true })}
                   showDueLabel={
                     item.dueDate && section.key === "overdue"
                       ? formatRelativeDate(item.dueDate, view.date)
@@ -204,8 +212,11 @@ export function DayList({
                 item={item}
                 onToggle={(next) => toggle(item, next)}
                 onEditNote={
-                  item.requiresFeedback ? () => setLogTarget(item) : undefined
+                  item.requiresFeedback
+                    ? () => setLogTarget({ item, askTime: false })
+                    : undefined
                 }
+                onLogTime={() => setLogTarget({ item, askTime: true })}
               />
             ))}
           </ul>
@@ -214,8 +225,9 @@ export function DayList({
 
       {logTarget && (
         <LogTimeDialog
-          key={logTarget.id}
-          item={logTarget}
+          key={logTarget.item.id}
+          item={logTarget.item}
+          needsTime={logTarget.askTime}
           onConfirm={(result) => void closeLogDialog(result)}
           onCancel={() => setLogTarget(null)}
         />

@@ -78,11 +78,14 @@ enum CaptureStatus {
   DISMISSED // deliberately let go — kept, because deleting hides the pattern
 }
 
-/// What a habit's quota is counted in.
+/// What a habit's optional log is counted in.
 ///
-/// MINUTES is credited automatically from logged timer sessions, so "meditate
-/// for 2 minutes" needs no bookkeeping at all — you just run the timer. COUNT
+/// MINUTES is credited automatically from logged timer sessions, so a session
+/// on this habit needs no bookkeeping at all — you just run the timer. COUNT
 /// is anything the clock can't see: pages, reps, glasses of water.
+///
+/// Neither is what the day is judged on. The bar is `minimalTask` — a named
+/// act — and this only says what the un-metered log counts.
 enum HabitUnit {
   MINUTES
   COUNT
@@ -101,18 +104,6 @@ enum HabitSlot {
   AFTERNOON
   EVENING
   ALWAYS
-}
-
-/// How far into a day's quota you got.
-///
-/// Stored on the occurrence rather than recomputed at read time, because the
-/// quota itself can change: raising your minimum from 1 page to 10 must not
-/// retroactively break a streak you actually earned. Same reasoning as
-/// FocusSession snapshotting the user's timer settings.
-enum QuotaTier {
-  NONE
-  MINIMUM
-  OPTIMAL
 }
 
 enum JournalKind {
@@ -533,19 +524,17 @@ model HabitRecurrence {
   /// 0 = Sunday .. 6 = Saturday, evaluated in User.timezone. DAILY => [0..6].
   daysOfWeek Int[]
 
-  /// The atomic-habit quotas.
+  /// One bar, not two: `minimalTask` is the smallest version that counts —
+  /// "Do the warmup", "One push-up", "Read a page". Doing it is the day's
+  /// whole requirement, and the only thing the streak cares about. A bar you
+  /// can clear on your worst day is the one that survives a worst day, and a
+  /// named act is a handle in a way a number never is.
   ///
-  /// `minimumQuota` is the whole mechanism: it is the amount that counts as
-  /// having done the habit, and the only thing the streak cares about. It is
-  /// meant to be embarrassingly small — one page, two minutes — because a
-  /// streak you can keep on your worst day is the one that survives.
-  ///
-  /// `optimalQuota` is what you'd do on a good day. It is deliberately NOT
-  /// what the streak measures; making the good day the bar is how streaks
-  /// break. Null means you never set one.
-  unit         HabitUnit @default(MINUTES)
-  minimumQuota Int       @default(1)
-  optimalQuota Int?
+  /// `unit` is only what the *optional* log counts. Anything past the minimal
+  /// task is logged, never required — there is no second bar and no good-day
+  /// tier, because making the good day the bar is how streaks break.
+  unit        HabitUnit @default(MINUTES)
+  minimalTask String    @default("")
   /// The habit is inert outside this window. startDate also anchors streaks.
   startDate    DateTime  @db.Date
   endDate      DateTime? @db.Date
@@ -694,15 +683,19 @@ model TaskOccurrence {
   completedAt DateTime?
   note        String?
 
-  /// Habits only; stays 0/NONE for todos.
+  /// Habits only; stays false for todos.
   ///
-  /// `progress` is in the habit's own unit. `tier` is derived from it against
-  /// the quotas *at the time*, and is what every statistic reads — which is
-  /// also why doing the minimum and then carrying on to the optimal counts
-  /// once, as OPTIMAL: the tier is a function of the day's total, not a log of
-  /// what happened in what order.
-  progress Int       @default(0)
-  tier     QuotaTier @default(NONE)
+  /// The claim: the minimal task was done. This alone is enough — ticking
+  /// "the warmup" counts the whole day, with `progress` left at zero.
+  minimalTaskDone Boolean @default(false)
+
+  /// Habits only; stays 0 for todos.
+  ///
+  /// The optional log in the habit's own unit — minutes from the timer, or
+  /// counter taps past the minimal task. `progress > 0` also marks the day
+  /// done (logging anything means you showed up) and is exactly what "went
+  /// beyond" reads. Never required: there is no target to hit.
+  progress Int @default(0)
 
   /// Roll-up of this day's FocusSession.elapsedSeconds, maintained by
   /// endSession(). Lets the day list render without an aggregate query.
@@ -715,7 +708,7 @@ model TaskOccurrence {
 
   @@unique([taskId, date])
   @@index([userId, date, status])
-  /// The habit statistics read: one habit across a date range, bucketed by tier.
+  /// The habit statistics read: one habit across a date range, by outcome.
   @@index([userId, taskId, date])
 }
 

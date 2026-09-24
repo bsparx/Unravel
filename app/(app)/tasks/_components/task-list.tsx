@@ -71,7 +71,6 @@ export function TaskList({
                   occurrenceStatus: null,
                   loggedSeconds: 0,
                   done: task.completedAt !== null,
-                  minimumMinutes: 1,
                   daysUntilDue: task.dueDate
                     ? Math.round(
                         (task.dueDate.getTime() - today.getTime()) / 86_400_000,
@@ -84,7 +83,7 @@ export function TaskList({
                   requiresFeedback: false,
                   feedbackNote: null,
                   feedbackPrompt: null,
-                  quota: null,
+                  bar: null,
                   progress: 0,
                 }}
                 onToggle={(next) => toggle(task.id, next)}

@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   ChevronDown,
-  Check,
   Clock,
   CornerDownRight,
   Link2,
@@ -15,12 +14,12 @@ import {
   Timer,
 } from "lucide-react";
 
+import { HabitDayLine } from "@/components/habit-day";
 import { StepList } from "@/components/step-list";
 import { TaskCheckbox } from "@/components/task-checkbox";
 import { MissedYesterdayBadge } from "@/components/missed-yesterday-badge";
 import { formatMinuteOfDay } from "@/lib/block-math";
 import { formatDuration, formatMinutes } from "@/lib/dates";
-import { formatQuota, habitTimerTargetSeconds, remainingToMinimum, tierFor, type Quota } from "@/lib/quota";
 import { nextStep, stepProgress } from "@/lib/steps";
 import { DEFAULTS } from "@/lib/timer-math";
 import type { TodayItem } from "@/lib/tasks";
@@ -40,24 +39,25 @@ export function TaskRow({
   item,
   onToggle,
   onEditNote,
+  onLogTime,
   showDueLabel,
 }: {
   item: TodayItem;
   onToggle: (next: boolean) => Promise<void>;
   /** Habits with feedback: re-open the dialog to rewrite today's note. */
   onEditNote?: () => void;
+  /** MINUTES habits: open the manual log, for time you didn't run the timer for. */
+  onLogTime?: () => void;
   showDueLabel?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
 
-  // Habits run against their own bars rather than their estimate: the minimum
-  // required time first, then the optimal, and only when neither is a time
-  // (COUNT habits) the estimate, then the classic 25 minutes.
+  // Habits run on the estimate, or the classic 25 minutes when they carry
+  // none. There is no quota to set the clock to any more — the bar is a named
+  // act, and the clock is just the clock.
   const estimatedSeconds =
-    item.type === "HABIT" && item.quota
-      ? habitTimerTargetSeconds(item.quota) ??
-        item.estimatedSeconds ??
-        DEFAULTS.targetSeconds
+    item.type === "HABIT"
+      ? (item.estimatedSeconds ?? DEFAULTS.targetSeconds)
       : item.estimatedSeconds;
 
   const href = buildTimerHref({
@@ -72,9 +72,11 @@ export function TaskRow({
   const upNext = nextStep(steps);
   const editHref = item.type === "HABIT" ? `/habits/${item.id}` : `/tasks/${item.id}`;
 
-  // Ticking done opens a dialog when the box can't answer alone: no time was
-  // logged, or the habit's day isn't accepted until a note is written.
-  const needsTime = item.loggedSeconds === 0 && !item.done;
+  // Ticking done opens a dialog when the box can't answer alone: a todo's
+  // time, or a habit's note. A habit's tick is never gated on time — the
+  // minimal task is a claim, and a claim needs no clock.
+  const needsTime =
+    item.type !== "HABIT" && item.loggedSeconds === 0 && !item.done;
   const needsFeedback = item.requiresFeedback && !item.feedbackNote;
 
   return (
@@ -103,9 +105,17 @@ export function TaskRow({
             </span>
           </span>
 
-          {upNext && !item.done && (
-            // The row's real call to action. Kept inside the timer link so
-            // clicking the step you're about to do starts the clock on it.
+          {item.bar?.minimalTask ? (
+            // The row's real call to action: the smallest version that counts,
+            // said out loud. Kept inside the timer link so clicking the thing
+            // you're about to do starts the clock on it — and it settles into
+            // the past tense once the day is done.
+            <HabitDayLine
+              bar={item.bar}
+              progress={item.progress}
+              done={item.done}
+            />
+          ) : upNext && !item.done ? (
             <span className="text-primary mt-0.5 flex items-center gap-1.5 text-label">
               <CornerDownRight className="size-3 shrink-0" aria-hidden />
               <span className="truncate">{upNext.title}</span>
@@ -115,7 +125,7 @@ export function TaskRow({
                 </span>
               ) : null}
             </span>
-          )}
+          ) : null}
 
           <span className="text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-label">
             {item.type === "HABIT" && item.missedYesterday && !item.done && (
@@ -134,10 +144,6 @@ export function TaskRow({
                 <Clock className="size-3" aria-hidden />
                 {formatMinuteOfDay(item.timeAnchorMinutes)}
               </span>
-            )}
-
-            {item.type === "HABIT" && item.quota && !item.done && (
-              <HabitQuotaStatus quota={item.quota} progress={item.progress} />
             )}
 
             {item.cue?.anchorTitle && (
@@ -225,6 +231,17 @@ export function TaskRow({
           >
             <Play className="size-3.5" aria-hidden />
           </Link>
+          {item.bar?.unit === "MINUTES" && onLogTime && (
+            <button
+              type="button"
+              onClick={onLogTime}
+              aria-label={`Log time for ${item.title}`}
+              title="Log time"
+              className="text-muted-foreground hover:text-foreground hover:border-primary/40 border-border focus-visible:ring-ring rounded-full border p-1.5 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+            >
+              <Clock className="size-3.5" aria-hidden />
+            </button>
+          )}
         </div>
       </div>
 
@@ -264,38 +281,5 @@ export function TaskRow({
         </>
       )}
     </li>
-  );
-}
-
-/**
- * Where today's habit stands against its quota, one quiet line in the row's
- * meta text. Two states only: the minimum is met and the box is ready to tick
- * (soft primary, with the check), or there's a remainder left (muted). Drawn
- * against the *minimum* deliberately — it is the bar the tick cares about; the
- * optimal is a good-day bonus, not a gate.
- */
-function HabitQuotaStatus({
-  quota,
-  progress,
-}: {
-  quota: Quota;
-  progress: number;
-}) {
-  const tier = tierFor(progress, quota);
-  const toGo = remainingToMinimum(progress, quota);
-
-  if (tier === "NONE") {
-    return (
-      <span className="tabular-nums">
-        {formatQuota(toGo, quota.unit)} to go
-      </span>
-    );
-  }
-
-  return (
-    <span className="text-primary/80 inline-flex items-center gap-1">
-      <Check className="size-3" aria-hidden />
-      Minimum met — tick it off
-    </span>
   );
 }

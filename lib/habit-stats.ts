@@ -10,7 +10,7 @@ import {
   type RecurrenceRule,
 } from "@/lib/recurrence";
 import { RANGE_DAYS, type StatsRange } from "@/lib/habit-range";
-import type { HabitUnit, Quota, QuotaTier } from "@/lib/quota";
+import type { HabitBar, HabitUnit } from "@/lib/habit-bar";
 
 /**
  * The habit statistics read.
@@ -23,17 +23,24 @@ import type { HabitUnit, Quota, QuotaTier } from "@/lib/quota";
  * It has to work that way. "Missed" is the absence of a row on a day the habit
  * was due, and due-ness is a rule, not a table. There is no `WHERE` clause that
  * can find a row that was never written.
+ *
+ * One bar, one outcome: a due day is DONE when the minimal task happened, and
+ * *separately* it may have gone beyond — anything in the optional log. There
+ * is no good-day tier to bucket by, because there is no second bar to fall
+ * short of.
  */
 
 // Re-exported for server callers; defined in a client-safe module so the
 // filter control can import them without pulling Prisma into the browser.
 export { RANGE_DAYS, isStatsRange, type StatsRange } from "@/lib/habit-range";
 
-export type DayOutcome = "OPTIMAL" | "MINIMUM" | "SKIPPED" | "MISSED" | "PENDING";
+export type DayOutcome = "DONE" | "SKIPPED" | "MISSED" | "PENDING";
 
 export type HabitDay = {
   dateISO: string;
   outcome: DayOutcome;
+  /** Kept going: anything at all landed in the optional log. */
+  wentBeyond: boolean;
   progress: number;
   loggedSeconds: number;
 };
@@ -41,21 +48,22 @@ export type HabitDay = {
 export type HabitStat = {
   id: string;
   title: string;
-  quota: Quota;
+  bar: HabitBar;
   daysOfWeek: number[];
   archived: boolean;
 
   /** Due days inside the range. The denominator for everything below. */
   expected: number;
-  optimalDays: number;
-  /** Minimum met but not optimal. Adds up with `optimalDays` to "done". */
-  minimumDays: number;
+  /** Due days where the minimal task happened — the whole bar. */
+  doneDays: number;
+  /** Of those, days that kept going past the claim. */
+  wentBeyondDays: number;
   skippedDays: number;
   missedDays: number;
-  /** Percent of due days where the minimum was met. 0..100. */
+  /** Percent of due days that were done. 0..100. */
   adherence: number;
-  /** Of the days you turned up at all, how many were good ones. 0..100. */
-  optimalShare: number;
+  /** Of the days you showed up, how many kept going. 0..100. */
+  wentBeyondShare: number;
 
   currentStreak: number;
   longestStreak: number;
@@ -76,16 +84,16 @@ export type HabitStatsView = {
   /** One row per day across the selection, for the charts. */
   daily: {
     dateISO: string;
-    optimal: number;
-    minimum: number;
+    done: number;
+    wentBeyond: number;
     missed: number;
     skipped: number;
     loggedSeconds: number;
   }[];
   totals: {
     expected: number;
-    optimalDays: number;
-    minimumDays: number;
+    doneDays: number;
+    wentBeyondDays: number;
     missedDays: number;
     skippedDays: number;
     loggedSeconds: number;
@@ -114,8 +122,7 @@ export async function getHabitStats(
           startDate: true,
           endDate: true,
           unit: true,
-          minimumQuota: true,
-          optimalQuota: true,
+          minimalTask: true,
         },
       },
     },
@@ -165,7 +172,7 @@ export async function getHabitStats(
             taskId: true,
             date: true,
             status: true,
-            tier: true,
+            minimalTaskDone: true,
             progress: true,
             loggedSeconds: true,
           },
@@ -203,8 +210,8 @@ export async function getHabitStats(
     const todayISO = toISODate(today);
 
     const days: HabitDay[] = [];
-    let optimalDays = 0;
-    let minimumDays = 0;
+    let doneDays = 0;
+    let wentBeyondDays = 0;
     let skippedDays = 0;
     let missedDays = 0;
     let loggedSeconds = 0;
@@ -223,40 +230,42 @@ export async function getHabitStats(
         continue;
       }
 
-      const outcome = outcomeFor(row?.tier, row?.status, dateISO === todayISO);
+      const outcome = outcomeFor(row, dateISO === todayISO);
+      const beyond = (row?.progress ?? 0) > 0;
       days.push({
         dateISO,
         outcome,
+        wentBeyond: beyond,
         progress: row?.progress ?? 0,
         loggedSeconds: row?.loggedSeconds ?? 0,
       });
 
-      if (outcome === "OPTIMAL") optimalDays += 1;
-      else if (outcome === "MINIMUM") minimumDays += 1;
-      else if (outcome === "SKIPPED") skippedDays += 1;
+      if (outcome === "DONE") {
+        doneDays += 1;
+        if (beyond) wentBeyondDays += 1;
+      } else if (outcome === "SKIPPED") skippedDays += 1;
       else if (outcome === "MISSED") missedDays += 1;
     }
 
     const expected = dueDates.length;
-    const done = optimalDays + minimumDays;
 
     return {
       id: habit.id,
       title: habit.title,
-      quota: {
+      bar: {
         unit: recurrence.unit as HabitUnit,
-        minimum: recurrence.minimumQuota,
-        optimal: recurrence.optimalQuota,
+        minimalTask: recurrence.minimalTask,
       },
       daysOfWeek: recurrence.daysOfWeek,
       archived: habit.archivedAt !== null,
       expected,
-      optimalDays,
-      minimumDays,
+      doneDays,
+      wentBeyondDays,
       skippedDays,
       missedDays,
-      adherence: expected > 0 ? Math.round((done / expected) * 100) : 0,
-      optimalShare: done > 0 ? Math.round((optimalDays / done) * 100) : 0,
+      adherence: expected > 0 ? Math.round((doneDays / expected) * 100) : 0,
+      wentBeyondShare:
+        doneDays > 0 ? Math.round((wentBeyondDays / doneDays) * 100) : 0,
       currentStreak: streak.current,
       longestStreak: streak.longest,
       loggedSeconds,
@@ -274,13 +283,13 @@ export async function getHabitStats(
     daily: rollUpByDay(from, today, stats, selected, occurrences),
     totals: {
       expected: sum(stats, (stat) => stat.expected),
-      optimalDays: sum(stats, (stat) => stat.optimalDays),
-      minimumDays: sum(stats, (stat) => stat.minimumDays),
+      doneDays: sum(stats, (stat) => stat.doneDays),
+      wentBeyondDays: sum(stats, (stat) => stat.wentBeyondDays),
       missedDays: sum(stats, (stat) => stat.missedDays),
       skippedDays: sum(stats, (stat) => stat.skippedDays),
       loggedSeconds: sum(stats, (stat) => stat.loggedSeconds),
       adherence: percent(
-        sum(stats, (stat) => stat.optimalDays + stat.minimumDays),
+        sum(stats, (stat) => stat.doneDays),
         sum(stats, (stat) => stat.expected),
       ),
     },
@@ -292,15 +301,19 @@ export async function getHabitStats(
  *
  * A habit you haven't got to yet at 10am is not a failure, and colouring it as
  * one is how a statistics page becomes something you avoid opening.
+ *
+ * The claim and the log both read as DONE here even while a feedback note
+ * still gates the *streak* — exactly the job `tier` used to do. What happened
+ * happened; whether the day was accepted is the streak's business.
  */
 function outcomeFor(
-  tier: QuotaTier | undefined,
-  status: string | undefined,
+  row:
+    | { status: string; minimalTaskDone: boolean; progress: number }
+    | undefined,
   isToday: boolean,
 ): DayOutcome {
-  if (tier === "OPTIMAL") return "OPTIMAL";
-  if (tier === "MINIMUM") return "MINIMUM";
-  if (status === "SKIPPED") return "SKIPPED";
+  if (row?.status === "SKIPPED") return "SKIPPED";
+  if (row && (row.minimalTaskDone || row.progress > 0)) return "DONE";
   return isToday ? "PENDING" : "MISSED";
 }
 
@@ -320,13 +333,17 @@ function rollUpByDay(
     logged.set(key, (logged.get(key) ?? 0) + row.loggedSeconds);
   }
 
-  const outcomes = new Map<string, Record<DayOutcome, number>>();
+  const outcomes = new Map<
+    string,
+    Record<DayOutcome, number> & { wentBeyond: number }
+  >();
   for (const stat of stats) {
     for (const day of stat.days) {
       const bucket =
         outcomes.get(day.dateISO) ??
-        { OPTIMAL: 0, MINIMUM: 0, SKIPPED: 0, MISSED: 0, PENDING: 0 };
+        { DONE: 0, SKIPPED: 0, MISSED: 0, PENDING: 0, wentBeyond: 0 };
       bucket[day.outcome] += 1;
+      if (day.outcome === "DONE" && day.wentBeyond) bucket.wentBeyond += 1;
       outcomes.set(day.dateISO, bucket);
     }
   }
@@ -336,8 +353,8 @@ function rollUpByDay(
     const bucket = outcomes.get(dateISO);
     return {
       dateISO,
-      optimal: bucket?.OPTIMAL ?? 0,
-      minimum: bucket?.MINIMUM ?? 0,
+      done: bucket?.DONE ?? 0,
+      wentBeyond: bucket?.wentBeyond ?? 0,
       missed: bucket?.MISSED ?? 0,
       skipped: bucket?.SKIPPED ?? 0,
       loggedSeconds: logged.get(dateISO) ?? 0,

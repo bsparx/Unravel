@@ -26,7 +26,7 @@ export function IdentitiesPanel({
       <h2 className="font-display text-title">Who you became</h2>
       <p className="text-muted-foreground mt-0.5 mb-3 max-w-prose text-label">
         Every habit is a vote for the kind of person you want to become. A vote
-        is a due day where the habit&apos;s minimum was met — over the habits in
+        is a due day where the minimal task happened — over the habits in
         view.
       </p>
       <ul className="space-y-3">
@@ -56,15 +56,14 @@ export function IdentitiesPanel({
             </div>
 
             <div className="bg-muted mt-3 flex h-2 w-full overflow-hidden rounded-full">
-              <Segment value={identity.optimalVotes} total={identity.expected} className="bg-primary" label={`${identity.optimalVotes} good days`} />
-              <Segment value={identity.minimumVotes} total={identity.expected} className="bg-primary/50" label={`${identity.minimumVotes} minimum days`} />
+              <Segment value={identity.votes} total={identity.expected} className="bg-primary" label={`${identity.votes} voted`} />
               <Segment value={identity.skipped} total={identity.expected} className="bg-muted-foreground/30" label={`${identity.skipped} skipped`} />
               <Segment value={identity.missed} total={identity.expected} className="bg-destructive/45" label={`${identity.missed} missed`} />
             </div>
 
             <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-label sm:grid-cols-4">
               <Cell label="Votes" value={String(identity.votes)} detail={`of ${identity.expected} due`} />
-              <Cell label="Good days" value={`${identity.optimalShare}%`} detail={identity.votes > 0 ? "of days voted" : undefined} />
+              <Cell label="Kept going" value={String(identity.wentBeyondVotes)} />
               <Cell label="Missed" value={String(identity.missed)} detail={identity.skipped > 0 ? `${identity.skipped} skipped on purpose` : undefined} />
               <Cell
                 label="Cold"

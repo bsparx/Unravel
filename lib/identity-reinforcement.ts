@@ -10,10 +10,10 @@
  *   to two identities casts one full vote for each: a vote for *each* self,
  *   never split between them.
  *
- *   **Vote earned** — that habit-day's minimum was met (OPTIMAL or MINIMUM).
- *   The two tiers are reported separately but count as one vote each: the
- *   minimum is what keeps a streak, and making the good day the bar is how
- *   streaks break. Same two-bar rule as everywhere else.
+ *   **Vote earned** — that habit-day's minimal task happened (DONE). One
+ *   vote per done day, never two: the smallest version is the whole day, and
+ *   anything past it is a quieter number, not a second vote. Same one-bar
+ *   rule as everywhere else.
  *
  *   **Missed** — a due day that came and went with no vote. A deliberate
  *   SKIPPED day is neither a vote nor a miss — it's reported as its own
@@ -26,12 +26,14 @@
  */
 
 /** The outcomes this module understands. Matches `HabitStatsView`'s. */
-export type VoteOutcome = "OPTIMAL" | "MINIMUM" | "SKIPPED" | "MISSED" | "PENDING";
+export type VoteOutcome = "DONE" | "SKIPPED" | "MISSED" | "PENDING";
 
 /** One due day of one habit. Non-due days are deliberately absent. */
 export type VoteDay = {
   dateISO: string;
   outcome: VoteOutcome;
+  /** Kept going: anything at all landed in the optional log. */
+  wentBeyond: boolean;
 };
 
 /** The slice of a habit's statistics the tally needs. */
@@ -74,11 +76,10 @@ export type StarvingHabit = {
 export type IdentityReinforcement = IdentitySeed & {
   /** Every due habit-day of every linked habit inside the range. */
   expected: number;
-  /** Opportunities that became votes: the minimum was met. */
+  /** Opportunities that became votes: the minimal task happened. */
   votes: number;
-  /** Of the votes, how many were good days (the optimal). */
-  optimalVotes: number;
-  minimumVotes: number;
+  /** Of the votes, how many kept going — the quiet optional number. */
+  wentBeyondVotes: number;
   /** Opportunities with no vote and no deliberate skip. */
   missed: number;
   /** Deliberately passed on. Neither a vote nor a miss. */
@@ -88,8 +89,6 @@ export type IdentityReinforcement = IdentitySeed & {
 
   /** Percent of opportunities that became votes. 0..100. */
   reinforcement: number;
-  /** Percent of votes that were good days. 0..100. */
-  optimalShare: number;
 
   /**
    * Consecutive due days with no vote at the tail of the range, walking back
@@ -143,8 +142,7 @@ export function reinforceIdentities(
 
     let expected = 0;
     let votes = 0;
-    let optimalVotes = 0;
-    let minimumVotes = 0;
+    let wentBeyondVotes = 0;
     let missed = 0;
     let skipped = 0;
     let pending = 0;
@@ -165,17 +163,9 @@ export function reinforceIdentities(
         if (bucket) bucket.due += 1;
 
         switch (day.outcome) {
-          case "OPTIMAL":
+          case "DONE":
             votes += 1;
-            optimalVotes += 1;
-            if (bucket) {
-              bucket.votes += 1;
-              bucket.touched = true;
-            }
-            break;
-          case "MINIMUM":
-            votes += 1;
-            minimumVotes += 1;
+            if (day.wentBeyond) wentBeyondVotes += 1;
             if (bucket) {
               bucket.votes += 1;
               bucket.touched = true;
@@ -208,13 +198,11 @@ export function reinforceIdentities(
       ...identity,
       expected,
       votes,
-      optimalVotes,
-      minimumVotes,
+      wentBeyondVotes,
       missed,
       skipped,
       pending,
       reinforcement: percent(votes, expected),
-      optimalShare: percent(optimalVotes, votes),
       coldDueDays: coldWalk(daily, range.todayISO),
       starving: starving.sort((a, b) => b.missed - a.missed),
       linked: linkedHabits.map((habit) => ({ habitId: habit.id, title: habit.title })),

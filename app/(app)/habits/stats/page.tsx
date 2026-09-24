@@ -12,7 +12,7 @@ import {
   type StatsRange,
 } from "@/lib/habit-stats";
 import { getIdentityReinforcements } from "@/lib/identity-stats";
-import { describeQuota, formatQuota } from "@/lib/quota";
+import { describeBar, formatLogged } from "@/lib/habit-bar";
 import { describeRecurrence } from "@/lib/recurrence";
 import { cn } from "@/lib/utils";
 
@@ -61,7 +61,7 @@ export default async function HabitStatsPage({
         <EmptyState
           icon={BarChart3}
           title="No habits to measure yet"
-          description="Add a habit with a minimum quota and this fills in: what you kept, what you missed, and how often you went past the minimum."
+          description="Add a habit with a minimal task and this fills in: what you kept, what you missed, and how often you kept going."
           action={
             <Button asChild size="sm">
               <Link href="/habits/new">Add a habit</Link>
@@ -79,9 +79,8 @@ export default async function HabitStatsPage({
       <header className="mb-6">
         <h1 className="text-display">Habit statistics</h1>
         <p className="text-muted-foreground mt-1 text-label">
-          The minimum is what keeps a streak. The optimal is what a good day
-          looks like. Both are here — a day that reached the optimal counts once,
-          as optimal.
+          The smallest version that counts is the whole day; anything past it
+          is logged, never required.
         </p>
       </header>
 
@@ -97,14 +96,14 @@ export default async function HabitStatsPage({
         <Stat
           label="Kept"
           value={`${stats.totals.adherence}%`}
-          detail={`${stats.totals.optimalDays + stats.totals.minimumDays} of ${
+          detail={`${stats.totals.doneDays} of ${
             stats.totals.expected
           } due days`}
         />
         <Stat
-          label="Good days"
-          value={String(stats.totals.optimalDays)}
-          detail="hit the optimal"
+          label="Kept going"
+          value={String(stats.totals.wentBeyondDays)}
+          detail="past the minimal task"
         />
         <Stat
           label="Missed"
@@ -112,7 +111,7 @@ export default async function HabitStatsPage({
           detail={
             stats.totals.skippedDays > 0
               ? `${stats.totals.skippedDays} skipped on purpose`
-              : "days the minimum wasn't met"
+              : "days nothing was done"
           }
         />
         <Stat
@@ -134,7 +133,7 @@ export default async function HabitStatsPage({
       <div className="space-y-10">
         <Panel
           title="Every day"
-          subtitle="Stacked, because the minimum and the optimal are two heights of the same thing. Bar height is how many habits you turned up for."
+          subtitle="Done, skipped, and missed partition the same due days. Bar height is how many habits you turned up for."
         >
           <OutcomesChart daily={stats.daily} />
         </Panel>
@@ -150,22 +149,21 @@ export default async function HabitStatsPage({
           <Panel
             title={`${single.title}, day by day`}
             subtitle={`Measured in ${
-              single.quota.unit === "MINUTES" ? "minutes" : "times"
-            }. ${describeQuota(single.quota)}.`}
+              single.bar.unit === "MINUTES" ? "minutes" : "times"
+            }. ${describeBar(single.bar)}.`}
           >
-            <ProgressChart days={single.days} quota={single.quota} />
+            <ProgressChart days={single.days} bar={single.bar} />
           </Panel>
         ) : (
           stats.habits.length > 1 && (
             <Panel
               title="Which ones are sticking"
-              subtitle="Percent of due days where you met the minimum. A stronger bar means more of those days went past it."
+              subtitle="Percent of due days where the minimal task happened."
             >
               <AdherenceChart
                 habits={stats.habits.map((habit) => ({
                   title: habit.title,
                   adherence: habit.adherence,
-                  optimalShare: habit.optimalShare,
                 }))}
               />
             </Panel>
@@ -189,7 +187,7 @@ export default async function HabitStatsPage({
                     </Link>
                     <p className="text-muted-foreground text-label">
                       {describeRecurrence(habit.daysOfWeek)} ·{" "}
-                      {describeQuota(habit.quota)}
+                      {describeBar(habit.bar)}
                     </p>
                   </div>
 
@@ -208,16 +206,10 @@ export default async function HabitStatsPage({
                     worst, so the shape of the row is the summary. */}
                 <div className="bg-muted mt-3 flex h-2 w-full overflow-hidden rounded-full">
                   <Segment
-                    value={habit.optimalDays}
+                    value={habit.doneDays}
                     total={habit.expected}
                     className="bg-primary"
-                    label={`${habit.optimalDays} optimal`}
-                  />
-                  <Segment
-                    value={habit.minimumDays}
-                    total={habit.expected}
-                    className="bg-primary/50"
-                    label={`${habit.minimumDays} minimum`}
+                    label={`${habit.doneDays} done`}
                   />
                   <Segment
                     value={habit.skippedDays}
@@ -236,11 +228,11 @@ export default async function HabitStatsPage({
                 <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-label sm:grid-cols-4">
                   <Cell label="Kept" value={`${habit.adherence}%`} />
                   <Cell
-                    label="Optimal"
-                    value={`${habit.optimalDays}`}
+                    label="Kept going"
+                    value={`${habit.wentBeyondDays}`}
                     detail={
-                      habit.optimalDays + habit.minimumDays > 0
-                        ? `${habit.optimalShare}% of days done`
+                      habit.doneDays > 0
+                        ? `${habit.wentBeyondShare}% of days done`
                         : undefined
                     }
                   />
@@ -249,8 +241,8 @@ export default async function HabitStatsPage({
                     label="Time"
                     value={formatDuration(habit.loggedSeconds)}
                     detail={
-                      habit.quota.unit === "COUNT"
-                        ? formatQuota(habit.totalProgress, habit.quota.unit)
+                      habit.bar.unit === "COUNT"
+                        ? formatLogged(habit.totalProgress, habit.bar.unit)
                         : undefined
                     }
                   />

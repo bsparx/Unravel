@@ -1,5 +1,4 @@
 import { addDays, dayOfWeek, toISODate, WEEKDAYS } from "@/lib/dates";
-import type { QuotaTier } from "@/lib/quota";
 import { isDueOn, type RecurrenceRule } from "@/lib/recurrence";
 import { cn } from "@/lib/utils";
 
@@ -13,14 +12,14 @@ import { cn } from "@/lib/utils";
 export function HabitGrid({
   rule,
   history,
-  tiers,
+  wentBeyond,
   today,
   weeks = 8,
 }: {
   rule: RecurrenceRule;
   history: Map<string, "DONE" | "SKIPPED">;
-  /** Optional: when present, optimal days are drawn a shade stronger. */
-  tiers?: Map<string, QuotaTier>;
+  /** Optional: when present, days that kept going are drawn a shade stronger. */
+  wentBeyond?: Map<string, boolean>;
   today: Date;
   weeks?: number;
 }) {
@@ -46,8 +45,7 @@ export function HabitGrid({
             const isFuture = date.getTime() > today.getTime();
             const due = !isFuture && isDueOn(rule, date);
             const status = history.get(iso);
-            const tier = tiers?.get(iso);
-            const optimal = tier === "OPTIMAL";
+            const keptGoing = wentBeyond?.get(iso) === true;
 
             return (
               <span
@@ -55,9 +53,9 @@ export function HabitGrid({
                 title={`${WEEKDAYS[dayOfWeek(date)].short} ${iso}${
                   due
                     ? status === "DONE"
-                      ? optimal
-                        ? " — optimal"
-                        : " — minimum"
+                      ? keptGoing
+                        ? " — done, went beyond"
+                        : " — done"
                       : status
                         ? ` — ${status.toLowerCase()}`
                         : " — missed"
@@ -70,9 +68,10 @@ export function HabitGrid({
                   // as a broken row.
                   !due && "bg-muted",
                   // Two weights for DONE, because the distinction between "kept
-                  // the streak" and "had a good day" is the whole point of two
-                  // quotas — and a single colour throws it away.
-                  due && status === "DONE" && (optimal ? "bg-primary" : "bg-primary/55"),
+                  // the streak" and "kept going" is the one distinction left —
+                  // the claim and the optional log. A single colour throws it
+                  // away.
+                  due && status === "DONE" && (keptGoing ? "bg-primary" : "bg-primary/55"),
                   due && status === "SKIPPED" && "bg-primary/20",
                   due && !status && "border-destructive/40 border bg-transparent",
                 )}

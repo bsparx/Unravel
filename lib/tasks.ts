@@ -19,14 +19,13 @@ import type {
 } from "@/lib/generated/prisma/client";
 import { anchorTitleOf } from "@/lib/habit-cue";
 import { isActiveInSlot } from "@/lib/habit-slots";
-import type { HabitUnit, Quota, QuotaTier } from "@/lib/quota";
+import type { DayClaim, HabitBar, HabitUnit } from "@/lib/habit-bar";
 import {
   isDueOn,
   wasMissedOn,
   type RecurrenceRule,
 } from "@/lib/recurrence";
 import type { StepLike } from "@/lib/steps";
-import { MAX_MANUAL_LOG_MINUTES } from "@/lib/timer-math";
 
 export type TaskSummary = {
   id: string;
@@ -49,12 +48,6 @@ export type TodayItem = TaskSummary & {
   occurrenceStatus: OccurrenceStatus | null;
   loggedSeconds: number;
   done: boolean;
-  /**
-   * The floor for the "how long did that take" dialog, in minutes. For a
-   * MINUTES habit it is the habit's own minimum; for everything else it is
-   * one — time is not the thing a COUNT habit is counted in.
-   */
-  minimumMinutes: number;
   /** Negative = overdue by N days. Null for habits and undated todos. */
   daysUntilDue: number | null;
   recurrenceDays: number[] | null;
@@ -85,11 +78,11 @@ export type TodayItem = TaskSummary & {
    */
   feedbackPrompt: string | null;
   /**
-   * Habits only: the two bars the day's progress is measured against. Null for
-   * todos, which have no quota.
+   * Habits only: what counts as done and what the optional log counts. Null
+   * for todos, which have no bar — a todo is done or it isn't.
    */
-  quota: Quota | null;
-  /** Habits only: today's progress, in the habit's own unit. */
+  bar: HabitBar | null;
+  /** Habits only: today's optional log, in the habit's own unit. */
   progress: number;
 };
 
@@ -296,10 +289,6 @@ export async function getTodayView(user: User): Promise<TodayView> {
         occurrenceStatus: occurrence?.status ?? null,
         loggedSeconds: occurrence?.loggedSeconds ?? 0,
         done: occurrence?.status === "DONE",
-        minimumMinutes:
-          task.recurrence?.unit === "MINUTES"
-            ? Math.min(task.recurrence.minimumQuota, MAX_MANUAL_LOG_MINUTES)
-            : 1,
         daysUntilDue: null,
         recurrenceDays: task.recurrence?.daysOfWeek ?? null,
         timeAnchorMinutes: task.recurrence?.timeAnchor ?? null,
@@ -312,10 +301,9 @@ export async function getTodayView(user: User): Promise<TodayView> {
           completionsForYesterday(task.id),
           yesterday,
         ),
-        quota: {
+        bar: {
           unit: task.recurrence!.unit as HabitUnit,
-          minimum: task.recurrence!.minimumQuota,
-          optimal: task.recurrence!.optimalQuota,
+          minimalTask: task.recurrence!.minimalTask,
         },
         progress: occurrence?.progress ?? 0,
       };
@@ -328,7 +316,6 @@ export async function getTodayView(user: User): Promise<TodayView> {
       occurrenceStatus: occurrence?.status ?? null,
       loggedSeconds: occurrence?.loggedSeconds ?? 0,
       done: task.completedAt !== null,
-      minimumMinutes: 1,
       daysUntilDue: task.dueDate
         ? Math.round(
             (task.dueDate.getTime() - today.getTime()) / 86_400_000,
@@ -341,7 +328,7 @@ export async function getTodayView(user: User): Promise<TodayView> {
       feedbackNote: null,
       feedbackPrompt: null,
       missedYesterday: false,
-      quota: null,
+      bar: null,
       progress: 0,
     };
   });
@@ -390,14 +377,15 @@ export type HabitWithHistory = TaskSummary & {
   /** ISO date -> status, for the adherence grid and streak walk. */
   history: Map<string, "DONE" | "SKIPPED">;
   /**
-   * ISO date -> tier, parallel to `history`. Kept separate rather than folded
-   * into it so `computeStreak` stays quota-unaware: the streak only ever asks
-   * "was this DONE", and DONE already means "the minimum was met".
+   * ISO date -> went-beyond, parallel to `history`. Kept separate rather than
+   * folded into it so `computeStreak` stays bar-unaware: the streak only ever
+   * asks "was this DONE", and DONE already means the minimal task happened.
+   * True when that day's optional log is non-empty — the grid's quiet half.
    */
-  tiers: Map<string, QuotaTier>;
-  quota: Quota;
-  /** Progress on `today`, in the habit's own unit. */
-  todayProgress: number;
+  wentBeyond: Map<string, boolean>;
+  bar: HabitBar;
+  /** The claim and the optional log on `today`. */
+  today: DayClaim;
   /** Today's written note, for the "write today's note" affordance. */
   todayNote: string | null;
   /** The day isn't DONE until a note exists. */
@@ -442,7 +430,7 @@ export async function getHabits(
         taskId: true,
         date: true,
         status: true,
-        tier: true,
+        minimalTaskDone: true,
         progress: true,
         note: true,
       },
@@ -450,8 +438,8 @@ export async function getHabits(
   ]);
 
   const historyByTask = new Map<string, Map<string, "DONE" | "SKIPPED">>();
-  const tiersByTask = new Map<string, Map<string, QuotaTier>>();
-  const todayProgress = new Map<string, number>();
+  const wentBeyondByTask = new Map<string, Map<string, boolean>>();
+  const todayByTask = new Map<string, DayClaim>();
   const todayNote = new Map<string, string | null>();
   const todayISO = toISODate(today);
 
@@ -464,12 +452,15 @@ export async function getHabits(
       historyByTask.set(occurrence.taskId, map);
     }
 
-    const tiers = tiersByTask.get(occurrence.taskId) ?? new Map();
-    tiers.set(iso, occurrence.tier);
-    tiersByTask.set(occurrence.taskId, tiers);
+    const wentBeyond = wentBeyondByTask.get(occurrence.taskId) ?? new Map();
+    wentBeyond.set(iso, occurrence.progress > 0);
+    wentBeyondByTask.set(occurrence.taskId, wentBeyond);
 
     if (iso === todayISO) {
-      todayProgress.set(occurrence.taskId, occurrence.progress);
+      todayByTask.set(occurrence.taskId, {
+        minimalTaskDone: occurrence.minimalTaskDone,
+        progress: occurrence.progress,
+      });
       todayNote.set(occurrence.taskId, occurrence.note);
     }
   }
@@ -482,13 +473,12 @@ export async function getHabits(
       rule: toRule(habit.recurrence!),
       daysOfWeek: habit.recurrence!.daysOfWeek,
       history: historyByTask.get(habit.id) ?? new Map(),
-      tiers: tiersByTask.get(habit.id) ?? new Map(),
-      quota: {
+      wentBeyond: wentBeyondByTask.get(habit.id) ?? new Map(),
+      bar: {
         unit: habit.recurrence!.unit as HabitUnit,
-        minimum: habit.recurrence!.minimumQuota,
-        optimal: habit.recurrence!.optimalQuota,
+        minimalTask: habit.recurrence!.minimalTask,
       },
-      todayProgress: todayProgress.get(habit.id) ?? 0,
+      today: todayByTask.get(habit.id) ?? { minimalTaskDone: false, progress: 0 },
       todayNote: todayNote.get(habit.id) ?? null,
       requiresFeedback: habit.requiresFeedback,
       feedbackPrompt: habit.feedbackPrompt,

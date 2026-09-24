@@ -14,7 +14,7 @@ import "dotenv/config";
 import { PrismaNeon } from "@prisma/adapter-neon";
 
 import { ensureGlobalCategories } from "@/lib/budget";
-import { tierFor, type Quota } from "@/lib/quota";
+
 import { PrismaClient } from "../lib/generated/prisma/client";
 import type {
   BodyPart,
@@ -1301,11 +1301,11 @@ async function main() {
         estimatedSeconds: 15 * 60,
         defaultMode: "BASIC" as TimerMode,
         reliability: 0.82,
-        // Two minutes to count, fifteen on a good day. The gap between the two
-        // is the point: it is what makes the streak survivable.
+        // One sentence is the bar, and a full morning's pages is just what
+        // tends to happen after. The gap between the two is the point: it is
+        // what makes the streak survivable.
         unit: "MINUTES" as const,
-        minimumQuota: 2,
-        optimalQuota: 15,
+        minimalTask: "Write one sentence",
       },
       {
         title: "Read something long",
@@ -1314,8 +1314,7 @@ async function main() {
         defaultMode: "FLOW" as TimerMode,
         reliability: 0.65,
         unit: "COUNT" as const,
-        minimumQuota: 1,
-        optimalQuota: 10,
+        minimalTask: "Read one page",
       },
       {
         title: "Inbox to zero",
@@ -1324,8 +1323,7 @@ async function main() {
         defaultMode: "POMODORO" as TimerMode,
         reliability: 0.74,
         unit: "MINUTES" as const,
-        minimumQuota: 5,
-        optimalQuota: 20,
+        minimalTask: "Reply to one message",
       },
       {
         title: "Stretch",
@@ -1333,11 +1331,10 @@ async function main() {
         estimatedSeconds: 10 * 60,
         defaultMode: "BASIC" as TimerMode,
         reliability: 0.5,
-        // No stretch goal at all — one of the four, so the "no optimal" path
-        // is exercised by the seed rather than only by tests.
+        // One stretch is the whole day, and that's the point — this path
+        // should be exercised by the seed rather than only by tests.
         unit: "COUNT" as const,
-        minimumQuota: 1,
-        optimalQuota: null,
+        minimalTask: "One stretch",
       },
     ].map(async (habit, index) => {
       const task = await prisma.task.create({
@@ -1355,8 +1352,7 @@ async function main() {
               daysOfWeek: habit.daysOfWeek,
               startDate: localDate(-DAYS_OF_HISTORY),
               unit: habit.unit,
-              minimumQuota: habit.minimumQuota,
-              optimalQuota: habit.optimalQuota,
+              minimalTask: habit.minimalTask,
             },
           },
         },
@@ -1454,22 +1450,17 @@ async function main() {
       // Real sessions rarely land exactly on the estimate.
       const elapsed = Math.round(target * (0.75 + random() * 0.75));
 
-      // A realistic spread of days: most clear the minimum, a good few go all
-      // the way. Derived through `tierFor` rather than assigned, so the seed
-      // can't invent a combination the app itself would never produce.
-      const quota: Quota = {
-        unit: habit.unit,
-        minimum: habit.minimumQuota,
-        optimal: habit.optimalQuota,
-      };
-      const ceiling = habit.optimalQuota ?? habit.minimumQuota;
-      const progress =
-        habit.unit === "MINUTES"
-          ? Math.max(habit.minimumQuota, Math.round(elapsed / 60))
-          : random() < 0.45
-            ? ceiling + Math.floor(random() * 3)
-            : habit.minimumQuota +
-              Math.floor(random() * Math.max(1, ceiling - habit.minimumQuota));
+      // A realistic spread of days: most stop at the minimal task — a claim
+      // and no number, which is a complete day. A good few keep going, and
+      // the optional log records how far. The claim is usually ticked either
+      // way; a timer-only day with no claim is also a thing.
+      const keptGoing = random() < 0.55;
+      const claimed = keptGoing ? random() < 0.75 : true;
+      const progress = keptGoing
+        ? habit.unit === "MINUTES"
+          ? Math.max(1, Math.round(elapsed / 60))
+          : 1 + Math.floor(random() * 9)
+        : 0;
 
       const occurrence = await prisma.taskOccurrence.create({
         data: {
@@ -1478,23 +1469,27 @@ async function main() {
           date,
           status: "DONE",
           completedAt: new Date(date.getTime() + 9 * 3600_000),
-          loggedSeconds: elapsed,
+          loggedSeconds: keptGoing ? elapsed : 0,
+          minimalTaskDone: claimed,
           progress,
-          tier: tierFor(progress, quota),
         },
       });
 
-      await createSession({
-        userId: user.id,
-        taskId: habit.task.id,
-        occurrenceId: occurrence.id,
-        localDate: date,
-        mode: habit.defaultMode,
-        targetSeconds: target,
-        elapsedSeconds: elapsed,
-        hour: 7 + Math.floor(random() * 3),
-      });
-      sessionCount += 1;
+      // Only the days that kept going have time on the clock — a claim is a
+      // claim, and never opening the timer is the whole point of it.
+      if (keptGoing) {
+        await createSession({
+          userId: user.id,
+          taskId: habit.task.id,
+          occurrenceId: occurrence.id,
+          localDate: date,
+          mode: habit.defaultMode,
+          targetSeconds: target,
+          elapsedSeconds: elapsed,
+          hour: 7 + Math.floor(random() * 3),
+        });
+        sessionCount += 1;
+      }
     }
 
     // A few deep-work sessions on weekdays.

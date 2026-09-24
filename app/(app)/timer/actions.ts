@@ -10,7 +10,7 @@ import { todayLocal } from "@/lib/dates";
 import type { FocusSession } from "@/lib/generated/prisma/client";
 import {
   creditLoggedTime,
-  getHabitQuota,
+  getHabitBar,
   toggleHabitDone,
 } from "@/lib/habit-progress";
 import { addLoggedSeconds, ensureOccurrence } from "@/lib/occurrences";
@@ -388,8 +388,8 @@ export async function endSession(
   const wallClock = serverElapsed(session, now);
 
   // What actually gets logged is the wall clock minus the breaks. Without this
-  // a pomodoro's break minutes are credited to the task, to habit quota and to
-  // the streak — see `focusElapsedSeconds` for why it subtracts rather than
+  // a pomodoro's break minutes are credited to the task, to the habit log and
+  // to the streak — see `focusElapsedSeconds` for why it subtracts rather than
   // sums. `accumulatedSeconds` stays the wall clock: it is the rehydration
   // figure, and rewriting it to the focus-only total would make a reload read
   // as if the breaks never happened.
@@ -444,8 +444,8 @@ export async function endSession(
   if (session.occurrenceId) {
     await addLoggedSeconds(session.occurrenceId, elapsed);
 
-    // A MINUTES habit fills its own quota from the clock — the entire point of
-    // "meditate for two minutes" is that running the timer IS the bookkeeping.
+    // A MINUTES habit fills its own log from the clock — the entire point of
+    // a timed habit is that running the timer IS the bookkeeping.
     // Credited against the day's total logged time rather than this session's
     // minutes, so a retried endSession can't book the same time twice.
     if (session.taskId) {
@@ -619,17 +619,17 @@ async function completeTaskFromTimer(
   if (!occurrenceId) return;
 
   if (task.type === "HABIT") {
-    // Through the quota, so `progress`, `tier` and `status` stay consistent.
-    // Writing status: DONE directly here would leave the day counting for the
-    // streak while showing tier NONE in every chart.
+    // Through the claim, so `minimalTaskDone`, `progress` and `status` stay
+    // consistent. Writing status: DONE directly here would leave the day
+    // counting for the streak with no claim behind it.
     const occurrence = await prisma.taskOccurrence.findUnique({
       where: { id: occurrenceId },
       select: { date: true },
     });
-    const quota = occurrence ? await getHabitQuota(userId, task.id) : null;
+    const bar = occurrence ? await getHabitBar(userId, task.id) : null;
 
-    if (occurrence && quota) {
-      await toggleHabitDone(userId, quota, occurrence.date, true);
+    if (occurrence && bar) {
+      await toggleHabitDone(userId, bar, occurrence.date, true);
       return;
     }
   }

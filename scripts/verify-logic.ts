@@ -136,16 +136,14 @@ import {
   wouldCycle,
 } from "@/lib/habit-cue";
 import {
-  meetsMinimum,
-  minimumMarkerRatio,
+  claimDone,
+  dayStatus,
+  describeBar,
+  formatLogged,
   minutesFromSeconds,
-  quotaRatio,
   recreditedProgress,
-  remainingToMinimum,
-  statusForTier,
-  tierFor,
-  type Quota,
-} from "@/lib/quota";
+  wentBeyond,
+} from "@/lib/habit-bar";
 import {
   EASY_FIRST_STEP_SECONDS,
   firstStep,
@@ -1477,102 +1475,90 @@ check("an unestimated first step is 'can't tell', never a warning", () => {
   assert.equal(isGentleStart(null), null);
 });
 
-console.log("\nhabit quotas — two bars, one streak");
+console.log("\none bar: the claim");
 
-const quota = (minimum: number, optimal: number | null = null): Quota => ({
-  unit: "COUNT",
-  minimum,
-  optimal,
+check("the claim alone is the whole day", () => {
+  // Ticking books no number: the claim is a statement about the named act,
+  // not a measurement. It is also already a complete day — no figure is
+  // owed beside it.
+  assert.equal(dayStatus({ minimalTaskDone: true, progress: 0 }), "DONE");
 });
 
-check("the tier is a function of the day's total, not of what happened first", () => {
-  // LOAD-BEARING, and the whole "minimum then optimal counts only as optimal"
-  // rule. Because the tier is derived from one number rather than reduced over
-  // a sequence of events, there is no representable state in which a single day
-  // counts twice. Do not reintroduce an event log here.
-  const q = quota(1, 10);
-  assert.equal(tierFor(1, q), "MINIMUM");
-  assert.equal(tierFor(10, q), "OPTIMAL");
-  // Did the minimum, carried on to the optimal: still exactly one OPTIMAL day.
-  assert.equal(tierFor(1 + 9, q), "OPTIMAL");
-  // And overshooting doesn't invent a third tier.
-  assert.equal(tierFor(400, q), "OPTIMAL");
+check("a log alone is the whole day", () => {
+  // Logging anything means you showed up. The optional log has no threshold
+  // to be past — presence is the whole question.
+  assert.equal(dayStatus({ minimalTaskDone: false, progress: 3 }), "DONE");
 });
 
-check("below the minimum is nothing, however close", () => {
-  assert.equal(tierFor(0, quota(1)), "NONE");
-  assert.equal(tierFor(9, quota(10, 20)), "NONE");
-  assert.equal(tierFor(10, quota(10, 20)), "MINIMUM");
+check("with neither claim nor log, the day is still pending", () => {
+  assert.equal(dayStatus({ minimalTaskDone: false, progress: 0 }), "PENDING");
 });
 
-check("a habit with no optimal tops out at MINIMUM", () => {
-  const q = quota(5, null);
-  assert.equal(tierFor(5, q), "MINIMUM");
-  assert.equal(tierFor(500, q), "MINIMUM", "no stretch goal means no optimal day");
+check("claim and log together are still one day", () => {
+  // LOAD-BEARING: one day is one day. Both is not a double feature — the
+  // status is derived from one record, never stored twice. And "went beyond"
+  // is a boolean about the log only: the claim never counts as kept going,
+  // or ticking the bar would quietly report a good day.
+  assert.equal(dayStatus({ minimalTaskDone: true, progress: 2 }), "DONE");
+  assert.equal(wentBeyond({ minimalTaskDone: true, progress: 0 }), false);
+  assert.equal(wentBeyond({ minimalTaskDone: true, progress: 2 }), true);
 });
 
-check("a zero minimum cannot make every untouched day count", () => {
-  // Otherwise an unset quota silently grants a permanent streak on every habit.
-  assert.equal(tierFor(0, quota(0)), "NONE");
+check("a required note holds a recorded day hostage until it lands", () => {
+  // LOAD-BEARING: the act is recorded, the day waits. The feedback gate is
+  // the caller's business (it has to read the note); this is the rule it
+  // applies — and it applies to the claim exactly as to the log.
+  assert.equal(dayStatus({ minimalTaskDone: true, progress: 0 }, false), "PENDING");
+  assert.equal(dayStatus({ minimalTaskDone: true, progress: 0 }, true), "DONE");
 });
 
-check("an optimal at or below the minimum resolves to the better tier", () => {
-  // The form rejects this, but old rows may hold it, and reading it as the
-  // worse of the two would demote days that genuinely cleared both bars.
-  assert.equal(tierFor(5, { unit: "COUNT", minimum: 5, optimal: 3 }), "OPTIMAL");
+check("Do the warmup becomes Did the warmup, and a stranger's phrasing gets the fixed frame", () => {
+  // Rewriting a stranger's grammar would be worse than a predictable frame:
+  // "Did Read a page" is broken, "Did it — Read a page" is clumsy once.
+  assert.equal(claimDone("Do the warmup"), "Did the warmup");
+  assert.equal(claimDone("Read a page"), "Did it — Read a page");
 });
 
-check("the streak asks about the minimum and nothing else", () => {
-  assert.equal(meetsMinimum("NONE"), false);
-  assert.equal(meetsMinimum("MINIMUM"), true);
-  assert.equal(meetsMinimum("OPTIMAL"), true);
-  // The invariant the whole app relies on: DONE means the minimum was met.
-  assert.equal(statusForTier("MINIMUM"), "DONE");
-  assert.equal(statusForTier("OPTIMAL"), "DONE");
-  assert.equal(statusForTier("NONE"), "PENDING");
+check("the clock can move the log down, and the hand-entered part is a floor", () => {
+  // The case this exists for: a timer left running all night books a log
+  // nobody had, so the figure follows the clock down. But only the part the
+  // clock earned — what was entered or tapped by hand stays. Someone who
+  // said "I did this" does not lose it because a different session on the
+  // same date was wrong. And the clock still rises, like crediting does.
+  assert.equal(recreditedProgress(40, 40 * 60, 5 * 60), 5);
+  assert.equal(recreditedProgress(40, 40 * 60, 0), 0);
+  assert.equal(recreditedProgress(5, 5 * 60, 40 * 60), 40);
+  // Progress 10 with only 2 minutes ever on the clock: 8 of those minutes
+  // were hand-entered, and are the floor.
+  assert.equal(recreditedProgress(10, 2 * 60, 0), 10);
+  assert.equal(recreditedProgress(10, 2 * 60, 60), 10);
+  // Once the clock exceeds the hand-entered floor, the clock wins again.
+  assert.equal(recreditedProgress(10, 2 * 60, 30 * 60), 30);
 });
 
-check("a minimum-only day keeps a streak exactly as an optimal day does", () => {
-  const rule = {
-    daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
-    startDate: parseLocalDate("2026-07-20")!,
-    endDate: null,
-  };
-  const today = parseLocalDate("2026-07-24")!;
-
-  // Four days: minimum, optimal, minimum, optimal. The streak cannot tell them
-  // apart, and that is the point of having a low bar at all.
-  const history = new Map<string, "DONE" | "SKIPPED">([
-    ["2026-07-20", "DONE"],
-    ["2026-07-21", "DONE"],
-    ["2026-07-22", "DONE"],
-    ["2026-07-23", "DONE"],
-  ]);
-
-  assert.equal(computeStreak(rule, history, today).current, 4);
+check("a correction moves the log and cannot reach the claim", () => {
+  // The claim is a separate flag and is never this function's business: it
+  // takes and returns numbers only, so there is no argument here that could
+  // untick anything. Correcting a runaway timer to zero empties the log —
+  // the claim stands, and the day with it. (Unticking is the write path's
+  // whole undo, and it wipes both: a half-undo would leave the record of a
+  // day the user just said didn't happen.)
+  const log = recreditedProgress(40, 40 * 60, 0);
+  assert.equal(log, 0);
+  assert.equal(dayStatus({ minimalTaskDone: true, progress: log }), "DONE");
 });
 
-check("the ring is drawn against the optimal, with the minimum as a notch", () => {
-  const q = quota(2, 10);
-  assert.equal(quotaRatio(0, q), 0);
-  assert.equal(quotaRatio(5, q), 0.5);
-  assert.equal(quotaRatio(10, q), 1);
-  assert.equal(quotaRatio(40, q), 1, "and never past full");
-  assert.equal(minimumMarkerRatio(q), 0.2);
-});
-
-check("with no optimal the minimum is the whole ring, and has no notch", () => {
-  const q = quota(4, null);
-  assert.equal(quotaRatio(2, q), 0.5);
-  assert.equal(quotaRatio(4, q), 1);
-  assert.equal(minimumMarkerRatio(q), null);
-});
-
-check("'left to keep the streak' hits zero at the minimum, not the optimal", () => {
-  const q = quota(2, 10);
-  assert.equal(remainingToMinimum(0, q), 2);
-  assert.equal(remainingToMinimum(2, q), 0);
-  assert.equal(remainingToMinimum(9, q), 0, "still zero — the streak is safe");
+check("the log agrees in number, and the bar's sentence is the whole promise", () => {
+  // Unit agreement on the figure, and the sentence under the title that
+  // says there is no second bar to hit.
+  assert.equal(formatLogged(2, "MINUTES"), "2 minutes");
+  assert.equal(formatLogged(1, "MINUTES"), "1 minute");
+  assert.equal(formatLogged(3, "COUNT"), "3 times");
+  assert.equal(formatLogged(1, "COUNT"), "1 time");
+  assert.equal(
+    describeBar({ unit: "MINUTES", minimalTask: "Do the warmup" }),
+    "Do the warmup counts the whole day",
+  );
 });
 
 check("logged time floors into minutes rather than rounding up", () => {
@@ -1608,24 +1594,6 @@ check("correcting a session down takes its overtime with it", () => {
   // Rest has no target to overrun, exactly as in endSession.
   assert.equal(adjustedOvertime("RECOVERY", 9999, 0), 0);
   assert.equal(adjustedOvertime("BASIC", 9999, 0), 0);
-});
-
-check("re-crediting follows the clock down when the clock earned it", () => {
-  // 40 minutes logged, 40 minutes of progress: all of it came from the timer,
-  // so correcting the log to 5 minutes must correct the habit too.
-  assert.equal(recreditedProgress(40, 40 * 60, 5 * 60), 5);
-  assert.equal(recreditedProgress(40, 40 * 60, 0), 0);
-  // And still rises, like crediting does.
-  assert.equal(recreditedProgress(5, 5 * 60, 40 * 60), 40);
-});
-
-check("re-crediting never takes back a day someone entered by hand", () => {
-  // Progress 10 with only 2 minutes ever on the clock: 8 of those minutes were
-  // claimed, not measured. Correcting the session cannot revoke the claim.
-  assert.equal(recreditedProgress(10, 2 * 60, 0), 10);
-  assert.equal(recreditedProgress(10, 2 * 60, 60), 10);
-  // Once the clock exceeds the hand-entered floor, the clock wins again.
-  assert.equal(recreditedProgress(10, 2 * 60, 30 * 60), 30);
 });
 
 // ---------------------------------------------------------------- transitions
@@ -2745,7 +2713,6 @@ const questHabit = (
   occurrenceStatus: null,
   loggedSeconds: 0,
   done: false,
-  minimumMinutes: 1,
   daysUntilDue: null,
   recurrenceDays: null,
   cue: null,
@@ -2753,7 +2720,7 @@ const questHabit = (
   requiresFeedback: false,
   feedbackNote: null,
   feedbackPrompt: null,
-  quota: null,
+  bar: { unit: "MINUTES", minimalTask: "Do the warmup" },
   progress: 0,
   ...overrides,
 });
@@ -2785,7 +2752,6 @@ const questTodo = (id: string, daysUntilDue: number | null): TodayItem => ({
   occurrenceStatus: null,
   loggedSeconds: 0,
   done: false,
-  minimumMinutes: 1,
   daysUntilDue: daysUntilDue,
   recurrenceDays: null,
   timeAnchorMinutes: null,
@@ -2794,7 +2760,7 @@ const questTodo = (id: string, daysUntilDue: number | null): TodayItem => ({
   requiresFeedback: false,
   feedbackNote: null,
   feedbackPrompt: null,
-  quota: null,
+  bar: null,
   progress: 0,
 });
 
@@ -2991,11 +2957,15 @@ const identitySeed = (id: string, name: string): IdentitySeed => ({
 const voteHabit = (
   id: string,
   title: string,
-  days: [string, VoteDay["outcome"]][],
+  days: [string, VoteDay["outcome"], boolean?][],
 ): VoteHabit => ({
   id,
   title,
-  days: days.map(([dateISO, outcome]) => ({ dateISO, outcome })),
+  days: days.map(([dateISO, outcome, keptGoing = false]) => ({
+    dateISO,
+    outcome,
+    wentBeyond: keptGoing,
+  })),
 });
 
 const week = {
@@ -3005,9 +2975,11 @@ const week = {
 };
 
 check("a kept habit-day is one full vote for every identity it serves", () => {
+  // One day kept the plain way, one that kept going. Each day is a single
+  // vote for each self — split votes would show 1 here.
   const walk = voteHabit("walk", "Walk", [
-    ["2026-03-02", "MINIMUM"],
-    ["2026-03-03", "OPTIMAL"],
+    ["2026-03-02", "DONE"],
+    ["2026-03-03", "DONE", true],
   ]);
   const tallies = reinforceIdentities(
     [identitySeed("a", "Athlete"), identitySeed("b", "Someone calm")],
@@ -3021,12 +2993,14 @@ check("a kept habit-day is one full vote for every identity it serves", () => {
 
   assert.equal(tallies.length, 2);
   for (const tally of tallies) {
-    // Split votes would show 1 here. A vote is for *each* self.
+    // A vote is for *each* self.
     assert.equal(tally.expected, 2);
     assert.equal(tally.votes, 2);
-    assert.equal(tally.optimalVotes, 1);
+    // LOAD-BEARING: the log never doubles the vote. Kept going is one quiet
+    // number beside the votes — two days kept, two votes, one kept-going.
+    // A second vote for the good day is how the tally starts lying.
+    assert.equal(tally.wentBeyondVotes, 1);
     assert.equal(tally.reinforcement, 100);
-    assert.equal(tally.optimalShare, 50);
   }
 });
 
@@ -3034,7 +3008,7 @@ check("a miss is a missed opportunity; a skip is neither vote nor miss", () => {
   const pages = voteHabit("pages", "Pages", [
     ["2026-03-02", "MISSED"],
     ["2026-03-03", "SKIPPED"],
-    ["2026-03-04", "MINIMUM"],
+    ["2026-03-04", "DONE"],
   ]);
   const [tally] = reinforceIdentities(
     [identitySeed("w", "Writer")],
@@ -3044,9 +3018,13 @@ check("a miss is a missed opportunity; a skip is neither vote nor miss", () => {
   );
 
   assert.equal(tally.expected, 3);
+  // A DONE day is one vote. A MISSED day is not one.
   assert.equal(tally.votes, 1);
   assert.equal(tally.missed, 1);
+  // SKIPPED is a decision to rest: neither vote nor miss, its own number.
   assert.equal(tally.skipped, 1);
+  // And a plain DONE day adds no kept-going beside its vote.
+  assert.equal(tally.wentBeyondVotes, 0);
   assert.equal(tally.starving.length, 1);
   assert.equal(tally.starving[0].title, "Pages");
   assert.equal(tally.starving[0].missed, 1);
@@ -3075,7 +3053,7 @@ check("a Friday-only habit is not going cold all week", () => {
   // Due Monday (kept) and Friday (missed) only. The four empty days between
   // are schedule gaps, not a four-day cold spell.
   const stretch = voteHabit("stretch", "Stretch", [
-    ["2026-03-02", "MINIMUM"],
+    ["2026-03-02", "DONE"],
     ["2026-03-06", "MISSED"],
   ]);
   const [tally] = reinforceIdentities(
@@ -3091,7 +3069,7 @@ check("a Friday-only habit is not going cold all week", () => {
 check("a vote today ends the cold spell", () => {
   const stretch = voteHabit("stretch", "Stretch", [
     ["2026-03-06", "MISSED"],
-    ["2026-03-08", "MINIMUM"],
+    ["2026-03-08", "DONE"],
   ]);
   const [tally] = reinforceIdentities(
     [identitySeed("a", "Athlete")],
@@ -3107,11 +3085,11 @@ check("needs focus lists the hungry, sorts worst first, skips the thriving", () 
   const walk = voteHabit("walk", "Walk", [
     ["2026-03-02", "MISSED"],
     ["2026-03-03", "MISSED"],
-    ["2026-03-04", "MINIMUM"],
+    ["2026-03-04", "DONE"],
   ]);
   const pages = voteHabit("pages", "Pages", [
-    ["2026-03-02", "MINIMUM"],
-    ["2026-03-03", "OPTIMAL"],
+    ["2026-03-02", "DONE"],
+    ["2026-03-03", "DONE"],
   ]);
   const meditate = voteHabit("meditate", "Meditate", []);
 
@@ -3154,7 +3132,7 @@ check("an identity nobody votes for still exists — and is not 'starved'", () =
 });
 
 check("the daily strip keeps its columns even on days nothing is due", () => {
-  const pages = voteHabit("pages", "Pages", [["2026-03-03", "MINIMUM"]]);
+  const pages = voteHabit("pages", "Pages", [["2026-03-03", "DONE"]]);
   const [tally] = reinforceIdentities(
     [identitySeed("w", "Writer")],
     [{ identityId: "w", taskId: "pages" }],

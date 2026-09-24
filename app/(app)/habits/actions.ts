@@ -7,7 +7,7 @@ import { prisma } from "@/lib/db";
 import { EVERY_DAY, parseLocalDate, todayLocal } from "@/lib/dates";
 import { cueEdges, wouldCycle } from "@/lib/habit-cue";
 import {
-  getHabitQuota,
+  getHabitBar,
   setHabitProgress,
   toggleHabitDone,
 } from "@/lib/habit-progress";
@@ -170,8 +170,7 @@ export async function createHabit(
             : today,
           endDate: input.endDate ? parseLocalDate(input.endDate) : null,
           unit: input.unit,
-          minimumQuota: input.minimumQuota,
-          optimalQuota: input.optimalQuota ?? null,
+          minimalTask: input.minimalTask,
           timeAnchor: input.timeAnchor ?? null,
           slots: input.slots,
         },
@@ -251,8 +250,7 @@ export async function updateHabit(
             startDate,
             endDate: input.endDate ? parseLocalDate(input.endDate) : null,
             unit: input.unit,
-            minimumQuota: input.minimumQuota,
-            optimalQuota: input.optimalQuota ?? null,
+            minimalTask: input.minimalTask,
             timeAnchor: input.timeAnchor ?? null,
             slots: input.slots,
           },
@@ -262,8 +260,7 @@ export async function updateHabit(
             startDate,
             endDate: input.endDate ? parseLocalDate(input.endDate) : null,
             unit: input.unit,
-            minimumQuota: input.minimumQuota,
-            optimalQuota: input.optimalQuota ?? null,
+            minimalTask: input.minimalTask,
             timeAnchor: input.timeAnchor ?? null,
             slots: input.slots,
           },
@@ -420,15 +417,15 @@ async function syncHabitIdentities(
   ]);
 }
 
-// ---------------------------------------------------------------- quotas
+// ---------------------------------------------------------------- the log
 
 /**
- * Move a habit's progress for a day: the +1 button, the stepper, or a typed
- * number.
+ * Move a habit's optional log for a day: the +1 button, the stepper, or a
+ * typed number. The claim is never set from here — logging is not ticking.
  *
- * Note that changing the quota later does **not** rewrite past days. Their
- * `tier` was recorded against the quota in force at the time, which is the
- * honest record — raising your minimum from one page to ten shouldn't
+ * Note that rewriting the minimal task later does **not** touch past days.
+ * Their claim was made against the act in force at the time, which is the
+ * honest record — renaming "Do the warmup" to "Full session" shouldn't
  * retroactively delete a streak you actually earned.
  */
 export async function logHabitProgress(formData: FormData): Promise<void> {
@@ -441,12 +438,12 @@ export async function logHabitProgress(formData: FormData): Promise<void> {
 
   // Scoped by userId inside, so an id off the wire finds nothing rather than
   // someone else's habit.
-  const quota = await getHabitQuota(user.id, parsed.data.taskId);
-  if (!quota) return;
+  const bar = await getHabitBar(user.id, parsed.data.taskId);
+  if (!bar) return;
 
   await setHabitProgress(
     user.id,
-    quota,
+    bar,
     date,
     parsed.data.set !== undefined
       ? { set: parsed.data.set }
@@ -457,12 +454,12 @@ export async function logHabitProgress(formData: FormData): Promise<void> {
 }
 
 /**
- * Tick a habit off for today from a list.
+ * Tick a habit off for today from a list — the claim.
  *
- * Routes through the quota so `progress`, `tier` and `status` can never
- * disagree — see `lib/habit-progress.ts`. Ticking books exactly the minimum,
- * never the optimal: a checkbox is a claim that you did it, not that you had a
- * good day.
+ * Routes through `lib/habit-progress.ts` so the claim, the log and `status`
+ * can never disagree. Ticking books **no number**: a checkbox is a claim that
+ * you did the minimal task, not a measurement of how much you did. The log
+ * stays exactly as it was — someone who kept going has the log to say so.
  */
 export async function toggleHabitForDate(formData: FormData): Promise<void> {
   const user = await requireUser();
@@ -475,9 +472,9 @@ export async function toggleHabitForDate(formData: FormData): Promise<void> {
   const date = parseLocalDate(String(formData.get("date") ?? ""));
   if (!date) return;
 
-  const quota = await getHabitQuota(user.id, parsed.data.taskId);
-  if (!quota) return;
+  const bar = await getHabitBar(user.id, parsed.data.taskId);
+  if (!bar) return;
 
-  await toggleHabitDone(user.id, quota, date, parsed.data.done);
+  await toggleHabitDone(user.id, bar, date, parsed.data.done);
   revalidateHabitViews();
 }

@@ -19,7 +19,6 @@ import {
   type Quest,
   type QuestObjective,
 } from "@/lib/day-quests";
-import { habitTimerTargetSeconds } from "@/lib/quota";
 import { formatMinutes } from "@/lib/dates";
 import type { TodayItem } from "@/lib/tasks";
 import { buildTimerHref, RECOVERY_HREF } from "@/lib/timer-url";
@@ -124,15 +123,13 @@ const objectiveHref = (objective: QuestObjective) =>
     plannedIntervals: objective.plannedIntervals,
   });
 
-/** Timer link for a habit quest, against its quota the way every row does it. */
+/** Timer link for a habit quest, against its estimate the way every row does it. */
 const habitHref = (item: TodayItem) =>
   buildTimerHref({
     id: item.id,
     estimatedSeconds:
-      item.type === "HABIT" && item.quota
-        ? (habitTimerTargetSeconds(item.quota) ??
-          item.estimatedSeconds ??
-          DEFAULTS.targetSeconds)
+      item.type === "HABIT"
+        ? (item.estimatedSeconds ?? DEFAULTS.targetSeconds)
         : item.estimatedSeconds,
     defaultMode: item.defaultMode,
     plannedIntervals: item.plannedIntervals,

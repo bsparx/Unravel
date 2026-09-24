@@ -11,14 +11,14 @@ import {
 
 import { ConfirmDelete } from "@/components/confirm-delete";
 import { EmptyState } from "@/components/empty-state";
+import { HabitDayControl } from "@/components/habit-day";
 import { MissedYesterdayBadge } from "@/components/missed-yesterday-badge";
-import { QuotaMeter } from "@/components/quota-meter";
 import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth";
 import { addDays, formatMinutes, toISODate, todayLocal } from "@/lib/dates";
 import { chainOf, cueEdges } from "@/lib/habit-cue";
 import { describeSlots } from "@/lib/habit-slots";
-import { describeQuota } from "@/lib/quota";
+import { describeBar, showedUp } from "@/lib/habit-bar";
 import { getHabits } from "@/lib/tasks";
 import {
   describeRecurrence,
@@ -174,19 +174,21 @@ export default async function HabitsPage() {
                     </form>
                   </>
                 }
-                quota={
+                day={
                   <div className="space-y-1.5">
-                    <QuotaMeter
+                    <HabitDayControl
                       taskId={habit.id}
                       dateISO={toISODate(today)}
-                      quota={habit.quota}
-                      progress={habit.todayProgress}
+                      bar={habit.bar}
+                      progress={habit.today.progress}
+                      done={habit.history.get(toISODate(today)) === "DONE"}
+                      label={habit.title}
                       identities={habit.identities.map((identity) => identity.name)}
                     />
                     {habit.requiresFeedback &&
                       isDueOn(habit.rule, today) &&
                       !habit.history.get(toISODate(today)) &&
-                      habit.todayProgress >= habit.quota.minimum &&
+                      showedUp(habit.today) &&
                       !habit.todayNote && (
                         <HabitFeedbackButton
                           taskId={habit.id}
@@ -211,7 +213,7 @@ export default async function HabitsPage() {
                       ))}
                       <span>{describeRecurrence(habit.daysOfWeek)}</span>
                       <span>{describeSlots(habit.slots)}</span>
-                      <span>{describeQuota(habit.quota)}</span>
+                      <span>{describeBar(habit.bar)}</span>
                       {habit.estimatedSeconds ? (
                         <span className="inline-flex items-center gap-1 tabular-nums">
                           <Timer className="size-3" aria-hidden />
@@ -226,7 +228,7 @@ export default async function HabitsPage() {
                 <HabitGrid
                   rule={habit.rule}
                   history={habit.history}
-                  tiers={habit.tiers}
+                  wentBeyond={habit.wentBeyond}
                   today={today}
                 />
               </HabitCard>

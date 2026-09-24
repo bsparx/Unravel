@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { parseLocalDate, todayLocal } from "@/lib/dates";
-import { getHabitQuota, toggleHabitDone, creditLoggedTime } from "@/lib/habit-progress";
+import { getHabitBar, toggleHabitDone, creditLoggedTime } from "@/lib/habit-progress";
 import {
   addLoggedSeconds,
   ensureOccurrence,
@@ -226,14 +226,15 @@ export async function quickAdd(
  *
  * The one question a checkbox can't answer: "how long did it actually take".
  * Ticking without the timer running would leave a DONE day with zero minutes
- * behind it — a hole in every average and habit tier downstream. This is the
- * other half of that moment.
+ * behind it — a hole in every average downstream. This is the other half of
+ * that moment. (The claim alone is still a complete day: this path is for
+ * when there *is* time to record beside it.)
  *
- * For a MINUTES habit the logged minutes are credited through the quota before
- * the habit is marked done, so the tier, streak and charts all read the real
- * figure rather than just the minimum. For a COUNT habit the quota is untouched
- * (time isn't pages) and ticking books the minimum as it always has — the time
- * still lands in the day's `loggedSeconds` for the stats.
+ * For a MINUTES habit the logged minutes are credited to the log before the
+ * claim is ticked, so the day, the streak and the charts all read the real
+ * figure. For a COUNT habit the log is untouched (time isn't pages) and the
+ * tick books no number — the time still lands in the day's `loggedSeconds`
+ * for the stats.
  */
 export async function logAndComplete(formData: FormData): Promise<void> {
   const user = await requireUser();
@@ -260,11 +261,11 @@ export async function logAndComplete(formData: FormData): Promise<void> {
   const loggedSeconds = updated?.loggedSeconds ?? 0;
 
   if (task.type === "HABIT") {
-    const quota = await getHabitQuota(user.id, task.id);
-    if (!quota) return;
+    const bar = await getHabitBar(user.id, task.id);
+    if (!bar) return;
 
     await creditLoggedTime(user.id, task.id, date, loggedSeconds);
-    await toggleHabitDone(user.id, quota, date, true);
+    await toggleHabitDone(user.id, bar, date, true);
   } else {
     await prisma.task.updateMany({
       where: { id: task.id, userId: user.id, type: "TODO" },
@@ -321,19 +322,19 @@ export async function completeWithNote(formData: FormData): Promise<ActionState>
   }
 
   if (task.type === "HABIT") {
-    const quota = await getHabitQuota(user.id, task.id);
-    if (!quota) return { status: "error", message: "That habit no longer exists." };
+    const bar = await getHabitBar(user.id, task.id);
+    if (!bar) return { status: "error", message: "That habit no longer exists." };
 
-    if (quota.requiresFeedback && !note?.trim()) {
+    if (bar.requiresFeedback && !note?.trim()) {
       return {
         status: "error",
         message: "Write the note before ticking it off.",
       };
     }
 
-    // A MINUTES habit fills its quota from the clock; the note is already on
+    // A MINUTES habit fills its log from the clock; the note is already on
     // the row, so `writeProgress`'s gate lets the day through.
-    if (minutes && quota.unit === "MINUTES") {
+    if (minutes && bar.unit === "MINUTES") {
       const updated = await prisma.taskOccurrence.findUnique({
         where: { id: occurrence.id },
         select: { loggedSeconds: true },
@@ -342,7 +343,7 @@ export async function completeWithNote(formData: FormData): Promise<ActionState>
         await creditLoggedTime(user.id, task.id, date, updated.loggedSeconds);
       }
     }
-    await toggleHabitDone(user.id, quota, date, true);
+    await toggleHabitDone(user.id, bar, date, true);
   } else {
     await prisma.task.updateMany({
       where: { id: task.id, userId: user.id, type: "TODO" },
@@ -405,13 +406,13 @@ export async function toggleOccurrence(formData: FormData): Promise<void> {
   });
   if (!owned) return;
 
-  // A habit's DONE has to go through its quota, or the day counts for the
-  // streak while every chart reads tier NONE. SKIPPED is untouched by quotas —
+  // A habit's DONE has to go through its claim, or the day counts for the
+  // streak with no claim behind it. SKIPPED is untouched by the bar —
   // it deliberately means "not today", which is neither done nor missed.
   if (owned.type === "HABIT" && parsed.data.status !== "SKIPPED") {
-    const quota = await getHabitQuota(user.id, owned.id);
-    if (quota) {
-      await toggleHabitDone(user.id, quota, date, parsed.data.status === "DONE");
+    const bar = await getHabitBar(user.id, owned.id);
+    if (bar) {
+      await toggleHabitDone(user.id, bar, date, parsed.data.status === "DONE");
       revalidateTaskViews();
       return;
     }

@@ -7,7 +7,6 @@ import {
   Cell,
   Line,
   LineChart,
-  ReferenceLine,
   XAxis,
   YAxis,
 } from "recharts";
@@ -21,22 +20,20 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { formatDuration } from "@/lib/dates";
-import { formatQuota, type Quota } from "@/lib/quota";
+import { formatLogged, type HabitBar } from "@/lib/habit-bar";
 
 /**
  * Colour, once, for every chart on this page.
  *
- * Optimal is the full primary; minimum is the same hue at half strength. That
- * relationship is deliberate — a good day is *more of the same thing*, not a
- * different thing, and giving optimal its own hue would read as two unrelated
- * metrics. Missed is the clay destructive, and skipped is neutral grey because
- * a deliberate "not today" is not a failure.
+ * Done is the full primary: the one bar, at full strength. Missed is the
+ * clay destructive, and skipped is neutral grey because a deliberate
+ * "not today" is not a failure. Went beyond is deliberately not a series —
+ * it is a subset of done, and stacking it would count those days twice.
  *
  * Amber appears nowhere here. It stays reserved for a clock that is running.
  */
 const OUTCOME_CONFIG = {
-  optimal: { label: "Optimal", color: "var(--primary)" },
-  minimum: { label: "Minimum", color: "color-mix(in oklab, var(--primary) 50%, var(--card))" },
+  done: { label: "Done", color: "var(--primary)" },
   skipped: { label: "Skipped", color: "var(--muted-foreground)" },
   missed: { label: "Missed", color: "var(--destructive)" },
 } satisfies ChartConfig;
@@ -44,19 +41,18 @@ const OUTCOME_CONFIG = {
 const shortDate = (dateISO: string) => dateISO.slice(8) + "/" + dateISO.slice(5, 7);
 
 /**
- * Days you hit it, stacked.
+ * Days you showed up, stacked.
  *
- * Stacked rather than grouped because minimum and optimal are tiers of one
- * thing: the total height is "days you turned up", and the split inside it is
- * how well. Grouped bars would invite reading them as competing series.
+ * Stacked because done, skipped, and missed partition the same due days:
+ * the total height is "days in play", and the split inside it is what
+ * happened. Grouped bars would invite reading them as competing series.
  */
 export function OutcomesChart({
   daily,
 }: {
   daily: {
     dateISO: string;
-    optimal: number;
-    minimum: number;
+    done: number;
     missed: number;
     skipped: number;
   }[];
@@ -84,8 +80,7 @@ export function OutcomesChart({
           content={<ChartTooltipContent labelFormatter={(value) => String(value)} />}
         />
         <ChartLegend content={<ChartLegendContent />} />
-        <Bar dataKey="optimal" stackId="a" fill="var(--color-optimal)" radius={[0, 0, 0, 0]} />
-        <Bar dataKey="minimum" stackId="a" fill="var(--color-minimum)" />
+        <Bar dataKey="done" stackId="a" fill="var(--color-done)" radius={[0, 0, 0, 0]} />
         <Bar dataKey="skipped" stackId="a" fill="var(--color-skipped)" fillOpacity={0.35} />
         <Bar dataKey="missed" stackId="a" fill="var(--color-missed)" fillOpacity={0.5} radius={[3, 3, 0, 0]} />
       </BarChart>
@@ -144,23 +139,21 @@ export function TimeChart({
 }
 
 /**
- * One habit's daily progress against both its bars.
+ * One habit's daily optional log.
  *
  * Only shown when a single habit is selected, because the y-axis is in that
  * habit's own unit — plotting pages and minutes on one axis would be nonsense.
- * The two reference lines are what make the shape readable: you can see at a
- * glance how many days cleared the low bar without touching the high one, which
- * is exactly the picture the two-quota idea is trying to give you.
+ * No reference lines: the log has no target to mark, only a shape.
  */
 export function ProgressChart({
   days,
-  quota,
+  bar,
 }: {
   days: { dateISO: string; progress: number; outcome: string }[];
-  quota: Quota;
+  bar: HabitBar;
 }) {
   const config = {
-    progress: { label: formatQuota(1, quota.unit).split(" ")[1], color: "var(--primary)" },
+    progress: { label: formatLogged(1, bar.unit).split(" ")[1], color: "var(--primary)" },
   } satisfies ChartConfig;
 
   return (
@@ -184,30 +177,6 @@ export function ProgressChart({
         />
         <ChartTooltip content={<ChartTooltipContent />} />
 
-        <ReferenceLine
-          y={quota.minimum}
-          stroke="var(--primary)"
-          strokeDasharray="4 4"
-          label={{
-            value: "minimum",
-            position: "insideBottomLeft",
-            className: "fill-muted-foreground text-micro",
-          }}
-        />
-        {quota.optimal !== null && (
-          <ReferenceLine
-            y={quota.optimal}
-            stroke="var(--primary)"
-            strokeOpacity={0.5}
-            strokeDasharray="2 6"
-            label={{
-              value: "good day",
-              position: "insideTopLeft",
-              className: "fill-muted-foreground text-micro",
-            }}
-          />
-        )}
-
         <Line
           type="monotone"
           dataKey="progress"
@@ -228,14 +197,13 @@ const ADHERENCE_CONFIG = {
 /**
  * Adherence per habit, as a horizontal ranking.
  *
- * Bars are tinted by how much of the adherence came from good days rather than
- * bare minimums, so "I show up every day but only just" and "I show up every
- * day properly" don't render identically.
+ * Bars are tinted by their own adherence, so a longer bar is also a stronger
+ * one and the ranking reads at a glance before the axis does.
  */
 export function AdherenceChart({
   habits,
 }: {
-  habits: { title: string; adherence: number; optimalShare: number }[];
+  habits: { title: string; adherence: number }[];
 }) {
   return (
     <ChartContainer
@@ -279,8 +247,8 @@ export function AdherenceChart({
             <Cell
               key={habit.title}
               fill="var(--color-adherence)"
-              // 0% optimal reads as a pale bar, 100% as the full primary.
-              fillOpacity={0.4 + (habit.optimalShare / 100) * 0.6}
+              // 0% reads as a pale bar, 100% as the full primary.
+              fillOpacity={0.4 + (habit.adherence / 100) * 0.6}
             />
           ))}
         </Bar>

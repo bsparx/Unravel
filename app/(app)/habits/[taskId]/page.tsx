@@ -91,8 +91,7 @@ export default async function EditHabitPage({
             ? toISODate(habit.recurrence.endDate)
             : null,
           unit: habit.recurrence?.unit,
-          minimumQuota: habit.recurrence?.minimumQuota,
-          optimalQuota: habit.recurrence?.optimalQuota ?? null,
+          minimalTask: habit.recurrence?.minimalTask,
           timeAnchorMinutes: habit.recurrence?.timeAnchor ?? null,
           slots: habit.recurrence?.slots,
           cueMode: habit.cue
@@ -115,9 +114,9 @@ export default async function EditHabitPage({
             Time on this
           </h2>
 
-          {/* A MINUTES habit fills its quota from the clock, so a session
-              logged wrong is a tier, a streak and a chart logged wrong with
-              it. Correcting one here moves that day's progress with it. */}
+          {/* A MINUTES habit fills its log from the clock, so a session
+              logged wrong is a log, a streak and a chart logged wrong with
+              it. Correcting one here moves that day's figure with it. */}
           <SessionLog
             sessions={sessions.map((session) => ({
               id: session.id,

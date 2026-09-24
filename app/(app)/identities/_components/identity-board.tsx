@@ -124,8 +124,7 @@ function IdentityCard({
           {/* One bar, split by outcome. Left to right, best to worst — the
               shape of the row is the summary. */}
           <div className="bg-muted mt-3 flex h-2 w-full overflow-hidden rounded-full">
-            <Segment value={identity.optimalVotes} total={identity.expected} className="bg-primary" label={`${identity.optimalVotes} good days`} />
-            <Segment value={identity.minimumVotes} total={identity.expected} className="bg-primary/50" label={`${identity.minimumVotes} minimum days`} />
+            <Segment value={identity.votes} total={identity.expected} className="bg-primary" label={`${identity.votes} days voted`} />
             <Segment value={identity.skipped} total={identity.expected} className="bg-muted-foreground/30" label={`${identity.skipped} skipped`} />
             <Segment value={identity.missed} total={identity.expected} className="bg-destructive/45" label={`${identity.missed} missed`} />
           </div>
@@ -134,8 +133,8 @@ function IdentityCard({
             <Cell label="Votes" value={String(identity.votes)} detail={`of ${identity.expected} due`} />
             <Cell label="Reinforced" value={`${identity.reinforcement}%`} />
             <Cell
-              label="Good days"
-              value={`${identity.optimalShare}%`}
+              label="Kept going"
+              value={String(identity.wentBeyondVotes)}
               detail={identity.votes > 0 ? "of days voted" : undefined}
             />
             <Cell

@@ -240,13 +240,40 @@ truth-tellings:
   dashed, pointer-safe invitation sits in the waking window: "Press and drag
   anywhere to claim a stretch of the day." The header sentence names the fact;
   the grid names what the hands do.
-| `/habits` | List + 8-week adherence grid | Grid is a heatmap row per habit; teal ramp, never the running colour. Two weights of teal for done — full for optimal, half for minimum — because collapsing them throws away the whole point of two quotas. Today's quota meter sits above the grid: history below, the one actionable thing above. |
-| `/habits/stats` | Filters, then charts, then a per-habit table | shadcn/recharts. Optimal is the full primary and minimum is the same hue at half strength — a good day is *more of the same thing*, not a different metric. Missed is clay; skipped is neutral grey, because a deliberate "not today" is not a failure. |
+| `/habits` | List + 8-week adherence grid | Grid is a heatmap row per habit; teal ramp, never the running colour. Two weights of teal for done — full for a day that kept going, half for the claim alone — because the claim and the optional log are the one distinction left. Today's day control sits above the grid: history below, the one actionable thing above. The control is the **Settle** (`habit-day.tsx`): the ask line reads "Do the warmup — that's the day" and rewrites to "Did the warmup · 25m extra" the moment the day lands, with the identity vote at its end. Nothing animates beyond the checkbox pop — a met day settles rather than celebrates, `/water`'s rule. |
+| `/habits/stats` | Filters, then charts, then a per-habit table | shadcn/recharts. Done is the full primary; kept going is a quiet count beside it and never a second stack — the log is a subset of done, and stacking it would double-count. Missed is clay; skipped is neutral grey, because a deliberate "not today" is not a failure. The per-habit chart carries no threshold lines any more: the log has no target to mark. |
 | `/timer` | Full-bleed, centred, minimal chrome | Elevation budget spent here — and since the face is a shader, the "elevation" is a lighting gradient rather than a shadow. The face is the page. One quiet line under the controls carries the day's total for the task, live; correcting it opens today's sessions in place. A break that runs over takes the controls over entirely — two buttons, clay, counting up — because the moment it catches you is the moment you have the least attention to spend on a menu. Second pass was **restraint on purpose**: the arrival is staged (header, face, controls each `rise` in, 60ms apart — content settling, nothing moving on its own), a desktop-only `Space starts and pauses` kbd hint names the screen's one gesture, and the session summary gets the same settling entrance. The face itself was left alone; the wrapper holding it must stay a full-width flex column or the `w-full` face shrink-wraps to its digits and collapses — that failure mode is now written down in the component. |
 | `/close` | One input per screen, vertically centred | Ritual, not a form. No progress bar, no "step 2 of 4", no back/next chrome — just the question and one quiet way out. |
 | `/stats` | Dense, chart-first | Work and recovery get identical panel width, bar height and type scale. The running colour only where the series genuinely is work on the clock. "Getting back" reports overruns as a median and only speaks up when there is a real gap between the break you pick and the break you take. |
 | `/water` | One wide aquarium | The day as a fish tank — the structural rhyme to the timer's draining ring (time drains, water fills). The tank spans the column's full width; one tap anywhere on the glass logs a glass; the count is the only big number and gets the mono display and the app's one overshoot. Edit and reminders sit below in quiet cards. Second pass: **the dry state is composed, not broken.** A resting fish is a 35° nose-down tilt rested *on* the gravel line (it used to rotate 82° straight through it), the plants wilt to one side with a droop instead of shedding leaves at random angles, and the cracks read in dark mode. The tap is invited, not assumed: a hover wash on the glass and an in-tank hint ("Tap anywhere to pour the first glass") that exists only while the tank is dry. Because a tank-sized button guarantees mis-taps, every logged glass offers an **Undo** on its toast — `logGlass` returns the row it wrote, and the undo rides the optimistic removal path. Time got an axis: a mono hour strip under the glass spans the reminder window with a tick at now, so the pace line's clock time has a schedule to sit against — the vessel is about volume, so the axis lives outside it. And a met day **settles rather than celebrates**: the tint deepens, the surface calms to half amplitude, and the pace line fades — there is no "should" left to measure against. || `/budget` | Two charts, one ledger | Money in is the teal of anything going well; money out is the clay of "the thing to notice" — the only two semantic colours the palette spends, and the pair is the whole story of a month. The headline sentence does the arithmetic ("…spent 61,000 and brought in 85,500 — 24,500 ahead"), the month is the grain (‹ August ›), and logging is a dialog, never a navigation. Categories sit on one side of the ledger each, wearing the existing chart hues — no new colour, and clay is never a category. |
 | `/settings` | Single column form | Timezone first — everything date-bucketed depends on it. |
+
+### The habit bar — one promise that settles
+
+The two numeric bars are gone. A habit now has one **minimal task** — a named
+act, "Do the warmup", written in the form's one display-face line (**The
+promise**: a bare-bottom-hairline input wearing Newsreader at title size, the
+timer's own treatment for a task title, because the sentence *is* the habit's
+definition of done and deserved the signature element). Doing it is the whole
+day. Everything past it is an un-metered log — minutes from the timer, taps of
+a counter — recorded, never measured against anything. There is deliberately
+no good-day bar and no tier: making the good day the requirement is how streaks
+break, and "two minutes" was still a judgment call where "the warmup" is
+something you can *start*. Starting is the expensive part.
+
+The day row and the habit card share the **Settle** (`habit-day.tsx`). The ask
+line leads with the minimal task and says out loud that it is the whole
+requirement — "Do the warmup — that's the day" — then rewrites into the past
+tense on the tick ("Did the warmup · 25m extra") with the identity vote landing
+at the end. The claim books no number: a tick is a claim about the named act,
+not a measurement of it. A day is DONE on the claim alone, on the log alone
+(logging anything means you showed up), or on both — once. `requiresFeedback`
+still holds the day until a note lands. The tick is never gated on time: a
+claim needs no clock, so the "how long did that take" dialog became the
+optional log's door rather than the tick's toll.
+
+Stats collapsed with it: **done**, and the quiet **kept going** count beside it.
+Identity votes are one per done day — the log never doubles the vote.
 
 ### Two structural rules
 
