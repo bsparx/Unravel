@@ -4,16 +4,11 @@ import { useMemo, useState } from "react";
 import { Minus, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import {
+  JournalSpreadDialog,
+  type SpreadEntry,
+} from "@/components/journal-spread";
 import {
   DEFAULT_FEEDBACK_PROMPT,
   MAX_FEEDBACK_LENGTH,
@@ -27,7 +22,9 @@ const PRESETS = [10, 15, 25, 45, 60];
 /**
  * The tick's other half, and the optional log's only door. A checkbox can't
  * answer "how long did that take" or "what did you actually get out of it",
- * so this dialog asks whichever is missing:
+ * so this dialog asks whichever is missing — on the right page of the day's
+ * journal spread (see components/journal-spread.tsx), with the rest of the
+ * day's notes on the left:
  *
  * - **Time** (`needsTime`, decided by the caller): the honest figure beside
  *   the day's claim. For a todo it is the honesty ask at tick time — a DONE
@@ -45,12 +42,18 @@ const PRESETS = [10, 15, 25, 45, 60];
 export function LogTimeDialog({
   item,
   needsTime,
+  dateLabel,
+  dayIndex,
   onConfirm,
   onCancel,
 }: {
   item: TodayItem;
   /** Ask for the optional (or honesty) time figure. False = notes only. */
   needsTime: boolean;
+  /** Already formatted — the spread's left page header. */
+  dateLabel: string;
+  /** The whole day, notes included, for the spread's left page. */
+  dayIndex: SpreadEntry[];
   onConfirm: (result: { minutes?: number; note?: string }) => void;
   onCancel: () => void;
 }) {
@@ -92,179 +95,137 @@ export function LogTimeDialog({
       ? "Log the rest"
       : "How long did that take?";
 
+  const blurb = needsFeedback ? (
+    <>
+      Ticking off &ldquo;{item.title}&rdquo; waits on the note — the day only
+      counts once it&apos;s written.
+    </>
+  ) : item.type === "HABIT" ? (
+    <>
+      Just for you: the optional log beside today&apos;s claim. The day already
+      counts — this never changes that.
+    </>
+  ) : (
+    <>
+      You ticked off &ldquo;{item.title}&rdquo; without the timer running. Log
+      the real time so today&apos;s stats stay honest.
+    </>
+  );
+
   return (
-    <Dialog open onOpenChange={(open) => !open && onCancel()}>
-      <DialogContent className="gap-4 sm:max-w-sm">
-        <DialogHeader>
-          <DialogTitle>{heading}</DialogTitle>
-          <DialogDescription className="text-label">
-            {needsFeedback ? (
-              <>
-                Ticking off &ldquo;{item.title}&rdquo; waits on the note — the
-                day only counts once it&apos;s written.
-              </>
-            ) : item.type === "HABIT" ? (
-              <>
-                Just for you: the optional log beside today&apos;s claim. The
-                day already counts — this never changes that.
-              </>
-            ) : (
-              <>
-                You ticked off &ldquo;{item.title}&rdquo; without the timer
-                running. Log the real time so today&apos;s stats stay honest.
-              </>
-            )}
-          </DialogDescription>
-        </DialogHeader>
-
-        {item.requiresFeedback && (
-          <div className="space-y-2">
-            <label
-              htmlFor="feedback-note"
-              className="font-display block text-title"
-            >
-              {prompt}
-            </label>
-            <Textarea
-              id="feedback-note"
-              name="note"
-              rows={3}
-              maxLength={MAX_FEEDBACK_LENGTH}
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-              placeholder="A line is enough — but it has to be a real one."
-              className={cn(
-                !noteValid && "border-destructive",
-              )}
-            />
-            <p
-              className={cn(
-                "text-right text-micro tabular-nums",
-                note.trim().length > MAX_FEEDBACK_LENGTH
-                  ? "text-destructive"
-                  : "text-muted-foreground",
-              )}
-              aria-live="polite"
-            >
-              {note.trim().length > MAX_FEEDBACK_LENGTH
-                ? `${note.length} / ${MAX_FEEDBACK_LENGTH} — over the limit`
-                : `${note.length} / ${MAX_FEEDBACK_LENGTH}`}
-            </p>
+    <JournalSpreadDialog
+      dateLabel={dateLabel}
+      heading={heading}
+      blurb={blurb}
+      prompt={item.requiresFeedback ? prompt : undefined}
+      dayIndex={dayIndex}
+      note={note}
+      onNoteChange={setNote}
+      showNote={item.requiresFeedback}
+      noteRequired={needsFeedback}
+      confirmLabel={
+        needsTime ? `Log ${formatBooked(shown)} & mark done` : "Save & mark done"
+      }
+      confirmDisabled={!valid}
+      onConfirm={() =>
+        valid &&
+        onConfirm({
+          ...(needsTime ? { minutes: parsed } : {}),
+          ...(item.requiresFeedback && note.trim() ? { note: note.trim() } : {}),
+        })
+      }
+      onCancel={onCancel}
+    >
+      {needsTime && (
+        <>
+          {/* The readout: the timer face, stopped at what you're claiming. */}
+          <div
+            className="relative mx-auto mt-4 grid size-36 place-items-center"
+            aria-hidden
+          >
+            <svg viewBox="0 0 100 100" className="absolute inset-0 size-full">
+              <circle
+                cx="50"
+                cy="50"
+                r="44"
+                fill="none"
+                stroke="var(--arc-track)"
+                strokeWidth="5"
+              />
+            </svg>
+            <div className="text-center">
+              <span className="tnum font-mono text-primary block text-4xl leading-none font-medium">
+                {shown}
+              </span>
+              <span className="text-paper-ink-muted mt-1.5 block text-label">
+                min
+              </span>
+            </div>
           </div>
-        )}
 
-        {needsTime && (
-          <>
-            {/* The readout: the timer face, stopped at what you're claiming. */}
-            <div
-              className="relative mx-auto grid size-36 place-items-center"
-              aria-hidden
-            >
-              <svg viewBox="0 0 100 100" className="absolute inset-0 size-full">
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="44"
-                  fill="none"
-                  stroke="var(--arc-track)"
-                  strokeWidth="5"
-                />
-              </svg>
-              <div className="text-center">
-                <span className="tnum font-mono text-primary block text-4xl leading-none font-medium">
-                  {shown}
-                </span>
-                <span className="text-muted-foreground mt-1.5 block text-label">
-                  min
-                </span>
-              </div>
+          <div className="space-y-2.5">
+            <div className="flex flex-wrap justify-center gap-1.5">
+              {presets.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setRaw(String(preset))}
+                  aria-pressed={timeValid && shown === preset}
+                  className={cn(
+                    "focus-visible:ring-ring rounded-full border px-3 py-1 text-label tabular-nums transition-colors focus-visible:ring-2 focus-visible:outline-none",
+                    timeValid && shown === preset
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-paper-edge text-paper-ink-muted hover:border-primary/50 hover:text-paper-ink",
+                  )}
+                >
+                  {preset}m
+                </button>
+              ))}
             </div>
 
-            <div className="space-y-2.5">
-              <div className="flex flex-wrap justify-center gap-1.5">
-                {presets.map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => setRaw(String(preset))}
-                    aria-pressed={timeValid && shown === preset}
-                    className={cn(
-                      "focus-visible:ring-ring rounded-full border px-3 py-1 text-label tabular-nums transition-colors focus-visible:ring-2 focus-visible:outline-none",
-                      timeValid && shown === preset
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground",
-                    )}
-                  >
-                    {preset}m
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex items-center justify-center gap-1.5">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon-sm"
-                  aria-label="Five minutes less"
-                  onClick={() => step(-5)}
-                  disabled={shown <= floor}
-                >
-                  <Minus className="size-3.5" aria-hidden />
-                </Button>
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  min={floor}
-                  max={max}
-                  value={raw}
-                  onChange={(event) => setRaw(event.target.value)}
-                  onBlur={() => !timeValid && setRaw(String(floor))}
-                  aria-label="Minutes to log"
-                  className="tnum font-mono w-20 text-center"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon-sm"
-                  aria-label="Five minutes more"
-                  onClick={() => step(5)}
-                  disabled={shown >= max}
-                >
-                  <Plus className="size-3.5" aria-hidden />
-                </Button>
-              </div>
+            <div className="flex items-center justify-center gap-1.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                aria-label="Five minutes less"
+                onClick={() => step(-5)}
+                disabled={shown <= floor}
+                className="border-paper-edge text-paper-ink"
+              >
+                <Minus className="size-3.5" aria-hidden />
+              </Button>
+              <Input
+                type="number"
+                inputMode="numeric"
+                min={floor}
+                max={max}
+                value={raw}
+                onChange={(event) => setRaw(event.target.value)}
+                onBlur={() => !timeValid && setRaw(String(floor))}
+                aria-label="Minutes to log"
+                className="tnum font-mono border-paper-edge text-paper-ink w-20 text-center"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                aria-label="Five minutes more"
+                onClick={() => step(5)}
+                disabled={shown >= max}
+                className="border-paper-edge text-paper-ink"
+              >
+                <Plus className="size-3.5" aria-hidden />
+              </Button>
             </div>
-          </>
-        )}
+          </div>
 
-        {needsTime && (
-          <p className="text-muted-foreground text-center text-micro">
+          <p className="text-paper-ink-muted mt-2 text-center text-micro">
             {constraint}
           </p>
-        )}
-
-        <DialogFooter className="sm:justify-between">
-          <Button type="button" variant="ghost" onClick={onCancel}>
-            Go back
-          </Button>
-          <Button
-            type="button"
-            disabled={!valid}
-            onClick={() =>
-              valid &&
-              onConfirm({
-                ...(needsTime ? { minutes: parsed } : {}),
-                ...(item.requiresFeedback && note.trim() ? { note: note.trim() } : {}),
-              })
-            }
-          >
-            {needsTime
-              ? `Log ${formatBooked(shown)} & mark done`
-              : "Save & mark done"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </>
+      )}
+    </JournalSpreadDialog>
   );
 }
 

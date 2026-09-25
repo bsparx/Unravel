@@ -7,35 +7,33 @@ import { toast } from "sonner";
 import { completeWithNote } from "@/app/(app)/tasks/actions";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  DEFAULT_FEEDBACK_PROMPT,
-  MAX_FEEDBACK_LENGTH,
-} from "@/lib/feedback";
-import { cn } from "@/lib/utils";
+  JournalSpreadDialog,
+  type SpreadEntry,
+} from "@/components/journal-spread";
+import { DEFAULT_FEEDBACK_PROMPT } from "@/lib/feedback";
 
 /**
  * The /habits side of a feedback habit: the meter can reach today's minimum —
  * the +1 taps, the timer's minutes — but the day stays pending until the note
- * is written. This is the button that writes it.
+ * is written. This is the button that writes it, on the right page of the
+ * day's journal spread, with the rest of today's habits and notes beside it.
  */
 export function HabitFeedbackButton({
   taskId,
   title,
   dateISO,
+  dateLabel,
   prompt,
+  dayIndex,
 }: {
   taskId: string;
   title: string;
   dateISO: string;
+  /** Already formatted — the spread's left page header. */
+  dateLabel: string;
   prompt: string | null;
+  /** Today's habits, notes included, for the spread's left page. */
+  dayIndex: SpreadEntry[];
 }) {
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState("");
@@ -72,52 +70,32 @@ export function HabitFeedbackButton({
         Write today&apos;s note
       </Button>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="gap-4 sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>{question}</DialogTitle>
-            <DialogDescription className="text-label">
+      {open && (
+        <JournalSpreadDialog
+          dateLabel={dateLabel}
+          heading="Write today's note"
+          blurb={
+            <>
               &ldquo;{title}&rdquo; has met today&apos;s minimum, but the day
               only counts once the note is written.
-            </DialogDescription>
-          </DialogHeader>
-
-          <Textarea
-            autoFocus
-            rows={3}
-            maxLength={MAX_FEEDBACK_LENGTH}
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-            placeholder="A line is enough — but it has to be a real one."
-          />
-          <p
-            className={cn(
-              "text-right text-micro tabular-nums",
-              note.trim().length > MAX_FEEDBACK_LENGTH
-                ? "text-destructive"
-                : "text-muted-foreground",
-            )}
-            aria-live="polite"
-          >
-            {note.trim().length > MAX_FEEDBACK_LENGTH
-              ? `${note.length} / ${MAX_FEEDBACK_LENGTH} — over the limit`
-              : `${note.length} / ${MAX_FEEDBACK_LENGTH}`}
-          </p>
-
-          <DialogFooter className="sm:justify-between">
-            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
-              Not yet
-            </Button>
-            <Button
-              type="button"
-              disabled={note.trim() === "" || pending}
-              onClick={() => void submit()}
-            >
-              {pending ? "Saving…" : "Save & mark done"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </>
+          }
+          prompt={question}
+          dayIndex={dayIndex.map((entry) => ({
+            ...entry,
+            active: entry.id === taskId,
+          }))}
+          note={note}
+          onNoteChange={setNote}
+          showNote
+          noteRequired
+          confirmLabel={pending ? "Saving…" : "Save & mark done"}
+          confirmDisabled={note.trim() === "" || pending}
+          onConfirm={() => void submit()}
+          onCancel={() => setOpen(false)}
+          cancelLabel="Not yet"
+        />
+      )}
     </>
   );
 }

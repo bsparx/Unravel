@@ -15,7 +15,13 @@ import { HabitDayControl } from "@/components/habit-day";
 import { MissedYesterdayBadge } from "@/components/missed-yesterday-badge";
 import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth";
-import { addDays, formatMinutes, toISODate, todayLocal } from "@/lib/dates";
+import {
+  addDays,
+  formatDateWithWeekday,
+  formatMinutes,
+  toISODate,
+  todayLocal,
+} from "@/lib/dates";
 import { chainOf, cueEdges } from "@/lib/habit-cue";
 import { describeSlots } from "@/lib/habit-slots";
 import { describeBar, showedUp } from "@/lib/habit-bar";
@@ -43,6 +49,16 @@ export default async function HabitsPage() {
 
   const active = habits.filter((habit) => habit.archivedAt === null);
   const archived = habits.filter((habit) => habit.archivedAt !== null);
+
+  // The note dialog's spread: every active habit and today's note, so the
+  // one being written sits among its siblings on the left page.
+  const todayISO = toISODate(today);
+  const dayIndex = active.map((habit) => ({
+    id: habit.id,
+    title: habit.title,
+    done: habit.history.get(todayISO) === "DONE",
+    note: habit.todayNote,
+  }));
 
   // The stack graph, built once from what's already in memory: a habit's cue
   // names one predecessor, and following those names gives the whole chain.
@@ -193,8 +209,10 @@ export default async function HabitsPage() {
                         <HabitFeedbackButton
                           taskId={habit.id}
                           title={habit.title}
-                          dateISO={toISODate(today)}
+                          dateISO={todayISO}
+                          dateLabel={formatDateWithWeekday(today)}
                           prompt={habit.feedbackPrompt}
+                          dayIndex={dayIndex}
                         />
                       )}
                   </div>

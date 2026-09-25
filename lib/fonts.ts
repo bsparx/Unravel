@@ -1,4 +1,4 @@
-import { JetBrains_Mono, Karla, Newsreader } from "next/font/google";
+import { Caveat, JetBrains_Mono, Karla, Newsreader } from "next/font/google";
 
 /** Display face — headings and the task title on the timer. Used with restraint. */
 export const newsreader = Newsreader({
@@ -22,4 +22,11 @@ export const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
-export const fontVariables = `${newsreader.variable} ${karla.variable} ${jetbrainsMono.variable}`;
+/** Handwriting — journal note bodies and spread page headers only. */
+export const caveat = Caveat({
+  variable: "--font-caveat",
+  subsets: ["latin"],
+  display: "swap",
+});
+
+export const fontVariables = `${newsreader.variable} ${karla.variable} ${jetbrainsMono.variable} ${caveat.variable}`;

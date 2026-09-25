@@ -549,6 +549,34 @@ arrival, tilts toward the pointer while you point at it, settles when an
 expense lands, and never moves on its own. WebGL is a luxury, not a
 dependency: if it fails, the same jar is drawn in SVG.
 
+### The journal spread — the note form as paper
+
+`components/journal-spread.tsx` — the tick-gated note form (the /day dialog and
+the /habits "Write today's note" dialog) is a two-page journal spread, not a
+form card. The decision: closing a day with a note is journaling, so the door
+into it is a notebook. Left page is the day — every task and the note it closed
+with, the active one underlined in washi — so the line being written sits among
+its siblings instead of alone in a box. Right page is today's page: the prompt,
+ruled paper, the optional time readout.
+
+- **Paper tokens are their own family** (`--paper`, `--paper-edge`,
+  `--paper-rule`, `--paper-ink`, `--paper-ink-muted`, `--washi*`): cream
+  `#f4ecdc` that darkens to `#ebe0cc` at night and cools to `#e8dfce` under
+  eggplant — paper stays paper in every theme, it never inverts to ink. All
+  text on it is `--paper-ink`, not `foreground`.
+- **Caveat (`--font-hand`) is rationed**: note bodies, the spread's page
+  headers and the left page's entries. Nothing else in the app may use it —
+  the moment headings elsewhere go handwritten, this one stops being a journal.
+- **The rules ride on a wrapper div**, never on the textarea: Chromium won't
+  reliably paint background images inside a textarea, and `background-attachment:
+  local` drops them after paint. Rule pitch is 1.9rem with the textarea's
+  leading matched to it.
+- **Signature element: the gutter** — an inset shadow on each page's facing
+  edge, plus one washi strip per page and a single filled line-art butterfly
+  (originals in `components/journal-ornaments.tsx`). Ornament budget stops
+  there; the spread is remembered for its pages, not its stickers.
+- On mobile the spread stacks **writing page first**, the day index beneath.
+
 ## The brand mark
 
 `components/brand-mark.tsx` — a loop that has come undone: a ring with a 50°

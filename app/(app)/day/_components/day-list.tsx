@@ -5,13 +5,17 @@ import { CheckCircle2, Sun } from "lucide-react";
 import { toast } from "sonner";
 
 import { EmptyState } from "@/components/empty-state";
+import type { SpreadEntry } from "@/components/journal-spread";
 import {
   completeWithNote,
   logAndComplete,
   toggleOccurrence,
   toggleTodo,
 } from "@/app/(app)/tasks/actions";
-import { formatRelativeDate } from "@/lib/dates";
+import {
+  formatDateWithWeekday,
+  formatRelativeDate,
+} from "@/lib/dates";
 import type { TodayItem, TodayView } from "@/lib/tasks";
 import type { WaterToday } from "@/lib/water-data";
 
@@ -116,6 +120,22 @@ export function DayList({
   ];
 
   const hasAnything = sections.some((section) => section.items.length > 0);
+
+  // The spread's left page: the whole day, notes included, with the item
+  // being logged marked active so it finds itself among its siblings.
+  const dayIndex: SpreadEntry[] = [
+    ...view.overdue,
+    ...view.habits,
+    ...view.dueToday,
+    ...view.undated,
+    ...view.completedToday,
+  ].map((item) => ({
+    id: item.id,
+    title: item.title,
+    done: item.done,
+    note: item.feedbackNote ?? null,
+    active: logTarget?.item.id === item.id,
+  }));
 
   if (!hasAnything && view.completedToday.length === 0) {
     return (
@@ -228,6 +248,8 @@ export function DayList({
           key={logTarget.item.id}
           item={logTarget.item}
           needsTime={logTarget.askTime}
+          dateLabel={formatDateWithWeekday(view.date)}
+          dayIndex={dayIndex}
           onConfirm={(result) => void closeLogDialog(result)}
           onCancel={() => setLogTarget(null)}
         />

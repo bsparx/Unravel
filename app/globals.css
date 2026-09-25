@@ -68,6 +68,16 @@
   --font-display: var(--font-newsreader);
   --font-mono: var(--font-jetbrains);
   --font-heading: var(--font-newsreader);
+  --font-hand: var(--font-caveat);
+
+  /* Journal spread paper — the note form is a physical page, in every theme. */
+  --color-paper: var(--paper);
+  --color-paper-edge: var(--paper-edge);
+  --color-paper-rule: var(--paper-rule);
+  --color-paper-ink: var(--paper-ink);
+  --color-paper-ink-muted: var(--paper-ink-muted);
+  --color-washi: var(--washi);
+  --color-washi-2: var(--washi-2);
 
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -238,6 +248,14 @@
   --sidebar-accent-foreground: #24564f;
   --sidebar-border: #e4ded2;
   --sidebar-ring: #2f6f6a;
+
+  --paper: #f4ecdc;
+  --paper-edge: #e2d5bc;
+  --paper-rule: #b9c9dd;
+  --paper-ink: #2a241c;
+  --paper-ink-muted: #8a8072;
+  --washi: #c5d4c8;
+  --washi-2: #d9c9b0;
 }
 
 .dark {
@@ -312,6 +330,15 @@
   --sidebar-accent-foreground: #a6d5ce;
   --sidebar-border: #2c2823;
   --sidebar-ring: #6fb3ab;
+
+  /* Aged cream — the paper darkens a little at night, it never becomes ink. */
+  --paper: #ebe0cc;
+  --paper-edge: #d4c4a8;
+  --paper-rule: #9aafc4;
+  --paper-ink: #241f18;
+  --paper-ink-muted: #7a705f;
+  --washi: #a8bbaa;
+  --washi-2: #c2b096;
 }
 
 /* ---------------------------------------------------------------------------
@@ -360,6 +387,15 @@
   --sidebar-accent-foreground: #c5a8c8;
   --sidebar-border: #221b30;
   --sidebar-ring: #b089b2;
+
+  /* Cream with a violet cast — the same paper, seen by lamplight. */
+  --paper: #e8dfce;
+  --paper-edge: #cfc0a6;
+  --paper-rule: #a9a0c2;
+  --paper-ink: #241e28;
+  --paper-ink-muted: #7c7288;
+  --washi: #b3a4c4;
+  --washi-2: #c9b89e;
 }
 
 @layer base {
@@ -430,6 +466,23 @@
   }
   .stagger > *:nth-child(8) {
     animation-delay: calc(var(--stagger-step, 40ms) * 7);
+  }
+
+  /**
+   * Ruled journal paper. Rule pitch matches 1.9rem so handwriting sits on
+   * the lines. No `background-attachment: local` — Chromium drops local
+   * backgrounds on textareas after paint, and field-sizing-content keeps the
+   * box growing with the text anyway.
+   */
+  .paper-ruled {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent calc(1.9rem - 1px),
+      var(--paper-rule) calc(1.9rem - 1px),
+      var(--paper-rule) 1.9rem
+    );
+    line-height: 1.9rem;
   }
 }
 
