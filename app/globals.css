@@ -469,20 +469,21 @@
   }
 
   /**
-   * Ruled journal paper. Rule pitch matches 1.9rem so handwriting sits on
-   * the lines. No `background-attachment: local` — Chromium drops local
-   * backgrounds on textareas after paint, and field-sizing-content keeps the
-   * box growing with the text anyway.
+   * Ruled journal paper. Rule pitch defaults to 1.9rem so handwriting sits on
+   * the lines; the note form raises `--paper-rule-pitch` on desktop to keep
+   * the bigger hand in step with the rules. No `background-attachment: local`
+   * — Chromium drops local backgrounds on textareas after paint, and
+   * field-sizing-content keeps the box growing with the text anyway.
    */
   .paper-ruled {
     background-image: repeating-linear-gradient(
       to bottom,
       transparent 0,
-      transparent calc(1.9rem - 1px),
-      var(--paper-rule) calc(1.9rem - 1px),
-      var(--paper-rule) 1.9rem
+      transparent calc(var(--paper-rule-pitch, 1.9rem) - 1px),
+      var(--paper-rule) calc(var(--paper-rule-pitch, 1.9rem) - 1px),
+      var(--paper-rule) var(--paper-rule-pitch, 1.9rem)
     );
-    line-height: 1.9rem;
+    line-height: var(--paper-rule-pitch, 1.9rem);
   }
 }
 

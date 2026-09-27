@@ -80,7 +80,7 @@ export function JournalSpreadDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onCancel()}>
-      <DialogContent className="border-paper-edge bg-paper text-paper-ink ring-paper-edge/60 gap-0 overflow-hidden p-0 sm:max-w-3xl">
+      <DialogContent className="border-paper-edge bg-paper text-paper-ink ring-paper-edge/60 gap-0 overflow-hidden p-0 sm:max-w-4xl lg:max-w-5xl">
         <div className="flex flex-col-reverse sm:flex-row">
           {/* ── Left page: the day ─────────────────────────────────────── */}
           <aside className="border-paper-edge bg-paper-edge/15 relative w-full shrink-0 border-b px-5 pt-8 pb-5 sm:w-[38%] sm:border-r sm:border-b-0 sm:shadow-[inset_-14px_0_18px_-16px_rgba(42,36,28,0.35)]">
@@ -104,7 +104,7 @@ export function JournalSpreadDialog({
                   className={cn(
                     "min-w-0",
                     entry.active &&
-                      "bg-washi/40 -mx-1.5 rounded-sm px-1.5 py-0.5",
+                    "bg-washi/40 -mx-1.5 rounded-sm px-1.5 py-0.5",
                   )}
                 >
                   <div className="flex items-baseline gap-2">
@@ -159,7 +159,7 @@ export function JournalSpreadDialog({
               <DialogTitle className="font-hand text-paper-ink text-3xl leading-none">
                 {heading}
               </DialogTitle>
-              <DialogDescription className="text-paper-ink-muted text-label">
+              <DialogDescription className="text-paper-ink-muted text-label sm:text-body">
                 {blurb}
               </DialogDescription>
             </DialogHeader>
@@ -169,14 +169,14 @@ export function JournalSpreadDialog({
                 {prompt && (
                   <label
                     htmlFor="spread-note"
-                    className="font-display text-paper-ink block text-title italic"
+                    className="font-display text-paper-ink block text-title italic sm:text-xl"
                   >
                     {prompt}
                   </label>
                 )}
                 {/* The rules live on the wrapper: Chromium won't reliably
                     paint background images inside a textarea. */}
-                <div className="paper-ruled border-paper-edge/70 rounded-md border-0 border-b">
+                <div className="paper-ruled border-paper-edge/70 rounded-md border-0 border-b sm:[--paper-rule-pitch:2.75rem]">
                   <Textarea
                     id="spread-note"
                     rows={4}
@@ -187,7 +187,7 @@ export function JournalSpreadDialog({
                     placeholder={placeholder}
                     className={cn(
                       "text-paper-ink placeholder:text-paper-ink-muted/70",
-                      "font-hand min-h-32 rounded-md border-0 bg-transparent px-1 py-0 text-xl leading-[1.9rem] shadow-none",
+                      "font-hand min-h-32 rounded-md border-0 bg-transparent px-1 py-0 text-xl leading-[1.9rem] shadow-none sm:min-h-44 sm:text-3xl sm:leading-[2.75rem]",
                       "dark:bg-transparent focus-visible:ring-primary/40 focus-visible:ring-2",
                     )}
                   />
