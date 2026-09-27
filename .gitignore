@@ -12,10 +12,15 @@
 
 # testing
 /coverage
+.mastery.json
+mastery.json
+CV-SUMMARY.md
 
 # next.js
 /.next/
 /out/
+
+/Lessons
 
 # production
 /build

@@ -187,8 +187,8 @@ export function JournalSpreadDialog({
                     placeholder={placeholder}
                     className={cn(
                       "text-paper-ink placeholder:text-paper-ink-muted/70",
-                      "font-hand min-h-32 rounded-md border-0 bg-transparent px-1 py-0 text-xl leading-[1.9rem] shadow-none sm:min-h-44 sm:text-3xl sm:leading-[2.75rem]",
-                      "dark:bg-transparent focus-visible:ring-primary/40 focus-visible:ring-2",
+                      "font-hand min-h-32 rounded-md border-0 bg-transparent px-1 py-0  leading-[1.9rem] shadow-none sm:min-h-44 sm:text-3xl md:text-2xl sm:leading-[2.75rem]",
+                      "dark:bg-transparent focus-visible:ring-primary/40 focus-visible:ring-2 text-5xl",
                     )}
                   />
                 </div>
