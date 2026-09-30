@@ -1,6 +1,5 @@
 "use client";
 
-import { useTransition } from "react";
 import { Check } from "lucide-react";
 
 import { togglePrayer } from "@/app/(app)/prayers/actions";
@@ -54,19 +53,17 @@ function PrayerRow({
   item: PrayerItem;
   dateISO: string;
 }) {
-  const [, startTransition] = useTransition();
-
   const checkable =
     item.status === "active" || item.status === "missed";
 
-  const handleToggle = (next: boolean) => {
+  // Returns the action's promise: TaskCheckbox holds its own transition open
+  // on it, which is what keeps the pending ring showing for the round trip.
+  const handleToggle = async (next: boolean) => {
     if (next && !checkable) return;
-    startTransition(async () => {
-      const formData = new FormData();
-      formData.set("prayer", item.prayer);
-      formData.set("date", dateISO);
-      await togglePrayer(formData);
-    });
+    const formData = new FormData();
+    formData.set("prayer", item.prayer);
+    formData.set("date", dateISO);
+    await togglePrayer(formData);
   };
 
   const range = (
@@ -96,7 +93,7 @@ function PrayerRow({
     );
 
   return (
-    <li className="group border-border/60 border-b last:border-b-0">
+    <li className="group pending-sweep border-border/60 border-b last:border-b-0">
       <div className="flex items-center gap-3 py-2.5">
         {item.status === "done" || checkable ? (
           <TaskCheckbox

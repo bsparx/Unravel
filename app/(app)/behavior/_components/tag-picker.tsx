@@ -119,7 +119,7 @@ export function TagPicker({
               aria-label="New tag name"
               className="w-28 min-w-0 border-0 px-0.5 text-label"
             />
-            <Button type="button" variant="ghost" size="sm" onClick={submitNew} disabled={pending || !name.trim()}>
+            <Button type="button" variant="ghost" size="sm" onClick={submitNew} loading={pending} disabled={!name.trim()}>
               Add
             </Button>
             <Button

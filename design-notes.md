@@ -508,6 +508,39 @@ itself rises in with `rise` (320ms) once. Both are killed by the single global
 reduced-motion rule. They are deliberately dumb: no logic, no data, no motion
 vocabulary of their own.
 
+### Pending actions — a click has to answer back
+
+The rule above is for a *page* arriving. An *action* in flight (a tick, a save,
+a glass of water) gets its own, smaller answer, because an optimistic control
+flips instantly and then sits still for the whole server round trip — on
+`/day` that is a dozen serial database hops — and a ticked box that does
+nothing afterwards reads as stuck.
+
+- **Labelled buttons** take `loading` (`components/ui/button.tsx`): a
+  `Spinner` in `currentColor`, `aria-busy`, disabled but kept at full opacity
+  (a dimmed button says "unavailable", not "working"). Keep the pending copy
+  ("Saving…") beside it.
+- **Small controls** (the 21px checkbox, step boxes, the round water `+`) get
+  a `PendingRing`: a faint track a few pixels outside the control with one arc
+  travelling it. It floats outside so a ticked box stays ticked while it waits.
+- **The row** says so too: put `pending-sweep` on the `<li>` and any
+  `aria-busy="true"` control inside lights a hairline under the row. The row
+  never needs to be told.
+- **Links that act like buttons** swap their icon for a spinner while
+  navigating (`components/link-status-swap.tsx`, `useLinkStatus`).
+- **Nothing shows for the first ~150ms.** An action that answers faster than
+  that has finished before anyone could read the indicator; a flash is a
+  glitch. Every indicator fades in after that grace and out at once.
+- **Reduced motion leaves a still frame, not nothing.** The global rule
+  collapses each animation to one 0.01ms pass and keeps the last frame, so
+  every pending animation must end on something visible (a full rotation, a
+  seamless dash loop) — and the row sweep, whose last frame is off-screen, has
+  its own static override.
+- **The handler must return its promise.** `TaskCheckbox`'s transition only
+  lasts as long as the `onToggle` it awaits; a handler that starts its own
+  inner transition and returns `void` resolves the outer one instantly and the
+  ring never shows.
+
 ### The now-tick draws two pixels, so only those re-render
 
 `useNowMinute` used to live in `CalendarView`, which meant every 30-second tick

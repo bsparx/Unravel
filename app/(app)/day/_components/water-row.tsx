@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Droplets, Plus } from "lucide-react";
 
 import { logGlass } from "@/app/(app)/water/actions";
+import { PendingRing } from "@/components/ui/spinner";
 import {
   expectedByNow,
   waterStatusShort,
@@ -23,7 +24,7 @@ export function WaterRow({
   today: WaterToday;
   timezone: string;
 }) {
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
   const [shown, applyDelta] = useOptimistic(today.count, (current, delta: number) =>
     current + delta,
   );
@@ -77,7 +78,7 @@ export function WaterRow({
   };
 
   return (
-    <li className="border-border/60 border-b">
+    <li className="pending-sweep border-border/60 border-b">
       <div className="flex items-center gap-3 py-2.5">
         <Link
           href="/water"
@@ -97,13 +98,18 @@ export function WaterRow({
           <span className="text-muted-foreground">/{goal}</span>
         </span>
 
+        {/* Not disabled while pending: the count is optimistic, so a second
+            tap is a second glass, and the ring just says the last one is
+            still on its way. */}
         <button
           type="button"
           onClick={log}
+          aria-busy={isPending}
           aria-label="Log a glass of water"
-          className="border-border text-muted-foreground hover:text-foreground hover:border-primary/50 focus-visible:ring-ring rounded-full border p-1 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          className="border-border text-muted-foreground hover:text-foreground hover:border-primary/50 focus-visible:ring-ring relative rounded-full border p-1 transition-colors focus-visible:ring-2 focus-visible:outline-none"
         >
           <Plus className="size-3.5" aria-hidden />
+          <PendingRing active={isPending} shape="circle" />
         </button>
       </div>
     </li>

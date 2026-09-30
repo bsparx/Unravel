@@ -44,6 +44,7 @@ export function LogTimeDialog({
   needsTime,
   dateLabel,
   dayIndex,
+  pending = false,
   onConfirm,
   onCancel,
 }: {
@@ -54,6 +55,8 @@ export function LogTimeDialog({
   dateLabel: string;
   /** The whole day, notes included, for the spread's left page. */
   dayIndex: SpreadEntry[];
+  /** The save is in flight — the dialog stays open until it answers. */
+  pending?: boolean;
   onConfirm: (result: { minutes?: number; note?: string }) => void;
   onCancel: () => void;
 }) {
@@ -124,9 +127,14 @@ export function LogTimeDialog({
       showNote={item.requiresFeedback}
       noteRequired={needsFeedback}
       confirmLabel={
-        needsTime ? `Log ${formatBooked(shown)} & mark done` : "Save & mark done"
+        pending
+          ? "Saving…"
+          : needsTime
+            ? `Log ${formatBooked(shown)} & mark done`
+            : "Save & mark done"
       }
       confirmDisabled={!valid}
+      confirmPending={pending}
       onConfirm={() =>
         valid &&
         onConfirm({

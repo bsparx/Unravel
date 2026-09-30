@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { CheckCircle2, Sun } from "lucide-react";
 import { toast } from "sonner";
 
@@ -38,6 +38,10 @@ export function DayList({
     item: TodayItem;
     askTime: boolean;
   } | null>(null);
+  // The dialog's save. It stays open while this runs — a dialog that vanishes
+  // the instant you confirm leaves a row that sits still with nothing to say
+  // why — and closes itself when the server has answered.
+  const [isLogging, startLogging] = useTransition();
 
   // Ticking done with a question hanging over it is gated in TaskRow: the
   // transition is never started, so the box stays idle. The question is
@@ -68,28 +72,36 @@ export function DayList({
     await toggleTodo(formData);
   };
 
-  const closeLogDialog = async (result: { minutes?: number; note?: string }) => {
+  const closeLogDialog = (result: { minutes?: number; note?: string }) => {
     const target = logTarget;
-    setLogTarget(null);
-    if (!target) return;
+    if (!target || isLogging) return;
 
-    if (target.item.type === "HABIT") {
-      const formData = new FormData();
-      formData.set("taskId", target.item.id);
-      formData.set("date", todayISO);
-      if (result.minutes) formData.set("minutes", String(result.minutes));
-      if (result.note) formData.set("note", result.note);
-      const state = await completeWithNote(formData);
-      if (state.status === "error") toast.error(state.message);
-      return;
-    }
-
-    if (result.minutes === undefined) return;
-    const formData = new FormData();
-    formData.set("taskId", target.item.id);
-    formData.set("date", todayISO);
-    formData.set("minutes", String(result.minutes));
-    await logAndComplete(formData);
+    startLogging(async () => {
+      try {
+        if (target.item.type === "HABIT") {
+          const formData = new FormData();
+          formData.set("taskId", target.item.id);
+          formData.set("date", todayISO);
+          if (result.minutes) formData.set("minutes", String(result.minutes));
+          if (result.note) formData.set("note", result.note);
+          const state = await completeWithNote(formData);
+          if (state.status === "error") {
+            // Stay open: the note they just wrote is still in the dialog.
+            toast.error(state.message);
+            return;
+          }
+        } else if (result.minutes !== undefined) {
+          const formData = new FormData();
+          formData.set("taskId", target.item.id);
+          formData.set("date", todayISO);
+          formData.set("minutes", String(result.minutes));
+          await logAndComplete(formData);
+        }
+        setLogTarget(null);
+      } catch {
+        toast.error("Couldn't save that. What you wrote is still here — try again.");
+      }
+    });
   };
 
   // The quest counters: done over done-and-still-open, per section. Done
@@ -250,7 +262,8 @@ export function DayList({
           needsTime={logTarget.askTime}
           dateLabel={formatDateWithWeekday(view.date)}
           dayIndex={dayIndex}
-          onConfirm={(result) => void closeLogDialog(result)}
+          pending={isLogging}
+          onConfirm={closeLogDialog}
           onCancel={() => setLogTarget(null)}
         />
       )}

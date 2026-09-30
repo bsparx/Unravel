@@ -115,6 +115,12 @@
   /* The calendar's one orchestrated moment: the week's day-strips drawing
      themselves in, left to right, when the grid arrives. The only consumer. */
   --animate-draw: draw 350ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* Work in flight — functional, never decorative. Every one of these ends on
+     a visible frame, because the reduced-motion rule below collapses each to a
+     single 0.01ms pass and whatever the last frame is, is what stays. */
+  --animate-spinner-spin: spinner-spin 900ms linear infinite;
+  --animate-spinner-dash: spinner-dash 1400ms ease-in-out infinite;
+  --animate-ring-orbit: ring-orbit 1300ms linear infinite;
 
   /* Content arriving. Small distance on purpose — 6px reads as "settling",
      20px reads as "flying in". */
@@ -150,6 +156,37 @@
     }
     to {
       transform: scaleX(1);
+    }
+  }
+
+  /* The inline spinner: the whole ring turns while its arc breathes between a
+     short comet and half the circle. pathLength=100 makes the dash numbers
+     percentages, so the same keyframes fit any size. */
+  @keyframes spinner-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes spinner-dash {
+    0%,
+    100% {
+      stroke-dasharray: 14 86;
+    }
+    50% {
+      stroke-dasharray: 52 48;
+    }
+  }
+
+  /* The orbit ring: one arc travelling the whole perimeter. The period is the
+     path length (100), so the loop is seamless and the last frame equals the
+     first. */
+  @keyframes ring-orbit {
+    from {
+      stroke-dashoffset: 0;
+    }
+    to {
+      stroke-dashoffset: -100;
     }
   }
 }
@@ -594,6 +631,67 @@
 .dark:not([data-theme="eggplant"]) [data-slot="button"].bg-primary:hover {
   background-image: linear-gradient(100deg, #345bff, #7040ea);
   border-color: #6674ff;
+}
+
+/**
+ * A row that is waiting on the server. Put `pending-sweep` on the row and any
+ * control inside it that sets `aria-busy="true"` lights a hairline along the
+ * row's bottom edge, with a soft highlight travelling across it. The row never
+ * needs to know it is pending — the busy control says so.
+ *
+ * The 140ms delay is deliberate: an action that answers faster than that has
+ * finished before anyone could read the indicator, and a flash is worse than
+ * nothing.
+ */
+.pending-sweep {
+  position: relative;
+}
+
+.pending-sweep::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 9999px;
+  pointer-events: none;
+  opacity: 0;
+  background-image: linear-gradient(
+    90deg,
+    transparent,
+    var(--primary),
+    transparent
+  );
+  background-repeat: no-repeat;
+  background-size: 38% 100%;
+  background-position: -60% 0;
+  transition: opacity 120ms ease;
+}
+
+.pending-sweep:has([aria-busy="true"])::after {
+  opacity: 0.85;
+  transition: opacity 220ms ease 140ms;
+  animation: pending-sweep 1300ms cubic-bezier(0.45, 0, 0.25, 1) 140ms infinite;
+}
+
+@keyframes pending-sweep {
+  from {
+    background-position: -60% 0;
+  }
+  to {
+    background-position: 160% 0;
+  }
+}
+
+/* Reduced motion collapses the sweep to its last frame, which is off-screen.
+   Show a still, faint line instead — the row is still visibly "working". */
+@media (prefers-reduced-motion: reduce) {
+  .pending-sweep:has([aria-busy="true"])::after {
+    animation: none;
+    background-size: 100% 100%;
+    background-position: 0 0;
+    opacity: 0.35;
+  }
 }
 
 /**

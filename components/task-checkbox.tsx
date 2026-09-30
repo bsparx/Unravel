@@ -3,13 +3,18 @@
 import { useOptimistic, useTransition } from "react";
 import { Check } from "lucide-react";
 
+import { PendingRing } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 
 /**
  * The one control for ticking anything off, shared by every list.
  *
  * Optimistic on purpose: the click has to feel instant, because the whole
- * reward of a list like this is the moment the thing goes away.
+ * reward of a list like this is the moment the thing goes away. But the thing
+ * doesn't go away until the server answers, and a ticked box that then sits
+ * still reads as stuck — so while the transition is pending an orbit ring
+ * circles the box, and `aria-busy` lets the row (`.pending-sweep`) say so too.
+ * `onToggle` must return its promise for any of that to last the round trip.
  */
 export function TaskCheckbox({
   done,
@@ -44,6 +49,7 @@ export function TaskCheckbox({
       role="checkbox"
       aria-checked={optimisticDone}
       aria-label={optimisticDone ? `Undo ${label}` : `Complete ${label}`}
+      aria-busy={isPending}
       disabled={isPending}
       onClick={() => {
         const next = !optimisticDone;
@@ -60,7 +66,7 @@ export function TaskCheckbox({
         });
       }}
       className={cn(
-        "focus-visible:ring-ring group relative grid size-[21px] shrink-0 place-items-center rounded-[7px] after:absolute after:-inset-3 border-2 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
+        "focus-visible:ring-ring group relative grid size-[21px] disabled:cursor-progress shrink-0 place-items-center rounded-[7px] after:absolute after:-inset-3 border-2 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
         // The pop is keyed off the optimistic value, so it fires on the click
         // rather than on the server's answer. Celebrating a round trip late is
         // worse than not celebrating.
@@ -80,6 +86,7 @@ export function TaskCheckbox({
         strokeWidth={3}
         aria-hidden
       />
+      <PendingRing active={isPending} />
     </button>
   );
 }

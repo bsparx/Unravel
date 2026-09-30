@@ -163,7 +163,11 @@ export function DumpBox() {
               <kbd className="font-mono">Enter</kbd> to save
               </span>
             </p>
-            <Button onClick={submit} disabled={pending || !body.trim() || !tagId}>
+            <Button
+              onClick={submit}
+              loading={pending}
+              disabled={!body.trim() || !tagId}
+            >
               {pending ? "Saving…" : "Save thought"}
             </Button>
           </div>

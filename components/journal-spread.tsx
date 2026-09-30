@@ -51,6 +51,7 @@ export function JournalSpreadDialog({
   children,
   confirmLabel,
   confirmDisabled,
+  confirmPending = false,
   onConfirm,
   onCancel,
   cancelLabel = "Go back",
@@ -72,6 +73,9 @@ export function JournalSpreadDialog({
   children?: ReactNode;
   confirmLabel: string;
   confirmDisabled?: boolean;
+  /** The save is in flight: spinner on the confirm button, and the dialog
+      holds still (no cancel, no dismiss, note read-only) until it answers. */
+  confirmPending?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
   cancelLabel?: string;
@@ -79,7 +83,10 @@ export function JournalSpreadDialog({
   const journaled = dayIndex.filter((entry) => entry.note?.trim()).length;
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onCancel()}>
+    <Dialog
+      open
+      onOpenChange={(open) => !open && !confirmPending && onCancel()}
+    >
       <DialogContent className="border-paper-edge bg-paper text-paper-ink ring-paper-edge/60 gap-0 overflow-hidden p-0 sm:max-w-4xl lg:max-w-5xl">
         <div className="flex flex-col-reverse sm:flex-row">
           {/* ── Left page: the day ─────────────────────────────────────── */}
@@ -182,6 +189,7 @@ export function JournalSpreadDialog({
                     rows={4}
                     maxLength={MAX_FEEDBACK_LENGTH}
                     aria-required={noteRequired}
+                    readOnly={confirmPending}
                     value={note}
                     onChange={(event) => onNoteChange(event.target.value)}
                     placeholder={placeholder}
@@ -215,6 +223,7 @@ export function JournalSpreadDialog({
             type="button"
             variant="ghost"
             className="text-paper-ink hover:bg-paper-edge/40 hover:text-paper-ink"
+            disabled={confirmPending}
             onClick={onCancel}
           >
             {cancelLabel}
@@ -222,6 +231,7 @@ export function JournalSpreadDialog({
           <Button
             type="button"
             disabled={confirmDisabled}
+            loading={confirmPending}
             className="bg-primary text-primary-foreground hover:bg-primary/90"
             onClick={onConfirm}
           >

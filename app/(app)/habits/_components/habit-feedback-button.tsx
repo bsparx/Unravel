@@ -91,6 +91,7 @@ export function HabitFeedbackButton({
           noteRequired
           confirmLabel={pending ? "Saving…" : "Save & mark done"}
           confirmDisabled={note.trim() === "" || pending}
+          confirmPending={pending}
           onConfirm={() => void submit()}
           onCancel={() => setOpen(false)}
           cancelLabel="Not yet"

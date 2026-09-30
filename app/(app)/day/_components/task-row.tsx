@@ -17,6 +17,7 @@ import {
 import { HabitDayLine } from "@/components/habit-day";
 import { StepList } from "@/components/step-list";
 import { TaskCheckbox } from "@/components/task-checkbox";
+import { LinkStatusSwap } from "@/components/link-status-swap";
 import { MissedYesterdayBadge } from "@/components/missed-yesterday-badge";
 import { formatMinuteOfDay } from "@/lib/block-math";
 import { formatDuration, formatMinutes } from "@/lib/dates";
@@ -80,7 +81,7 @@ export function TaskRow({
   const needsFeedback = item.requiresFeedback && !item.feedbackNote;
 
   return (
-    <li className="group border-border/60 border-b last:border-b-0">
+    <li className="group pending-sweep border-border/60 border-b last:border-b-0">
       <div className="flex items-center gap-3 py-2.5">
         <TaskCheckbox
           done={item.done}
@@ -222,14 +223,18 @@ export function TaskRow({
             aria-label={`Edit ${item.title}`}
             className="text-muted-foreground hover:text-foreground hover:border-primary/40 border-border focus-visible:ring-ring rounded-full border p-1.5 transition-colors focus-visible:ring-2 focus-visible:outline-none"
           >
-            <Pencil className="size-3.5" aria-hidden />
+            <LinkStatusSwap spinnerClassName="size-3.5">
+              <Pencil className="size-3.5" aria-hidden />
+            </LinkStatusSwap>
           </Link>
           <Link
             href={href}
             aria-label={`Start a timer for ${item.title}`}
             className="text-muted-foreground hover:text-primary hover:border-primary/40 border-border focus-visible:ring-ring rounded-full border p-1.5 transition-colors focus-visible:ring-2 focus-visible:outline-none"
           >
-            <Play className="size-3.5" aria-hidden />
+            <LinkStatusSwap spinnerClassName="size-3.5">
+              <Play className="size-3.5" aria-hidden />
+            </LinkStatusSwap>
           </Link>
           {item.bar?.unit === "MINUTES" && onLogTime && (
             <button

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useTransition } from "react";
 import { CheckCircle2 } from "lucide-react";
 
 import { toggleBlockTask } from "@/app/(app)/calendar/actions";
@@ -155,16 +154,14 @@ function BlockQuestCard({
   nowMinute: number;
   moreActive: number;
 }) {
-  const [isTicking, startTicking] = useTransition();
-
-  const toggleObjective = (taskId: string, done: boolean) => {
-    startTicking(async () => {
-      const formData = new FormData();
-      formData.set("blockId", quest.id);
-      formData.set("taskId", taskId);
-      formData.set("done", String(done));
-      await toggleBlockTask(formData);
-    });
+  // Returns the action's promise: each TaskCheckbox holds its own transition
+  // open on it, which is what keeps its pending ring up for the round trip.
+  const toggleObjective = async (taskId: string, done: boolean) => {
+    const formData = new FormData();
+    formData.set("blockId", quest.id);
+    formData.set("taskId", taskId);
+    formData.set("done", String(done));
+    await toggleBlockTask(formData);
   };
 
   const left = Math.max(0, quest.endMinute - nowMinute);
@@ -179,7 +176,6 @@ function BlockQuestCard({
 
   return (
     <div
-      aria-busy={isTicking}
       className={cn(
         cardShell,
         "focus-visible:ring-ring border-primary/35 bg-accent/40 hover:border-primary/55 focus-within:ring-2 focus-within:ring-ring focus-within:outline-none",
@@ -205,7 +201,10 @@ function BlockQuestCard({
       {quest.objectives.length > 0 && (
         <ul className="mt-3 space-y-2">
           {quest.objectives.map((objective) => (
-            <li key={objective.id} className="flex items-center gap-3">
+            <li
+              key={objective.id}
+              className="pending-sweep flex items-center gap-3"
+            >
               <TaskCheckbox
                 done={objective.doneAt !== null}
                 label={objective.title}

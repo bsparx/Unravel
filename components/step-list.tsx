@@ -4,6 +4,7 @@ import { useOptimistic, useTransition } from "react";
 import { Check } from "lucide-react";
 
 import { toggleStep } from "@/app/(app)/tasks/actions";
+import { PendingRing } from "@/components/ui/spinner";
 import { formatMinutes } from "@/lib/dates";
 import { inOrder, type StepLike } from "@/lib/steps";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,13 @@ export function StepList({
   className?: string;
 }) {
   const [, startTransition] = useTransition();
+  // Which step is waiting on the server. Optimistic like the ticks themselves:
+  // set inside the transition, it shows for exactly as long as the round trip
+  // and then falls back to null on its own.
+  const [pendingId, markPending] = useOptimistic<string | null, string>(
+    null,
+    (_current, id) => id,
+  );
   const [shown, applyToggle] = useOptimistic(
     inOrder(steps),
     (current, change: { id: string; done: boolean }) =>
@@ -45,6 +53,7 @@ export function StepList({
   const toggle = (step: StepView) => {
     const done = step.completedAt === null;
     startTransition(async () => {
+      markPending(step.id);
       applyToggle({ id: step.id, done });
       const formData = new FormData();
       formData.set("stepId", step.id);
@@ -58,6 +67,7 @@ export function StepList({
       {shown.map((step, index) => {
         const done = step.completedAt !== null;
         const isNext = step.id === nextId;
+        const isPending = step.id === pendingId;
 
         return (
           <li key={step.id}>
@@ -65,6 +75,7 @@ export function StepList({
               type="button"
               onClick={() => toggle(step)}
               aria-pressed={done}
+              aria-busy={isPending}
               className={cn(
                 "focus-visible:ring-ring group flex w-full min-h-11 items-start gap-3 rounded-lg px-2 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none",
                 isNext ? "bg-accent/60 hover:bg-accent" : "hover:bg-muted/60",
@@ -72,7 +83,7 @@ export function StepList({
             >
               <span
                 className={cn(
-                  "mt-0.5 grid size-[21px] shrink-0 place-items-center rounded-[7px] border transition-colors",
+                  "relative mt-0.5 grid size-[21px] shrink-0 place-items-center rounded-[7px] border transition-colors",
                   done
                     ? "border-primary bg-primary text-primary-foreground"
                     : isNext
@@ -88,6 +99,7 @@ export function StepList({
                   strokeWidth={3}
                   aria-hidden
                 />
+                <PendingRing active={isPending} />
               </span>
 
               <span className="min-w-0 flex-1">

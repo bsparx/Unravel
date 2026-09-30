@@ -220,6 +220,10 @@ or the capture action.
 
 Use brief hover, press, and state-change feedback. No decorative loops,
 parallax, automatic carousels, or celebration effects. Honour reduced motion.
+An action in flight is state, not decoration: labelled buttons take `loading`
+(spinner, full opacity), small controls get the orbit ring, and nothing shows
+for the first ~150ms so fast actions never flash. Under reduced motion each
+leaves a still frame behind.
 The live timer's depletion conveys time; the detailed rendering and recovery
 contracts remain recorded in `design-notes.md`.
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CalendarDays, Plus } from "lucide-react";
 
+import { LinkStatusSwap } from "@/components/link-status-swap";
 import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth";
 import {
@@ -104,13 +105,17 @@ export default async function TodayPage() {
       <div className="border-border mt-10 flex flex-wrap justify-center gap-2 border-t pt-6">
         <Button asChild variant="ghost" size="sm">
           <Link href="/tasks/new">
-            <Plus className="size-4" aria-hidden />
+            <LinkStatusSwap spinnerClassName="size-3.5">
+              <Plus className="size-4" aria-hidden />
+            </LinkStatusSwap>
             Add with details
           </Link>
         </Button>
         <Button asChild variant="ghost" size="sm">
           <Link href={`/calendar?view=day&date=${todayISO}`}>
-            <CalendarDays className="size-4" aria-hidden />
+            <LinkStatusSwap spinnerClassName="size-3.5">
+              <CalendarDays className="size-4" aria-hidden />
+            </LinkStatusSwap>
             Give it all a time
           </Link>
         </Button>
