@@ -111,13 +111,12 @@ export function AppShell({
                 asChild
                 size="lg"
                 tooltip="Unravel"
-                className="group-data-[collapsible=icon]:justify-center"
               >
                 <Link href="/">
                   {/* The mark survives the collapse — the wordmark hides, the
                       loop doesn't. */}
                   <BrandMark className="text-accent-foreground size-6 shrink-0" />
-                  <span className="font-display text-title tracking-tight group-data-[collapsible=icon]:hidden">
+                  <span className="font-display text-title tracking-tight">
                     Unravel
                   </span>
                 </Link>
