@@ -182,9 +182,9 @@ export function BlockDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-[20px] sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-display">
+          <DialogTitle className="font-heading">
             {editing ? "Edit this block" : "Block out some time"}
           </DialogTitle>
           <DialogDescription>
@@ -196,7 +196,6 @@ export function BlockDialog({
 
         <form action={formAction} className="space-y-4">
           {draft.id && <input type="hidden" name="id" value={draft.id} />}
-          <input type="hidden" name="date" value={draft.dateISO} />
           <input type="hidden" name="startMinute" value={start} />
           <input type="hidden" name="endMinute" value={end} />
           <input type="hidden" name="kind" value={kind} />
@@ -227,7 +226,22 @@ export function BlockDialog({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="block-date">Date</Label>
+            <Input
+              id="block-date"
+              name="date"
+              type="date"
+              defaultValue={draft.dateISO}
+              required
+              aria-invalid={Boolean(error("date"))}
+              aria-describedby={error("date") ? "block-date-error" : undefined}
+              className="min-h-11 font-mono tabular-nums"
+            />
+            {error("date") && <p id="block-date-error" role="alert" className="text-destructive text-label">{error("date")}</p>}
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="block-start">From</Label>
               <Input
@@ -242,7 +256,7 @@ export function BlockDialog({
                   setStart(minute);
                   setEnd(minute + length);
                 }}
-                className="tabular-nums"
+                className="min-h-11 font-mono tabular-nums"
               />
             </div>
             <div className="space-y-1.5">
@@ -256,7 +270,7 @@ export function BlockDialog({
                   const minute = parseMinuteOfDay(event.target.value);
                   if (minute !== null) setEnd(minute);
                 }}
-                className="tabular-nums"
+                className="min-h-11 font-mono tabular-nums"
               />
             </div>
           </div>
@@ -275,7 +289,7 @@ export function BlockDialog({
                 onClick={() => setLength(minutes)}
                 aria-pressed={end - start === minutes}
                 className={cn(
-                  "focus-visible:ring-ring rounded-full border px-2.5 py-0.5 text-label tabular-nums transition-colors focus-visible:ring-2 focus-visible:outline-none",
+                  "focus-visible:ring-ring min-h-11 min-w-11 rounded-[10px] border px-3 py-2 font-mono text-label tabular-nums transition-colors focus-visible:ring-2 focus-visible:outline-none",
                   end - start === minutes
                     ? "border-primary bg-primary text-primary-foreground"
                     : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground",
@@ -297,7 +311,7 @@ export function BlockDialog({
                   aria-pressed={kind === option.value}
                   title={option.hint}
                   className={cn(
-                    "focus-visible:ring-ring rounded-md border px-2 py-1.5 text-label transition-colors focus-visible:ring-2 focus-visible:outline-none",
+                    "focus-visible:ring-ring min-h-11 rounded-[10px] border px-2 py-2 text-label transition-colors focus-visible:ring-2 focus-visible:outline-none",
                     kind === option.value
                       ? option.value === "RECOVERY"
                         ? "border-rest bg-rest-muted"
@@ -390,7 +404,7 @@ export function BlockDialog({
 
             <p className="text-muted-foreground text-label">
               {linked.length > 1
-                ? "No order between them — the two hours are for all of these."
+                ? "This time is for all of these tasks."
                 : "A block is what the time is for. Add as many as it takes, or none at all."}
             </p>
           </div>
@@ -400,8 +414,7 @@ export function BlockDialog({
               <Label>Colour</Label>
               <ColorSwatches value={taskColor} onChange={pickTaskColor} />
               <p className="text-muted-foreground text-label">
-                The task&apos;s hue — every block of it across the calendar
-                re-tints with this.
+                Changing the task&apos;s colour updates every calendar block for it.
               </p>
             </div>
           )}

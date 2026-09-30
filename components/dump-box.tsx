@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
@@ -32,6 +33,7 @@ export function DumpBox() {
   const [open, setOpen] = useState(false);
   const [body, setBody] = useState("");
   const [tagId, setTagId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
@@ -70,26 +72,32 @@ export function DumpBox() {
   const submit = () => {
     const text = body.trim();
     if (!text || !tagId || pending) return;
+    setError(null);
 
     startTransition(async () => {
-      const result = await captureThought(text, tagId);
+      try {
+        const result = await captureThought(text, tagId);
 
-      if (!result.ok) {
-        toast.error(result.message);
-        return;
+        if (!result.ok) {
+          setError(result.message);
+          return;
+        }
+
+        // Clear and close immediately — the instant feel comes from the dialog
+        // getting out of the way, not from waiting on anything.
+        setBody("");
+        setTagId(null);
+        setError(null);
+        setOpen(false);
+        toast.success("Got it.", {
+          description: "It's in your behavior log. Deal with it later.",
+        });
+
+        // If they happen to be looking at the behavior log, stream the new row in.
+        if (pathname.startsWith("/behavior")) router.refresh();
+      } catch {
+        setError("Could not save this thought. Your draft is still here. Try again.");
       }
-
-      // Clear and close immediately — the instant feel comes from the dialog
-      // getting out of the way, not from waiting on anything.
-      setBody("");
-      setTagId(null);
-      setOpen(false);
-      toast.success("Got it.", {
-        description: "It's in your behavior log. Deal with it later.",
-      });
-
-      // If they happen to be looking at the behavior log, stream the new row in.
-      if (pathname.startsWith("/behavior")) router.refresh();
     });
   };
 
@@ -101,7 +109,7 @@ export function DumpBox() {
         aria-label="Write something down"
         aria-keyshortcuts="c"
         className={cn(
-          "bg-primary text-primary-foreground focus-visible:ring-ring fixed right-4 bottom-24 z-50 grid size-12 place-items-center rounded-full shadow-lg transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none motion-reduce:transition-none",
+          "bg-primary text-primary-foreground focus-visible:ring-ring fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-50 grid size-12 place-items-center rounded-lg shadow-sm transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
           // On desktop the mini timer badge lives up top, so the bottom-right
           // corner — where a thumb and a cursor both expect it — is ours.
           "md:right-6 md:bottom-6",
@@ -112,20 +120,24 @@ export function DumpBox() {
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
-          showCloseButton={false}
-          className="top-[22%] translate-y-0 gap-3 p-4 sm:max-w-xl"
+          className="gap-4 p-5 sm:max-w-xl"
           onOpenAutoFocus={(event) => {
             event.preventDefault();
             textareaRef.current?.focus();
           }}
         >
-          <DialogTitle className="sr-only">Write something down</DialogTitle>
-          <DialogDescription className="sr-only">
-            What is on your mind and what was behind it. It goes to your
-            behavior log.
+          <DialogTitle>Write something down</DialogTitle>
+          <DialogDescription>
+            What you felt and what triggered it. Save it to your behavior log.
           </DialogDescription>
 
+          <label htmlFor="capture-body" className="text-label font-medium">
+            What&apos;s on your mind?
+          </label>
           <Textarea
+            id="capture-body"
+            aria-describedby={error ? "capture-help capture-error" : "capture-help"}
+            aria-invalid={Boolean(error)}
             ref={textareaRef}
             value={body}
             onChange={(event) => setBody(event.target.value)}
@@ -139,17 +151,22 @@ export function DumpBox() {
             rows={3}
             maxLength={2000}
             placeholder="What's on your mind?"
-            className="resize-none border-0 !text-body shadow-none focus-visible:ring-0"
+            className="resize-none"
           />
 
           <TagPicker value={tagId} onChange={setTagId} />
-
-          <p className="text-muted-foreground flex items-center justify-between text-label">
-            <span>What you felt and what triggered it.</span>
-            <span className="text-micro">
+          {error && <p id="capture-error" role="alert" className="text-label text-destructive">{error}</p>}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p id="capture-help" className="text-label text-muted-foreground">
+              {tagId ? "Your draft stays here until saved." : "Choose what was behind it to save."}
+              <span className="ml-1 hidden sm:inline">
               <kbd className="font-mono">Enter</kbd> to save
-            </span>
-          </p>
+              </span>
+            </p>
+            <Button onClick={submit} disabled={pending || !body.trim() || !tagId}>
+              {pending ? "Saving…" : "Save thought"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </>

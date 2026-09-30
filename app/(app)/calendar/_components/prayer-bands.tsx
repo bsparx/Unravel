@@ -121,7 +121,7 @@ function PrayerBandView({
             <span className="text-muted-foreground font-normal">
               {" "}
               {formatMinuteOfDay(band.startMin)}
-              {band.continuation ? "" : " –"}
+              {band.continuation ? "" : " -"}
             </span>
           )}
         </span>

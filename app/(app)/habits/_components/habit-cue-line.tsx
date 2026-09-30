@@ -15,25 +15,25 @@ import type { CueSummary } from "@/lib/tasks";
  * thing that triggers this" is the natural next question once a chain exists.
  * A label anchor is plain text — there is nothing to visit, on purpose.
  */
-export function HabitCueLine({ cue }: { cue: CueSummary }) {
+export function HabitCueLine({ cue }: { cue: CueSummary; }) {
   const description = describeCue(cue.anchorTitle);
   if (!description) return null;
 
   return (
-    <p className="text-muted-foreground mb-0.5 flex items-center gap-1 truncate text-micro normal-case tracking-normal">
+    <p className="text-muted-foreground mb-1 flex flex-wrap items-center gap-1.5 text-label normal-case tracking-normal">
       <CornerDownRight className="size-3 shrink-0" aria-hidden />
       {cue.anchorTaskId ? (
         <>
           After{" "}
           <Link
             href={`/habits/${cue.anchorTaskId}`}
-            className="hover:text-primary focus-visible:ring-ring truncate rounded underline underline-offset-2 focus-visible:ring-2 focus-visible:outline-none"
+            className="hover:text-foreground focus-visible:ring-ring rounded underline underline-offset-2 focus-visible:ring-2 focus-visible:outline-none"
           >
             {cue.anchorTitle}
           </Link>
         </>
       ) : (
-        <span className="truncate">{description}</span>
+        <span>{description}</span>
       )}
     </p>
   );
@@ -46,7 +46,7 @@ export function HabitCueLine({ cue }: { cue: CueSummary }) {
  * and the streak. Only rendered when there is more than one step in front of
  * this habit — for a single anchor it would just repeat the line above.
  */
-export function HabitStackTrail({ steps }: { steps: string[] }) {
+export function HabitStackTrail({ steps }: { steps: string[]; }) {
   if (steps.length < 3) return null;
 
   return (

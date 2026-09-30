@@ -33,7 +33,7 @@ export function TaskCheckbox({
 
   const ringByPriority = {
     P1: "border-destructive",
-    P2: "border-running",
+    P2: "border-accent-foreground",
     P3: "border-primary",
     P4: "border-input",
   }[priority];
@@ -60,7 +60,7 @@ export function TaskCheckbox({
         });
       }}
       className={cn(
-        "focus-visible:ring-ring group grid size-5 shrink-0 place-items-center rounded-full border-2 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
+        "focus-visible:ring-ring group relative grid size-[21px] shrink-0 place-items-center rounded-[7px] after:absolute after:-inset-3 border-2 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
         // The pop is keyed off the optimistic value, so it fires on the click
         // rather than on the server's answer. Celebrating a round trip late is
         // worse than not celebrating.

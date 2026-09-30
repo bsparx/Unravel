@@ -120,7 +120,7 @@ export function MorningPass({
                   )}
                 >
                   <span className="min-w-0">
-                    <span className="block truncate text-body">
+                    <span className="block text-body break-words">
                       {option.label}
                     </span>
                     {option.detail && (
@@ -130,7 +130,7 @@ export function MorningPass({
                     )}
                   </span>
                   <ArrowRight
-                    className="text-muted-foreground group-hover:text-primary size-4 shrink-0"
+                    className="text-muted-foreground group-hover:text-accent-foreground size-4 shrink-0"
                     aria-hidden
                   />
                 </button>
@@ -140,27 +140,34 @@ export function MorningPass({
         </ul>
       )}
 
-      <form action={formAction} className="mt-6 flex gap-2">
+      <form action={formAction} className="mt-6 space-y-2">
         <input type="hidden" name="date" value={dateISO} />
-        <label htmlFor="one-thing-title" className="sr-only">
-          Or type your frog
+        <label htmlFor="one-thing-title" className="block text-label font-medium">
+          {options.length > 0 ? "Or choose something else" : "Your frog"}
         </label>
-        <Input
-          id="one-thing-title"
-          name="title"
-          value={typed}
-          onChange={(event) => setTyped(event.target.value)}
-          disabled={pending}
-          maxLength={200}
-          autoComplete="off"
-          placeholder={
-            options.length > 0 ? "Or type your frog…" : "Type your frog…"
-          }
-          className="h-11 text-body"
-        />
-        <Button type="submit" disabled={pending || typed.trim().length === 0}>
-          Set it
-        </Button>
+        <div className="flex items-start gap-2">
+          <Input
+            id="one-thing-title"
+            aria-invalid={state.status === "error"}
+            aria-describedby={state.status === "error" ? "one-thing-error" : undefined}
+            name="title"
+            value={typed}
+            onChange={(event) => setTyped(event.target.value)}
+            disabled={pending}
+            maxLength={200}
+            autoComplete="off"
+            placeholder={
+              options.length > 0 ? "Or type your frog…" : "Type your frog…"
+            }
+            className="h-11 text-body"
+          />
+          <Button type="submit" disabled={pending || typed.trim().length === 0}>
+            Set it
+          </Button>
+        </div>
+        {state.status === "error" && (
+          <p id="one-thing-error" role="alert" className="text-label text-destructive">{state.message}</p>
+        )}
       </form>
 
       {/* The way out for a frog that's actually several moves. Quiet, and
@@ -168,7 +175,7 @@ export function MorningPass({
       <button
         type="button"
         onClick={() => setDetailed(true)}
-        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring mt-3 inline-flex items-center gap-1.5 rounded text-label underline underline-offset-4 focus-visible:ring-2 focus-visible:outline-none"
+        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring mt-3 inline-flex min-h-11 items-center gap-2 rounded text-label underline underline-offset-4 focus-visible:ring-2 focus-visible:outline-none"
       >
         <ListPlus className="size-4" aria-hidden />
         Add steps and an estimate

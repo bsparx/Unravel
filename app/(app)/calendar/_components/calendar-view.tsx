@@ -21,6 +21,7 @@ export function CalendarView({
   blocks,
   prayerBands,
   todayISO,
+  anchorISO,
   timeZone,
   tasks,
 }: {
@@ -28,6 +29,7 @@ export function CalendarView({
   blocks: CalendarBlock[];
   prayerBands: Record<string, PrayerBand[]>;
   todayISO: string;
+  anchorISO: string;
   timeZone: string;
   /** `cueTitle` is set for a habit that brings a precursor block with it;
       `color` is the task's calendar hue, shown when the editor opens. */
@@ -50,6 +52,7 @@ export function CalendarView({
     <>
       <NowProvider timeZone={timeZone}>
         <CalendarGrid
+          key={`${anchorISO}-${days.length}`}
           onDropItem={(item, dateISO, startMinute) => {
           startTransition(async () => {
             const formData = new FormData();
@@ -67,13 +70,14 @@ export function CalendarView({
             // whether a cue came along — and getting two blocks from one drop
             // needs saying.
             else if (result.status === "success")
-              toast.success(result.message ?? `${item.title} — blocked out.`);
+              toast.success(result.message ?? `${item.title} blocked out.`);
           });
         }}
         days={days}
         blocks={blocks}
         prayerBands={prayerBands}
         todayISO={todayISO}
+        anchorISO={anchorISO}
         onCreate={(dateISO, span) => {
           setDraft({
             dateISO,
@@ -133,7 +137,7 @@ export function CalendarView({
             toast.success(
               block.title
                 ? `Added to ${block.title}.`
-                : `Added to that block — ${block.tasks.length + 1} in it now.`,
+                : `Added to that block. It now holds ${block.tasks.length + 1} tasks.`,
             );
           });
         }}

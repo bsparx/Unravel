@@ -18,13 +18,13 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "border-border flex flex-col items-center gap-3 rounded-lg border border-dashed px-6 py-12 text-center",
+        "border-border flex flex-col items-center gap-3 rounded-2xl border bg-muted/25 px-6 py-12 text-center",
         className,
       )}
     >
-      <Icon className="text-muted-foreground/60 size-6" aria-hidden />
+      <Icon className="text-muted-foreground size-6" aria-hidden />
       <div className="space-y-1">
-        <p className="font-display text-title">{title}</p>
+        <p className="font-sans text-title font-semibold">{title}</p>
         <p className="text-muted-foreground mx-auto max-w-sm text-label">
           {description}
         </p>

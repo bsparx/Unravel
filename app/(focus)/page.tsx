@@ -30,8 +30,8 @@ export default async function HomePage() {
   const dayLog = await getDayLog(user, today);
 
   return (
-    <main className="mx-auto flex min-h-full w-full max-w-xl flex-1 flex-col justify-center px-6 py-20">
-      <p className="text-micro text-muted-foreground mb-8 font-medium tracking-wider uppercase">
+    <main className="mx-auto flex min-h-full w-full max-w-xl flex-1 flex-col justify-center px-4 py-10 sm:px-6 sm:py-16">
+      <p className="text-label text-muted-foreground mb-6 font-mono">
         {formatFullDate(today)}
       </p>
 
@@ -46,22 +46,22 @@ export default async function HomePage() {
       )}
 
       {/* The only way out of this screen, and it's quiet on purpose. */}
-      <nav className="text-muted-foreground mt-16 flex gap-5 text-label">
+      <nav className="text-muted-foreground mt-12 flex flex-wrap gap-x-5 gap-y-1 text-label">
         <Link
           href="/day"
-          className="hover:text-foreground underline underline-offset-4"
+          className="inline-flex min-h-11 items-center rounded hover:text-foreground underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           The whole day
         </Link>
         <Link
           href="/behavior"
-          className="hover:text-foreground underline underline-offset-4"
+          className="inline-flex min-h-11 items-center rounded hover:text-foreground underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           Behavior
         </Link>
         <Link
           href="/close"
-          className="hover:text-foreground underline underline-offset-4"
+          className="inline-flex min-h-11 items-center rounded hover:text-foreground underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           Close the day
         </Link>

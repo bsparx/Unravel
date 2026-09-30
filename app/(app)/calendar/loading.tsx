@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Loading() {
   return (
-    <div className="mx-auto w-full max-w-6xl px-5 py-8 md:px-8 md:py-12">
+    <div className="w-full px-4 py-6 md:px-6 md:py-8" role="status" aria-label="Loading calendar">
       <div className="animate-rise space-y-6">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div className="space-y-2">
@@ -12,16 +12,16 @@ export default function Loading() {
           </div>
           <div className="flex items-center gap-2">
             <div className="flex gap-1">
-              <Skeleton className="h-7 w-12 rounded-full" />
-              <Skeleton className="h-7 w-12 rounded-full" />
+              <Skeleton className="h-11 w-14 rounded-[10px]" />
+              <Skeleton className="h-11 w-14 rounded-[10px]" />
             </div>
-            <Skeleton className="h-8 w-32 rounded-full" />
+            <Skeleton className="h-11 w-36 rounded-[13px]" />
           </div>
         </header>
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
           {/* The grid — day view is the default, so one wide column. */}
-          <div className="bg-card overflow-hidden rounded-xl border">
+          <div className="bg-card overflow-hidden rounded-[20px] border">
             <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] border-b">
               <div />
               <div className="space-y-1.5 border-l px-2 pt-2 pb-1.5 text-center">
@@ -70,7 +70,15 @@ export default function Loading() {
           </div>
 
           {/* The scheduling panel */}
-          <aside className="space-y-4">
+          <aside className="space-y-6">
+            <div className="bg-card rounded-[20px] border p-4">
+              <Skeleton className="mx-auto mb-5 h-5 w-32 rounded-md" />
+              <div className="grid grid-cols-7 gap-x-2 gap-y-4">
+                {Array.from({ length: 42 }).map((_, index) => (
+                  <Skeleton key={index} className="mx-auto size-5 rounded-md" />
+                ))}
+              </div>
+            </div>
             <div className="space-y-1.5">
               <Skeleton className="h-6 w-40 rounded-md" />
               <Skeleton className="h-4 w-full rounded-md" />

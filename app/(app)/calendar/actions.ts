@@ -286,7 +286,7 @@ async function reflowCue(
 
 /** Append the cue's name to a success message, when there is one. */
 const withCueNote = (message: string, cue: PlannedCue | null) =>
-  cue ? `${message} — with ${cue.title} before it.` : message;
+  cue ? `${message} ${cue.title} is scheduled before it.` : message;
 
 // ---------------------------------------------------------------- create/edit
 
@@ -534,7 +534,7 @@ export async function scheduleTask(
     return {
       status: "error",
       message: cue
-        ? `No free ${wanted}-minute gap left that day — ${task.title} needs room for ${cue.title} first. Move something, or make this one smaller.`
+        ? `No free ${wanted}-minute gap left that day. ${task.title} needs room for ${cue.title} first. Move something, or make this one smaller.`
         : `No free ${wanted}-minute gap left that day. Move something, or make this one smaller.`,
     };
   }

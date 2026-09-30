@@ -66,13 +66,13 @@ export function StepList({
               onClick={() => toggle(step)}
               aria-pressed={done}
               className={cn(
-                "focus-visible:ring-ring group flex w-full items-start gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none",
+                "focus-visible:ring-ring group flex w-full min-h-11 items-start gap-3 rounded-lg px-2 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none",
                 isNext ? "bg-accent/60 hover:bg-accent" : "hover:bg-muted/60",
               )}
             >
               <span
                 className={cn(
-                  "mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border transition-colors",
+                  "mt-0.5 grid size-[21px] shrink-0 place-items-center rounded-[7px] border transition-colors",
                   done
                     ? "border-primary bg-primary text-primary-foreground"
                     : isNext
@@ -101,14 +101,14 @@ export function StepList({
                   {step.title}
                 </span>
                 {isNext && index === 0 && (
-                  <span className="text-primary block text-micro">
+                  <span className="text-accent-foreground mt-1 block text-label">
                     Start here. Nothing else needs deciding yet.
                   </span>
                 )}
               </span>
 
               {step.estimatedSeconds ? (
-                <span className="text-muted-foreground shrink-0 text-micro tabular-nums">
+                <span className="text-muted-foreground shrink-0 font-mono text-micro tabular-nums">
                   {formatMinutes(step.estimatedSeconds)}
                 </span>
               ) : null}

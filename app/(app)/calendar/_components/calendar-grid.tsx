@@ -9,9 +9,11 @@ import {
   useState,
   useTransition,
 } from "react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import { Check, CornerDownRight, GripHorizontal, Play, X } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 
 import {
   BLOCK_MIN_HEIGHT_PX,
@@ -184,6 +186,7 @@ export function CalendarGrid({
   blocks,
   prayerBands,
   todayISO,
+  anchorISO,
   onCreate,
   onEdit,
   onDropItem,
@@ -194,6 +197,8 @@ export function CalendarGrid({
   /** Tinted prayer windows per day ISO — see lib/prayers.ts. */
   prayerBands: Record<string, PrayerBand[]>;
   todayISO: string;
+  /** The URL's selected date, also the initial day in the mobile week view. */
+  anchorISO: string;
   /** A slot was clicked or dragged into a span: open the editor on it. */
   onCreate: (
     dateISO: string,
@@ -206,7 +211,8 @@ export function CalendarGrid({
   onDropOnBlock: (item: PlanDragItem, block: CalendarBlock) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const scrolledRef = useRef(false);
+  const scrolledDayRef = useRef<string | null>(null);
+  const selectedDay = days.find((day) => day.dateISO === anchorISO) ?? days[0];
   const nowMinute = useContext(NowContext);
   const [, startTransition] = useTransition();
 
@@ -283,23 +289,25 @@ export function CalendarGrid({
   // means hunting down the afternoon. `nowMinute` is null for one frame after
   // mount (the same tick the now-line waits for), so this fires when it lands.
   useEffect(() => {
-    if (nowMinute === null || scrolledRef.current) return;
+    if (nowMinute === null || scrolledDayRef.current === selectedDay.dateISO) return;
     const container = scrollRef.current;
     if (!container) return;
-    scrolledRef.current = true;
+    scrolledDayRef.current = selectedDay.dateISO;
 
-    if (days.some((day) => day.dateISO === todayISO)) {
+    const desktopWeek = window.matchMedia("(min-width: 1024px)").matches && days.length > 1;
+    if (selectedDay.dateISO === todayISO || (desktopWeek && days.some((day) => day.dateISO === todayISO))) {
       container.scrollTop = Math.max(0, (nowMinute - 30) * MINUTE_PX);
       return;
     }
 
-    const earliest = blocks.length
-      ? Math.min(...blocks.map((block) => block.startMinute))
+    const selectedBlocks = blocks.filter((block) => block.dateISO === selectedDay.dateISO);
+    const earliest = selectedBlocks.length
+      ? Math.min(...selectedBlocks.map((block) => block.startMinute))
       : 8 * 60;
     container.scrollTop = Math.max(0, (Math.min(earliest, 8 * 60) - 30) * MINUTE_PX);
     // Only on mount: re-running this would yank the viewport away mid-edit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nowMinute]);
+  }, [nowMinute, selectedDay.dateISO]);
 
   const commit = (next: NonNullable<typeof drag>) => {
     const span = clampSpan(next.startMinute, next.endMinute);
@@ -358,28 +366,55 @@ export function CalendarGrid({
   };
 
   return (
-    <div className="border-border bg-card overflow-hidden rounded-xl border">
+    <div className="min-w-0 space-y-5">
+      {days.length > 1 && (
+        <nav aria-label="Choose a day in this week" className="grid auto-cols-[minmax(44px,1fr)] grid-flow-col gap-1 overflow-x-auto lg:hidden">
+          {days.map((day) => (
+            <Button
+              key={day.dateISO}
+              asChild
+              variant={day.dateISO === selectedDay.dateISO ? "secondary" : "ghost"}
+              className="h-auto min-h-16 min-w-0 flex-col gap-0.5 px-1 py-2"
+            >
+              <Link
+                href={`/calendar?view=week&date=${day.dateISO}`}
+                aria-current={day.dateISO === selectedDay.dateISO ? "date" : undefined}
+                aria-label={`${day.weekday}, ${day.label}${day.isToday ? ", today" : ""}`}
+              >
+                <span className="text-xs text-muted-foreground">{day.weekday}</span>
+                <span className="font-mono text-base tabular-nums">{dayNumber(day.dateISO)}</span>
+                {day.isToday && <span className="text-xs text-accent-foreground">Today</span>}
+              </Link>
+            </Button>
+          ))}
+        </nav>
+      )}
+
+      <div
+        className="border-border bg-card overflow-hidden rounded-[20px] border"
+        style={{ "--calendar-columns": `3.5rem repeat(${days.length}, minmax(0, 1fr))` } as CSSProperties}
+      >
       {/* Day headings, outside the scroller so they stay put. Each one carries
           a strip of its waking hours — the week's shape read at a glance, and
           the page's legend. */}
       <div
-        className="border-border bg-card/80 grid border-b backdrop-blur"
-        style={{ gridTemplateColumns: `3.5rem repeat(${days.length}, minmax(0, 1fr))` }}
+        className="border-border bg-card/80 grid grid-cols-[3.5rem_minmax(0,1fr)] border-b backdrop-blur lg:[grid-template-columns:var(--calendar-columns)]"
       >
         <div aria-hidden />
         {days.map((day, index) => (
           <div
             key={day.dateISO}
             className={cn(
-              "border-border/60 border-l px-2 pt-2 pb-1.5 text-center",
+              "border-border/40 border-l px-2 pt-3 pb-2 text-center",
+              day.dateISO !== selectedDay.dateISO && "hidden lg:block",
               day.isToday && "bg-accent/40",
             )}
           >
             <p
               className={cn(
-                "text-micro font-medium tracking-wider uppercase",
+                "text-label font-medium",
                 day.isToday
-                  ? "text-primary"
+                  ? "text-accent-foreground"
                   : isWeekend(day.dateISO)
                     ? "text-muted-foreground/70"
                     : "text-muted-foreground",
@@ -399,9 +434,10 @@ export function CalendarGrid({
                       ),
                 )}
               >
-                {dayNumber(day.dateISO)}
+              {dayNumber(day.dateISO)}
               </span>
             </p>
+            {day.isToday && <p className="mt-1 text-xs text-accent-foreground">Today</p>}
             <DayStrip
               blocks={blocksFor(day.dateISO)}
               isToday={day.dateISO === todayISO}
@@ -413,12 +449,11 @@ export function CalendarGrid({
 
       <div
         ref={scrollRef}
-        className="max-h-[68vh] overflow-y-auto overscroll-contain"
+        className="max-h-[min(68dvh,780px)] overflow-y-auto overscroll-contain"
       >
         <div
-          className="relative grid"
+          className="relative grid grid-cols-[3.5rem_minmax(0,1fr)] lg:[grid-template-columns:var(--calendar-columns)]"
           style={{
-            gridTemplateColumns: `3.5rem repeat(${days.length}, minmax(0, 1fr))`,
             height: MINUTES_PER_DAY * MINUTE_PX,
           }}
         >
@@ -432,6 +467,7 @@ export function CalendarGrid({
               prayerBands={prayerBands[day.dateISO] ?? []}
               isToday={day.dateISO === todayISO}
               dayView={days.length === 1}
+              selected={day.dateISO === selectedDay.dateISO}
               drag={drag}
               setDrag={setDrag}
               commit={commit}
@@ -446,6 +482,17 @@ export function CalendarGrid({
           ))}
         </div>
       </div>
+      </div>
+
+      <SelectedDayAgenda
+        day={selectedDay}
+        blocks={blocksFor(selectedDay.dateISO)}
+        onCreate={onCreate}
+        onEdit={onEdit}
+        onToggleDone={toggleDone}
+        onToggleTask={toggleTask}
+        onDropCue={dropCue}
+      />
     </div>
   );
 }
@@ -457,6 +504,129 @@ const isWeekend = (dateISO: string): boolean => {
   const day = new Date(`${dateISO}T00:00:00Z`).getUTCDay();
   return day === 0 || day === 6;
 };
+
+const KIND_LABELS: Record<CalendarBlock["kind"], string> = {
+  WORK: "Work",
+  RECOVERY: "Recovery",
+  BUFFER: "Buffer",
+  DAYDREAM: "Break",
+};
+
+/** A readable, full-size alternative to manipulating small timed blocks. */
+function SelectedDayAgenda({
+  day,
+  blocks,
+  onCreate,
+  onEdit,
+  onToggleDone,
+  onToggleTask,
+  onDropCue,
+}: {
+  day: GridDay;
+  blocks: CalendarBlock[];
+  onCreate: (dateISO: string, span: { startMinute: number; endMinute: number }) => void;
+  onEdit: (block: CalendarBlock) => void;
+  onToggleDone: (block: CalendarBlock) => void;
+  onToggleTask: (block: CalendarBlock, taskId: string) => void;
+  onDropCue: (block: CalendarBlock) => void;
+}) {
+  const sorted = [...blocks].sort((a, b) => a.startMinute - b.startMinute);
+
+  return (
+    <section className="space-y-4 lg:hidden" aria-label={`${day.label} agenda`}>
+      <header className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">{day.isToday ? "Today's agenda" : `${day.weekday}, ${day.label}`}</h2>
+          <p className="text-sm text-muted-foreground">Planned time</p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => onCreate(day.dateISO, spanOfLength(9 * 60, PLAN_DEFAULT_MINUTES))}
+          className="min-h-11"
+        >
+          Add block
+        </Button>
+      </header>
+
+      {sorted.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border p-5">
+          <p className="font-medium">Nothing planned</p>
+          <p className="mt-1 text-sm text-muted-foreground">Add a block, or choose a time in the grid above.</p>
+        </div>
+      ) : (
+        <ol className="space-y-3">
+          {sorted.map((block, index) => {
+            const done = block.completedAt !== null;
+            const cue = block.cueForId !== null;
+            const earlierPlans = sorted.slice(0, index).filter((previous) => previous.kind !== "DAYDREAM");
+            const previousEnd = earlierPlans.length === 0 ? null : Math.max(...earlierPlans.map((previous) => previous.endMinute));
+            const gap = previousEnd === null || block.kind === "DAYDREAM" ? 0 : block.startMinute - previousEnd;
+            return (
+              <li key={block.id}>
+                {gap > 0 && (
+                  <p className="mb-3 pl-4 font-mono text-xs text-muted-foreground tabular-nums">
+                    {formatSpanLength({ startMinute: 0, endMinute: gap })} open
+                  </p>
+                )}
+                <article className={cn("rounded-xl border p-4", KIND_STYLES[block.kind])}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-mono text-xs text-muted-foreground tabular-nums">
+                        {formatMinuteOfDay(block.startMinute)} - {formatMinuteOfDay(block.endMinute)}
+                      </p>
+                      <h3 className={cn("mt-1 text-base font-medium break-words", done && "text-muted-foreground line-through")}>{blockLabel(block)}</h3>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {cue ? "Cue" : KIND_LABELS[block.kind]}{done ? " · Completed" : ""}
+                      </p>
+                    </div>
+                    <Button variant="ghost" onClick={() => onEdit(block)} className="min-h-11" aria-label={`Details for ${blockLabel(block)}`}>
+                      Details
+                    </Button>
+                  </div>
+
+                  {block.tasks.length > 1 && (
+                    <ul className="mt-3 space-y-1 border-t border-current/10 pt-2">
+                      {block.tasks.map((task) => (
+                        <li key={task.id} className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-11"
+                            aria-label={`${task.doneAt ? "Untick" : "Tick off"} ${task.title} in this block`}
+                            aria-pressed={task.doneAt !== null}
+                            onClick={() => onToggleTask(block, task.id)}
+                          >
+                            <span className={cn("grid size-4 place-items-center rounded-[7px] border", task.doneAt ? "border-primary bg-primary text-primary-foreground" : "border-current/50")}>
+                              {task.doneAt && <Check className="size-3" aria-hidden />}
+                            </span>
+                          </Button>
+                          <span className={cn("min-w-0 flex-1 text-sm break-words", task.doneAt && "text-muted-foreground line-through")}>{task.title}</span>
+                          <TaskTimerLink task={task} minutes={spanMinutes(block)} done={task.doneAt !== null} roomy />
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {cue ? (
+                      <Button variant="ghost" className="min-h-11" onClick={() => onDropCue(block)}>Skip cue today</Button>
+                    ) : (
+                      <Button variant="ghost" className="min-h-11" onClick={() => onToggleDone(block)} aria-pressed={done}>
+                        <Check className="size-4" aria-hidden />
+                        {done ? "Undo completion" : "Mark done"}
+                      </Button>
+                    )}
+                    {!cue && block.tasks.length === 1 && <TaskTimerLink task={block.tasks[0]} minutes={spanMinutes(block)} done={done} roomy />}
+                  </div>
+                </article>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </section>
+  );
+}
 
 /**
  * The day as one thin bar, in the header of its column.
@@ -500,7 +670,7 @@ function DayStrip({
   return (
     <div
       aria-hidden
-      className="animate-draw relative mx-1 mt-1.5 h-1.5 origin-left"
+      className="relative mx-1 mt-1.5 h-1.5 origin-left"
       style={{ animationDelay: `${index * 40}ms` }}
     >
       <div className="bg-muted/60 absolute inset-0 rounded-full" />
@@ -583,7 +753,7 @@ function HourGutter() {
       {Array.from({ length: 24 }, (_, hour) => (
         <div
           key={hour}
-          className="text-muted-foreground absolute right-2 -translate-y-1/2 text-micro tabular-nums"
+          className="text-muted-foreground absolute right-2 -translate-y-1/2 font-mono text-xs tabular-nums"
           style={{ top: hour * 60 * MINUTE_PX }}
         >
           {hour === 0 ? "" : formatMinuteOfDay(hour * 60)}
@@ -599,6 +769,7 @@ function DayColumn({
   prayerBands,
   isToday,
   dayView,
+  selected,
   drag,
   setDrag,
   commit,
@@ -616,6 +787,7 @@ function DayColumn({
   isToday: boolean;
   /** The grid is showing exactly one day — the invitation may speak. */
   dayView: boolean;
+  selected: boolean;
   drag: {
     id: string;
     mode: "move" | "resize";
@@ -818,7 +990,8 @@ function DayColumn({
     <div
       ref={columnRef}
       className={cn(
-        "border-border/60 relative border-l",
+        "border-border/40 relative border-l",
+        !selected && "hidden lg:block",
         day.isToday && "bg-accent/30 ring-primary/15 ring-1 ring-inset",
       )}
       onDragOver={(event) => {
@@ -856,7 +1029,7 @@ function DayColumn({
           key={half}
           className={cn(
             "pointer-events-none absolute inset-x-0",
-            half % 2 === 0 ? "border-border/50 border-t" : "border-border/25 border-t",
+            half % 2 === 0 ? "border-border/40 border-t" : "border-border/15 border-t",
           )}
           style={{ top: half * 30 * MINUTE_PX }}
         />
@@ -921,7 +1094,7 @@ function DayColumn({
         >
           <p className="truncate text-label leading-4 font-medium">New block</p>
           <p className="text-muted-foreground text-micro tabular-nums">
-            {formatMinuteOfDay(creating.startMinute)} –{" "}
+            {formatMinuteOfDay(creating.startMinute)} -{" "}
             {formatMinuteOfDay(creating.endMinute)}
           </p>
         </div>
@@ -1023,6 +1196,7 @@ function DayColumn({
           onToggleDone={() => onToggleDone(block)}
           onToggleTask={(taskId) => onToggleTask(block, taskId)}
           onDropCue={() => onDropCue(block)}
+          onEdit={() => onEdit(block)}
         />
       ))}
     </div>
@@ -1063,7 +1237,7 @@ function DropPreview({
       >
         {crowded
           ? "no room to switch"
-          : `${formatMinuteOfDay(startMinute)} – ${formatMinuteOfDay(
+          : `${formatMinuteOfDay(startMinute)} - ${formatMinuteOfDay(
               startMinute + minutes,
             )}`}
       </p>
@@ -1107,24 +1281,39 @@ function TaskTimerLink({
   task,
   minutes,
   done,
+  roomy = false,
 }: {
   task: BlockTask;
   minutes: number;
   done: boolean;
+  roomy?: boolean;
 }) {
   if (done) return null;
 
+  const href = buildTimerHref({
+    id: task.id,
+    estimatedSeconds: minutes * 60,
+    defaultMode: toWorkMode(task.defaultMode),
+    plannedIntervals: task.plannedIntervals,
+  });
+
+  if (roomy) {
+    return (
+      <Button asChild variant="ghost" className="min-h-11 text-accent-foreground">
+        <Link href={href} aria-label={`Start a timer for ${task.title}`}>
+          <Play className="size-4" aria-hidden />
+          Start
+        </Link>
+      </Button>
+    );
+  }
+
   return (
     <Link
-      href={buildTimerHref({
-        id: task.id,
-        estimatedSeconds: minutes * 60,
-        defaultMode: toWorkMode(task.defaultMode),
-        plannedIntervals: task.plannedIntervals,
-      })}
+      href={href}
       aria-label={`Start a timer for ${task.title}`}
       onPointerDown={(event) => event.stopPropagation()}
-      className="text-muted-foreground/45 group-hover/row:text-primary focus-visible:text-primary shrink-0 transition-colors group-hover/row:opacity-100 focus-visible:opacity-100"
+      className="text-muted-foreground hover:text-accent-foreground focus-visible:text-accent-foreground focus-visible:ring-ring relative grid size-4 shrink-0 place-items-center rounded-md transition-colors before:absolute before:-inset-x-3 before:inset-y-0 focus-visible:ring-2 focus-visible:outline-none"
     >
       <Play className="size-3" aria-hidden />
     </Link>
@@ -1174,14 +1363,14 @@ function BlockTaskRow({
             ? `Untick ${task.title} in this block`
             : `Tick ${task.title} off in this block`
         }
-        title="Done in this block — the task itself stays open"
+        title="Done in this block. The task itself stays open."
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => {
           event.stopPropagation();
           onToggle();
         }}
         className={cn(
-          "grid size-3 shrink-0 place-items-center rounded-[3px] border transition-colors",
+          "focus-visible:ring-ring relative grid size-3 shrink-0 place-items-center rounded-[3px] border transition-colors before:absolute before:-inset-x-3 before:inset-y-0 focus-visible:ring-2 focus-visible:outline-none",
           done
             ? "border-primary bg-primary text-primary-foreground animate-pop"
             : "hover:border-current",
@@ -1204,7 +1393,7 @@ function BlockTaskRow({
 
       <span
         className={cn(
-          "min-w-0 flex-1 truncate text-label",
+          "min-w-0 flex-1 truncate text-label leading-4",
           done && "text-muted-foreground line-through",
         )}
       >
@@ -1226,6 +1415,7 @@ function BlockChip({
   onToggleDone,
   onToggleTask,
   onDropCue,
+  onEdit,
 }: {
   block: CalendarBlock;
   column: number;
@@ -1237,6 +1427,7 @@ function BlockChip({
   onToggleDone: () => void;
   onToggleTask: (taskId: string) => void;
   onDropCue: () => void;
+  onEdit: () => void;
 }) {
   const minutes = spanMinutes(block);
   const compact = minutes < COMPACT_MINUTES;
@@ -1297,7 +1488,8 @@ function BlockChip({
   // component at different heights.
   const heightPx = Math.max(BLOCK_MIN_HEIGHT_PX, minutes * MINUTE_PX - 2);
   const { fit, showMeta } = layoutBlockBody({
-    heightPx,
+    // Reserve a larger, separate footer target without changing time scale.
+    heightPx: compact ? heightPx : heightPx - 14,
     // A single-task block draws no list, so it must not make room for one.
     taskCount: multi ? block.tasks.length : 0,
     isCue,
@@ -1313,13 +1505,12 @@ function BlockChip({
   return (
     <div
       className={cn(
-        "group absolute z-10 flex flex-col overflow-hidden rounded-md border px-2 select-none",
+        "group focus-visible:ring-ring absolute z-10 flex flex-col overflow-hidden rounded-xl border px-2 select-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
         tight ? "py-0" : "py-1",
         "transition-shadow duration-150 hover:shadow-sm",
         // A task-coloured block sheds the kind's tint and the buffer's
         // dashed "empty on purpose" reading — it has a thing behind it now.
         tint ? "text-foreground" : KIND_STYLES[block.kind],
-        done && "opacity-55",
         // A cue is quieter than what it triggers, and only rounded at the top,
         // so the pair reads as one object with a seam rather than two blocks
         // that happen to touch. It is still a real block underneath — the styling
@@ -1336,6 +1527,16 @@ function BlockChip({
         width,
         left,
         ...tint,
+      }}
+      role="group"
+      tabIndex={0}
+      aria-label={`${label}. ${KIND_LABELS[block.kind]}, ${formatMinuteOfDay(block.startMinute)} to ${formatMinuteOfDay(block.endMinute)}${done ? ", completed" : ""}. Press Enter for details.`}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onEdit();
+        }
       }}
       onPointerDown={(event) => onPointerDown(event, "move")}
     >
@@ -1357,7 +1558,7 @@ function BlockChip({
               event.stopPropagation();
               onDropCue();
             }}
-            className="text-muted-foreground hover:text-destructive shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+            className="text-muted-foreground hover:text-destructive focus-visible:ring-ring relative grid size-4 shrink-0 place-items-center rounded-md before:absolute before:-inset-x-3 before:-inset-y-2 focus-visible:ring-2 focus-visible:outline-none"
           >
             <X className="size-3" aria-hidden />
           </button>
@@ -1382,7 +1583,7 @@ function BlockChip({
                 onToggleDone();
               }}
               className={cn(
-                "mt-0.5 grid size-3.5 shrink-0 place-items-center rounded-full border transition-colors",
+                "focus-visible:ring-ring relative mt-0.5 grid size-3.5 shrink-0 place-items-center rounded-full border transition-colors before:absolute before:-inset-x-3 before:inset-y-0 focus-visible:ring-2 focus-visible:outline-none",
                 compact && "mt-0",
                 done
                   ? "border-primary bg-primary text-primary-foreground animate-pop"
@@ -1499,9 +1700,20 @@ function BlockChip({
           and a two-hour block holding two things genuinely has room left in it;
           the pinned stamp is what turns that from an accident into a fact. */}
       {showMeta && (
-        <p className="text-muted-foreground mt-auto shrink-0 pt-0.5 text-micro tabular-nums">
-          {formatMinuteOfDay(block.startMinute)} · {formatSpanLength(block)}
-        </p>
+        <div className="mt-auto flex min-h-7 shrink-0 items-center justify-between gap-1 pt-0.5">
+          <p className="text-muted-foreground min-w-0 truncate font-mono text-micro leading-[14px] tabular-nums">
+            {KIND_LABELS[block.kind]} {formatMinuteOfDay(block.startMinute)} · {formatSpanLength(block)}
+          </p>
+          <button
+            type="button"
+            aria-label={`Details for ${label}`}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={onEdit}
+            className="text-accent-foreground focus-visible:ring-ring relative shrink-0 rounded-sm text-micro leading-4 font-medium before:absolute before:-inset-x-1 before:-inset-y-1.5 hover:underline focus-visible:ring-2 focus-visible:outline-none"
+          >
+            Details
+          </button>
+        </div>
       )}
 
       {/* Resize handle. Only appears on hover, so it never competes with the
@@ -1511,12 +1723,15 @@ function BlockChip({
           dragging it would either overlap what it cues or open a gap — both of
           which break the adjacency that makes it a cue. Change the length on the
           habit instead. */}
-      {!isCue && (
+      {!isCue && heightPx >= 44 && (
         <button
           type="button"
           aria-label={`Change the length of ${label}`}
           onPointerDown={(event) => onPointerDown(event, "resize")}
-          className="absolute inset-x-0 bottom-0 flex h-2 cursor-ns-resize items-center justify-center opacity-0 transition-opacity group-hover:opacity-60 focus-visible:opacity-100"
+          onClick={(event) => {
+            if (event.detail === 0) onEdit();
+          }}
+          className="focus-visible:ring-ring absolute left-1 bottom-0 flex h-3 w-11 cursor-ns-resize items-end justify-center rounded-md opacity-50 transition-opacity before:absolute before:inset-x-0 before:bottom-0 before:h-7 group-hover:opacity-100 focus-visible:ring-2 focus-visible:opacity-100 focus-visible:outline-none"
         >
           <GripHorizontal className="size-3" aria-hidden />
         </button>

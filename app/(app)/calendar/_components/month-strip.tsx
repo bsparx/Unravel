@@ -50,12 +50,12 @@ export function MonthStrip({
   ].map((day) => day.short);
 
   return (
-    <section className="border-border bg-card rounded-lg border">
+    <section className="border-border bg-card rounded-[20px] border">
       <header className="flex items-center justify-between gap-2 px-3 pt-3">
         <Link
           href={`/calendar?view=day&date=${toISODate(addMonths(month, -1))}`}
           aria-label="Previous month"
-          className="focus-visible:ring-ring text-muted-foreground hover:text-foreground rounded-md p-1 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          className="focus-visible:ring-ring text-muted-foreground hover:text-foreground grid size-11 place-items-center rounded-[10px] transition-colors focus-visible:ring-2 focus-visible:outline-none"
         >
           <ChevronLeft className="size-4" aria-hidden />
         </Link>
@@ -63,7 +63,7 @@ export function MonthStrip({
         <Link
           href={`/calendar?view=day&date=${toISODate(addMonths(month, 1))}`}
           aria-label="Next month"
-          className="focus-visible:ring-ring text-muted-foreground hover:text-foreground rounded-md p-1 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          className="focus-visible:ring-ring text-muted-foreground hover:text-foreground grid size-11 place-items-center rounded-[10px] transition-colors focus-visible:ring-2 focus-visible:outline-none"
         >
           <ChevronRight className="size-4" aria-hidden />
         </Link>
@@ -91,16 +91,17 @@ export function MonthStrip({
             <Link
               key={iso}
               href={`/calendar?view=day&date=${iso}`}
-              aria-label={toISODate(date)}
+              aria-label={`${toISODate(date)}${isToday ? ", today" : ""}${hasBlocks ? ", has planned time" : ""}`}
+              aria-current={isAnchor ? "date" : undefined}
               className={cn(
-                "focus-visible:ring-ring relative mx-auto grid size-7 place-items-center rounded-full text-label tabular-nums transition-colors focus-visible:ring-2 focus-visible:outline-none",
+                "focus-visible:ring-ring relative mx-auto grid h-11 w-9 max-w-full place-items-center rounded-[10px] text-label tabular-nums transition-colors focus-visible:ring-2 focus-visible:outline-none",
                 isToday
                   ? "bg-primary text-primary-foreground font-medium"
                   : isAnchor
                     ? "bg-accent text-foreground font-medium"
                     : inMonth
                       ? "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-                      : "text-muted-foreground/35 hover:bg-accent/40",
+                      : "text-muted-foreground hover:bg-accent/40",
               )}
             >
               {date.getUTCDate()}

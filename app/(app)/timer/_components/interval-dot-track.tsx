@@ -16,13 +16,11 @@ export type IntervalDotTrackProps = {
 
 /**
  * Spatial progression bar for multi-block Pomodoro sessions.
- * Visualizes the sequence of focus intervals and breaks at a glance,
- * giving ADHD users a clear, dopamine-rich sense of progress.
+ * Shows the sequence of focus intervals and breaks without ambient motion.
  */
 export function IntervalDotTrack({
   plan,
   intervalIndex,
-  running,
   idle,
   onBreak,
   className,
@@ -39,27 +37,26 @@ export function IntervalDotTrack({
     .filter((interval) => interval.kind === "FOCUS").length;
 
   const currentFocusIndex = Math.max(0, activeFocusCount - 1);
-  const currentInterval = plan[Math.min(intervalIndex, plan.length - 1)];
 
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center gap-2",
+        "flex w-full flex-col items-center justify-center gap-2",
         className,
       )}
       role="region"
       aria-label={`Pomodoro intervals: block ${idle ? 1 : activeFocusCount} of ${focusBlocks.length}`}
     >
-      <div className="flex items-center gap-2 sm:gap-2.5">
+      <div className="max-w-full overflow-x-auto p-1">
+      <div className="flex w-max items-center gap-2 sm:gap-2.5">
         {focusBlocks.map((block, idx) => {
           const isDone = !idle && idx < currentFocusIndex;
           const isCurrent = !idle && idx === currentFocusIndex && !onBreak;
           const isBreakAfterThis =
             !idle && idx === currentFocusIndex && onBreak;
-          const isUpcoming = idle || idx > currentFocusIndex;
 
           return (
-            <div key={block.index} className="flex items-center gap-2 sm:gap-2.5">
+            <div key={block.index} className="flex shrink-0 items-center gap-2 sm:gap-2.5">
               {/* Focus Block Indicator */}
               <div
                 className={cn(
@@ -70,7 +67,7 @@ export function IntervalDotTrack({
                     : "size-6",
                   // Colors
                   isDone
-                    ? "bg-primary/15 text-primary border border-primary/30"
+                    ? "bg-primary/15 text-accent-foreground border border-primary/30"
                     : isCurrent
                       ? "bg-running text-running-foreground font-mono text-xs font-semibold"
                       : isBreakAfterThis
@@ -83,11 +80,11 @@ export function IntervalDotTrack({
                   <Check className="size-3 stroke-[2.5]" aria-hidden />
                 ) : isCurrent ? (
                   <>
-                    <span className="size-1.5 rounded-full bg-white animate-pulse" />
-                    <span className="text-[0.6875rem]">#{idx + 1}</span>
+                    <span className="size-1.5 rounded-full bg-current" />
+                    <span className="text-micro">#{idx + 1}</span>
                   </>
                 ) : (
-                  <span className="font-mono text-[0.625rem] font-medium">
+                  <span className="font-mono text-micro font-medium">
                     {idx + 1}
                   </span>
                 )}
@@ -102,13 +99,13 @@ export function IntervalDotTrack({
                       isDone
                         ? "bg-primary/40"
                         : isBreakAfterThis
-                          ? "bg-destructive/60 animate-pulse"
+                          ? "bg-rest/60"
                           : "bg-border/60",
                     )}
                   />
                   {isBreakAfterThis && (
                     <Coffee
-                      className="size-3 text-destructive animate-bounce"
+                      className="size-3 text-rest"
                       aria-label="On break"
                     />
                   )}
@@ -119,8 +116,10 @@ export function IntervalDotTrack({
         })}
       </div>
 
+      </div>
+
       {/* Micro legend */}
-      <p className="font-mono text-micro text-muted-foreground/70 tracking-tight">
+      <p className="font-mono text-micro text-muted-foreground tracking-tight">
         {idle
           ? `${focusBlocks.length} blocks · ${formatDuration(focusBlocks[0]?.targetSeconds ?? 1500)} each`
           : onBreak

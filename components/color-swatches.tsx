@@ -4,6 +4,7 @@ import {
   type CalendarColor,
 } from "@/lib/calendar-colors";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 /**
  * The twenty calendar hues as a swatch row — the same picker everywhere a
@@ -20,20 +21,23 @@ export function ColorSwatches({
   return (
     <div className="flex flex-wrap gap-1.5">
       {CALENDAR_COLOR_NAMES.map((option) => (
-        <button
+        <Button
           key={option}
           type="button"
+          variant="ghost"
+          size="icon"
           onClick={() => onChange(option)}
           aria-pressed={value === option}
           aria-label={`${option} colour`}
           title={option}
-          className={cn(
-            "focus-visible:ring-ring size-6 rounded-full border border-black/10 transition-transform focus-visible:ring-2 focus-visible:outline-none",
-            value === option &&
-              "ring-foreground/30 ring-offset-background scale-110 ring-2 ring-offset-2",
-          )}
-          style={{ backgroundColor: CALENDAR_COLORS[option] }}
-        />
+          className="size-11"
+        >
+          <span
+            aria-hidden
+            className={cn("size-6 rounded-full border border-black/10", value === option && "ring-accent-foreground ring-2 ring-offset-2 ring-offset-background")}
+            style={{ backgroundColor: CALENDAR_COLORS[option] }}
+          />
+        </Button>
       ))}
     </div>
   );

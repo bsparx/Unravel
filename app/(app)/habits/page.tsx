@@ -1,9 +1,7 @@
 import Link from "next/link";
 import {
-  Archive,
   BarChart3,
   NotebookPen,
-  Pencil,
   Plus,
   Repeat,
   Timer,
@@ -39,6 +37,7 @@ import { HabitCard } from "./_components/habit-card";
 import { HabitCueLine, HabitStackTrail } from "./_components/habit-cue-line";
 import { HabitFeedbackButton } from "./_components/habit-feedback-button";
 import { HabitGrid } from "./_components/habit-grid";
+import { HabitMoreMenu } from "./_components/habit-more-menu";
 
 export const metadata = { title: "Habits" };
 
@@ -49,6 +48,10 @@ export default async function HabitsPage() {
 
   const active = habits.filter((habit) => habit.archivedAt === null);
   const archived = habits.filter((habit) => habit.archivedAt !== null);
+  const groups = [
+    { title: "Due today", habits: active.filter((habit) => isDueOn(habit.rule, today)) },
+    { title: "Other days", habits: active.filter((habit) => !isDueOn(habit.rule, today)) },
+  ];
 
   // The note dialog's spread: every active habit and today's note, so the
   // one being written sits among its siblings on the left page.
@@ -81,17 +84,17 @@ export default async function HabitsPage() {
 
     return [
       ...(rootLabel ? [rootLabel] : []),
-      ...ids.map((id) => titleById.get(id) ?? "—"),
+      ...ids.map((id) => titleById.get(id) ?? "Untitled habit"),
     ];
   };
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-5 py-8 md:px-8 md:py-12">
-      <header className="mb-8 flex items-end justify-between gap-4">
+    <div className="mx-auto w-full max-w-5xl px-4 py-8 md:px-8 md:py-12">
+      <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-display">Habits</h1>
           <p className="text-muted-foreground mt-1 text-label">
-            Recurring things. They only appear on the days you chose.
+            Your minimum action is enough to complete the day.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -104,7 +107,7 @@ export default async function HabitsPage() {
           <Button asChild size="sm">
             <Link href="/habits/new">
               <Plus className="size-4" aria-hidden />
-              Add
+              Add habit
             </Link>
           </Button>
         </div>
@@ -114,7 +117,7 @@ export default async function HabitsPage() {
         <EmptyState
           icon={Repeat}
           title="No habits yet"
-          description="A habit is anything you want to come back to on a schedule — daily, weekdays, or whichever days you pick."
+          description="A habit is anything you want to come back to on a schedule: daily, weekdays, or whichever days you pick."
           action={
             <Button asChild size="sm">
               <Link href="/habits/new">Add a habit</Link>
@@ -122,149 +125,157 @@ export default async function HabitsPage() {
           }
         />
       ) : (
-        <ul className="space-y-2">
-          {active.map((habit) => {
-            const missedYesterday = wasMissedOn(
-              habit.rule,
-              habit.history,
-              addDays(today, -1),
-            );
-            const expected = expectedDatesBetween(
-              habit.rule,
-              addDays(today, -55),
-              today,
-            ).length;
-            const done = [...habit.history.values()].filter(
-              (status) => status === "DONE",
-            ).length;
-            const adherence =
-              expected > 0 ? Math.round((done / expected) * 100) : 0;
+        <div className="space-y-10">
+          {groups.map((group) => (
+            (group.title === "Due today" || group.habits.length > 0) && (
+              <section key={group.title} aria-labelledby={`habits-${group.title === "Due today" ? "today" : "other"}`}>
+                <div className="mb-4">
+                  <h2 id={`habits-${group.title === "Due today" ? "today" : "other"}`} className="font-sans text-heading font-semibold">
+                    {group.title}
+                    <span className="text-muted-foreground ml-3 text-label font-normal tabular-nums">{group.habits.length}</span>
+                  </h2>
+                  {group.title === "Other days" && (
+                    <p className="text-muted-foreground mt-1 text-label">Outside today&apos;s schedule. You can still check in.</p>
+                  )}
+                </div>
+                {group.habits.length === 0 ? (
+                  <p className="border-border bg-card rounded-[1.25rem] border p-6 text-muted-foreground">Nothing due today. Your other habits are below.</p>
+                ) : (
+                  <ul className="space-y-4">
+                    {group.habits.map((habit) => {
+                      const missedYesterday = wasMissedOn(
+                        habit.rule,
+                        habit.history,
+                        addDays(today, -1),
+                      );
+                      const expectedDates = expectedDatesBetween(
+                        habit.rule,
+                        addDays(today, -55),
+                        today,
+                      );
+                      const expected = expectedDates.length;
+                      const done = expectedDates.filter(
+                        (date) => habit.history.get(toISODate(date)) === "DONE",
+                      ).length;
+                      const adherence =
+                        expected > 0 ? Math.round((done / expected) * 100) : 0;
 
-            return (
-              <HabitCard
-                key={habit.id}
-                name={habit.title}
-                adherence={adherence}
-                cue={habit.cue ? <HabitCueLine cue={habit.cue} /> : null}
-                title={
-                  <div className="flex min-w-0 items-center gap-2">
-                    <Button asChild variant="outline" size="sm" className="shrink-0">
-                      <Link href={`/habits/${habit.id}/log`}>
-                        <NotebookPen className="size-3.5" aria-hidden />
-                        Log
-                      </Link>
-                    </Button>
-                    <Link
-                      href={buildTimerHref({
-                        id: habit.id,
-                        estimatedSeconds: habit.estimatedSeconds,
-                        defaultMode: habit.defaultMode,
-                        plannedIntervals: habit.plannedIntervals,
-                      })}
-                      className="focus-visible:ring-ring hover:text-primary font-display min-w-0 truncate rounded text-title focus-visible:ring-2 focus-visible:outline-none"
-                    >
-                      {habit.title}
-                    </Link>
-                  </div>
-                }
-                actions={
-                  <>
-                    <Button asChild variant="ghost" size="icon">
-                      <Link
-                        href={`/habits/${habit.id}`}
-                        aria-label={`Edit ${habit.title}`}
-                      >
-                        <Pencil className="size-4" aria-hidden />
-                      </Link>
-                    </Button>
-                    <form action={archiveHabit}>
-                      <input type="hidden" name="taskId" value={habit.id} />
-                      <Button
-                        type="submit"
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Archive ${habit.title}`}
-                      >
-                        <Archive className="size-4" aria-hidden />
-                      </Button>
-                    </form>
-                  </>
-                }
-                day={
-                  <div className="space-y-1.5">
-                    <HabitDayControl
-                      taskId={habit.id}
-                      dateISO={toISODate(today)}
-                      bar={habit.bar}
-                      progress={habit.today.progress}
-                      done={habit.history.get(toISODate(today)) === "DONE"}
-                      label={habit.title}
-                      identities={habit.identities.map((identity) => identity.name)}
-                    />
-                    {habit.requiresFeedback &&
-                      isDueOn(habit.rule, today) &&
-                      !habit.history.get(toISODate(today)) &&
-                      showedUp(habit.today) &&
-                      !habit.todayNote && (
-                        <HabitFeedbackButton
-                          taskId={habit.id}
-                          title={habit.title}
-                          dateISO={todayISO}
-                          dateLabel={formatDateWithWeekday(today)}
-                          prompt={habit.feedbackPrompt}
-                          dayIndex={dayIndex}
-                        />
-                      )}
-                  </div>
-                }
-                meta={
-                  <>
-                    <HabitStackTrail steps={stackTrail(habit.id)} />
-                    <p className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-label">
-                      {habit.identities.map((identity) => (
-                        <span
-                          key={identity.id}
-                          className="border-border rounded-full border px-2 py-0.5 text-micro"
+                      return (
+                        <HabitCard
+                          key={habit.id}
+                          name={habit.title}
+                          adherence={adherence}
+                          cue={habit.cue ? <HabitCueLine cue={habit.cue} /> : null}
+                          id={`habit-${habit.id}`}
+                          title={<h3 className="font-sans text-title font-semibold leading-snug">{habit.title}</h3>}
+                          actions={
+                            <>
+                              <Button asChild variant="outline" size="sm" className="min-h-11 gap-1.5">
+                                <Link
+                                  href={buildTimerHref({
+                                    id: habit.id,
+                                    estimatedSeconds: habit.estimatedSeconds,
+                                    defaultMode: habit.defaultMode,
+                                    plannedIntervals: habit.plannedIntervals,
+                                  })}
+                                  aria-label={`Start ${habit.title}`}
+                                >
+                                  <Timer className="size-4" aria-hidden />
+                                  Start
+                                </Link>
+                              </Button>
+                              <HabitMoreMenu taskId={habit.id} name={habit.title} />
+                            </>
+                          }
+                          day={
+                            <div className="space-y-1.5">
+                              <HabitDayControl
+                                prominent
+                                taskId={habit.id}
+                                dateISO={toISODate(today)}
+                                bar={habit.bar}
+                                progress={habit.today.progress}
+                                done={habit.history.get(toISODate(today)) === "DONE"}
+                                label={habit.title}
+                                identities={habit.identities.map((identity) => identity.name)}
+                              />
+                              {habit.requiresFeedback &&
+                                isDueOn(habit.rule, today) &&
+                                !habit.history.get(toISODate(today)) &&
+                                showedUp(habit.today) &&
+                                !habit.todayNote && (
+                                  <HabitFeedbackButton
+                                    taskId={habit.id}
+                                    title={habit.title}
+                                    dateISO={todayISO}
+                                    dateLabel={formatDateWithWeekday(today)}
+                                    prompt={habit.feedbackPrompt}
+                                    dayIndex={dayIndex}
+                                  />
+                                )}
+                            </div>
+                          }
+                          meta={
+                            <>
+                              <div className="flex flex-wrap items-center justify-between gap-3">
+                                <HabitStackTrail steps={stackTrail(habit.id)} />
+                                <Button asChild variant="outline" size="sm" className="min-h-11">
+                                  <Link href={`/habits/${habit.id}/log`} aria-label={`Open the log for ${habit.title}`}>
+                                    <NotebookPen className="size-4" aria-hidden />
+                                    Log
+                                  </Link>
+                                </Button>
+                              </div>
+                              <p className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-label">
+                                {habit.identities.map((identity) => (
+                                  <span
+                                    key={identity.id}
+                                    className="border-border rounded-full border px-2 py-0.5 text-micro"
+                                  >
+                                    {identity.name}
+                                  </span>
+                                ))}
+                                <span>{describeRecurrence(habit.daysOfWeek)}</span>
+                                <span>{describeSlots(habit.slots)}</span>
+                                <span>{describeBar(habit.bar)}</span>
+                                {habit.estimatedSeconds ? (
+                                  <span className="inline-flex items-center gap-1 tabular-nums">
+                                    <Timer className="size-3" aria-hidden />
+                                    {formatMinutes(habit.estimatedSeconds)}
+                                  </span>
+                                ) : null}
+                                {missedYesterday && <MissedYesterdayBadge />}
+                              </p>
+                            </>
+                          }
                         >
-                          {identity.name}
-                        </span>
-                      ))}
-                      <span>{describeRecurrence(habit.daysOfWeek)}</span>
-                      <span>{describeSlots(habit.slots)}</span>
-                      <span>{describeBar(habit.bar)}</span>
-                      {habit.estimatedSeconds ? (
-                        <span className="inline-flex items-center gap-1 tabular-nums">
-                          <Timer className="size-3" aria-hidden />
-                          {formatMinutes(habit.estimatedSeconds)}
-                        </span>
-                      ) : null}
-                      {missedYesterday && <MissedYesterdayBadge />}
-                    </p>
-                  </>
-                }
-              >
-                <HabitGrid
-                  rule={habit.rule}
-                  history={habit.history}
-                  wentBeyond={habit.wentBeyond}
-                  today={today}
-                />
-              </HabitCard>
-            );
-          })}
-        </ul>
+                          <HabitGrid
+                            rule={habit.rule}
+                            history={habit.history}
+                            wentBeyond={habit.wentBeyond}
+                            today={today}
+                          />
+                        </HabitCard>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
+            )
+          ))}
+        </div>
       )}
 
       {archived.length > 0 && (
         <section className="mt-10">
-          <h2 className="text-micro text-muted-foreground mb-2 font-sans font-medium tracking-wider uppercase">
+          <h2 className="text-muted-foreground mb-4 font-sans text-heading font-semibold">
             Archived
           </h2>
           <ul className="space-y-1">
             {archived.map((habit) => (
               <li
                 key={habit.id}
-                className="text-muted-foreground flex items-center justify-between gap-4 text-label"
+                className="text-muted-foreground flex flex-wrap items-center justify-between gap-2 py-2 text-label"
               >
                 <span className="truncate">{habit.title}</span>
                 <div className="flex shrink-0 items-center gap-1">

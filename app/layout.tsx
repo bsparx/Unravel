@@ -19,8 +19,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#faf7f2" },
-    { media: "(prefers-color-scheme: dark)", color: "#14120f" },
+    { media: "(prefers-color-scheme: light)", color: "#f7f2fb" },
+    { media: "(prefers-color-scheme: dark)", color: "#060a19" },
   ],
 };
 
@@ -45,7 +45,7 @@ export default function RootLayout({
         {/* Clerk 7 + Next 16: ClerkProvider goes inside <body>, not around <html>. */}
         <ClerkProvider>
           <TooltipProvider delayDuration={300}>{children}</TooltipProvider>
-          <Toaster position="bottom-center" />
+          <Toaster position="top-center" />
         </ClerkProvider>
       </body>
     </html>

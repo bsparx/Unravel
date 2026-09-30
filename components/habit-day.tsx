@@ -2,9 +2,11 @@
 
 import { useOptimistic, useTransition } from "react";
 import { Check, Clock, CornerDownRight, Minus, Plus } from "lucide-react";
+import { toast } from "sonner";
 
 import { logHabitProgress, toggleHabitForDate } from "@/app/(app)/habits/actions";
 import { TaskCheckbox } from "@/components/task-checkbox";
+import { Button } from "@/components/ui/button";
 import {
   claimDone,
   formatLogged,
@@ -29,6 +31,7 @@ export function HabitDayLine({
   done,
   identities,
   className,
+  prominent = false,
 }: {
   bar: HabitBar;
   /** Today's optional log, in the habit's own unit. */
@@ -38,36 +41,42 @@ export function HabitDayLine({
   /** Names of the identities this habit is a vote for. */
   identities?: string[];
   className?: string;
+  /** Give the minimum promise the first read on a habit's own card. */
+  prominent?: boolean;
 }) {
   return (
     <span
       className={cn(
         "mt-0.5 flex flex-wrap items-baseline gap-x-2 text-label",
+        prominent && "min-w-0 flex-1 flex-col items-start gap-y-1 text-body",
         className,
       )}
     >
       <span
         className={cn(
-          "flex min-w-0 items-center gap-1.5",
-          done ? "text-muted-foreground" : "text-primary",
+          "flex min-w-0 items-start gap-1.5",
+          prominent && "w-full",
+          done ? "text-muted-foreground" : prominent ? "text-foreground font-medium" : "text-accent-foreground",
         )}
       >
-        {done ? (
+        {!prominent && (done ? (
           <Check className="size-3 shrink-0" aria-hidden />
         ) : (
           <CornerDownRight className="size-3 shrink-0" aria-hidden />
-        )}
-        <span className="truncate">
-          {done ? claimDone(bar.minimalTask) : bar.minimalTask}
+        ))}
+        <span className={prominent ? "min-w-0 break-words leading-relaxed" : "truncate"}>
+          {done ? claimDone(bar.minimalTask).replace(" — ", ": ") : bar.minimalTask}
         </span>
-        {!done && (
+        {!done && !prominent && (
           <span className="text-muted-foreground shrink-0">
-            — that&apos;s the day
+            (that&apos;s the day)
           </span>
         )}
       </span>
 
-      {progress > 0 && (
+      {prominent && !done && <span className="text-muted-foreground text-label font-normal">This is enough for today.</span>}
+
+      {progress > 0 && !prominent && (
         <span className="text-muted-foreground shrink-0 tabular-nums">
           · {formatLogged(progress, bar.unit)}
           {done ? " extra" : " logged"}
@@ -100,6 +109,7 @@ export function HabitDayControl({
   label,
   identities,
   onLogTime,
+  prominent = false,
 }: {
   taskId: string;
   dateISO: string;
@@ -111,12 +121,12 @@ export function HabitDayControl({
   identities?: string[];
   /**
    * Open a manual time log. Only offered for MINUTES habits, and only where a
-   * dialog lives (the day list). Elsewhere the timer is the door — the card's
-   * title already opens it.
+   * dialog lives (the day list). Elsewhere the named Start action opens the timer.
    */
   onLogTime?: () => void;
+  prominent?: boolean;
 }) {
-  const [, startTransition] = useTransition();
+  const [pending, startTransition] = useTransition();
   const [shown, applyDelta] = useOptimistic(progress, (current, delta: number) =>
     Math.max(0, current + delta),
   );
@@ -128,7 +138,11 @@ export function HabitDayControl({
       formData.set("taskId", taskId);
       formData.set("date", dateISO);
       formData.set("increment", String(delta));
-      await logHabitProgress(formData);
+      try {
+        await logHabitProgress(formData);
+      } catch {
+        toast.error("The extra could not be logged. Try again.");
+      }
     });
   };
 
@@ -139,6 +153,42 @@ export function HabitDayControl({
     formData.set("done", String(next));
     return toggleHabitForDate(formData);
   };
+
+  if (prominent) {
+    return (
+      <div className="space-y-4" aria-busy={pending}>
+        <div className="flex items-start gap-3 py-1">
+          <TaskCheckbox done={done} label={label} onToggle={toggle} className="mt-1.5" />
+          <HabitDayLine bar={bar} progress={shown} done={done} identities={identities} prominent />
+        </div>
+        <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 pl-8 text-label">
+          <span className="min-w-0 flex-1" aria-live="polite">
+            Optional extra{shown > 0 ? `: ${formatLogged(shown, bar.unit)}` : ""}
+          </span>
+          {bar.unit === "COUNT" ? (
+            <div className="flex shrink-0 items-center gap-1">
+              <StepButton label={`Remove one from the optional log for ${label}`} onClick={() => step(-1)} disabled={pending || shown === 0}>
+                <Minus className="size-4" aria-hidden />
+              </StepButton>
+              <StepButton label={`Add one to the optional log for ${label}`} onClick={() => step(1)} disabled={pending}>
+                <Plus className="size-4" aria-hidden />
+              </StepButton>
+            </div>
+          ) : onLogTime ? (
+            <Button type="button" variant="ghost" size="sm" onClick={onLogTime} aria-label={`Log time for ${label}`}>
+              <Clock className="size-4" aria-hidden />
+              Log time
+            </Button>
+          ) : (
+            <span className="inline-flex items-center gap-1.5">
+              <Clock className="size-3.5" aria-hidden />
+              From the timer
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-start gap-2">
@@ -155,23 +205,25 @@ export function HabitDayControl({
 
       {bar.unit === "COUNT" ? (
         <div className="flex shrink-0 items-center gap-0.5">
-          <StepButton label="One less" onClick={() => step(-1)} disabled={shown === 0}>
+          <StepButton label={`One less for ${label}`} onClick={() => step(-1)} disabled={pending || shown === 0}>
             <Minus className="size-3.5" aria-hidden />
           </StepButton>
-          <StepButton label="One more" onClick={() => step(1)}>
+          <StepButton label={`One more for ${label}`} onClick={() => step(1)} disabled={pending}>
             <Plus className="size-3.5" aria-hidden />
           </StepButton>
         </div>
       ) : onLogTime ? (
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon"
           onClick={onLogTime}
-          className="text-muted-foreground hover:text-foreground hover:border-primary/50 border-border focus-visible:ring-ring shrink-0 rounded-full border p-1 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          className="text-muted-foreground shrink-0"
           aria-label={`Log time for ${label}`}
           title="Log time"
         >
           <Clock className="size-3.5" aria-hidden />
-        </button>
+        </Button>
       ) : (
         <span
           className="text-muted-foreground shrink-0"
@@ -196,14 +248,16 @@ function StepButton({
   children: React.ReactNode;
 }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="outline"
+      size="icon"
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className="border-border text-muted-foreground hover:text-foreground hover:border-primary/50 focus-visible:ring-ring rounded-full border p-1 transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-30"
+      className="border-border text-muted-foreground min-h-11 min-w-11"
     >
       {children}
-    </button>
+    </Button>
   );
 }

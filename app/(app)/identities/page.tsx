@@ -10,9 +10,8 @@ export const metadata = { title: "Identities" };
  * Who you are becoming.
  *
  * The identity layer's home: the identities themselves, their statements, the
- * habits that vote for them, and the tally for the last 30 days — what each
- * identity got, and which are going hungry. Management happens in dialogs on
- * this one screen; the reinforcement numbers come from the same pure tally
+ * habits that vote for them, and the tally for the last 30 days. Management
+ * happens in dialogs on this screen; the numbers come from the same pure tally
  * `/habits/stats` shows.
  */
 export default async function IdentitiesPage() {
@@ -36,15 +35,21 @@ export default async function IdentitiesPage() {
   const unlinked = stats.allHabits.filter(
     (habit) => !habit.archived && !linkedIds.has(habit.id),
   );
+  const pendingHabitIds = stats.habits
+    .filter((habit) =>
+      !habit.archived && habit.days.some(
+        (day) => day.dateISO === stats.toISO && day.outcome === "PENDING",
+      ),
+    )
+    .map((habit) => habit.id);
 
   return (
     <div className="mx-auto w-full max-w-4xl px-5 py-8 md:px-8 md:py-12">
       <header className="mb-8">
         <h1 className="text-display">Identities</h1>
-        <p className="text-muted-foreground mt-1 max-w-prose text-label">
-          Who you are becoming. Every habit kept is a vote for one of these —
-          this is the tally for the last 30 days: how many votes each one got,
-          and which ones are going hungry.
+        <p className="text-muted-foreground mt-2 max-w-prose text-body">
+          Who you are becoming, practised in small ways. Every habit minimum
+          you keep is a vote for an identity.
         </p>
       </header>
 
@@ -53,6 +58,7 @@ export default async function IdentitiesPage() {
         focus={focus}
         habits={stats.allHabits}
         unlinked={unlinked}
+        pendingHabitIds={pendingHabitIds}
       />
     </div>
   );

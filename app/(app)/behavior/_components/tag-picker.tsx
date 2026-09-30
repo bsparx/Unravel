@@ -75,9 +75,9 @@ export function TagPicker({
               type="button"
               onClick={() => onChange(tag.id)}
               aria-pressed={selected}
-              aria-label={tag.description ?? tag.name}
+              aria-label={tag.name}
               className={cn(
-                "border-border text-label focus-visible:ring-ring inline-flex h-7 items-center gap-1 rounded-full border px-2.5 transition-colors focus-visible:ring-2 focus-visible:outline-none",
+                "border-border text-label focus-visible:ring-ring inline-flex min-h-11 items-center gap-1.5 rounded-lg border px-3 transition-colors focus-visible:ring-2 focus-visible:outline-none",
                 selected
                   ? "bg-primary text-primary-foreground border-transparent"
                   : "bg-background text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -99,7 +99,7 @@ export function TagPicker({
         })}
 
         {adding ? (
-          <span className="flex items-center gap-1 rounded-full border border-dashed px-2">
+          <span className="flex max-w-full items-center gap-1 rounded-lg border border-dashed px-2">
             <Input
               autoFocus
               value={name}
@@ -116,8 +116,12 @@ export function TagPicker({
               }}
               disabled={pending}
               placeholder="Tag name"
-              className="h-7 w-28 border-0 px-0.5 text-xs focus-visible:ring-0"
+              aria-label="New tag name"
+              className="w-28 min-w-0 border-0 px-0.5 text-label"
             />
+            <Button type="button" variant="ghost" size="sm" onClick={submitNew} disabled={pending || !name.trim()}>
+              Add
+            </Button>
             <Button
               type="button"
               size="icon-sm"
@@ -135,7 +139,7 @@ export function TagPicker({
           <button
             type="button"
             onClick={() => setAdding(true)}
-            className="border-border text-label text-muted-foreground hover:text-foreground inline-flex h-7 items-center gap-1 rounded-full border border-dashed px-2.5 transition-colors focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none"
+            className="border-border text-label text-muted-foreground hover:text-foreground inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-dashed px-3 transition-colors focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none"
           >
             <Plus className="size-3" aria-hidden />
             New

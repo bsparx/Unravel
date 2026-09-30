@@ -30,7 +30,7 @@ export function ReturnNote({
 
   return (
     <label className="mt-6 block w-full max-w-sm text-center">
-      <span className="text-micro text-muted-foreground font-medium tracking-wider uppercase">
+      <span className="text-label text-muted-foreground font-medium">
         When you come back
       </span>
       <Input
@@ -47,7 +47,7 @@ export function ReturnNote({
         }}
         placeholder={placeholder ?? "what you're in the middle of"}
         maxLength={140}
-        className="mt-2 text-center rounded-full border-border/80 bg-card/60 px-4 text-label shadow-xs focus-visible:ring-primary/40"
+        className="mt-2 text-center"
       />
     </label>
   );

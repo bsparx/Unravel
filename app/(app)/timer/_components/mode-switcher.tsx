@@ -10,7 +10,6 @@ import {
   clampTarget,
   MAX_INTERVALS,
   MODE_DESCRIPTIONS,
-  MODE_LABELS,
   sessionKind,
   suggestIntervals,
   type TimerConfig,
@@ -78,9 +77,9 @@ export function ModePills({
   return (
     <div className={cn("flex flex-col items-center gap-1.5", className)}>
       <div
-        role="tablist"
-        aria-label="Timer Modes"
-        className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-card/80 p-1 shadow-xs backdrop-blur-xs"
+        role="group"
+        aria-label="Timer mode"
+        className="grid grid-cols-2 items-center gap-1 rounded-xl border border-border/70 bg-card/80 p-1 sm:inline-flex"
       >
         {modes.map((item) => {
           const isSelected = config.mode === item.id;
@@ -90,16 +89,15 @@ export function ModePills({
           return (
             <button
               key={item.id}
-              role="tab"
-              aria-selected={isSelected}
+              aria-pressed={isSelected}
               type="button"
               onClick={() => selectMode(item.id)}
               className={cn(
-                "relative flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-label font-medium transition-all duration-200 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                "relative flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 py-2 text-label font-medium transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
                 isSelected
                   ? isRest
-                    ? "bg-rest text-rest-foreground shadow-xs font-semibold"
-                    : "bg-primary text-primary-foreground shadow-xs font-semibold"
+                    ? "bg-rest text-rest-foreground font-semibold"
+                    : "bg-primary text-primary-foreground font-semibold"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/60",
               )}
             >
@@ -110,7 +108,7 @@ export function ModePills({
         })}
       </div>
 
-      <p className="text-micro text-muted-foreground/80 text-center font-normal">
+      <p className="text-label text-muted-foreground text-center font-normal">
         {MODE_DESCRIPTIONS[config.mode]}
       </p>
     </div>
@@ -149,7 +147,7 @@ export function DurationDial({
         <p className="text-title font-medium text-foreground">
           Open-ended rest
         </p>
-        <p className="text-micro text-muted-foreground mt-1">
+        <p className="text-label text-muted-foreground mt-1">
           No countdown or finish line. Take the time you need to reset.
         </p>
       </div>
@@ -162,14 +160,14 @@ export function DurationDial({
   return (
     <div
       className={cn(
-        "w-full max-w-md rounded-2xl border border-border/70 bg-card/60 p-4 shadow-xs backdrop-blur-xs transition-all space-y-4",
+        "w-full max-w-md rounded-2xl border border-border/70 bg-card/60 p-4 space-y-4",
         className,
       )}
     >
       {/* Quick Duration Pills */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-micro font-medium uppercase tracking-wider text-muted-foreground">
+          <span className="text-label font-medium text-muted-foreground">
             {config.mode === "FLOW" ? "Target goal" : "Duration"}
           </span>
           <span className="font-mono text-micro text-muted-foreground tabular-nums">
@@ -187,9 +185,9 @@ export function DurationDial({
                 onClick={() => setTarget(minutes * 60)}
                 aria-pressed={isMatch}
                 className={cn(
-                  "rounded-full px-2.5 py-1 font-mono text-label tabular-nums transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                  "min-h-11 min-w-11 rounded-lg px-2 py-2 font-mono text-label tabular-nums transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
                   isMatch
-                    ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                    ? "bg-primary text-primary-foreground font-semibold"
                     : "border border-border/70 text-muted-foreground hover:border-primary/40 hover:text-foreground hover:bg-muted/40",
                 )}
               >
@@ -202,7 +200,7 @@ export function DurationDial({
 
       {/* Precision Stepper */}
       <div className="flex items-center justify-between border-t border-border/50 pt-3">
-        <span className="text-micro font-medium uppercase tracking-wider text-muted-foreground">
+        <span className="text-label font-medium text-muted-foreground">
           Fine tune
         </span>
 
@@ -211,7 +209,7 @@ export function DurationDial({
             type="button"
             variant="outline"
             size="icon"
-            className="size-7 rounded-full border-border/80 hover:border-primary/50"
+            className="border-border/80 hover:border-primary/50"
             aria-label="Five minutes less"
             onClick={() => setTarget(config.targetSeconds - 300)}
           >
@@ -226,7 +224,7 @@ export function DurationDial({
             type="button"
             variant="outline"
             size="icon"
-            className="size-7 rounded-full border-border/80 hover:border-primary/50"
+            className="border-border/80 hover:border-primary/50"
             aria-label="Five minutes more"
             onClick={() => setTarget(config.targetSeconds + 300)}
           >
@@ -239,10 +237,10 @@ export function DurationDial({
       {isPomodoro && (
         <div className="flex items-center justify-between border-t border-border/50 pt-3">
           <div className="flex flex-col">
-            <span className="text-micro font-medium uppercase tracking-wider text-muted-foreground">
+            <span className="text-label font-medium text-muted-foreground">
               Intervals
             </span>
-            <span className="text-micro text-muted-foreground/80">
+            <span className="text-micro text-muted-foreground">
               {formatDuration(perFocusSeconds)} per block
             </span>
           </div>
@@ -252,7 +250,7 @@ export function DurationDial({
               type="button"
               variant="outline"
               size="icon"
-              className="size-7 rounded-full border-border/80 hover:border-primary/50"
+              className="border-border/80 hover:border-primary/50"
               aria-label="One session fewer"
               disabled={config.intervals <= 1}
               onClick={() =>
@@ -270,7 +268,7 @@ export function DurationDial({
               type="button"
               variant="outline"
               size="icon"
-              className="size-7 rounded-full border-border/80 hover:border-primary/50"
+              className="border-border/80 hover:border-primary/50"
               aria-label="One session more"
               disabled={config.intervals >= MAX_INTERVALS}
               onClick={() =>

@@ -116,7 +116,7 @@ export function AppShell({
                 <Link href="/">
                   {/* The mark survives the collapse — the wordmark hides, the
                       loop doesn't. */}
-                  <BrandMark className="text-primary size-6 shrink-0" />
+                  <BrandMark className="text-accent-foreground size-6 shrink-0" />
                   <span className="font-display text-title tracking-tight group-data-[collapsible=icon]:hidden">
                     Unravel
                   </span>
@@ -133,7 +133,7 @@ export function AppShell({
         <SidebarContent>
           <SidebarGroup>
             <SidebarMenu>
-        {MOBILE_NAV.map(({ href, label, icon: Icon }) => (
+        {NAV.map(({ href, label, icon: Icon }) => (
                 <SidebarMenuItem key={href}>
                   <SidebarMenuButton
                     asChild
@@ -208,22 +208,22 @@ export function AppShell({
 
       <SidebarInset>
         {banner}
-        <main className="flex-1 pb-20 md:pb-0">{children}</main>
+        <main className="flex-1 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">{children}</main>
       </SidebarInset>
 
       {/* Mobile bar */}
       <nav
         aria-label="Main"
-        className="bg-background/95 border-border fixed inset-x-0 bottom-0 z-40 flex border-t backdrop-blur md:hidden"
+        className="bg-background/95 border-border fixed inset-x-0 bottom-0 z-40 flex border-t pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
       >
-        {NAV.map(({ href, label, icon: Icon }) => (
+        {MOBILE_NAV.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}
             aria-current={isActive(href) ? "page" : undefined}
             className={cn(
-              "flex flex-1 flex-col items-center gap-1 py-2.5 text-micro tracking-wide uppercase transition-colors",
-              isActive(href) ? "text-primary" : "text-muted-foreground",
+              "flex min-h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 py-2 text-micro font-medium transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring focus-visible:outline-none",
+              isActive(href) ? "bg-accent/40 text-accent-foreground" : "text-muted-foreground",
             )}
           >
             <Icon className="size-5" aria-hidden />

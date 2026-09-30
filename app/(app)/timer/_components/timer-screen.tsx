@@ -234,7 +234,7 @@ export function TimerScreen({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col items-center px-5 py-10 md:py-16">
+    <div className="mx-auto flex w-full max-w-3xl flex-col items-center px-4 py-8 md:px-6 md:py-12">
       {hasActiveSession && state.sessionId && (
         <ResumeBanner onDiscard={discard} />
       )}
@@ -242,10 +242,10 @@ export function TimerScreen({
       {/* The page arrives in three small steps — header, face, controls — all
           "content settling in" rather than anything that moves on its own. The
           face's own motion stays exactly what it was: the depletion itself. */}
-      <header className="animate-rise mb-8 text-center">
+      <header className="animate-rise mb-6 text-center">
         {recovery ? (
           <>
-            <p className="text-micro text-rest font-medium tracking-wider uppercase">
+            <p className="text-label text-rest font-medium">
               Recovery
             </p>
             <h1 className="font-display mt-1 text-heading text-balance">
@@ -254,7 +254,7 @@ export function TimerScreen({
           </>
         ) : state.task ? (
           <>
-            <p className="text-micro text-muted-foreground font-medium tracking-wider uppercase">
+            <p className="text-label text-muted-foreground font-medium">
               {state.task.type === "HABIT" ? (
                 <span className="inline-flex items-center gap-1">
                   <Repeat className="size-3" aria-hidden />
@@ -270,7 +270,7 @@ export function TimerScreen({
           </>
         ) : (
           <>
-            <p className="text-micro text-muted-foreground font-medium tracking-wider uppercase">
+            <p className="text-label text-muted-foreground font-medium">
               No task attached
             </p>
             <h1 className="font-display mt-1 text-heading">Just a timer</h1>
@@ -278,33 +278,10 @@ export function TimerScreen({
         )}
       </header>
 
-      {/* Top Mode Selector (idle only) */}
-      {idle && (
-        <div className="animate-rise mb-6" style={{ animationDelay: "30ms" }}>
-          <ModePills
-            config={state.config}
-            onChange={(next) => configure(next)}
-          />
-        </div>
-      )}
-
       {/* The face is sized by its own w-full, so this wrapper must hand it a
           definite width — a bare flex item here would shrink-wrap it to its
           digits and collapse the whole face. */}
       <div className="animate-rise relative flex w-full flex-col items-center justify-center" style={{ animationDelay: "60ms" }}>
-        {/* Soft ambient stage glow */}
-        <div
-          className={cn(
-            "pointer-events-none absolute aspect-square w-full max-w-[340px] rounded-full blur-3xl transition-opacity duration-700",
-            running
-              ? recovery
-                ? "bg-rest/10 opacity-70"
-                : "bg-running/10 opacity-70"
-              : "bg-primary/5 opacity-40",
-          )}
-          aria-hidden
-        />
-
         {(() => {
         const face = (
           <div className="relative z-10 text-center select-none">
@@ -387,26 +364,13 @@ export function TimerScreen({
 
       {/* Interval Dot Track for multi-block Pomodoro sessions */}
       {isPomodoro && focusBlocks.length > 1 && (
-        <div className="animate-rise mt-5" style={{ animationDelay: "70ms" }}>
+        <div className="mt-5 w-full max-w-sm">
           <IntervalDotTrack
             plan={plan}
             intervalIndex={state.intervalIndex}
             running={running}
             idle={idle}
             onBreak={onBreak}
-          />
-        </div>
-      )}
-
-      {/* Compact Horizontal Dial for choosing duration & intervals (idle only) */}
-      {idle && (
-        <div
-          className="animate-rise mt-6 flex w-full flex-col items-center"
-          style={{ animationDelay: "90ms" }}
-        >
-          <DurationDial
-            config={state.config}
-            onChange={(next) => configure(next)}
           />
         </div>
       )}
@@ -432,7 +396,7 @@ export function TimerScreen({
       ) : (
         <div className="flex flex-col items-center">
           <div
-            className="animate-rise mt-6 flex items-center gap-2 rounded-full border border-border/80 bg-card/90 p-1.5 shadow-md shadow-foreground/5 backdrop-blur-sm transition-all"
+            className="animate-rise mt-6 flex items-center gap-2"
             style={{ animationDelay: "110ms" }}
           >
             {idle ? (
@@ -440,7 +404,7 @@ export function TimerScreen({
                 size="lg"
                 onClick={toggle}
                 className={cn(
-                  "h-12 rounded-full px-8 text-title font-medium shadow-none transition-all active:scale-[0.98]",
+                  "h-12 rounded-lg px-6 text-title font-medium",
                   recovery
                     ? "bg-rest text-rest-foreground hover:bg-rest/90"
                     : "bg-primary text-primary-foreground hover:bg-primary/90",
@@ -456,7 +420,7 @@ export function TimerScreen({
                     variant="ghost"
                     size="icon"
                     onClick={skipInterval}
-                    className="size-11 rounded-full text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
+                    className="size-11 rounded-lg text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
                     aria-label="Skip to the next block"
                   >
                     <SkipForward className="size-4" aria-hidden />
@@ -467,7 +431,7 @@ export function TimerScreen({
                   size="lg"
                   onClick={toggle}
                   className={cn(
-                    "h-12 rounded-full px-8 text-title font-medium shadow-none transition-all active:scale-[0.98]",
+                    "h-12 rounded-lg px-6 text-title font-medium",
                     recovery
                       ? "bg-rest text-rest-foreground hover:bg-rest/90"
                       : "bg-running text-running-foreground hover:bg-running/90",
@@ -490,7 +454,7 @@ export function TimerScreen({
                   variant="ghost"
                   size="icon"
                   onClick={() => void stop()}
-                  className="size-11 rounded-full text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
+                  className="size-11 rounded-lg text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
                   aria-label="Stop and log this session"
                 >
                   <Square className="size-4" aria-hidden />
@@ -502,13 +466,36 @@ export function TimerScreen({
           {/* For the hands on the keyboard. The one gesture this screen has
               is worth naming once, quietly, on the only screen where it
               exists. */}
-          <p className="text-muted-foreground/70 mt-3 hidden text-micro md:block">
-            <kbd className="border-border bg-muted rounded border px-1.5 py-0.5 font-mono text-[0.625rem]">
+          <p className="text-muted-foreground mt-3 hidden text-micro md:block">
+            <kbd className="border-border bg-muted rounded border px-1.5 py-0.5 font-mono text-micro">
               Space
             </kbd>{" "}
             starts and pauses
           </p>
         </div>
+      )}
+
+      {/* Mode selection follows the primary control while idle */}
+      {idle && (
+        <div className="mt-6" style={{ animationDelay: "30ms" }}>
+          <ModePills
+            config={state.config}
+            onChange={(next) => configure(next)}
+          />
+        </div>
+      )}
+
+      {idle && (
+        <details className="mt-6 w-full max-w-md">
+          <summary className="flex min-h-11 cursor-pointer items-center justify-center rounded-lg px-3 text-label text-muted-foreground underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
+            {recovery ? "About recovery" : "Adjust duration and intervals"}
+          </summary>
+          <DurationDial
+            className="mt-3"
+            config={state.config}
+            onChange={(next) => configure(next)}
+          />
+        </details>
       )}
 
       {/* Only while the break is still a break. Once it has run over, the
@@ -538,7 +525,7 @@ export function TimerScreen({
 
       {steps.length > 0 && !recovery && (
         <section className="mt-8 w-full max-w-sm">
-          <h2 className="text-micro text-muted-foreground mb-1 text-center font-medium tracking-wider uppercase">
+          <h2 className="text-label text-muted-foreground mb-2 text-center font-semibold">
             {upNext ? "You're on" : "All the way through"}
           </h2>
           <StepList steps={steps} />
@@ -633,7 +620,7 @@ function SessionSummary({
     // The same arrival the running screen gets — one settling motion, then
     // stillness. A summary is a landing, not a launch.
     <div className="animate-rise mx-auto flex w-full max-w-md flex-col items-center px-5 py-16 text-center">
-      <p className="text-micro text-muted-foreground font-medium tracking-wider uppercase">
+      <p className="text-label text-muted-foreground font-medium">
         {recovery ? "Recovery logged" : "Session logged"}
       </p>
 
@@ -694,14 +681,14 @@ function SessionSummary({
       <div className="mt-8 flex items-center gap-3">
         <Button
           onClick={() => void onDone()}
-          className="rounded-full px-6 shadow-sm"
+          className="px-6"
         >
           Back to today
         </Button>
         <Button
           variant="outline"
           onClick={onAgain}
-          className="rounded-full px-6"
+          className="px-6"
         >
           <RotateCcw className="mr-1.5 size-4" aria-hidden />
           Go again

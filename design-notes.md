@@ -1,94 +1,118 @@
 # Design notes
 
-Log of the design decisions per surface, so new pages don't unconsciously
-re-derive (or drift from) the ones already made.
+Implementation history for Unravel. The current, concise design foundation is
+[design.md](design.md); its interactive companion is [index.html](index.html).
+Use those two anchors together when adding or refining a component.
 
-## The brief
+The specimen is one long page with Today, Habits, Calendar, Timer, and
+Components anchor links. Its sample data stays in memory and resets on reload;
+appearance alone is remembered under `unravel-reference-theme`. The live app adopts the refinements recorded below; these specimen
+interactions still do not change production data.
 
-**Unravel** — a productivity app for people with ADHD. The audience is
-someone who has thirteen things they mean to do, no felt sense of how long any
-of them take, and who loses the thread the moment a screen gets busy.
+## Current direction: calm focus
 
-Every surface has one job: **make the next action obvious and make time
-visible.** If a screen is asking you to make more than one decision, it's wrong.
+Unravel is a personal habit, calendar, and productivity app built to feel
+calming, relaxing, beautiful, and easy to use. **Make the next action obvious
+and make time visible.** Lead with one useful action, then make the surrounding
+plan available without making it compete for attention.
 
-## Direction: "Calm focus"
+This is an evolution of the current brand. Dark mode already works well; keep
+its colours, gradients, and atmosphere. The refinement concentrates on type
+roles, space, component hierarchy, and easy-to-reach actions.
 
-Deliberately *not* the two defaults it would otherwise land on: not the
-cream-paper/serif/terracotta AI house style, and not untouched shadcn
-zinc + Geist + `--radius: 0.5rem`.
+`DESIGN_VARIANCE: 5`, `MOTION_INTENSITY: 2`, `VISUAL_DENSITY: 3`.
+Clear reading order, still by default, and generous space between meaningful
+groups. The full component and accessibility contracts live in `design.md`.
 
-### Palette
+### Current palette
 
-Tokens live in `app/globals.css` under `:root` / `.dark`, exposed to Tailwind v4
-through `@theme inline`. There is no `tailwind.config.ts` — Tailwind v4 is
-CSS-first.
+Shipping tokens live in `app/globals.css` under `:root`, `.dark`, and
+`.dark[data-theme="eggplant"]`, exposed through Tailwind v4's `@theme inline`.
 
-| Role | Light | Dark | Notes |
+| Role | Light | Dark | Eggplant |
 | --- | --- | --- | --- |
-| Paper (background) | `#faf7f2` | `#14120f` | Warm, not blue-grey. Reads as paper, not as a dashboard. |
-| Ink (foreground) | `#1c1a17` | `#ece6dc` | Warm near-black; pure `#000` is harsh at this contrast. |
-| Teal (primary) | `#2f6f6a` | `#6fb3ab` | Muted, low-chroma. Actions and links. |
-| **Blue (running)** | `#3b6fb0` | `#7ba7de` | **Reserved.** Means "work is on the clock" and nothing else. |
-| **Slate blue (rest)** | `#5a7f8c` | `#7fa6b3` | **Reserved.** Recovery, and only recovery. |
-| Clay (destructive) | `#b85c4a` | `#d4796a` | Overdue and delete. A warm relative of the palette, not `red-500`. |
-| Warm grey (muted) | `#8a8378` | `#9d9488` | Secondary text. |
+| Background | `#f7f2fb` | `#060a19` | `#0b0811` |
+| Foreground | `#302637` | `#f1f5ff` | `#ece6dc` |
+| Card | `rgba(255,255,255,.68)` | `rgba(12,25,55,.69)` | `#120e1a` |
+| Primary fill | `#654263` | `#3652e9` | `#b089b2` |
+| Primary label | `#ffffff` | `#ffffff` | `#1f141f` |
+| Accent/action text | `#603b64` | `#a7b8ff` | `#c5a8c8` |
+| Secondary text | `#564a60` | `#b2c0dc` | `#a494a8` |
+| Focus ring | `#654263` | `#8fa3ff` | `#b089b2` |
+| Destructive | `#b34462` | `#ff7c91` | `#d4796a` |
 
-Calendar blocks are coloured by **kind, never by state**: work is a wash of
-teal, recovery a wash of slate blue, buffer a dashed grey. The now-line is the
-only running-blue on that screen. A planned block borrowing it would make an
-entire untouched day look like it was already in progress — the reservation holds on
-the calendar exactly as it holds everywhere else.
+Light keeps lilac, blush, and peach washes behind plum actions. Dark keeps the
+navy atmosphere and blue-violet primary gradient. Eggplant keeps aubergine
+surfaces and a lifted mauve primary. Use the dark primary for filled actions;
+use the lighter action-text and focus-ring roles for readable small controls.
 
-The running-colour reservation is the single most load-bearing rule here. If it
-appears on a button, a badge, or a chart series that isn't about a live work
-timer, the signal is diluted and the design has failed.
+Running remains reserved for live work or the calendar's now-line:
+`#3d5fb2` in Light, `#8aa2f0` in Dark and Eggplant. Recovery remains its own
+labelled colour: `#66748f` in Light, `#93a0bd` in Dark and Eggplant. Planned
+work uses the primary wash; buffer is neutral. State also needs words or icons.
 
-The running colour was amber (`#c97b27` / `#e0a050`) until it was deliberately
-moved to blue: a calmer hue to sit under for twenty-five minutes at a stretch,
-on a ring large enough to dominate the screen. The reservation is unchanged —
-only the hue it is spent on.
+The app accepts Light, Dark, Eggplant, and System. `lib/theme.ts` and
+`components/theme-script.tsx` apply the preference before paint. Eggplant
+sets `.dark` and `data-theme="eggplant"`; System follows the device preference.
 
-Recovery got its **own** colour rather than a tint of the running one,
-deliberately. Rest is a peer of work, not a variation on it, and a paler shade
-of work would have said the opposite.
+### Type, shape, and hierarchy
 
-**This is the cost of the move to blue, and it is a real one.** Work and rest
-used to be temperature-opposed — warm for work, cool for rest — so which kind
-of time was running read from across the room, including in the mini badge
-where the label is too small to see. Both are now cool, and the pair is carried
-entirely by hue and chroma: work is a true blue at ~50% saturation, recovery a
-desaturated grey-teal. That still separates, but it is a weaker signal than
-temperature was. If the two are ever confused in use, recovery is the one to
-move — it has no reservation to protect.
+Keep Newsreader for page headings and the focused task title. Karla handles
+section/component headings, navigation, rows, forms, and reading. JetBrains
+Mono carries timer digits, durations, dates, and counts with tabular figures.
+Caveat stays confined to journal writing and spread headers. These fonts are
+self-hosted through `next/font` in `lib/fonts.ts`.
 
-### Typography
+The refined specimen establishes comfortable 16px body, 14px secondary, and
+12px optional metadata. Page headings are 36px on mobile and 36-46px on
+desktop; Karla section headings use 22-24px and component headings 17-19px.
+Newsreader focused task titles use 24-26px. Live app tokens now use 16px
+body, 14px label, and 12px micro, with Karla for `font-heading`.
 
-Wired via `next/font/google` in `lib/fonts.ts` → CSS variables → `@theme inline`.
+Keep the soft radius family around the app's 10px base. The refined specimen
+uses 10px controls, 20px panels, 12px agenda items, 16px inset state containers,
+and 7px visible checkboxes, with role-specific shape rules in `design.md`. Keep
+44px action targets, even when the visible icon is smaller. The atmosphere
+is the outer layer, a priority panel can rise above it, and supporting rows
+can share one quiet surface. Fields need stable fills; menus and dialogs need
+denser fills than cards. Keep reduced-transparency and unsupported-blur
+fallbacks. Use space and type before adding more elevated containers.
 
-- **Newsreader** (`--font-display`) — headings and the task title on the timer.
-  A quiet serif; keeps the app from reading like a SaaS dashboard.
-- **Karla** (`--font-sans`) — body. Slightly humanist, easy at small sizes.
-- **JetBrains Mono** (`--font-mono`) — every numeral: timer digits, durations,
-  counts. Always with `.tnum` (tabular figures) so digits don't jitter as they
-  count.
+### Live adoption — 30 September 2026
 
-A real type scale (`--text-micro` … `--text-display`) is defined in `@theme`
-with paired line-heights and letter-spacing, rather than reaching for the bare
-`text-sm/base/lg/xl` staircase.
+The app now uses the reference's larger reading scale, Karla component
+headings, 44px everyday controls, stable field fills, and consistent shapes.
+Dark's existing palette and atmosphere stay intact; its primary gradient no
+longer overrides Eggplant's mauve fill. The rail has larger targets and the
+mobile bar includes the device safe-area inset.
 
-### Shape and elevation
+Calendar keeps its day default and truthful time scale. Below 1024px an
+optional week uses day links followed by the selected-day grid and agenda.
+Explicit Details actions and date/time fields offer touch and keyboard paths
+for editing and rescheduling; short blocks keep their real duration.
 
-`--radius: 0.625rem` — soft, not pill. Flat surfaces with hairline borders;
-**no `shadow-sm` on every card**. The elevation budget is spent in exactly one
-place: the timer.
+Habits separates Due today and Other days. The minimum and completion lead;
+Start is named, More holds rare edits, and history stays collapsed. History
+marks reveal a written date/outcome on focus or press with arrow-key movement.
+Optional extra still does not become a second target.
 
-### Layout archetype
+Identities leads with name, statement, and one vote summary, opens deeper
+analytics on request, and folds attention prompts into the matching card.
+Habit links and contextual check-in actions remain live. Skips and rest stay
+neutral. Form errors keep drafts visible; a link-save retry reuses an identity
+already created rather than creating another one.
 
-Persistent left rail on desktop, bottom bar on mobile; a single focused column
-of content. Explicitly not a centred `max-w-7xl` three-column card grid — the
-content here is a prioritised list and one big clock, neither of which is a set
-of equivalent tiles.
+Today retains its one-task morning workflow and frog illustration. Timer
+retains its existing live renderer and session logic, with the primary control
+before optional idle settings and a quieter, accessible mode selector. The
+capture dialog has visible labels, a Save thought action, and inline errors.
+
+## Historical implementation decisions
+
+The entries below retain the detailed reasoning behind existing surfaces.
+Earlier references to teal, paper backgrounds, a smaller type scale, or
+previous layouts describe those iterations. The current foundation above and
+in `design.md` takes precedence for new components.
 
 ### Signature element
 
@@ -143,12 +167,11 @@ Everything else on the timer screen is quiet so the faces carry the page.
 
 ### Motion
 
-Three named animations, all under 400ms, defined in `@theme` next to the
-colours: `breathe` (attached to exactly one element), `rise` (content
-arriving, 6px — enough to read as settling, not as flying in) and `pop`, the
-only overshoot in the app, spent entirely on the moment something gets ticked
-off. That moment is the reward loop of a task list; everywhere else, bounce
-reads as noise.
+The app defines four named animations in `@theme`: `rise` (320ms content
+arrival over 6px), `pop` (260ms completion feedback), `draw` (350ms calendar
+strip arrival), and the historical `breathe` (a five-second opacity loop).
+The refined foundation does not add ambient loops. A completion can settle
+with a brief confirmation; other motion must communicate an action or state.
 
 `prefers-reduced-motion` is honoured with **one global rule** in `globals.css`,
 not a `motion-reduce:` variant per element. A per-element variant is something
@@ -188,7 +211,7 @@ desk is exactly when the chime is off.
 | `/inbox` | Flat list, row actions | Triage. Deliberate, unlike capture — which is why it's a page and the dump box isn't. |
 | `/tasks` | Grouped list by project | Filters as quiet segmented control, not tabs-as-chrome. Edit and start-timer are hover-revealed row actions; the row body itself is always the timer. |
 | `/tasks/[id]` | Single column form + log | Create and edit are the same form. Delete is behind one dialog — it takes the session history with it. Every row in the log is correctable in place. |
-| `/calendar` | Two columns: grid + scheduling panel | Week by default, day on request. Blocks are dragged and resized directly; the panel is the only place anything is "assigned" a time by pressing a button. Gaps between blocks are drawn as transitions, live while you drag — the space between two things is where a plan comes apart, and it was the only thing on this page not rendered. |
+| `/calendar` | Two columns: grid + scheduling panel | Day by default, week on request. Blocks are dragged and resized directly; the panel is the only place anything is "assigned" a time by pressing a button. Gaps between blocks are drawn as transitions, live while you drag — the space between two things is where a plan comes apart, and it was the only thing on this page not rendered. |
 | `/exercises` | Week grid, then figure + results split | **The body is the navigation.** Two flat SVG figures, front and back, where every muscle group is a control: hover lifts it, click filters the catalog to it. That replaced a body-part dropdown saying the same thing in words. The figure reads both ways — pointing at any exercise, in the week or the catalog, lights the muscles it works, and a full-body exercise lights the whole figure. The two states are drawn differently on purpose: a filter you chose is a solid fill, a passing highlight is a wash, so a lit figure never looks like a filter you don't remember setting. Both figures stay side by side down to phone width — they're tall and narrow, so two fit where one would waste the space. Second pass: **the week as columns.** Seven stacked rows said the same words one day at a time; the grid (1 → 2 → 4 → 7 columns) says the week — training days raised, rest days recessed and dashed, and today wearing a ★Today chip so the plan and the day you're in meet in one glance (computed server-side from the timezone; a weekday doesn't change mid-session, so there's nothing to hydrate-mismatch). Each slot wears a **mini plate** (`exercise-mini-figure.tsx`): one figure, no names, lit with the muscles it works — the dialog's own drawing shrunk to row size, front unless the exercise is entirely back-only. Swap and unpin stay always-visible because a hover-revealed control is invisible on a phone. |
 
 The calendar's second pass: **a week you can see the shape of.** The grid was
@@ -596,9 +619,9 @@ mechanism: `.dark` remains the switch every component keys off, and eggplant
 rides it with a `data-theme="eggplant"` attribute whose token block
 (`.dark[data-theme="eggplant"]`) overrides the surfaces and accent. The base
 is near-black with a deep aubergine cast (`#0b0811`, cards `#120e1a`), the
-accent a lifted mauve (`#b089b2`) — the same lift dark mode gives the teal.
-Reserved colours are
-untouched: running stays the clock's blue, rest the recovery slate, charts
+accent a lifted mauve (`#b089b2`). The refined anchor keeps its primary mauve;
+scope the navy gradient to Dark when adopting the component rules. Reserved
+colours are untouched: running stays the clock's blue, rest the recovery slate, charts
 and money keep their own palettes. Applied by `lib/theme.ts` and the
 before-paint script, toggled from Settings → Appearance.
 

@@ -5,9 +5,11 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ---------------------------------------------------------------------------
-   Calm focus — see design-notes.md
-   Warm paper / deep ink base, muted teal primary, and a calm blue reserved
-   EXCLUSIVELY for "the clock is moving". Nothing else in the app uses it.
+   Translucent lilac / navy — the reference theme.
+   Light is a lilac field with a plum accent; dark is a navy field with a
+   blue-to-violet primary. Every surface is glass over one soft atmosphere
+   gradient, and the reserved colours stay reserved: `--running` is still the
+   only blue that means "the clock is moving", `--rest` still owns recovery.
 --------------------------------------------------------------------------- */
 
 @theme inline {
@@ -31,6 +33,7 @@
 
   --color-border: var(--border);
   --color-input: var(--input);
+  --color-input-surface: var(--input-surface);
   --color-ring: var(--ring);
 
   /* The running-timer colour. Reserved for work on the clock. */
@@ -67,7 +70,7 @@
   --font-sans: var(--font-karla);
   --font-display: var(--font-newsreader);
   --font-mono: var(--font-jetbrains);
-  --font-heading: var(--font-newsreader);
+  --font-heading: var(--font-karla);
   --font-hand: var(--font-caveat);
 
   /* Journal spread paper — the note form is a physical page, in every theme. */
@@ -82,19 +85,19 @@
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-xl: 0.8125rem;
+  --radius-2xl: 1.25rem;
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
 
   /* A deliberate type scale rather than the bare text-sm/base/lg staircase. */
-  --text-micro: 0.6875rem;
+  --text-micro: 0.75rem;
   --text-micro--line-height: 1rem;
-  --text-micro--letter-spacing: 0.06em;
-  --text-label: 0.8125rem;
+  --text-micro--letter-spacing: 0.01em;
+  --text-label: 0.875rem;
   --text-label--line-height: 1.25rem;
-  --text-body: 0.9375rem;
-  --text-body--line-height: 1.55rem;
+  --text-body: 1rem;
+  --text-body--line-height: 1.625rem;
   --text-title: 1.0625rem;
   --text-title--line-height: 1.5rem;
   --text-heading: 1.5rem;
@@ -104,28 +107,14 @@
   --text-display--line-height: 2.5rem;
   --text-display--letter-spacing: -0.02em;
 
-  /* Motion budget.
-     Three named animations, all under 400ms, none of them looping except
-     `breathe` — which is attached to exactly one element. The rule this app
-     follows is that motion either confirms something you just did or shows
-     something arriving; nothing moves to be decorative. On a screen built for
-     people who are easily pulled off task, ambient movement is a cost. */
-  --animate-breathe: breathe 5s ease-in-out infinite;
+  /* Motion confirms an action or briefly settles arriving content.
+     Ambient movement is disabled; the live clock keeps its truthful motion. */
+  --animate-breathe: none;
   --animate-rise: rise 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  --animate-pop: pop 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  --animate-pop: pop 180ms ease-out;
   /* The calendar's one orchestrated moment: the week's day-strips drawing
      themselves in, left to right, when the grid arrives. The only consumer. */
   --animate-draw: draw 350ms cubic-bezier(0.22, 1, 0.36, 1) both;
-
-  @keyframes breathe {
-    0%,
-    100% {
-      opacity: 0.55;
-    }
-    50% {
-      opacity: 1;
-    }
-  }
 
   /* Content arriving. Small distance on purpose — 6px reads as "settling",
      20px reads as "flying in". */
@@ -140,15 +129,13 @@
     }
   }
 
-  /* The one bit of overshoot in the app, spent on ticking something off. That
-     moment is the entire reward loop of a task list; everywhere else, easing
-     that overshoots reads as noise. */
+  /* A small, single settling response when a task is checked. */
   @keyframes pop {
     0% {
       transform: scale(1);
     }
     45% {
-      transform: scale(1.22);
+      transform: scale(1.06);
     }
     100% {
       transform: scale(1);
@@ -170,50 +157,69 @@
 :root {
   --radius: 0.625rem;
 
-  --background: #faf7f2;
-  --foreground: #1c1a17;
+  /* The atmosphere: a fixed field of lilac, blush, and peach washes under
+     every surface. Translucent surfaces blur it; opaque ones hide it. */
+  --atmosphere:
+    linear-gradient(32deg, rgba(164, 117, 230, 0.1) 0 20%, transparent 20%),
+    linear-gradient(145deg, transparent 0 82%, rgba(255, 166, 193, 0.09) 82%),
+    radial-gradient(ellipse at 2% 7%, rgba(190, 153, 247, 0.69), transparent 38%),
+    radial-gradient(ellipse at 96% 11%, rgba(255, 196, 211, 0.68), transparent 39%),
+    radial-gradient(ellipse at 84% 82%, rgba(255, 212, 180, 0.62), transparent 42%),
+    radial-gradient(ellipse at 24% 91%, rgba(230, 193, 255, 0.55), transparent 44%),
+    linear-gradient(125deg, #f6f3ff, #faf4fe 48%, #fff9f3);
 
-  --card: #fffdfa;
-  --card-foreground: #1c1a17;
-  --popover: #fffdfa;
-  --popover-foreground: #1c1a17;
+  --background: #f7f2fb;
+  --foreground: #302637;
 
-  --primary: #2f6f6a;
-  --primary-foreground: #f6fbfa;
-  --secondary: #efeae1;
-  --secondary-foreground: #3b3630;
-  --muted: #f1ece3;
-  --muted-foreground: #8a8378;
-  --accent: #e4edeb;
-  --accent-foreground: #24564f;
-  --destructive: #b85c4a;
+  --card: rgba(255, 255, 255, 0.68);
+  --card-foreground: #302637;
+  --popover: rgba(255, 255, 255, 0.88);
+  --popover-foreground: #302637;
 
-  --border: #e4ded2;
-  --input: #ded7c9;
-  --ring: #2f6f6a;
+  --primary: #654263;
+  --primary-foreground: #ffffff;
+  --secondary: rgba(255, 255, 255, 0.51);
+  --secondary-foreground: #302637;
+  --muted: rgba(255, 255, 255, 0.51);
+  --muted-foreground: #564a60;
+  --accent: rgba(238, 221, 250, 0.68);
+  --accent-foreground: #603b64;
+  --destructive: #b34462;
 
-  /* A settled mid-blue, not a bright one. It has to hold a large ring for
+  --border: rgba(105, 74, 128, 0.23);
+  --input: rgba(105, 74, 128, 0.32);
+  --input-surface: #fdf9ff;
+  --ring: #654263;
+
+  /* Panel edge and elevation, from the reference's frosted panels. */
+  --card-edge: rgba(255, 255, 255, 0.78);
+  --card-shadow:
+    0 20px 54px rgba(118, 75, 146, 0.11), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --pop-shadow:
+    0 22px 58px rgba(111, 68, 130, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.75);
+
+  /* A settled indigo, not a bright one. It has to hold a large ring for
      twenty-five minutes without becoming something you want to look away
-     from, so the chroma stays well under the teal's. */
-  --running: #3b6fb0;
-  --running-foreground: #f7faff;
-  --running-muted: #dce7f6;
+     from, so the chroma stays well under the plum's. */
+  --running: #3d5fb2;
+  --running-foreground: #f7f9ff;
+  --running-muted: #dde4f8;
 
   /* Cool and low-chroma, so recovery reads as a different kind of time at a
      glance rather than as "the timer, but a bit different". */
-  --rest: #5a7f8c;
-  --rest-foreground: #f7fafb;
-  --rest-muted: #dfe8eb;
-  --rest-track: #e6ebed;
+  --rest: #66748f;
+  --rest-foreground: #f7f9fc;
+  --rest-muted: #e2e7f0;
+  --rest-track: #e7eaf3;
 
-  --arc-track: #e9e2d6;
-  --arc-tick: #c8bfae;
+  --arc-track: #e8e2f2;
+  --arc-tick: #c9c0dc;
 
-  --chart-1: #2f6f6a;
-  --chart-2: #c97b27;
-  --chart-3: #6f8f7a;
-  --chart-4: #a8896b;
-  --chart-5: #b85c4a;
+  --chart-1: #654263;
+  --chart-2: #4a5fc4;
+  --chart-3: #227a65;
+  --chart-4: #b98a3f;
+  --chart-5: #b34462;
 
   /* The wider money palette. Each entry is a distinct hue; amber/clay read
      from the chart tokens, everything else lives here so the budget can
@@ -240,14 +246,14 @@
   --money-lilac: #8f7ba8;
   --money-peach: #c9976b;
 
-  --sidebar: #f5f1ea;
-  --sidebar-foreground: #3b3630;
-  --sidebar-primary: #2f6f6a;
-  --sidebar-primary-foreground: #f6fbfa;
-  --sidebar-accent: #e4edeb;
-  --sidebar-accent-foreground: #24564f;
-  --sidebar-border: #e4ded2;
-  --sidebar-ring: #2f6f6a;
+  --sidebar: rgba(255, 255, 255, 0.62);
+  --sidebar-foreground: #3b3044;
+  --sidebar-primary: #654263;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(238, 221, 250, 0.68);
+  --sidebar-accent-foreground: #603b64;
+  --sidebar-border: rgba(105, 74, 128, 0.23);
+  --sidebar-ring: #654263;
 
   --paper: #f4ecdc;
   --paper-edge: #e2d5bc;
@@ -259,47 +265,63 @@
 }
 
 .dark {
-  --background: #14120f;
-  --foreground: #ece6dc;
+  /* Deep navy with blue and violet light wells. */
+  --atmosphere:
+    linear-gradient(32deg, rgba(27, 76, 153, 0.11) 0 19%, transparent 19%),
+    linear-gradient(145deg, transparent 0 85%, rgba(87, 42, 155, 0.1) 85%),
+    radial-gradient(ellipse at 4% 5%, rgba(39, 72, 151, 0.52), transparent 39%),
+    radial-gradient(ellipse at 93% 14%, rgba(91, 45, 145, 0.31), transparent 41%),
+    radial-gradient(ellipse at 83% 85%, rgba(13, 87, 133, 0.28), transparent 45%),
+    linear-gradient(135deg, #060a19, #080d21 46%, #05091b);
 
-  --card: #1c1a16;
-  --card-foreground: #ece6dc;
-  --popover: #1c1a16;
-  --popover-foreground: #ece6dc;
+  --background: #060a19;
+  --foreground: #f1f5ff;
 
-  --primary: #6fb3ab;
-  --primary-foreground: #10201e;
-  --secondary: #262320;
-  --secondary-foreground: #ded7cb;
-  --muted: #242019;
-  --muted-foreground: #9d9488;
-  --accent: #23322f;
-  --accent-foreground: #a6d5ce;
-  --destructive: #d4796a;
+  --card: rgba(12, 25, 55, 0.69);
+  --card-foreground: #f1f5ff;
+  --popover: rgba(11, 21, 46, 0.92);
+  --popover-foreground: #f1f5ff;
 
-  --border: #2c2823;
-  --input: #35302a;
-  --ring: #6fb3ab;
+  --primary: #3652e9;
+  --primary-foreground: #ffffff;
+  --secondary: rgba(25, 43, 82, 0.61);
+  --secondary-foreground: #eaf1ff;
+  --muted: rgba(25, 43, 82, 0.5);
+  --muted-foreground: #b2c0dc;
+  --accent: rgba(57, 82, 165, 0.3);
+  --accent-foreground: #a7b8ff;
+  --destructive: #ff7c91;
+
+  --border: rgba(139, 163, 229, 0.27);
+  --input: rgba(139, 163, 229, 0.34);
+  --input-surface: #0e1b37;
+  --ring: #8fa3ff;
+
+  --card-edge: rgba(149, 174, 247, 0.25);
+  --card-shadow:
+    0 26px 64px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(228, 239, 255, 0.11);
+  --pop-shadow:
+    0 28px 68px rgba(0, 0, 0, 0.39), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 
   /* Lifted and slightly desaturated for the dark surface: the light-mode blue
      goes muddy on near-black, and a saturated one glares. */
-  --running: #7ba7de;
-  --running-foreground: #0d1626;
-  --running-muted: #1a2740;
+  --running: #8aa2f0;
+  --running-foreground: #0c1226;
+  --running-muted: #1c2545;
 
-  --rest: #7fa6b3;
-  --rest-foreground: #0f1a1e;
-  --rest-muted: #1e2b30;
-  --rest-track: #232c30;
+  --rest: #93a0bd;
+  --rest-foreground: #0c1220;
+  --rest-muted: #1b2338;
+  --rest-track: #212a42;
 
-  --arc-track: #2b2721;
-  --arc-tick: #4a443b;
+  --arc-track: #1b2340;
+  --arc-tick: #3d496e;
 
-  --chart-1: #6fb3ab;
-  --chart-2: #e0a050;
-  --chart-3: #8fae98;
-  --chart-4: #c2a184;
-  --chart-5: #d4796a;
+  --chart-1: #a7b8ff;
+  --chart-2: #18bd99;
+  --chart-3: #ffd17d;
+  --chart-4: #ff7c91;
+  --chart-5: #c9a6f2;
 
   --money-amber: #e0a050;
   --money-rust: #c07a52;
@@ -322,14 +344,14 @@
   --money-lilac: #ad9cc2;
   --money-peach: #d9ab85;
 
-  --sidebar: #1a1814;
-  --sidebar-foreground: #ded7cb;
-  --sidebar-primary: #6fb3ab;
-  --sidebar-primary-foreground: #10201e;
-  --sidebar-accent: #23322f;
-  --sidebar-accent-foreground: #a6d5ce;
-  --sidebar-border: #2c2823;
-  --sidebar-ring: #6fb3ab;
+  --sidebar: rgba(12, 25, 55, 0.62);
+  --sidebar-foreground: #dfe7f8;
+  --sidebar-primary: #3652e9;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(57, 82, 165, 0.3);
+  --sidebar-accent-foreground: #a7b8ff;
+  --sidebar-border: rgba(139, 163, 229, 0.27);
+  --sidebar-ring: #8fa3ff;
 
   /* Aged cream — the paper darkens a little at night, it never becomes ink. */
   --paper: #ebe0cc;
@@ -374,7 +396,22 @@
 
   --border: #221b30;
   --input: #2a2138;
+  --input-surface: #171122;
   --ring: #b089b2;
+
+  /* The violet night gets its own atmosphere — otherwise it would inherit
+     the navy one from `.dark` and glow the wrong colour behind its glass. */
+  --atmosphere:
+    radial-gradient(ellipse at 4% 5%, rgba(74, 37, 120, 0.55), transparent 40%),
+    radial-gradient(ellipse at 93% 14%, rgba(120, 46, 104, 0.3), transparent 42%),
+    radial-gradient(ellipse at 83% 85%, rgba(44, 28, 88, 0.4), transparent 45%),
+    linear-gradient(135deg, #0b0811, #0e0a18 46%, #090510);
+
+  --card-edge: rgba(176, 137, 178, 0.28);
+  --card-shadow:
+    0 26px 64px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(236, 230, 220, 0.08);
+  --pop-shadow:
+    0 28px 68px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 
   --arc-track: #1c1626;
   --arc-tick: #3a3148;
@@ -411,16 +448,30 @@
 
   body {
     @apply bg-background text-foreground;
+    /* The whole theme sits on this field. Fixed, so it stays put while the
+       day's list scrolls over it — the glass has something to blur. */
+    background-image: var(--atmosphere);
+    background-attachment: fixed;
     font-size: var(--text-body);
     line-height: var(--text-body--line-height);
     -webkit-font-smoothing: antialiased;
   }
 
-  h1,
-  h2,
-  h3 {
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 30%, transparent);
+  }
+
+  h1 {
     @apply font-display;
     font-weight: 500;
+    overflow-wrap: anywhere;
+  }
+
+  h2,
+  h3 {
+    @apply font-sans;
+    font-weight: 600;
+    overflow-wrap: anywhere;
   }
 
   /* Every number in this app is a timer, a count, or a duration. */
@@ -484,6 +535,123 @@
       var(--paper-rule) var(--paper-rule-pitch, 1.9rem)
     );
     line-height: var(--paper-rule-pitch, 1.9rem);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Glass over the atmosphere.
+
+   The reference draws every large surface as frosted glass over one fixed
+   gradient field. Unlayered on purpose: these rules have to outrank the
+   Tailwind utilities that would otherwise paint a surface flat and stamp the
+   old hairline ring on top.
+--------------------------------------------------------------------------- */
+
+/* The main column is a window onto the atmosphere, not a painted panel. */
+[data-slot="sidebar-inset"] {
+  background-color: transparent;
+}
+
+[data-slot="card"],
+[data-slot="dialog-content"],
+[data-slot="popover-content"],
+[data-slot="dropdown-menu-content"],
+[data-slot="dropdown-menu-sub-content"],
+[data-slot="select-content"],
+[data-slot="sheet-content"],
+[data-slot="sidebar-inner"],
+/* Most of the app's panels are plain divs rather than the Card component. */
+.bg-card,
+.bg-popover,
+.bg-sidebar {
+  backdrop-filter: blur(22px) saturate(1.3);
+  -webkit-backdrop-filter: blur(22px) saturate(1.3);
+}
+
+/* Frosted edge and soft elevation, replacing the flat hairline ring. */
+[data-slot="card"] {
+  border: 1px solid var(--card-edge);
+  box-shadow: var(--card-shadow);
+}
+
+[data-slot="dialog-content"] {
+  box-shadow: var(--pop-shadow);
+}
+
+/* Primary action: a plum fill in light, the reference's blue-to-violet
+   gradient in dark. Scoped to `.bg-primary` so buttons that swapped their
+   fill for a reserved colour (`bg-running` and friends) keep it. */
+[data-slot="button"].bg-primary {
+  box-shadow: 0 4px 12px rgba(89, 50, 89, 0.2);
+}
+
+.dark:not([data-theme="eggplant"]) [data-slot="button"].bg-primary {
+  background-image: linear-gradient(100deg, #284be3, #5e31d3);
+  border-color: #4c54e6;
+  box-shadow: 0 3px 0 #1b2374;
+}
+
+.dark:not([data-theme="eggplant"]) [data-slot="button"].bg-primary:hover {
+  background-image: linear-gradient(100deg, #345bff, #7040ea);
+  border-color: #6674ff;
+}
+
+/**
+ * Opaque twins where the glass can't exist: no `backdrop-filter`, or a reader
+ * who asked for less transparency. Same tokens, no alpha.
+ */
+@supports not (backdrop-filter: blur(1px)) {
+  :root {
+    --card: #fdf9ff;
+    --popover: #fffdfe;
+    --secondary: #f7f1fc;
+    --muted: #f5effc;
+    --accent: #f0e4fa;
+    --sidebar: #fdf9ff;
+  }
+
+  .dark {
+    --card: #0e1b37;
+    --popover: #0c1830;
+    --secondary: #172a50;
+    --muted: #152648;
+    --accent: #1d3164;
+    --sidebar: #0e1b37;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --card: #fdf9ff;
+    --popover: #fffdfe;
+    --secondary: #f7f1fc;
+    --muted: #f5effc;
+    --accent: #f0e4fa;
+    --sidebar: #fdf9ff;
+  }
+
+  .dark {
+    --card: #0e1b37;
+    --popover: #0c1830;
+    --secondary: #172a50;
+    --muted: #152648;
+    --accent: #1d3164;
+    --sidebar: #0e1b37;
+  }
+
+  [data-slot="card"],
+  [data-slot="dialog-content"],
+  [data-slot="popover-content"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="dropdown-menu-sub-content"],
+  [data-slot="select-content"],
+  [data-slot="sheet-content"],
+  [data-slot="sidebar-inner"],
+  .bg-card,
+  .bg-popover,
+  .bg-sidebar {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 }
 

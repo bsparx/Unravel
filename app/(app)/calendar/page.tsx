@@ -164,7 +164,7 @@ export default async function CalendarPage({
     if (anchorIsToday) {
       return committed.length > 0
         ? "All planned time is behind you."
-        : "Nothing planned yet — click anywhere on today to open a slot.";
+        : "Nothing planned yet. Choose a time to add a block.";
     }
     if (committed.length === 0) return "Nothing planned yet.";
     return (
@@ -183,14 +183,14 @@ export default async function CalendarPage({
   })();
 
   return (
-    <div className="w-full px-2 py-4 md:px-3">
+    <div className="w-full px-4 py-6 md:px-6 md:py-8">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-display">Calendar</h1>
           <p className="text-muted-foreground mt-1 text-label">
             {view === "day"
               ? formatFullDate(anchor)
-              : `${formatDate(start)} – ${formatDate(addDays(start, 6))}`}
+              : `${formatDate(start)} - ${formatDate(addDays(start, 6))}`}
           </p>
           <p className="text-muted-foreground mt-0.5 text-label">{headline}</p>
           {/* Only when there is something to say. A day with room to switch in
@@ -209,15 +209,15 @@ export default async function CalendarPage({
           )}
         </div>
 
-        <div className="flex items-center gap-2">
-          <nav aria-label="View" className="flex gap-1">
+        <div className="flex flex-wrap items-center gap-3">
+          <nav aria-label="View" className="bg-secondary/50 flex gap-1 rounded-[13px] p-1">
             {(["day", "week"] as const).map((option) => (
               <Link
                 key={option}
                 href={`/calendar?view=${option}&date=${anchorISO}`}
                 aria-current={view === option ? "true" : undefined}
                 className={cn(
-                  "focus-visible:ring-ring rounded-full px-3 py-1 text-label capitalize transition-colors focus-visible:ring-2 focus-visible:outline-none",
+                  "focus-visible:ring-ring inline-flex min-h-11 min-w-14 items-center justify-center rounded-[10px] px-3 py-2 text-label capitalize transition-colors focus-visible:ring-2 focus-visible:outline-none",
                   view === option
                     ? "bg-secondary text-secondary-foreground font-medium"
                     : "text-muted-foreground hover:text-foreground",
@@ -228,17 +228,17 @@ export default async function CalendarPage({
             ))}
           </nav>
 
-          <div className="border-border flex items-center rounded-full border">
-            <Button asChild variant="ghost" size="icon" className="rounded-l-full">
-              <Link href={hrefFor(addDays(anchor, -step))} aria-label="Previous">
+          <div className="border-border flex items-center rounded-[13px] border p-1">
+            <Button asChild variant="ghost" size="icon" className="size-11 rounded-[10px]">
+              <Link href={hrefFor(addDays(anchor, -step))} aria-label={`Previous ${view}`}>
                 <ChevronLeft className="size-4" aria-hidden />
               </Link>
             </Button>
-            <Button asChild variant="ghost" size="sm" className="rounded-none px-3">
+            <Button asChild variant="ghost" size="sm" className="min-h-11 rounded-[10px] px-3">
               <Link href={hrefFor(today)}>Today</Link>
             </Button>
-            <Button asChild variant="ghost" size="icon" className="rounded-r-full">
-              <Link href={hrefFor(addDays(anchor, step))} aria-label="Next">
+            <Button asChild variant="ghost" size="icon" className="size-11 rounded-[10px]">
+              <Link href={hrefFor(addDays(anchor, step))} aria-label={`Next ${view}`}>
                 <ChevronRight className="size-4" aria-hidden />
               </Link>
             </Button>
@@ -252,6 +252,7 @@ export default async function CalendarPage({
           blocks={blocks}
           prayerBands={prayerBands}
           todayISO={toISODate(today)}
+          anchorISO={anchorISO}
           timeZone={user.timezone}
           tasks={schedulable.map((task) => ({
             id: task.id,
@@ -270,7 +271,7 @@ export default async function CalendarPage({
             blockedDays={blockedDays}
           />
           <section>
-            <h2 className="font-display text-title">
+            <h2 className="font-heading text-lg font-semibold">
               Not on the day yet
               {schedulable.length > 0 && (
                 <span className="text-muted-foreground font-sans text-label">
@@ -293,8 +294,7 @@ export default async function CalendarPage({
       </div>
 
       <p className="text-muted-foreground mt-6 text-label">
-        A block is a plan and a session is what happened — the app keeps them
-        apart on purpose, so{" "}
+        Blocks show planned time. Sessions show what happened, so{" "}
         <Link href="/stats" className="hover:text-foreground underline underline-offset-4">
           your stats
         </Link>{" "}

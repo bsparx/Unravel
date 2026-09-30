@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -23,7 +24,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { IdentityReinforcement } from "@/lib/identity-reinforcement";
-import { cn } from "@/lib/utils";
 
 /**
  * Add or edit one identity: its name, its statement, its characteristics, and
@@ -45,6 +45,10 @@ export function IdentityDialog({
     identity ? identity.linked.map((habit) => habit.habitId) : [],
   );
   const [pending, startTransition] = useTransition();
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  // If creation succeeded but linking failed, retry the same identity.
+  const [createdIdentityId, setCreatedIdentityId] = useState<string | null>(null);
 
   const toggle = (id: string) =>
     setSelected((current) =>
@@ -59,66 +63,73 @@ export function IdentityDialog({
     const name = String(form.get("name") ?? "").trim();
     const statement = String(form.get("statement") ?? "").trim();
     const characteristics = String(form.get("characteristics") ?? "").trim();
+    setNameError(null);
+    setSaveError(null);
 
     if (!name) {
-      toast.error("Name it — the noun, like \"Writer\".");
+      setNameError("Give this identity a name, such as Writer.");
       return;
     }
 
     startTransition(async () => {
-      let identityId = identity?.id ?? null;
+      try {
+        let identityId = identity?.id ?? createdIdentityId;
 
-      if (identity) {
-        const result = await updateIdentity({
-          id: identity.id,
-          name,
-          statement: statement || null,
-          characteristics: characteristics || null,
-        });
-        if (!result.ok) {
-          toast.error(result.message);
+        if (identityId) {
+          const result = await updateIdentity({
+            id: identityId,
+            name,
+            statement: statement || null,
+            characteristics: characteristics || null,
+          });
+          if (!result.ok) {
+            setSaveError(result.message);
+            return;
+          }
+        } else {
+          const result = await createIdentity(
+            name,
+            statement || null,
+            characteristics || null,
+          );
+          if (!result.ok) {
+            setSaveError(result.message);
+            return;
+          }
+          identityId = result.identity.id;
+          setCreatedIdentityId(identityId);
+        }
+
+        // The links are the second half of the same thought. Set semantics: the
+        // chips are the whole answer.
+        const links = await setIdentityHabits(identityId!, selected);
+        if (!links.ok) {
+          setSaveError(links.message);
           return;
         }
-      } else {
-        const result = await createIdentity(
-          name,
-          statement || null,
-          characteristics || null,
-        );
-        if (!result.ok) {
-          toast.error(result.message);
-          return;
-        }
-        identityId = result.identity.id;
-      }
 
-      // The links are the second half of the same thought. Set semantics: the
-      // chips are the whole answer.
-      const links = await setIdentityHabits(identityId!, selected);
-      if (!links.ok) {
-        toast.error(links.message);
-        return;
+        toast.success(identity ? `Saved "${name}".` : `"${name}" added.`);
+        onOpenChange(false);
+      } catch {
+        setSaveError("Could not save this identity. Your draft is still here. Try again.");
       }
-
-      toast.success(identity ? `Saved "${name}".` : `"${name}" added.`);
-      onOpenChange(false);
     });
   };
 
   return (
-    <Dialog open onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+    <Dialog open onOpenChange={(open) => { if (!pending) onOpenChange(open); }}>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-[20px] p-5 sm:max-w-lg sm:p-6">
         <DialogHeader>
-          <DialogTitle className="font-display">
+          <DialogTitle className="font-sans text-xl font-semibold">
             {identity ? identity.name : "Add identity"}
           </DialogTitle>
           <DialogDescription>
-            Who you are becoming. The habits you link are the evidence — every
-            one you keep casts a vote for this.
+            Link habits that help you practise this identity. Keeping a
+            habit&apos;s minimum counts as a vote.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} className="space-y-5" aria-busy={pending}>
           <div className="space-y-2">
             <Label htmlFor="identity-name" className="text-label font-medium">
               Name
@@ -130,8 +141,12 @@ export function IdentityDialog({
               maxLength={24}
               defaultValue={identity?.name ?? ""}
               placeholder="Writer"
-              className="h-9"
+              className="min-h-11"
+              aria-invalid={!!nameError}
+              aria-describedby={nameError ? "identity-name-error" : undefined}
+              disabled={pending}
             />
+            {nameError && <p id="identity-name-error" role="alert" className="text-destructive text-label">{nameError}</p>}
           </div>
 
           <div className="space-y-2">
@@ -144,11 +159,12 @@ export function IdentityDialog({
               maxLength={200}
               defaultValue={identity?.statement ?? ""}
               placeholder="I am someone who writes every day."
-              className="h-9"
+              className="min-h-11"
+              aria-describedby="identity-statement-help"
+              disabled={pending}
             />
-            <p className="text-muted-foreground text-micro">
-              The sentence the habits are evidence for. The tally reads it back
-              at you.
+            <p id="identity-statement-help" className="text-muted-foreground text-label">
+              A sentence that describes the person you want to become.
             </p>
           </div>
 
@@ -162,46 +178,47 @@ export function IdentityDialog({
               rows={5}
               maxLength={5000}
               defaultValue={identity?.characteristics ?? ""}
-              placeholder="What this one looks like. How it moves, speaks, decides. What it does that none of the others do."
+              placeholder="The choices and qualities you want to practise."
               className="resize-none text-body"
+              aria-describedby="identity-characteristics-help"
+              disabled={pending}
             />
-            <p className="text-muted-foreground text-micro">
-              The archetype&apos;s portrait. Optional, and fine empty.
+            <p id="identity-characteristics-help" className="text-muted-foreground text-label">
+              Optional. Add details that make this identity useful to you.
             </p>
           </div>
 
-          <div className="space-y-2">
-            <Label className="text-label font-medium">
+          <fieldset className="space-y-2" disabled={pending}>
+            <legend className="text-label font-medium">
               Which habits vote for it?
-            </Label>
-            <div className="flex flex-wrap gap-1.5">
+            </legend>
+            <div className="flex flex-wrap gap-2">
               {habits.map((habit) => {
                 const on = selected.includes(habit.id);
                 return (
-                  <button
+                  <Button
                     key={habit.id}
                     type="button"
                     onClick={() => toggle(habit.id)}
                     aria-pressed={on}
-                    className={cn(
-                      "border-border text-label focus-visible:ring-ring inline-flex h-7 items-center rounded-full border px-2.5 transition-colors focus-visible:ring-2 focus-visible:outline-none",
-                      on
-                        ? "bg-primary text-primary-foreground border-transparent"
-                        : "bg-background text-muted-foreground hover:bg-muted hover:text-foreground",
-                      habit.archived && "opacity-60",
-                    )}
+                    variant={on ? "default" : "outline"}
+                    className="h-auto min-h-11 max-w-full py-2 text-left text-label whitespace-normal"
                   >
                     {habit.title}
-                  </button>
+                    {habit.archived && <span className="text-xs">(archived)</span>}
+                  </Button>
                 );
               })}
               {habits.length === 0 && (
-                <p className="text-muted-foreground text-label">
-                  No habits yet — add one on /habits first.
-                </p>
+                <div className="space-y-2">
+                  <p className="text-muted-foreground text-label">No habits yet. You can link one later.</p>
+                  <Button variant="outline" asChild><Link href="/habits/new">Add habit</Link></Button>
+                </div>
               )}
             </div>
-          </div>
+          </fieldset>
+
+          {saveError && <p role="alert" className="text-destructive text-label">{saveError}</p>}
 
           <div className="border-border flex items-center justify-between gap-3 border-t pt-4">
             {identity ? (
@@ -212,13 +229,14 @@ export function IdentityDialog({
                     variant="ghost"
                     className="text-muted-foreground hover:text-destructive"
                     onClick={openDialog}
+                    disabled={pending}
                   >
                     <Trash2 className="size-4" aria-hidden />
                     Delete
                   </Button>
                 )}
                 title={`Delete "${identity.name}"?`}
-                description="The habits and their history stand — they just stop counting for this one. Since the tally reads your links as they are today, its votes leave with it."
+                description="Your habits and their history stay. This identity and its links are removed, so its vote tally is no longer shown."
                 confirmLabel="Delete identity"
                 onConfirm={async () => {
                   const result = await deleteIdentity(identity.id);
@@ -239,6 +257,7 @@ export function IdentityDialog({
                 type="button"
                 variant="ghost"
                 onClick={() => onOpenChange(false)}
+                disabled={pending}
               >
                 Cancel
               </Button>

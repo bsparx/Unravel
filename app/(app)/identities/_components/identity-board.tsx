@@ -3,10 +3,18 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus, UserRound } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, MoreHorizontal, Pencil, Plus, UserRound } from "lucide-react";
+import { Collapsible } from "radix-ui";
 
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { IdentityReinforcement } from "@/lib/identity-reinforcement";
 import { cn } from "@/lib/utils";
 
@@ -14,27 +22,25 @@ import { IdentityDialog } from "./identity-dialog";
 
 type HabitOption = { id: string; title: string; archived: boolean };
 
-/**
- * The identities, their tallies, and the two panels that say who to worry
- * about: habits that are nobody's evidence yet, and identities going hungry.
- * All management happens in the dialog — one screen, one decision at a time —
- * and every mutation refreshes the server props rather than keeping a second
- * copy of the tally in client state that could disagree with the page.
- */
+/** The server remains the source of truth for every vote and linked habit. */
 export function IdentityBoard({
   identities,
   focus,
   habits,
   unlinked,
+  pendingHabitIds,
 }: {
   identities: IdentityReinforcement[];
   focus: IdentityReinforcement[];
   habits: HabitOption[];
   unlinked: { id: string; title: string }[];
+  pendingHabitIds: string[];
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState<IdentityReinforcement | null>(null);
   const [creating, setCreating] = useState(false);
+  const focusIds = new Set(focus.map((identity) => identity.id));
+  const pendingIds = new Set(pendingHabitIds);
 
   const close = () => {
     setCreating(false);
@@ -43,10 +49,10 @@ export function IdentityBoard({
   };
 
   return (
-    <div className="space-y-10">
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-muted-foreground text-label">Last 30 days.</p>
-        <Button size="sm" onClick={() => setCreating(true)}>
+    <div className="space-y-8">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <p className="text-muted-foreground text-label">Last 30 days</p>
+        <Button onClick={() => setCreating(true)}>
           <Plus className="size-4" aria-hidden />
           Add identity
         </Button>
@@ -56,14 +62,17 @@ export function IdentityBoard({
         <EmptyState
           icon={UserRound}
           title="No identities yet"
-          description="Name who you want to become — a writer, an athlete — then link the habits that are evidence for it. The tally starts the same day."
+          description="Name who you want to become, then link a habit that helps you practise it. Keeping its minimum counts as a vote."
+          className="rounded-[20px]"
         />
       ) : (
-        <ul className="space-y-3">
+        <ul className="space-y-5">
           {identities.map((identity) => (
             <IdentityCard
               key={identity.id}
               identity={identity}
+              needsAttention={focusIds.has(identity.id) && identity.missed > 0}
+              pendingHabit={identity.linked.find((habit) => pendingIds.has(habit.habitId))}
               onEdit={() => setEditing(identity)}
             />
           ))}
@@ -72,12 +81,8 @@ export function IdentityBoard({
 
       {unlinked.length > 0 && <UnlinkedHabitsSection habits={unlinked} />}
 
-      {focus.length > 0 && <NeedsFocusSection focus={focus} />}
-
       {(creating || editing) && (
         <IdentityDialog
-          // Keyed so the form mounts with the right values every time — a
-          // dialog kept alive between edits would show the last one's state.
           key={editing?.id ?? "new"}
           identity={editing}
           habits={habits}
@@ -92,140 +97,199 @@ export function IdentityBoard({
 
 function IdentityCard({
   identity,
+  needsAttention,
+  pendingHabit,
   onEdit,
 }: {
   identity: IdentityReinforcement;
+  needsAttention: boolean;
+  pendingHabit: IdentityReinforcement["linked"][number] | undefined;
   onEdit: () => void;
 }) {
+  const reviewHabit = identity.starving[0];
+
   return (
-    <li className="border-border bg-card rounded-lg border p-4">
+    <li className="border-border bg-card min-w-0 rounded-[20px] border p-5 sm:p-6">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="font-display text-title">{identity.name}</h2>
-          {identity.statement && <p className="mt-0.5 text-label">{identity.statement}</p>}
-          {identity.characteristics && (
-            <p className="text-muted-foreground mt-1 line-clamp-3 whitespace-pre-wrap text-label">
-              {identity.characteristics}
-            </p>
-          )}
+        <div className="min-w-0 space-y-1.5">
+          <h2 className="font-sans text-xl leading-snug font-semibold break-words">{identity.name}</h2>
+          {identity.statement && <p className="max-w-prose text-body break-words">{identity.statement}</p>}
         </div>
-        <Button variant="ghost" size="sm" onClick={onEdit}>
-          <Pencil className="size-3.5" aria-hidden />
-          Edit
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="text-muted-foreground" aria-label={`More for ${identity.name}`}>
+              <MoreHorizontal className="size-4" aria-hidden />
+              More
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-44">
+            <DropdownMenuItem onSelect={onEdit} className="min-h-11">
+              <Pencil className="size-4" aria-hidden />
+              Edit identity
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {identity.linked.length === 0 ? (
-        <p className="text-muted-foreground mt-3 text-label">
-          No habits voting for this one yet — link one to start the tally.
-        </p>
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-muted-foreground max-w-prose text-label">
+            Link a habit to start gathering evidence for this identity.
+          </p>
+          <Button variant="secondary" onClick={onEdit}>Link habits</Button>
+        </div>
       ) : (
         <>
-          {/* One bar, split by outcome. Left to right, best to worst — the
-              shape of the row is the summary. */}
-          <div className="bg-muted mt-3 flex h-2 w-full overflow-hidden rounded-full">
-            <Segment value={identity.votes} total={identity.expected} className="bg-primary" label={`${identity.votes} days voted`} />
-            <Segment value={identity.skipped} total={identity.expected} className="bg-muted-foreground/30" label={`${identity.skipped} skipped`} />
-            <Segment value={identity.missed} total={identity.expected} className="bg-destructive/45" label={`${identity.missed} missed`} />
+          <p className="mt-5 text-body">
+            <span className="font-mono font-medium tabular-nums">{identity.votes}</span>{" "}
+            {identity.votes === 1 ? "vote" : "votes"}
+            <span className="text-muted-foreground">
+              {" "}from {identity.expected} due {identity.expected === 1 ? "check-in" : "check-ins"}
+            </span>
+          </p>
+
+          <div className="mt-4 space-y-2">
+            <p className="text-muted-foreground text-label">Habits that support this</p>
+            <ul className="flex flex-wrap gap-2">
+              {identity.linked.map((habit) => (
+                <li key={habit.habitId} className="min-w-0 max-w-full">
+                  <Link
+                    href={`/habits/${habit.habitId}`}
+                    aria-label={`Edit habit: ${habit.title}`}
+                    className="border-border text-foreground hover:bg-muted focus-visible:ring-ring inline-flex min-h-11 max-w-full items-center rounded-lg border px-3 py-2 text-label break-words transition-colors focus-visible:ring-2 focus-visible:outline-none motion-reduce:transition-none"
+                  >
+                    <Pencil className="mr-2 size-3.5 shrink-0" aria-hidden />
+                    {habit.title}
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </div>
 
-          <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-label sm:grid-cols-4">
-            <Cell label="Votes" value={String(identity.votes)} detail={`of ${identity.expected} due`} />
-            <Cell label="Reinforced" value={`${identity.reinforcement}%`} />
-            <Cell
-              label="Kept going"
-              value={String(identity.wentBeyondVotes)}
-              detail={identity.votes > 0 ? "of days voted" : undefined}
-            />
-            <Cell
-              label="Missed"
-              value={String(identity.missed)}
-              detail={identity.skipped > 0 ? `${identity.skipped} skipped on purpose` : undefined}
-            />
-          </dl>
-
-          {identity.coldDueDays > 0 && (
-            <p className="text-destructive/80 mt-2 text-label">
-              {identity.coldDueDays} due{" "}
-              {identity.coldDueDays === 1 ? "day" : "days"} without a vote.
-            </p>
-          )}
-
-          <Strip daily={identity.daily} />
-
-          <p className="text-muted-foreground mt-2 flex flex-wrap gap-1.5">
-            {identity.linked.map((habit) => (
-              <span
-                key={habit.habitId}
-                className="border-border rounded-full border px-2 py-0.5 text-micro"
-              >
-                {habit.title}
-              </span>
-            ))}
-          </p>
+          {pendingHabit ? (
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-muted-foreground max-w-prose text-label">
+                {pendingHabit.title} is due today. Its minimum is enough.
+              </p>
+              <Button variant="secondary" asChild>
+                <Link href={`/habits#habit-${pendingHabit.habitId}`}>
+                  Check in <ArrowRight className="size-4" aria-hidden />
+                </Link>
+              </Button>
+            </div>
+          ) : needsAttention && reviewHabit ? (
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-muted-foreground max-w-prose text-label">
+                Make {reviewHabit.title} easier to return to. You can adjust its minimum or schedule.
+              </p>
+              <Button variant="secondary" asChild>
+                <Link href={`/habits/${reviewHabit.habitId}`}>Review habit</Link>
+              </Button>
+            </div>
+          ) : null}
         </>
+      )}
+
+      {(identity.linked.length > 0 || identity.characteristics) && (
+        <Collapsible.Root className="border-border mt-5 border-t pt-2">
+          <Collapsible.Trigger asChild>
+            <Button variant="ghost" className="text-muted-foreground group -ml-2 justify-start">
+              Details &amp; history
+              <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180 motion-reduce:transition-none" aria-hidden />
+            </Button>
+          </Collapsible.Trigger>
+          <Collapsible.Content className="space-y-5 pt-3">
+            {identity.characteristics && (
+              <div className="space-y-2">
+                <h3 className="text-label font-medium">Characteristics</h3>
+                <p className="text-muted-foreground max-w-prose text-body break-words whitespace-pre-wrap">{identity.characteristics}</p>
+              </div>
+            )}
+            {identity.linked.length > 0 && (
+              <>
+                <dl className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3">
+                  <Cell label="Reinforcement" value={`${identity.reinforcement}%`} detail="Votes as a share of due check-ins" />
+                  <Cell label="Optional extra" value={String(identity.wentBeyondVotes)} detail="Kept going after the minimum" />
+                  <Cell label="Skipped" value={String(identity.skipped)} detail="A deliberate pause, not a miss" />
+                  <Cell label="Not recorded" value={String(identity.missed)} detail="Past due check-ins without a vote" />
+                  <Cell label="Still open today" value={String(identity.pending)} />
+                  <Cell label="Due days since a vote" value={String(identity.coldDueDays)} detail="Days off are outside this count" />
+                </dl>
+                <div>
+                  <h3 className="text-label font-medium">Daily votes</h3>
+                  <p className="text-muted-foreground mt-1 text-label">
+                    Select a day for its tally. Skipped days and days off stay neutral.
+                  </p>
+                  <VoteHistory daily={identity.daily} />
+                </div>
+              </>
+            )}
+          </Collapsible.Content>
+        </Collapsible.Root>
       )}
     </li>
   );
 }
 
-/** The touched strip: filled means at least one vote that day. */
-function Strip({ daily }: { daily: IdentityReinforcement["daily"] }) {
+/** Zero votes is neutral here: the tally cannot distinguish skips from misses. */
+function VoteHistory({ daily }: { daily: IdentityReinforcement["daily"] }) {
   return (
-    <div
-      className="mt-3 flex gap-0.5"
-      role="img"
-      aria-label="Days this identity got a vote, last 30 days"
-    >
-      {daily.map((day) => (
-        <span
-          key={day.dateISO}
-          title={
-            day.due === 0
-              ? `${day.dateISO} — nothing due`
-              : `${day.dateISO} — ${day.votes} of ${day.due} votes`
-          }
-          className={cn(
-            "h-4 flex-1 rounded-sm",
-            day.touched
-              ? "bg-primary"
-              : day.due > 0
-                ? "bg-destructive/35"
-                : "bg-muted",
-          )}
-        />
-      ))}
-    </div>
+    <ul className="mt-3 grid grid-cols-4 gap-1.5 min-[420px]:grid-cols-5 sm:grid-cols-7">
+      {daily.map((day) => {
+        const date = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${day.dateISO}T00:00:00Z`));
+        const tally = day.due === 0
+          ? "Nothing due"
+          : `${day.votes} ${day.votes === 1 ? "vote" : "votes"} from ${day.due} due ${day.due === 1 ? "check-in" : "check-ins"}`;
+
+        return (
+          <li key={day.dateISO} className="min-w-0">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  aria-label={`${date}: ${tally}`}
+                  className={cn(
+                    "border-border h-auto min-h-11 w-full flex-col gap-0.5 rounded-lg border px-1 py-2 font-mono text-xs tabular-nums",
+                    day.touched ? "bg-primary/10 text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  {day.dateISO.slice(-2)}
+                  {day.touched ? <Check className="size-3" aria-hidden /> : <span className="h-3 text-[10px]">{day.due > 0 ? "0" : "-"}</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="max-w-[calc(100vw-2rem)] p-4">
+                <p className="font-medium">{date}</p>
+                <p>{tally}</p>
+                {day.due > 0 && day.votes === 0 && (
+                  <p className="text-muted-foreground">A skipped check-in records a deliberate pause. It does not count as a miss.</p>
+                )}
+              </PopoverContent>
+            </Popover>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
-/**
- * Habits that are nobody's evidence yet. A setup gap, not a verdict: the
- * habit exists, it just isn't counted for any self until it is linked. Each
- * name goes to the habit form, where the identity chips already live.
- */
-function UnlinkedHabitsSection({
-  habits,
-}: {
-  habits: { id: string; title: string }[];
-}) {
+function UnlinkedHabitsSection({ habits }: { habits: { id: string; title: string }[] }) {
   return (
-    <section>
-      <h2 className="font-display text-title">Not voting yet</h2>
-      <p className="text-muted-foreground mt-0.5 mb-3 max-w-prose text-label">
-        These habits are nobody&apos;s evidence yet. Link one and its kept
-        days start counting as votes.
-      </p>
-      <ul className="space-y-3">
+    <section className="space-y-3">
+      <div className="space-y-1.5">
+        <h2 className="font-sans text-xl font-semibold">Habits without an identity</h2>
+        <p className="text-muted-foreground max-w-prose text-label">
+          Linking is optional. Open a habit to choose which identities its kept days support.
+        </p>
+      </div>
+      <ul className="flex flex-wrap gap-2">
         {habits.map((habit) => (
-          <li
-            key={habit.id}
-            className="border-border bg-card rounded-lg border p-4"
-          >
+          <li key={habit.id} className="min-w-0 max-w-full">
             <Link
               href={`/habits/${habit.id}`}
-              className="text-foreground hover:text-primary underline underline-offset-4"
+              aria-label={`Edit habit: ${habit.title}`}
+              className="border-border hover:bg-muted focus-visible:ring-ring inline-flex min-h-11 max-w-full items-center rounded-lg border px-3 py-2 text-label break-words transition-colors focus-visible:ring-2 focus-visible:outline-none motion-reduce:transition-none"
             >
+              <Pencil className="mr-2 size-3.5 shrink-0" aria-hidden />
               {habit.title}
             </Link>
           </li>
@@ -235,100 +299,12 @@ function UnlinkedHabitsSection({
   );
 }
 
-/**
- * The hungry ones. Deliberately a pointer, not a verdict: the identities with
- * the fewest votes in the range, with the specific habits that cost them.
- */
-function NeedsFocusSection({ focus }: { focus: IdentityReinforcement[] }) {
+function Cell({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
-    <section>
-      <h2 className="font-display text-title">Needs focus</h2>
-      <p className="text-muted-foreground mt-0.5 mb-3 max-w-prose text-label">
-        The identities with the fewest votes lately, and the habits that
-        missed. Not a verdict — a pointer.
-      </p>
-      <ul className="space-y-3">
-        {focus.map((identity) => (
-          <li key={identity.id} className="border-border bg-card rounded-lg border p-4">
-            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-              <h3 className="font-display text-body">{identity.name}</h3>
-              <span className="text-label tabular-nums">
-                {identity.reinforcement}%
-                <span className="text-muted-foreground">
-                  {" "}
-                  · {identity.votes} of {identity.expected} votes
-                </span>
-              </span>
-            </div>
-
-            {identity.coldDueDays > 0 && (
-              <p className="text-destructive/80 mt-1 text-label">
-                {identity.coldDueDays} due{" "}
-                {identity.coldDueDays === 1 ? "day" : "days"} without a vote.
-              </p>
-            )}
-
-            {identity.starving.length > 0 && (
-              <p className="text-muted-foreground mt-1 text-label">
-                Missed:{" "}
-                {identity.starving.map((habit, index) => (
-                  <span key={habit.habitId}>
-                    {index > 0 && " · "}
-                    <Link
-                      href={`/habits/${habit.habitId}`}
-                      className="text-foreground hover:text-primary underline underline-offset-4"
-                    >
-                      {habit.title}
-                    </Link>{" "}
-                    <span className="tabular-nums">{habit.missed}×</span>
-                  </span>
-                ))}
-              </p>
-            )}
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-function Segment({
-  value,
-  total,
-  className,
-  label,
-}: {
-  value: number;
-  total: number;
-  className: string;
-  label: string;
-}) {
-  if (value <= 0 || total <= 0) return null;
-  return (
-    <span
-      title={label}
-      className={className}
-      style={{ width: `${(value / total) * 100}%` }}
-    />
-  );
-}
-
-function Cell({
-  label,
-  value,
-  detail,
-}: {
-  label: string;
-  value: string;
-  detail?: string;
-}) {
-  return (
-    <div>
-      <dt className="text-micro text-muted-foreground font-medium tracking-wider uppercase">
-        {label}
-      </dt>
-      <dd className="font-mono tabular-nums">{value}</dd>
-      {detail && <p className="text-muted-foreground text-micro">{detail}</p>}
+    <div className="space-y-1">
+      <dt className="text-muted-foreground text-label">{label}</dt>
+      <dd className="font-mono text-body font-medium tabular-nums">{value}</dd>
+      {detail && <dd className="text-muted-foreground text-label">{detail}</dd>}
     </div>
   );
 }
