@@ -61,6 +61,8 @@ export async function getStats(user: User, range: StatsRange) {
     occurrenceDays,
     attachedSessionDays,
     occurrenceTasks,
+    habits,
+    habitOccurrences,
   ] = await Promise.all([
     prisma.focusSession.aggregate({
       where: { ...scope, ...workOnly },
@@ -212,6 +214,24 @@ export async function getStats(user: User, range: StatsRange) {
         loggedSeconds: { gt: 0 },
       },
       _sum: { loggedSeconds: true },
+    }),
+
+    // ---- habits ---------------------------------------------------------
+    // Independent of everything above, so they share its round trip. The
+    // history is reached through the relation rather than a list of ids, so
+    // it needn't wait for the habits either.
+    prisma.task.findMany({
+      where: { userId: user.id, type: "HABIT", archivedAt: null },
+      select: { id: true, title: true, recurrence: true },
+    }),
+    prisma.taskOccurrence.findMany({
+      where: {
+        userId: user.id,
+        task: { type: "HABIT", archivedAt: null },
+        status: { in: ["DONE", "SKIPPED"] },
+      },
+      select: { taskId: true, date: true, status: true },
+      orderBy: { date: "asc" },
     }),
   ]);
 
@@ -367,24 +387,7 @@ export async function getStats(user: User, range: StatsRange) {
     .sort((a, b) => b.overBy - a.overBy)
     .slice(0, 5);
 
-  // ---- habits -------------------------------------------------------------
-
-  const habits = await prisma.task.findMany({
-    where: { userId: user.id, type: "HABIT", archivedAt: null },
-    select: { id: true, title: true, recurrence: true },
-  });
-
-  const habitOccurrences = habits.length
-    ? await prisma.taskOccurrence.findMany({
-        where: {
-          userId: user.id,
-          taskId: { in: habits.map((habit) => habit.id) },
-          status: { in: ["DONE", "SKIPPED"] },
-        },
-        select: { taskId: true, date: true, status: true },
-        orderBy: { date: "asc" },
-      })
-    : [];
+  // ---- habits (fetched with the first round) -----------------------------
 
   const historyByHabit = new Map<string, Map<string, "DONE" | "SKIPPED">>();
   for (const occurrence of habitOccurrences) {

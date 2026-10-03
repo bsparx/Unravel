@@ -4,8 +4,9 @@ import { TimezoneSync } from "@/components/timezone-sync";
 import { WaterReminder } from "@/components/water-reminder";
 import { TimerProvider } from "@/app/(app)/timer/_hooks/timer-provider";
 import { getActiveSession } from "@/app/(app)/timer/_lib/session-hydrate";
+import { todayLocal } from "@/lib/dates";
 import type { User } from "@/lib/generated/prisma/client";
-import type { WaterToday } from "@/lib/water-data";
+import { getWaterToday } from "@/lib/water-data";
 
 /**
  * Everything a signed-in person carries with them, regardless of which layout
@@ -21,17 +22,21 @@ import type { WaterToday } from "@/lib/water-data";
  * interval index) lives in the `FocusSession` row and is re-read here by
  * `getActiveSession`. The only thing lost is an un-started config, which
  * `/timer` re-derives from its searchParams on arrival anyway.
+ *
+ * Its two reads are independent, so they share one round trip, and both are
+ * request-cached for the pages (/day, /timer) that ask for the same thing.
  */
 export async function AuthedProviders({
   user,
-  water,
   children,
 }: {
   user: User;
-  water: WaterToday;
   children: React.ReactNode;
 }) {
-  const active = await getActiveSession(user);
+  const [active, water] = await Promise.all([
+    getActiveSession(user),
+    getWaterToday(user, todayLocal(user.timezone)),
+  ]);
 
   return (
     <TimerProvider

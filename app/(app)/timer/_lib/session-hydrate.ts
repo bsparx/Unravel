@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { prisma } from "@/lib/db";
 import type { User } from "@/lib/generated/prisma/client";
 import {
@@ -43,10 +45,12 @@ export type HydratedSession = {
  * Also reaps stale rows lazily: a session whose tab died without a `pagehide`
  * beacon is marked ABANDONED the next time anyone looks, which is why this app
  * needs no cron job.
+ *
+ * Request-cached: the shared providers and /timer both ask on the same render.
  */
-export async function getActiveSession(
+export const getActiveSession = cache(async (
   user: User,
-): Promise<HydratedSession | null> {
+): Promise<HydratedSession | null> => {
   const session = await prisma.focusSession.findFirst({
     where: { userId: user.id, status: { in: ["RUNNING", "PAUSED"] } },
     orderBy: { startedAt: "desc" },
@@ -124,4 +128,4 @@ export async function getActiveSession(
     config,
     task: session.task,
   };
-}
+});

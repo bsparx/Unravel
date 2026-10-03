@@ -19,17 +19,19 @@ export const metadata = { title: "Identities" };
  */
 export default async function IdentitiesPage() {
   const user = await requireUser();
-  // Independent reads in one round; only the reinforcement needs the stats.
-  const [stats, votes, leadId] = await Promise.all([
-    getHabitStats(user, "month"),
+  // Everything in one round. The reinforcement takes the stats still in
+  // flight: its own query runs now and only its arithmetic waits for them.
+  const statsRead = getHabitStats(user, "month");
+  const [stats, votes, leadId, { identities: reinforced, focus }] = await Promise.all([
+    statsRead,
     getIdentityVotes(user),
     getLeadIdentityId(user),
+    getIdentityReinforcements(
+      user,
+      statsRead.then((read) => read.habits),
+      "month",
+    ),
   ]);
-  const { identities: reinforced, focus } = await getIdentityReinforcements(
-    user,
-    stats.habits,
-    "month",
-  );
   const profiles = new Map(votes.identities.map((identity) => [identity.id, identity]));
   const identities: BoardIdentity[] = reinforced.flatMap((identity) => {
     const profile = profiles.get(identity.id);

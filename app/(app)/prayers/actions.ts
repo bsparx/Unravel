@@ -29,14 +29,12 @@ export async function togglePrayer(formData: FormData): Promise<void> {
     prayer: prayer as PrayerKind,
   };
 
-  const existing = await prisma.prayerCheck.findUnique({
-    where: { userId_date_prayer: where },
-  });
-
-  if (existing) {
-    await prisma.prayerCheck.delete({ where: { id: existing.id } });
-  } else {
-    await prisma.prayerCheck.create({ data: where });
+  // Delete first: un-checking is then one write, and only a check that
+  // wasn't there needs the second. `skipDuplicates` keeps a double tap from
+  // tripping the unique constraint.
+  const { count } = await prisma.prayerCheck.deleteMany({ where });
+  if (count === 0) {
+    await prisma.prayerCheck.createMany({ data: [where], skipDuplicates: true });
   }
 
   revalidatePath("/day");

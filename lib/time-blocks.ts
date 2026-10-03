@@ -257,15 +257,9 @@ export async function getSchedulableItems(
 ): Promise<SchedulableItem[]> {
   // Reached through the block rather than a `taskId` column on it: a task is
   // spoken for once it sits *inside* any of the day's blocks, whether that
-  // block holds one task or four.
-  const alreadyBlocked = await prisma.timeBlockTask.findMany({
-    where: { block: { userId: user.id, date } },
-    select: { taskId: true },
-  });
-
-  const excluded = alreadyBlocked.map((link) => link.taskId);
-
-  const notBlocked = excluded.length > 0 ? { id: { notIn: excluded } } : {};
+  // block holds one task or four. A relation filter in each query rather than
+  // a lookup first, so nothing waits on a list of ids.
+  const notBlocked = { blocks: { none: { block: { userId: user.id, date } } } };
 
   const [todos, habits, occurrences, priorOccurrences] = await Promise.all([
     prisma.task.findMany({

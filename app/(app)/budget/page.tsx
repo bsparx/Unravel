@@ -109,14 +109,16 @@ export default async function BudgetPage({
       ? (parseLocalDate(`${raw}-01`) ?? thisMonth)
       : thisMonth;
 
-  // Global categories are the floor every account starts from. Idempotent —
-  // a no-op after the first visit.
-  await ensureGlobalCategories();
-
-  // Accounts came after the ledger: make sure there's always one to log into,
-  // and move any pre-account entry into it.
-  const mainAccount = await ensureDefaultAccount(user.id);
-  await backfillDefaultAccount(user.id, mainAccount.id);
+  // Two independent setup steps, side by side. Global categories are the
+  // floor every account starts from, and accounts came after the ledger: make
+  // sure there's always one to log into, and move any pre-account entry into
+  // it. Both are idempotent, a no-op after the first visit.
+  await Promise.all([
+    ensureGlobalCategories(),
+    ensureDefaultAccount(user.id).then((mainAccount) =>
+      backfillDefaultAccount(user.id, mainAccount.id),
+    ),
+  ]);
 
   const [month, categories, budgets, accounts, debts] = await Promise.all([
     getBudgetMonth(user, anchor),

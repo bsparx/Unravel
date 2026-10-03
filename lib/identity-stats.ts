@@ -24,27 +24,33 @@ import {
  * /identities, the current filter selection for /habits/stats (the filters
  * govern the whole page there, and identity numbers that disagreed with the
  * rows beside them would be the bug, not the feature).
+ *
+ * `habits` may be the stats read still in flight: the identity query doesn't
+ * need it, so the two run side by side and only the arithmetic waits.
  */
 export async function getIdentityReinforcements(
   user: User,
-  habits: HabitStat[],
+  habits: HabitStat[] | Promise<HabitStat[]>,
   range: StatsRange,
 ): Promise<{
   identities: IdentityReinforcement[];
   /** The hungry ones, worst first. See `needsFocus`. */
   focus: IdentityReinforcement[];
 }> {
-  const records = await prisma.identity.findMany({
-    where: { userId: user.id },
-    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-    select: {
-      id: true,
-      name: true,
-      statement: true,
-      characteristics: true,
-      habits: { select: { taskId: true } },
-    },
-  });
+  const [records, habitStats] = await Promise.all([
+    prisma.identity.findMany({
+      where: { userId: user.id },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      select: {
+        id: true,
+        name: true,
+        statement: true,
+        characteristics: true,
+        habits: { select: { taskId: true } },
+      },
+    }),
+    habits,
+  ]);
 
   const seeds: IdentitySeed[] = records.map((record) => ({
     id: record.id,
@@ -59,7 +65,7 @@ export async function getIdentityReinforcements(
   const today = todayLocal(user.timezone);
   const from = addDays(today, -(RANGE_DAYS[range] - 1));
 
-  const identities = reinforceIdentities(seeds, links, habits, {
+  const identities = reinforceIdentities(seeds, links, habitStats, {
     fromISO: toISODate(from),
     toISO: toISODate(today),
     todayISO: toISODate(today),

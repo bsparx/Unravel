@@ -7,8 +7,7 @@ import { prisma } from "@/lib/db";
 import { parseLocalDate, todayLocal } from "@/lib/dates";
 import { getHabitBar, toggleHabitDone, creditLoggedTime } from "@/lib/habit-progress";
 import {
-  addLoggedSeconds,
-  ensureOccurrence,
+  logToOccurrence,
   setOccurrenceStatus,
 } from "@/lib/occurrences";
 import { parseQuickAdd } from "@/lib/quick-parse";
@@ -245,33 +244,28 @@ export async function logAndComplete(formData: FormData): Promise<void> {
   const date = parseLocalDate(parsed.data.date);
   if (!date) return;
 
-  const task = await prisma.task.findFirst({
-    where: { id: parsed.data.taskId, userId: user.id },
-    select: { id: true, type: true },
-  });
+  // The bar is scoped by user too, so it shares the ownership check's trip
+  // (and is simply null for a todo).
+  const [task, bar] = await Promise.all([
+    prisma.task.findFirst({
+      where: { id: parsed.data.taskId, userId: user.id },
+      select: { id: true, type: true },
+    }),
+    getHabitBar(user.id, parsed.data.taskId),
+  ]);
   if (!task) return;
 
-  const occurrence = await ensureOccurrence(user.id, task.id, date);
-  await addLoggedSeconds(occurrence.id, parsed.data.minutes * 60);
-
-  const updated = await prisma.taskOccurrence.findUnique({
-    where: { id: occurrence.id },
-    select: { loggedSeconds: true },
+  const { loggedSeconds } = await logToOccurrence(user.id, task.id, date, {
+    seconds: parsed.data.minutes * 60,
   });
-  const loggedSeconds = updated?.loggedSeconds ?? 0;
 
   if (task.type === "HABIT") {
-    const bar = await getHabitBar(user.id, task.id);
     if (!bar) return;
 
     await creditLoggedTime(user.id, task.id, date, loggedSeconds);
     await toggleHabitDone(user.id, bar, date, true);
   } else {
-    await prisma.task.updateMany({
-      where: { id: task.id, userId: user.id, type: "TODO" },
-      data: { completedAt: new Date() },
-    });
-    await setOccurrenceStatus(user.id, task.id, date, "DONE");
+    await completeTodoOn(user.id, task.id, date);
   }
 
   revalidateTaskViews();
@@ -305,24 +299,22 @@ export async function completeWithNote(formData: FormData): Promise<ActionState>
   const date = parseLocalDate(parsed.data.date);
   if (!date) return { status: "error", message: "That date didn't look right." };
 
-  const task = await prisma.task.findFirst({
-    where: { id: taskId, userId: user.id },
-    select: { id: true, type: true },
-  });
+  const [task, bar] = await Promise.all([
+    prisma.task.findFirst({
+      where: { id: taskId, userId: user.id },
+      select: { id: true, type: true },
+    }),
+    getHabitBar(user.id, taskId),
+  ]);
   if (!task) return { status: "error", message: "That task no longer exists." };
 
-  const occurrence = await ensureOccurrence(user.id, task.id, date);
-
-  if (minutes) await addLoggedSeconds(occurrence.id, minutes * 60);
-  if (note) {
-    await prisma.taskOccurrence.update({
-      where: { id: occurrence.id },
-      data: { note },
-    });
-  }
+  // Time and note in one write; the returned row carries the day's total.
+  const occurrence = await logToOccurrence(user.id, task.id, date, {
+    seconds: (minutes ?? 0) * 60,
+    note,
+  });
 
   if (task.type === "HABIT") {
-    const bar = await getHabitBar(user.id, task.id);
     if (!bar) return { status: "error", message: "That habit no longer exists." };
 
     if (bar.requiresFeedback && !note?.trim()) {
@@ -335,21 +327,11 @@ export async function completeWithNote(formData: FormData): Promise<ActionState>
     // A MINUTES habit fills its log from the clock; the note is already on
     // the row, so `writeProgress`'s gate lets the day through.
     if (minutes && bar.unit === "MINUTES") {
-      const updated = await prisma.taskOccurrence.findUnique({
-        where: { id: occurrence.id },
-        select: { loggedSeconds: true },
-      });
-      if (updated) {
-        await creditLoggedTime(user.id, task.id, date, updated.loggedSeconds);
-      }
+      await creditLoggedTime(user.id, task.id, date, occurrence.loggedSeconds);
     }
     await toggleHabitDone(user.id, bar, date, true);
   } else {
-    await prisma.task.updateMany({
-      where: { id: task.id, userId: user.id, type: "TODO" },
-      data: { completedAt: new Date() },
-    });
-    await setOccurrenceStatus(user.id, task.id, date, "DONE");
+    await completeTodoOn(user.id, task.id, date);
   }
 
   revalidateTaskViews();
@@ -400,17 +382,19 @@ export async function toggleOccurrence(formData: FormData): Promise<void> {
   const date = parseLocalDate(parsed.data.date);
   if (!date) return;
 
-  const owned = await prisma.task.findFirst({
-    where: { id: parsed.data.taskId, userId: user.id },
-    select: { id: true, type: true },
-  });
+  const [owned, bar] = await Promise.all([
+    prisma.task.findFirst({
+      where: { id: parsed.data.taskId, userId: user.id },
+      select: { id: true, type: true },
+    }),
+    getHabitBar(user.id, parsed.data.taskId),
+  ]);
   if (!owned) return;
 
   // A habit's DONE has to go through its claim, or the day counts for the
   // streak with no claim behind it. SKIPPED is untouched by the bar —
   // it deliberately means "not today", which is neither done nor missed.
   if (owned.type === "HABIT" && parsed.data.status !== "SKIPPED") {
-    const bar = await getHabitBar(user.id, owned.id);
     if (bar) {
       await toggleHabitDone(user.id, bar, date, parsed.data.status === "DONE");
       revalidateTaskViews();
@@ -497,4 +481,18 @@ async function resolveProjectId(
   });
 
   return project?.id ?? null;
+}
+
+/**
+ * Mark a todo finished and mirror it onto the day's occurrence. Two writes
+ * that don't depend on each other, so they share one round trip.
+ */
+async function completeTodoOn(userId: string, taskId: string, date: Date): Promise<void> {
+  await Promise.all([
+    prisma.task.updateMany({
+      where: { id: taskId, userId, type: "TODO" },
+      data: { completedAt: new Date() },
+    }),
+    setOccurrenceStatus(userId, taskId, date, "DONE"),
+  ]);
 }

@@ -23,26 +23,27 @@ export default async function EditTaskPage({
   // Next 16: params is a Promise.
   const { taskId } = await params;
 
-  const [task, projects] = await Promise.all([
+  const [task, projects, sessions] = await Promise.all([
     getTask(user, taskId),
     getProjects(user),
+    // Scoped by user, so it needs only the id from the URL and can share the
+    // task's round trip.
+    prisma.focusSession.findMany({
+      where: { taskId, userId: user.id, status: "COMPLETED" },
+      orderBy: { startedAt: "desc" },
+      take: 20,
+      select: {
+        id: true,
+        mode: true,
+        startedAt: true,
+        elapsedSeconds: true,
+        overtimeSeconds: true,
+        measuredSeconds: true,
+      },
+    }),
   ]);
 
   if (!task || task.type !== "TODO") notFound();
-
-  const sessions = await prisma.focusSession.findMany({
-    where: { taskId: task.id, userId: user.id, status: "COMPLETED" },
-    orderBy: { startedAt: "desc" },
-    take: 20,
-    select: {
-      id: true,
-      mode: true,
-      startedAt: true,
-      elapsedSeconds: true,
-      overtimeSeconds: true,
-      measuredSeconds: true,
-    },
-  });
 
   const totalLogged = sessions.reduce(
     (sum, session) => sum + session.elapsedSeconds,

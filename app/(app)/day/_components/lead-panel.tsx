@@ -1,5 +1,11 @@
+"use client";
+
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { Flag, Play, Sprout } from "lucide-react";
+import { toast } from "sonner";
+
+import { saveTodaysLead } from "@/app/(app)/identities/actions";
 
 import { IdentitySigil, hueStyle } from "@/components/identity-sigil";
 import { StarterPicker } from "@/components/starter-picker";
@@ -16,12 +22,14 @@ import { LeadPicker } from "./lead-picker";
  * The identity layer's front door on /day: who leads today, the lead's next
  * kept-minimum, the question they bring, and the day's votes so far.
  *
- * A Server Component. Only the picker is client code, so the rest costs
- * nothing to hydrate.
+ * A Client Component that already holds every identity and today's habits, so
+ * switching the lead is local: the card redraws at once and the choice is saved
+ * in the background, with no server render of the page. A failed save puts
+ * back the last lead the server accepted.
  */
 export function LeadPanel({
   identities,
-  leadId,
+  leadId: serverLeadId,
   habits,
 }: {
   identities: IdentityWithVotes[];
@@ -29,6 +37,42 @@ export function LeadPanel({
   /** Today's due habits, from the day view. */
   habits: TodayItem[];
 }) {
+  const [leadId, setLeadId] = useState(serverLeadId);
+  // A later server render (checking off a habit, say) brings the saved lead
+  // back as a prop. Adopt it, the way React's docs adjust state to a prop.
+  const [syncedFrom, setSyncedFrom] = useState(serverLeadId);
+  if (serverLeadId !== syncedFrom) {
+    setSyncedFrom(serverLeadId);
+    setLeadId(serverLeadId);
+  }
+  const saved = useRef(serverLeadId);
+  useEffect(() => {
+    saved.current = serverLeadId;
+  }, [serverLeadId]);
+  // Only the newest press may roll the picker back. Next sends actions one at
+  // a time, so saves land in the order they were made.
+  const latest = useRef(0);
+  const [, startTransition] = useTransition();
+
+  const choose = (id: string) => {
+    if (id === leadId) return;
+    setLeadId(id);
+    const request = ++latest.current;
+    startTransition(async () => {
+      try {
+        const result = await saveTodaysLead(id);
+        if (result.ok) {
+          saved.current = id;
+          return;
+        }
+        toast.error(result.message);
+      } catch {
+        toast.error("Couldn't save who leads today. Try again in a moment.");
+      }
+      if (request === latest.current) setLeadId(saved.current);
+    });
+  };
+
   // Habits but no cast: a nudge, not a takeover of a day that already has a
   // shape. /identities holds the same starter characters.
   if (identities.length === 0 && habits.length > 0) {
@@ -93,6 +137,7 @@ export function LeadPanel({
         <LeadPicker
           options={identities.map(({ id, short, sigil, colorSlot }) => ({ id, short, sigil, colorSlot }))}
           leadId={leadId}
+          onChange={choose}
         />
 
         {lead && (

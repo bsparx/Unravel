@@ -98,33 +98,35 @@ export async function swapRoutineExercise(
 
   const { routineId, dayOfWeek, position, exerciseId } = parsed.data;
 
-  const routine = await prisma.exerciseRoutine.findFirst({
-    where: { id: routineId, userId: user.id },
-    select: { id: true },
-  });
+  // Three independent checks, one round trip. The duplicate check reads only
+  // a yes/no, and counts only once the routine is known to be yours.
+  const [routine, target, duplicate] = await Promise.all([
+    prisma.exerciseRoutine.findFirst({
+      where: { id: routineId, userId: user.id },
+      select: { id: true },
+    }),
+    // The target exercise exists and is live.
+    prisma.exercise.findFirst({
+      where: { id: exerciseId, active: true },
+      select: { id: true },
+    }),
+    // One day never carries the same exercise twice.
+    prisma.routineExercise.findFirst({
+      where: {
+        routineId,
+        dayOfWeek,
+        exerciseId,
+        NOT: { position },
+      },
+      select: { id: true },
+    }),
+  ]);
   if (!routine) {
     return { status: "error", message: "That routine is gone." };
   }
-
-  // The target exercise exists and is live.
-  const target = await prisma.exercise.findFirst({
-    where: { id: exerciseId, active: true },
-    select: { id: true },
-  });
   if (!target) {
     return { status: "error", message: "That exercise is gone." };
   }
-
-  // One day never carries the same exercise twice.
-  const duplicate = await prisma.routineExercise.findFirst({
-    where: {
-      routineId,
-      dayOfWeek,
-      exerciseId,
-      NOT: { position },
-    },
-    select: { id: true },
-  });
   if (duplicate) {
     return {
       status: "error",
@@ -156,10 +158,18 @@ export async function regenerateRoutine(
     };
   }
 
-  const routine = await prisma.exerciseRoutine.findFirst({
-    where: { id: parsed.data.routineId, userId: user.id },
-    include: { exercises: true },
-  });
+  // The routine and the catalog are independent reads: one round trip.
+  const [routine, exercises] = await Promise.all([
+    prisma.exerciseRoutine.findFirst({
+      where: { id: parsed.data.routineId, userId: user.id },
+      include: { exercises: true },
+    }),
+    prisma.exercise.findMany({
+      where: { active: true },
+      select: { id: true, equipment: true, goal: true, type: true, difficulty: true },
+      orderBy: { sortOrder: "asc" },
+    }),
+  ]);
   if (!routine) {
     return { status: "error", message: "That routine is gone." };
   }
@@ -170,11 +180,6 @@ export async function regenerateRoutine(
   // regeneration only writes slot rows — so every click returned the
   // identical routine.)
   const variant = Math.floor(Math.random() * 1_000_000);
-  const exercises = await prisma.exercise.findMany({
-    where: { active: true },
-    select: { id: true, equipment: true, goal: true, type: true, difficulty: true },
-    orderBy: { sortOrder: "asc" },
-  });
 
   const pinned = routine.exercises
     .filter((slot) => slot.swapped)
@@ -218,23 +223,29 @@ export async function regenerateRoutine(
       slot.exerciseId,
     ]),
   );
-  let moved = 0;
-
-  await prisma.$transaction(async (tx) => {
-    for (const slot of slots) {
-      const key = `${slot.dayOfWeek}:${slot.position}`;
-      if (pinnedKeys.has(key)) continue;
-      if (before.get(key) !== slot.exerciseId) moved += 1;
-      await tx.routineExercise.updateMany({
-        where: {
-          routineId: routine.id,
-          dayOfWeek: slot.dayOfWeek,
-          position: slot.position,
-        },
-        data: { exerciseId: slot.exerciseId },
-      });
-    }
+  // Only slots whose exercise actually changed are written: each write inside
+  // the transaction is its own round trip, and rewriting a slot with the
+  // exercise it already holds is a trip for nothing.
+  const changed = slots.filter((slot) => {
+    const key = `${slot.dayOfWeek}:${slot.position}`;
+    return !pinnedKeys.has(key) && before.get(key) !== slot.exerciseId;
   });
+  const moved = changed.length;
+
+  if (changed.length > 0) {
+    await prisma.$transaction(async (tx) => {
+      for (const slot of changed) {
+        await tx.routineExercise.updateMany({
+          where: {
+            routineId: routine.id,
+            dayOfWeek: slot.dayOfWeek,
+            position: slot.position,
+          },
+          data: { exerciseId: slot.exerciseId },
+        });
+      }
+    });
+  }
 
   revalidateExercises();
   return {
@@ -263,18 +274,14 @@ export async function unpinRoutineExercise(
 
   const { routineId, dayOfWeek, position } = parsed.data;
 
-  const routine = await prisma.exerciseRoutine.findFirst({
-    where: { id: routineId, userId: user.id },
-    select: { id: true },
-  });
-  if (!routine) {
-    return { status: "error", message: "That routine is gone." };
-  }
-
-  await prisma.routineExercise.updateMany({
-    where: { routineId, dayOfWeek, position },
+  // Scoped through the routine's owner, so the write is its own check.
+  const { count } = await prisma.routineExercise.updateMany({
+    where: { routineId, dayOfWeek, position, routine: { userId: user.id } },
     data: { swapped: false },
   });
+  if (count === 0) {
+    return { status: "error", message: "That routine is gone." };
+  }
 
   revalidateExercises();
   return { status: "success", message: "Unpinned — it can move again." };

@@ -81,6 +81,61 @@ async function ownedBudget(userId: string, budgetId: string, date: Date) {
   });
 }
 
+
+/**
+ * The three things an entry points at — its category, its account and, if it
+ * names one, a budget covering its date — checked in one round rather than
+ * one after another. Errors come back in the order the form reads, so the
+ * message is the same one the sequential checks gave.
+ */
+async function resolveEntryRefs(
+  user: { id: string; timezone: string },
+  data: {
+    categoryId: string;
+    kind: "INCOME" | "EXPENSE";
+    accountId: string;
+    budgetId?: string;
+    date?: string;
+  },
+): Promise<
+  | {
+      ok: true;
+      category: { id: string };
+      account: { id: string };
+      budget: { id: string } | null;
+      date: Date;
+    }
+  | { ok: false; state: ActionState }
+> {
+  const date = data.date ? parseLocalDate(data.date) : todayLocal(user.timezone);
+
+  const [category, account, budget] = await Promise.all([
+    ownedCategory(user.id, data.categoryId, data.kind),
+    ownedAccount(user.id, data.accountId),
+    data.budgetId && date ? ownedBudget(user.id, data.budgetId, date) : null,
+  ]);
+
+  if (!category) {
+    return { ok: false, state: { status: "error", message: "Pick a category from the list." } };
+  }
+  if (!account) {
+    return { ok: false, state: { status: "error", message: "Pick an account from the list." } };
+  }
+  if (!date) return { ok: false, state: { status: "error", message: "That date didn't parse." } };
+  if (data.budgetId && !budget) {
+    return {
+      ok: false,
+      state: {
+        status: "error",
+        message: "That budget doesn't cover this date.",
+        fieldErrors: { budgetId: "Pick a budget that covers the date, or no budget." },
+      },
+    };
+  }
+
+  return { ok: true, category, account, budget, date };
+}
+
 // ---------------------------------------------------------------- transactions
 
 export async function logTransaction(
@@ -102,35 +157,9 @@ export async function logTransaction(
     return { status: "error", message: "That amount is out of range." };
   }
 
-  const category = await ownedCategory(
-    user.id,
-    parsed.data.categoryId,
-    parsed.data.kind,
-  );
-  if (!category) {
-    return { status: "error", message: "Pick a category from the list." };
-  }
-
-  const account = await ownedAccount(user.id, parsed.data.accountId);
-  if (!account) {
-    return { status: "error", message: "Pick an account from the list." };
-  }
-
-  const date = parsed.data.date
-    ? parseLocalDate(parsed.data.date)
-    : todayLocal(user.timezone);
-  if (!date) return { status: "error", message: "That date didn't parse." };
-
-  const budget = parsed.data.budgetId
-    ? await ownedBudget(user.id, parsed.data.budgetId, date)
-    : null;
-  if (parsed.data.budgetId && !budget) {
-    return {
-      status: "error",
-      message: "That budget doesn't cover this date.",
-      fieldErrors: { budgetId: "Pick a budget that covers the date, or no budget." },
-    };
-  }
+  const refs = await resolveEntryRefs(user, parsed.data);
+  if (!refs.ok) return refs.state;
+  const { category, account, budget, date } = refs;
 
   await prisma.moneyTransaction.create({
     data: {
@@ -170,35 +199,9 @@ export async function updateTransaction(
     return { status: "error", message: "That amount is out of range." };
   }
 
-  const category = await ownedCategory(
-    user.id,
-    parsed.data.categoryId,
-    parsed.data.kind,
-  );
-  if (!category) {
-    return { status: "error", message: "Pick a category from the list." };
-  }
-
-  const account = await ownedAccount(user.id, parsed.data.accountId);
-  if (!account) {
-    return { status: "error", message: "Pick an account from the list." };
-  }
-
-  const date = parsed.data.date
-    ? parseLocalDate(parsed.data.date)
-    : todayLocal(user.timezone);
-  if (!date) return { status: "error", message: "That date didn't parse." };
-
-  const budget = parsed.data.budgetId
-    ? await ownedBudget(user.id, parsed.data.budgetId, date)
-    : null;
-  if (parsed.data.budgetId && !budget) {
-    return {
-      status: "error",
-      message: "That budget doesn't cover this date.",
-      fieldErrors: { budgetId: "Pick a budget that covers the date, or no budget." },
-    };
-  }
+  const refs = await resolveEntryRefs(user, parsed.data);
+  if (!refs.ok) return refs.state;
+  const { category, account, budget, date } = refs;
 
   const { count } = await prisma.moneyTransaction.updateMany({
     where: { id: parsed.data.id, userId: user.id },
@@ -246,23 +249,24 @@ export async function createCategory(
     };
   }
 
-  const existing = await prisma.moneyCategory.findUnique({
-    where: {
-      ownerKey_kind_name: {
-        ownerKey: user.id,
-        kind: parsed.data.kind,
-        name: parsed.data.name,
+  const [existing, last] = await Promise.all([
+    prisma.moneyCategory.findUnique({
+      where: {
+        ownerKey_kind_name: {
+          ownerKey: user.id,
+          kind: parsed.data.kind,
+          name: parsed.data.name,
+        },
       },
-    },
-  });
+    }),
+    prisma.moneyCategory.aggregate({
+      where: { ownerKey: user.id },
+      _max: { sortOrder: true },
+    }),
+  ]);
   if (existing) {
     return { status: "error", message: "You already have that one." };
   }
-
-  const last = await prisma.moneyCategory.aggregate({
-    where: { ownerKey: user.id },
-    _max: { sortOrder: true },
-  });
 
   await prisma.moneyCategory.create({
     data: {
@@ -501,17 +505,18 @@ export async function createAccount(
     return { status: "error", message: "That opening amount is out of range." };
   }
 
-  const existing = await prisma.moneyAccount.findUnique({
-    where: { userId_name: { userId: user.id, name: parsed.data.name } },
-  });
+  const [existing, last] = await Promise.all([
+    prisma.moneyAccount.findUnique({
+      where: { userId_name: { userId: user.id, name: parsed.data.name } },
+    }),
+    prisma.moneyAccount.aggregate({
+      where: { userId: user.id },
+      _max: { sortOrder: true },
+    }),
+  ]);
   if (existing) {
     return { status: "error", message: "You already have that account." };
   }
-
-  const last = await prisma.moneyAccount.aggregate({
-    where: { userId: user.id },
-    _max: { sortOrder: true },
-  });
 
   await prisma.moneyAccount.create({
     data: {
@@ -824,40 +829,17 @@ export async function settleDebtWithTransaction(
     return { status: "error", message: "That amount is out of range." };
   }
 
-  const category = await ownedCategory(
-    user.id,
-    parsed.data.categoryId,
-    parsed.data.kind,
-  );
-  if (!category) {
-    return { status: "error", message: "Pick a category from the list." };
-  }
+  // The IOU doesn't depend on the entry's references: one round for all.
+  const [refs, debt] = await Promise.all([
+    resolveEntryRefs(user, parsed.data),
+    prisma.moneyDebt.findFirst({
+      where: { id: parsed.data.debtId, userId: user.id },
+      select: { direction: true, settledAt: true, counterparty: true },
+    }),
+  ]);
+  if (!refs.ok) return refs.state;
+  const { category, account, budget, date } = refs;
 
-  const account = await ownedAccount(user.id, parsed.data.accountId);
-  if (!account) {
-    return { status: "error", message: "Pick an account from the list." };
-  }
-
-  const date = parsed.data.date
-    ? parseLocalDate(parsed.data.date)
-    : todayLocal(user.timezone);
-  if (!date) return { status: "error", message: "That date didn't parse." };
-
-  const budget = parsed.data.budgetId
-    ? await ownedBudget(user.id, parsed.data.budgetId, date)
-    : null;
-  if (parsed.data.budgetId && !budget) {
-    return {
-      status: "error",
-      message: "That budget doesn't cover this date.",
-      fieldErrors: { budgetId: "Pick a budget that covers the date, or no budget." },
-    };
-  }
-
-  const debt = await prisma.moneyDebt.findFirst({
-    where: { id: parsed.data.debtId, userId: user.id },
-    select: { direction: true, settledAt: true, counterparty: true },
-  });
   if (!debt) {
     return { status: "error", message: "That IOU is gone." };
   }

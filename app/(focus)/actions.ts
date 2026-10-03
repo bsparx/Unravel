@@ -176,21 +176,25 @@ async function promoteToTask(
 
   const { title, minutes, priority } = parseQuickAdd(capture.body);
 
-  const task = await prisma.task.create({
-    data: {
-      userId,
-      type: "TODO",
-      title: (title || capture.body).slice(0, 200),
-      priority,
-      estimatedSeconds: minutes ? minutes * 60 : null,
-      sortOrder: Date.now(),
-    },
-  });
-
-  await prisma.capture.update({
+  // The task is created through the capture's own relation: one write that
+  // makes the task and marks the note promoted together, rather than two.
+  const promoted = await prisma.capture.update({
     where: { id: capture.id },
-    data: { status: "PROMOTED", promotedTaskId: task.id },
+    data: {
+      status: "PROMOTED",
+      promotedTask: {
+        create: {
+          userId,
+          type: "TODO",
+          title: (title || capture.body).slice(0, 200),
+          priority,
+          estimatedSeconds: minutes ? minutes * 60 : null,
+          sortOrder: Date.now(),
+        },
+      },
+    },
+    select: { promotedTaskId: true },
   });
 
-  return task.id;
+  return promoted.promotedTaskId;
 }

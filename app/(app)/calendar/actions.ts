@@ -96,11 +96,27 @@ async function plannedCueForAny(
   taskIds: string[],
   includeCue: boolean,
 ): Promise<PlannedCue | null> {
-  if (!includeCue) return null;
+  if (!includeCue || taskIds.length === 0) return null;
+
+  // One read for every task's cue, rather than one per task in turn; the
+  // order the tasks were picked still decides which one wins.
+  const cues = await prisma.habitCue.findMany({
+    where: { taskId: { in: taskIds }, task: { userId } },
+    select: {
+      taskId: true,
+      anchorTaskId: true,
+      anchorLabel: true,
+      anchorTask: { select: { title: true } },
+    },
+  });
+  const byTask = new Map(cues.map((cue) => [cue.taskId, cue]));
 
   for (const taskId of taskIds) {
-    const cue = await plannedCueFor(userId, taskId, includeCue);
-    if (cue) return cue;
+    const cue = byTask.get(taskId);
+    const title = cue ? anchorTitleOf(cue, cue.anchorTask?.title) : null;
+    if (cue && title) {
+      return { taskId: cue.anchorTaskId, title, minutes: PLAN_CUE_MINUTES };
+    }
   }
 
   return null;
@@ -260,21 +276,26 @@ async function reconcileBlockCompletion(
   });
 }
 
-/**
- * Keep an existing cue block glued to the front of the block it cues, after that
- * block has moved or changed length. Its own length is preserved.
- */
-async function reflowCue(
-  userId: string,
-  blockId: string,
-  date: Date,
-  span: Span,
-): Promise<void> {
-  const cue = await prisma.timeBlock.findFirst({
+/** The cue block glued to the front of `blockId`, if it has one. */
+function findCue(userId: string, blockId: string) {
+  return prisma.timeBlock.findFirst({
     where: { cueForId: blockId, userId },
     select: { id: true, startMinute: true, endMinute: true },
   });
+}
 
+/**
+ * Keep an existing cue block glued to the front of the block it cues, after that
+ * block has moved or changed length. Its own length is preserved.
+ *
+ * Takes the cue already loaded (see `findCue`), so callers can read it
+ * alongside their own write instead of after it.
+ */
+async function reflowCue(
+  cue: { id: string; startMinute: number; endMinute: number } | null,
+  date: Date,
+  span: Span,
+): Promise<void> {
   if (!cue) return;
 
   const next = cueSpanFor(span, cue.endMinute - cue.startMinute);
@@ -392,22 +413,23 @@ export async function updateBlock(
 
   // Ownership is established by that update, so the list can be rewritten on
   // the block id alone. Kept ticks survive — see syncBlockTasks.
-  await syncBlockTasks(user.id, input.id, taskIds);
-
+  //
   // An existing cue follows the block it cues. A missing one is only added when
   // asked for — a cue dropped for the day should stay dropped, and re-editing
-  // the block is not a request to bring it back.
-  const existing = await prisma.timeBlock.findFirst({
-    where: { cueForId: input.id, userId: user.id },
-    select: { id: true },
-  });
+  // the block is not a request to bring it back. Neither read waits on the
+  // task list, so all three share one round.
+  const [, existing, planned] = await Promise.all([
+    syncBlockTasks(user.id, input.id, taskIds),
+    findCue(user.id, input.id),
+    plannedCueForAny(user.id, taskIds, input.includeCue),
+  ]);
 
   let cue: PlannedCue | null = null;
 
   if (existing) {
-    await reflowCue(user.id, input.id, date, span);
+    await reflowCue(existing, date, span);
   } else {
-    cue = await plannedCueForAny(user.id, taskIds, input.includeCue);
+    cue = planned;
     if (cue) {
       const cueSpan = cueSpanFor(span, cue.minutes);
       if (cueSpan) {
@@ -460,14 +482,18 @@ export async function moveBlock(formData: FormData): Promise<void> {
     snap(parsed.data.endMinute),
   );
 
-  const { count } = await prisma.timeBlock.updateMany({
-    where: { id: parsed.data.id, userId: user.id },
-    data: { date, ...span },
-  });
+  // The cue is scoped by user too, so it's read alongside the move rather than
+  // after it.
+  const [{ count }, cue] = await Promise.all([
+    prisma.timeBlock.updateMany({
+      where: { id: parsed.data.id, userId: user.id },
+      data: { date, ...span },
+    }),
+    findCue(user.id, parsed.data.id),
+  ]);
 
-  // Ownership is established by that update, so the reflow can match on the
-  // block id alone. Skipped entirely when nothing was updated.
-  if (count > 0) await reflowCue(user.id, parsed.data.id, date, span);
+  // Skipped entirely when nothing was updated: not this user's block.
+  if (count > 0) await reflowCue(cue, date, span);
 
   revalidateCalendar();
 }
@@ -508,27 +534,29 @@ export async function scheduleTask(
   const date = parseLocalDate(input.date);
   if (!date) return { status: "error", message: "That date didn't parse." };
 
-  const task = await prisma.task.findFirst({
-    where: { id: input.taskId, userId: user.id },
-    select: { id: true, title: true },
-  });
+  // Three independent reads in one round. The cue is scoped through the
+  // task's owner, so it's safe to read before the task check lands.
+  const [task, cue, dayBlocks] = await Promise.all([
+    prisma.task.findFirst({
+      where: { id: input.taskId, userId: user.id },
+      select: { id: true, title: true },
+    }),
+    plannedCueFor(user.id, input.taskId, input.includeCue),
+    prisma.timeBlock.findMany({
+      where: { userId: user.id, date },
+      select: { startMinute: true, endMinute: true, kind: true },
+      orderBy: { startMinute: "asc" },
+    }),
+  ]);
 
   if (!task) return { status: "error", message: "That task no longer exists." };
 
   const minutes = PLAN_DEFAULT_MINUTES;
-
-  const cue = await plannedCueFor(user.id, task.id, input.includeCue);
   const cueMinutes = cue?.minutes ?? 0;
 
   // Daydream blocks claim nothing, so they don't shrink the gaps a real
   // block can land in — "Fit it in" may place a task on top of one.
-  const existing = (
-    await prisma.timeBlock.findMany({
-      where: { userId: user.id, date },
-      select: { startMinute: true, endMinute: true, kind: true },
-      orderBy: { startMinute: "asc" },
-    })
-  )
+  const existing = dayBlocks
     .filter((block) => block.kind !== "DAYDREAM")
     .map(({ startMinute, endMinute }) => ({ startMinute, endMinute }));
 

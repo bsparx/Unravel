@@ -1,5 +1,6 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 
 import { prisma } from "@/lib/db";
 import type { User } from "@/lib/generated/prisma/client";
@@ -13,16 +14,9 @@ import type { User } from "@/lib/generated/prisma/client";
  * `auth()` is async in Clerk 7 / Next 16 and must always be awaited.
  */
 export async function requireUser(): Promise<User> {
-  const { userId } = await auth();
-
-  if (!userId) {
-    redirect("/sign-in");
-  }
-
-  const existing = await prisma.user.findUnique({ where: { clerkId: userId } });
-  if (existing) return existing;
-
-  return createLocalUser(userId);
+  const user = await ensureUser();
+  if (!user) redirect("/sign-in");
+  return user;
 }
 
 async function createLocalUser(clerkId: string): Promise<User> {
@@ -49,11 +43,11 @@ async function createLocalUser(clerkId: string): Promise<User> {
  *
  * Note this does NOT create the local row — see `ensureUser` for that.
  */
-export async function getUser(): Promise<User | null> {
+export const getUser = cache(async (): Promise<User | null> => {
   const { userId } = await auth();
   if (!userId) return null;
   return prisma.user.findUnique({ where: { clerkId: userId } });
-}
+});
 
 /**
  * Find-or-create, without redirecting.
@@ -62,8 +56,13 @@ export async function getUser(): Promise<User | null> {
  * so it can't call `requireUser()` — but a brand-new account whose very first
  * authed request lands on `/` has no local row yet, and `getUser()` would
  * return null and silently drop the providers.
+ *
+ * Wrapped in React's `cache`, so one render asks Clerk and the database once:
+ * the layout and the page both call this (via `requireUser`) on every
+ * request. Outside a render, in Server Actions and route handlers, `cache`
+ * calls straight through.
  */
-export async function ensureUser(): Promise<User | null> {
+export const ensureUser = cache(async (): Promise<User | null> => {
   const { userId } = await auth();
   if (!userId) return null;
 
@@ -71,4 +70,4 @@ export async function ensureUser(): Promise<User | null> {
   if (existing) return existing;
 
   return createLocalUser(userId);
-}
+});

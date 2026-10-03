@@ -110,16 +110,18 @@ async function rollUpOccurrence(
   occurrenceId: string,
   taskId: string | null,
 ): Promise<void> {
-  const occurrence = await prisma.taskOccurrence.findUnique({
-    where: { id: occurrenceId },
-    select: { id: true, date: true, loggedSeconds: true },
-  });
+  // The day's row and the sum of its sessions are independent reads.
+  const [occurrence, total] = await Promise.all([
+    prisma.taskOccurrence.findUnique({
+      where: { id: occurrenceId },
+      select: { id: true, date: true, loggedSeconds: true },
+    }),
+    prisma.focusSession.aggregate({
+      where: { occurrenceId, status: "COMPLETED" },
+      _sum: { elapsedSeconds: true },
+    }),
+  ]);
   if (!occurrence) return;
-
-  const total = await prisma.focusSession.aggregate({
-    where: { occurrenceId, status: "COMPLETED" },
-    _sum: { elapsedSeconds: true },
-  });
 
   const logged = Math.max(0, total._sum.elapsedSeconds ?? 0);
 

@@ -121,13 +121,15 @@ export async function creditLoggedTime(
   date: Date,
   totalLoggedSeconds: number,
 ): Promise<void> {
-  const bar = await getHabitBar(userId, taskId);
+  // Independent reads: the bar and the day's row share one round trip.
+  const [bar, existing] = await Promise.all([
+    getHabitBar(userId, taskId),
+    prisma.taskOccurrence.findUnique({
+      where: { taskId_date: { taskId, date } },
+      select: { progress: true, minimalTaskDone: true },
+    }),
+  ]);
   if (!bar || bar.unit !== "MINUTES") return;
-
-  const existing = await prisma.taskOccurrence.findUnique({
-    where: { taskId_date: { taskId, date } },
-    select: { progress: true, minimalTaskDone: true },
-  });
 
   const earned = minutesFromSeconds(totalLoggedSeconds);
   const next = Math.max(existing?.progress ?? 0, earned);
@@ -158,13 +160,15 @@ export async function recreditLoggedTime(
   oldLoggedSeconds: number,
   newLoggedSeconds: number,
 ): Promise<void> {
-  const bar = await getHabitBar(userId, taskId);
+  // Independent reads: the bar and the day's row share one round trip.
+  const [bar, existing] = await Promise.all([
+    getHabitBar(userId, taskId),
+    prisma.taskOccurrence.findUnique({
+      where: { taskId_date: { taskId, date } },
+      select: { progress: true, minimalTaskDone: true },
+    }),
+  ]);
   if (!bar || bar.unit !== "MINUTES") return;
-
-  const existing = await prisma.taskOccurrence.findUnique({
-    where: { taskId_date: { taskId, date } },
-    select: { progress: true, minimalTaskDone: true },
-  });
 
   const current = existing?.progress ?? 0;
   const next = recreditedProgress(current, oldLoggedSeconds, newLoggedSeconds);

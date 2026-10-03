@@ -23,27 +23,28 @@ export default async function EditHabitPage({
   // Next 16: params is a Promise.
   const { taskId } = await params;
 
-  const [habit, projects, habits] = await Promise.all([
+  const [habit, projects, habits, sessions] = await Promise.all([
     getTask(user, taskId),
     getProjects(user),
     getAnchorHabits(user, taskId),
+    // Scoped by user, so it needs only the id from the URL and can share the
+    // task's round trip.
+    prisma.focusSession.findMany({
+      where: { taskId, userId: user.id, status: "COMPLETED" },
+      orderBy: { startedAt: "desc" },
+      take: 20,
+      select: {
+        id: true,
+        mode: true,
+        startedAt: true,
+        elapsedSeconds: true,
+        overtimeSeconds: true,
+        measuredSeconds: true,
+      },
+    }),
   ]);
 
   if (!habit || habit.type !== "HABIT") notFound();
-
-  const sessions = await prisma.focusSession.findMany({
-    where: { taskId: habit.id, userId: user.id, status: "COMPLETED" },
-    orderBy: { startedAt: "desc" },
-    take: 20,
-    select: {
-      id: true,
-      mode: true,
-      startedAt: true,
-      elapsedSeconds: true,
-      overtimeSeconds: true,
-      measuredSeconds: true,
-    },
-  });
 
   return (
     <div className="mx-auto w-full max-w-3xl px-5 py-8 md:px-8 md:py-12">

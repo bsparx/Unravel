@@ -46,10 +46,18 @@ export default async function HabitStatsPage({
       ? [rawHabits]
       : [];
 
-  const stats = await getHabitStats(user, range, selected);
   // The identity tally over the same selection: the filters govern the whole
-  // page, identity rows included.
-  const identityStats = await getIdentityReinforcements(user, stats.habits, range);
+  // page, identity rows included. Its query runs alongside the stats read,
+  // and only its arithmetic waits for them.
+  const statsRead = getHabitStats(user, range, selected);
+  const [stats, identityStats] = await Promise.all([
+    statsRead,
+    getIdentityReinforcements(
+      user,
+      statsRead.then((read) => read.habits),
+      range,
+    ),
+  ]);
   // A single habit means the y-axis has one unit, which is the only case where
   // plotting raw progress makes sense.
   const single = stats.habits.length === 1 ? stats.habits[0] : null;

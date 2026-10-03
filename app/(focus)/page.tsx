@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { auth } from "@clerk/nextjs/server";
 
 import { Landing } from "@/app/_components/landing";
-import { requireUser } from "@/lib/auth";
+import { ensureUser, type requireUser } from "@/lib/auth";
 import { getRawCaptures } from "@/lib/captures";
 import { formatFullDate, toISODate, todayLocal } from "@/lib/dates";
 import { getDayLog } from "@/lib/day-log";
@@ -20,14 +19,18 @@ import { OneThingCard } from "./_components/one-thing-card";
 const CANDIDATES = 5;
 
 export default async function HomePage() {
-  // Clerk 7: auth() is async.
-  const { userId } = await auth();
-  if (!userId) return <Landing />;
+  // The same cached lookup the focus layout already made: signed out is the
+  // landing, signed in (even on the very first request) is a user row.
+  const user = await ensureUser();
+  if (!user) return <Landing />;
 
-  const user = await requireUser();
   const today = todayLocal(user.timezone);
   const dateISO = toISODate(today);
   const dayLog = await getDayLog(user, today);
+  // Only the pass needs these, and they don't depend on each other.
+  const [options, projects] = dayLog?.selectedTask
+    ? [[], []]
+    : await Promise.all([candidateOptions(user), getProjects(user)]);
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-xl flex-1 flex-col justify-center px-4 py-10 sm:px-6 sm:py-16">
@@ -39,9 +42,9 @@ export default async function HomePage() {
         <OneThingCard dayLog={dayLog} dateISO={dateISO} />
       ) : (
         <MorningPass
-          options={await candidateOptions(user)}
+          options={options}
           dateISO={dateISO}
-          projects={await getProjects(user)}
+          projects={projects}
         />
       )}
 

@@ -82,21 +82,26 @@ async function resolveCue(
     };
   }
 
-  const anchor = input.cueTaskId
-    ? await prisma.task.findFirst({
-        where: { id: input.cueTaskId, userId, type: "HABIT" },
-        select: { id: true },
-      })
-    : null;
+  if (!input.cueTaskId) return { ok: true, cue: null };
+
+  // The anchor check and the edge map don't depend on each other, so they
+  // share a round trip. The edges are only read when there's a chain to check.
+  const [anchor, rows] = await Promise.all([
+    prisma.task.findFirst({
+      where: { id: input.cueTaskId, userId, type: "HABIT" },
+      select: { id: true },
+    }),
+    habitId
+      ? prisma.habitCue.findMany({
+          where: { task: { userId }, anchorTaskId: { not: null } },
+          select: { taskId: true, anchorTaskId: true },
+        })
+      : null,
+  ]);
 
   if (!anchor) return { ok: true, cue: null };
 
-  if (habitId) {
-    const rows = await prisma.habitCue.findMany({
-      where: { task: { userId }, anchorTaskId: { not: null } },
-      select: { taskId: true, anchorTaskId: true },
-    });
-
+  if (habitId && rows) {
     if (wouldCycle(habitId, anchor.id, cueEdges(rows))) {
       return {
         ok: false,
@@ -140,7 +145,11 @@ export async function createHabit(
   const input = parsed.data;
   const today = todayLocal(user.timezone);
 
-  const cue = await resolveCue(user.id, null, input);
+  // Two independent checks on ids off the wire, in one round.
+  const [cue, projectId] = await Promise.all([
+    resolveCue(user.id, null, input),
+    resolveProjectId(user.id, input.projectId),
+  ]);
   if (!cue.ok) return cue.state;
 
   const created = await prisma.task.create({
@@ -150,7 +159,7 @@ export async function createHabit(
       title: input.title,
       notes: input.notes || null,
       priority: input.priority,
-      projectId: await resolveProjectId(user.id, input.projectId),
+      projectId,
       estimatedSeconds: input.estimateMinutes
         ? input.estimateMinutes * 60
         : null,
@@ -205,20 +214,25 @@ export async function updateHabit(
 
   const input = parsed.data;
 
-  const owned = await prisma.task.findFirst({
-    where: { id: input.id, userId: user.id, type: "HABIT" },
-    select: {
-      id: true,
-      recurrence: { select: { startDate: true } },
-      cue: { select: { taskId: true } },
-    },
-  });
+  // The ownership check and the two id checks don't depend on each other.
+  // The cue's cycle check only reads this user's own stack, so running it on
+  // the id before ownership is confirmed reveals nothing.
+  const [owned, cue, projectId] = await Promise.all([
+    prisma.task.findFirst({
+      where: { id: input.id, userId: user.id, type: "HABIT" },
+      select: {
+        id: true,
+        recurrence: { select: { startDate: true } },
+        cue: { select: { taskId: true } },
+      },
+    }),
+    resolveCue(user.id, input.id, input),
+    resolveProjectId(user.id, input.projectId),
+  ]);
 
   if (!owned) {
     return { status: "error", message: "That habit no longer exists." };
   }
-
-  const cue = await resolveCue(user.id, owned.id, input);
   if (!cue.ok) return cue.state;
 
   const today = todayLocal(user.timezone);
@@ -234,7 +248,7 @@ export async function updateHabit(
       title: input.title,
       notes: input.notes || null,
       priority: input.priority,
-      projectId: await resolveProjectId(user.id, input.projectId),
+      projectId,
       estimatedSeconds: input.estimateMinutes
         ? input.estimateMinutes * 60
         : null,
@@ -278,8 +292,11 @@ export async function updateHabit(
     },
   });
 
-  await syncSteps(user.id, owned.id, input.steps);
-  await syncHabitIdentities(user.id, owned.id, input.identityIds);
+  // Different tables, no shared rows: side by side.
+  await Promise.all([
+    syncSteps(user.id, owned.id, input.steps),
+    syncHabitIdentities(user.id, owned.id, input.identityIds),
+  ]);
 
   revalidateHabitViews();
   return { status: "success", message: "Saved." };

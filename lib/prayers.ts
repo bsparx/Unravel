@@ -215,10 +215,12 @@ export async function getTimingsForDates(
     months.set(key, [...(months.get(key) ?? []), date]);
   }
 
-  for (const [key, monthDates] of months) {
+  // Each missing month is its own API call and its own insert, so they run
+  // side by side rather than one month after another.
+  await Promise.all([...months].map(async ([key, monthDates]) => {
     const [year, month] = key.split("-").map(Number);
     const fetched = await fetchMonth(city, year, month);
-    if (!fetched) continue;
+    if (!fetched) return;
 
     const toPersist = [...fetched]
       .filter(([iso]) => monthDates.some((d) => toISODate(d) === iso))
@@ -240,7 +242,7 @@ export async function getTimingsForDates(
         result.set(iso, timings);
       }
     }
-  }
+  }));
 
   // API unreachable: degrade to the most recent cached timings for the city.
   const stillMissing = dates.filter((date) => !result.has(toISODate(date)));
@@ -285,7 +287,14 @@ export async function getPrayerCycle(
   const city = (user.prayerCity ?? "").trim() || DEFAULT_CITY;
   const today = todayLocal(timeZone, now);
   const dates = [addDays(today, -1), today, addDays(today, 1)];
-  const times = await getTimingsForDates(city, dates);
+  // The cycle is yesterday or today, which needs the timings to decide, so
+  // both days' checks are read alongside them and the right one kept below.
+  const [times, recentChecks] = await Promise.all([
+    getTimingsForDates(city, dates),
+    prisma.prayerCheck.findMany({
+      where: { userId: user.id, date: { in: [dates[0], today] } },
+    }),
+  ]);
 
   const todayTimings = times.get(toISODate(today));
   if (!todayTimings) return null;
@@ -317,9 +326,7 @@ export async function getPrayerCycle(
     nextFajr,
   );
 
-  const checks = await prisma.prayerCheck.findMany({
-    where: { userId: user.id, date: cycle },
-  });
+  const checks = recentChecks.filter((check) => check.date.getTime() === cycle.getTime());
   const checkedByPrayer = new Map<PrayerKind, Date>(
     checks.map((check) => [check.prayer, check.checkedAt]),
   );
@@ -357,12 +364,13 @@ export async function getPrayerBands(
   const timeZone = user.timezone;
   const city = (user.prayerCity ?? "").trim() || DEFAULT_CITY;
   const dates = eachDateInRange(start, addDays(start, days - 1));
-  const times = await getTimingsForDates(city, dates);
+  const [times, checks] = await Promise.all([
+    getTimingsForDates(city, dates),
+    prisma.prayerCheck.findMany({
+      where: { userId: user.id, date: { in: dates } },
+    }),
+  ]);
   if (times.size === 0) return {};
-
-  const checks = await prisma.prayerCheck.findMany({
-    where: { userId: user.id, date: { in: dates } },
-  });
   const checkedKeys = new Set(
     checks.map((check) => `${toISODate(check.date)}|${check.prayer}`),
   );

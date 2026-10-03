@@ -69,15 +69,15 @@ export async function deleteCustomTag(
   tagId: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const user = await requireUser();
-  const tag = await prisma.tag.findFirst({
+  // Scoped to the user's own tags (built-ins have no owner), so the delete is
+  // its own ownership check: one round trip.
+  const { count } = await prisma.tag.deleteMany({
     where: { id: tagId, userId: user.id },
-    select: { id: true },
   });
-  if (!tag) {
+  if (count === 0) {
     return { ok: false, message: "That tag isn't yours to delete." };
   }
 
-  await prisma.tag.delete({ where: { id: tag.id } });
   revalidatePath("/behavior");
   return { ok: true };
 }

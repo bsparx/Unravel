@@ -50,3 +50,28 @@ export async function addLoggedSeconds(
     data: { loggedSeconds: { increment: Math.round(seconds) } },
   });
 }
+
+/**
+ * Book time (and optionally a note) onto a day's occurrence in one write,
+ * creating the row if it's the first thing to touch that day.
+ *
+ * The same effect as `ensureOccurrence` then `addLoggedSeconds` then a re-read,
+ * in one round trip instead of three: the upsert returns the row as it now
+ * stands, `loggedSeconds` included.
+ */
+export async function logToOccurrence(
+  userId: string,
+  taskId: string,
+  date: Date,
+  { seconds = 0, note }: { seconds?: number; note?: string | null },
+): Promise<TaskOccurrence> {
+  const add = Math.max(0, Math.round(seconds));
+  return prisma.taskOccurrence.upsert({
+    where: { taskId_date: { taskId, date } },
+    create: { userId, taskId, date, status: "PENDING", loggedSeconds: add, ...(note ? { note } : {}) },
+    update: {
+      ...(add > 0 ? { loggedSeconds: { increment: add } } : {}),
+      ...(note ? { note } : {}),
+    },
+  });
+}

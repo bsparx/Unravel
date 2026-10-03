@@ -137,18 +137,26 @@ export async function getBudgetMonth(
 ): Promise<BudgetMonth> {
   const start = startOfMonth(anchor);
   const end = addMonths(start, 1);
+  const prevStart = addMonths(start, -1);
 
-  const transactions = await prisma.moneyTransaction.findMany({
-    where: { userId: user.id, date: { gte: start, lt: end } },
-    include: {
-      category: {
-        select: { id: true, name: true, color: true, kind: true, ownerKey: true },
+  // This month and the one before, for the comparison: independent reads.
+  const [transactions, prevTransactions] = await Promise.all([
+    prisma.moneyTransaction.findMany({
+      where: { userId: user.id, date: { gte: start, lt: end } },
+      include: {
+        category: {
+          select: { id: true, name: true, color: true, kind: true, ownerKey: true },
+        },
+        budget: { select: { id: true, name: true } },
+        account: { select: { id: true, name: true, color: true } },
       },
-      budget: { select: { id: true, name: true } },
-      account: { select: { id: true, name: true, color: true } },
-    },
-    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-  });
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+    }),
+    prisma.moneyTransaction.findMany({
+      where: { userId: user.id, date: { gte: prevStart, lt: start } },
+      include: { category: { select: { kind: true } } },
+    }),
+  ]);
 
   const entries = transactions.map((transaction) => ({
     id: transaction.id,
@@ -197,11 +205,6 @@ export async function getBudgetMonth(
 
   const balance = dailyBalance(transactions, daysInMonth);
 
-  const prevStart = addMonths(start, -1);
-  const prevTransactions = await prisma.moneyTransaction.findMany({
-    where: { userId: user.id, date: { gte: prevStart, lt: start } },
-    include: { category: { select: { kind: true } } },
-  });
   const prevDays = Math.round((start.getTime() - prevStart.getTime()) / MS_PER_DAY);
   const prevBalance = dailyBalance(prevTransactions, prevDays);
   const prevList: (number | null)[] = prevBalance.map((point) => point.cents);
@@ -312,18 +315,21 @@ export async function getBudgetCategories(user: User): Promise<{
 /**
  * Where each account's money stands right now: opening balance, plus every
  * income, minus every expense, plus transfers in, minus transfers out. The
- * four movements are fetched scoped to a set of accounts (all of them for the
- * page, one for the drill-in) and joined by account id.
+ * four movements are fetched scoped to a set of accounts (one for the
+ * drill-in) or to every account the user has ("all", for the page, which then
+ * needn't wait for the account list first) and joined by account id.
  */
 async function liveBalances(
   user: User,
-  accountIds: string[],
+  accountIds: string[] | "all",
 ): Promise<Map<string, number>> {
-  if (accountIds.length === 0) return new Map();
+  if (accountIds !== "all" && accountIds.length === 0) return new Map();
+  const scope = accountIds === "all" ? { not: null } : { in: accountIds };
+  const transferScope = accountIds === "all" ? undefined : { in: accountIds };
 
   const [transactions, out, incoming] = await Promise.all([
     prisma.moneyTransaction.findMany({
-      where: { userId: user.id, accountId: { in: accountIds } },
+      where: { userId: user.id, accountId: scope },
       select: {
         accountId: true,
         amountCents: true,
@@ -332,12 +338,12 @@ async function liveBalances(
     }),
     prisma.accountTransfer.groupBy({
       by: ["fromAccountId"],
-      where: { userId: user.id, fromAccountId: { in: accountIds } },
+      where: { userId: user.id, fromAccountId: transferScope },
       _sum: { amountCents: true },
     }),
     prisma.accountTransfer.groupBy({
       by: ["toAccountId"],
-      where: { userId: user.id, toAccountId: { in: accountIds } },
+      where: { userId: user.id, toAccountId: transferScope },
       _sum: { amountCents: true },
     }),
   ]);
@@ -369,13 +375,13 @@ function accountBalance(
  * live balance. Same shape as `getBudgets`.
  */
 export async function getAccounts(user: User): Promise<Account[]> {
-  const rows = await prisma.moneyAccount.findMany({
-    where: { userId: user.id },
-    orderBy: [{ archivedAt: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
-  });
-  if (rows.length === 0) return [];
-
-  const deltas = await liveBalances(user, rows.map((row) => row.id));
+  const [rows, deltas] = await Promise.all([
+    prisma.moneyAccount.findMany({
+      where: { userId: user.id },
+      orderBy: [{ archivedAt: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
+    }),
+    liveBalances(user, "all"),
+  ]);
 
   return rows.map((row) => ({
     id: row.id,
@@ -396,15 +402,16 @@ export async function getAccountDetail(
   accountId: string,
   anchor: Date,
 ): Promise<AccountDetail | null> {
-  const account = await prisma.moneyAccount.findFirst({
-    where: { id: accountId, userId: user.id },
-  });
-  if (!account) return null;
-
   const start = startOfMonth(anchor);
   const end = addMonths(start, 1);
 
-  const [transactions, transfers] = await Promise.all([
+  // Every read is scoped by user as well as account, so none has to wait for
+  // the ownership check: they share its round trip, and a foreign id finds
+  // nothing anywhere.
+  const [account, transactions, transfers, deltas] = await Promise.all([
+    prisma.moneyAccount.findFirst({
+      where: { id: accountId, userId: user.id },
+    }),
     prisma.moneyTransaction.findMany({
       where: { userId: user.id, accountId, date: { gte: start, lt: end } },
       include: {
@@ -428,7 +435,9 @@ export async function getAccountDetail(
       },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     }),
+    liveBalances(user, [accountId]),
   ]);
+  if (!account) return null;
 
   const toCategory = (row: (typeof transactions)[number]["category"]) => ({
     id: row.id,
@@ -466,10 +475,7 @@ export async function getAccountDetail(
   const runningBalance: { day: number; cents: number }[] = [];
   // The month starts where the account was at midnight before day one: the
   // live balance minus whatever moved during this month.
-  const liveBalanceCents = accountBalance(
-    account,
-    await liveBalances(user, [account.id]),
-  );
+  const liveBalanceCents = accountBalance(account, deltas);
   let running =
     liveBalanceCents -
     (incomeCents - expenseCents - transferredOutCents + transferredInCents);
@@ -525,20 +531,20 @@ export async function getAccountDetail(
  * against each — a single `groupBy` over the assignments, joined in JS.
  */
 export async function getBudgets(user: User): Promise<Budget[]> {
-  const budgets = await prisma.moneyBudget.findMany({
-    where: { userId: user.id, archivedAt: null },
-    orderBy: { startsOn: "desc" },
-  });
+  // The sums cover every envelope the user has, so they needn't wait for the
+  // list; an archived envelope's sum is simply never looked up.
+  const [budgets, spent] = await Promise.all([
+    prisma.moneyBudget.findMany({
+      where: { userId: user.id, archivedAt: null },
+      orderBy: { startsOn: "desc" },
+    }),
+    prisma.moneyTransaction.groupBy({
+      by: ["budgetId"],
+      where: { userId: user.id, budgetId: { not: null } },
+      _sum: { amountCents: true },
+    }),
+  ]);
   if (budgets.length === 0) return [];
-
-  const spent = await prisma.moneyTransaction.groupBy({
-    by: ["budgetId"],
-    where: {
-      userId: user.id,
-      budgetId: { in: budgets.map((budget) => budget.id) },
-    },
-    _sum: { amountCents: true },
-  });
   const spentById = new Map(
     spent.map((row) => [row.budgetId, row._sum.amountCents ?? 0]),
   );
@@ -562,20 +568,22 @@ export async function getBudgetDetail(
   user: User,
   budgetId: string,
 ): Promise<BudgetDetail | null> {
-  const budget = await prisma.moneyBudget.findFirst({
-    where: { id: budgetId, userId: user.id, archivedAt: null },
-  });
-  if (!budget) return null;
-
-  const transactions = await prisma.moneyTransaction.findMany({
-    where: { userId: user.id, budgetId },
-    include: {
-      category: {
-        select: { id: true, name: true, color: true, kind: true, ownerKey: true },
+  // Both scoped by user, so the entries share the ownership check's round trip.
+  const [budget, transactions] = await Promise.all([
+    prisma.moneyBudget.findFirst({
+      where: { id: budgetId, userId: user.id, archivedAt: null },
+    }),
+    prisma.moneyTransaction.findMany({
+      where: { userId: user.id, budgetId },
+      include: {
+        category: {
+          select: { id: true, name: true, color: true, kind: true, ownerKey: true },
+        },
       },
-    },
-    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-  });
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+    }),
+  ]);
+  if (!budget) return null;
 
   const spentCents = transactions.reduce(
     (total, transaction) => total + transaction.amountCents,

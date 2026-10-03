@@ -1,7 +1,9 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { prisma } from "@/lib/db";
-import { addDays, toISODate } from "@/lib/dates";
+import { addDays, parseLocalDate, toISODate } from "@/lib/dates";
 import type { User } from "@/lib/generated/prisma/client";
 import {
   daysOnGoal,
@@ -89,28 +91,29 @@ export type WaterToday = Pick<
  * The small slice the reminder needs, for the app-wide mount: settings plus
  * today's count and latest glass. Kept separate from `getWaterDay` so the
  * shared layout doesn't pay for the streak query on every route visit.
+ *
+ * The layout and /day both ask for it on the same request, so the read is
+ * cached per render on (user id, date), the primitives, since a fresh `Date`
+ * would never hit `cache`.
  */
 export async function getWaterToday(
   user: User,
   date: Date,
 ): Promise<WaterToday> {
   const dateISO = toISODate(date);
-  const last = await prisma.waterGlass.findFirst({
-    where: { userId: user.id, date },
-    orderBy: { timeMinute: "desc" },
-    select: { timeMinute: true },
-  });
-
-  const count = last
-    ? await prisma.waterGlass.count({
-        where: { userId: user.id, date },
-      })
-    : 0;
-
-  return {
-    settings: waterSettingsFrom(user),
-    dateISO,
-    count,
-    lastTimeMin: last ? last.timeMinute : null,
-  };
+  const { count, lastTimeMin } = await readWaterToday(user.id, dateISO);
+  return { settings: waterSettingsFrom(user), dateISO, count, lastTimeMin };
 }
+
+const readWaterToday = cache(async (userId: string, dateISO: string) => {
+  const date = parseLocalDate(dateISO)!;
+  const [count, last] = await Promise.all([
+    prisma.waterGlass.count({ where: { userId, date } }),
+    prisma.waterGlass.findFirst({
+      where: { userId, date },
+      orderBy: { timeMinute: "desc" },
+      select: { timeMinute: true },
+    }),
+  ]);
+  return { count, lastTimeMin: last ? last.timeMinute : null };
+});

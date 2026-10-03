@@ -29,7 +29,9 @@ export default async function TimerPage({
 
   // Always scoped by user: an id off the wire is a request, not a fact. The
   // other reads don't depend on the task, so they share its round trip.
-  const [task, active, identities, leadId] = await Promise.all([
+  // Today's log only needs the id, so it rides along too and is dropped below
+  // unless the task turns out to be this user's.
+  const [task, active, identities, leadId, taskLog] = await Promise.all([
     params.taskId ? getTask(user, params.taskId) : null,
     getActiveSession(user),
     prisma.identity.findMany({
@@ -47,6 +49,7 @@ export default async function TimerPage({
       },
     }),
     getLeadIdentityId(user),
+    params.taskId ? getTodayLog(user, params.taskId) : null,
   ]);
   const voter = identities.find((identity) => (identity.habits?.length ?? 0) > 0);
 
@@ -84,7 +87,7 @@ export default async function TimerPage({
 
   // Only for the task the page was opened for. A live session belonging to a
   // *different* task is guarded in the screen, exactly as the step list is.
-  const todayLog = task ? await getTodayLog(user, task.id) : null;
+  const todayLog = task ? taskLog : null;
 
   return (
     // Nothing here starts the clock. The screen mounts IDLE with the arc full,

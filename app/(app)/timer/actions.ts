@@ -13,7 +13,7 @@ import {
   getHabitBar,
   toggleHabitDone,
 } from "@/lib/habit-progress";
-import { addLoggedSeconds, ensureOccurrence } from "@/lib/occurrences";
+import { ensureOccurrence } from "@/lib/occurrences";
 import { adjustSessionSeconds } from "@/lib/sessions";
 import { adjustSessionSchema } from "@/lib/validation";
 import {
@@ -88,21 +88,23 @@ export async function startSession(
 
   // Idempotent: a retry, a double submit, or a StrictMode double-effect all
   // resolve to the same row rather than two sessions.
-  const existing = await prisma.focusSession.findUnique({
-    where: { clientKey: input.clientKey },
-  });
+  // The task lookup doesn't depend on that answer, so it rides the same trip.
+  const [existing, task] = await Promise.all([
+    prisma.focusSession.findUnique({
+      where: { clientKey: input.clientKey },
+    }),
+    input.taskId
+      ? prisma.task.findFirst({
+          where: { id: input.taskId, userId: user.id },
+          select: { id: true },
+        })
+      : null,
+  ]);
 
   if (existing) {
     if (existing.userId !== user.id) return null;
     return snapshot(existing, 0);
   }
-
-  const task = input.taskId
-    ? await prisma.task.findFirst({
-        where: { id: input.taskId, userId: user.id },
-        select: { id: true },
-      })
-    : null;
 
   const localDate = todayLocal(user.timezone);
   const occurrence = task
@@ -193,15 +195,16 @@ export async function resumeSession(
 
   const now = new Date();
 
-  const updated = await prisma.focusSession.update({
-    where: { id: session.id },
-    data: { status: "RUNNING", runningSince: now, lastBeatAt: now },
-  });
-
-  await prisma.sessionInterval.updateMany({
-    where: { sessionId: session.id, endedAt: null },
-    data: { runningSince: now },
-  });
+  const [updated] = await Promise.all([
+    prisma.focusSession.update({
+      where: { id: session.id },
+      data: { status: "RUNNING", runningSince: now, lastBeatAt: now },
+    }),
+    prisma.sessionInterval.updateMany({
+      where: { sessionId: session.id, endedAt: null },
+      data: { runningSince: now },
+    }),
+  ]);
 
   return snapshot(updated, currentIndex(session));
 }
@@ -404,65 +407,72 @@ export async function endSession(
       : Math.max(0, elapsed - session.targetSeconds);
   const completedTask = options.completedTask === true;
 
-  const updated = await prisma.focusSession.update({
-    where: { id: session.id },
-    data: {
-      status: "COMPLETED",
-      endedAt: now,
-      lastBeatAt: now,
-      runningSince: null,
-      // Stays the wall clock. It is the rehydration figure, and rewriting it to
-      // the focus-only total would make a reload read as if the breaks never
-      // happened.
-      accumulatedSeconds: wallClock,
-      elapsedSeconds: elapsed,
-      overtimeSeconds: overtime,
-      completedTask,
-      endReason: completedTask
-        ? "TASK_COMPLETED"
-        : (options.reason ?? "USER_STOPPED"),
-      ...(session.mode !== "RECOVERY" &&
-      session.reachedTargetAt === null &&
-      elapsed >= session.targetSeconds
-        ? { reachedTargetAt: now }
-        : {}),
-    },
-  });
-
-  // Close the open interval with its real duration rather than only stamping
-  // `endedAt`. Every session ends with one interval still open, so leaving this
-  // to `updateMany` left the last interval of every session reading zero — and
-  // /stats' break figures are read straight off these rows.
-  await prisma.$transaction([
-    ...closeOpenIntervalOps(session, now, true),
-    prisma.sessionInterval.updateMany({
-      where: { sessionId: session.id, endedAt: null },
-      data: { endedAt: now, runningSince: null },
+  // Three independent writes, side by side: the session row, its intervals,
+  // and the day's logged time (which returns the new total for the habit
+  // credit below, so it needn't be read back).
+  const [updated, , occurrence] = await Promise.all([
+    prisma.focusSession.update({
+      where: { id: session.id },
+      data: {
+        status: "COMPLETED",
+        endedAt: now,
+        lastBeatAt: now,
+        runningSince: null,
+        // Stays the wall clock. It is the rehydration figure, and rewriting it to
+        // the focus-only total would make a reload read as if the breaks never
+        // happened.
+        accumulatedSeconds: wallClock,
+        elapsedSeconds: elapsed,
+        overtimeSeconds: overtime,
+        completedTask,
+        endReason: completedTask
+          ? "TASK_COMPLETED"
+          : (options.reason ?? "USER_STOPPED"),
+        ...(session.mode !== "RECOVERY" &&
+        session.reachedTargetAt === null &&
+        elapsed >= session.targetSeconds
+          ? { reachedTargetAt: now }
+          : {}),
+      },
     }),
+
+    // Close the open interval with its real duration rather than only stamping
+    // `endedAt`. Every session ends with one interval still open, so leaving
+    // this to `updateMany` left the last interval of every session reading
+    // zero — and /stats' break figures are read straight off these rows.
+    prisma.$transaction([
+      ...closeOpenIntervalOps(session, now, true),
+      prisma.sessionInterval.updateMany({
+        where: { sessionId: session.id, endedAt: null },
+        data: { endedAt: now, runningSince: null },
+      }),
+    ]),
+
+    !session.occurrenceId
+      ? null
+      : elapsed > 0
+        ? prisma.taskOccurrence.update({
+            where: { id: session.occurrenceId },
+            data: { loggedSeconds: { increment: Math.round(elapsed) } },
+            select: { loggedSeconds: true, date: true },
+          })
+        : prisma.taskOccurrence.findUnique({
+            where: { id: session.occurrenceId },
+            select: { loggedSeconds: true, date: true },
+          }),
   ]);
 
-  if (session.occurrenceId) {
-    await addLoggedSeconds(session.occurrenceId, elapsed);
-
-    // A MINUTES habit fills its own log from the clock — the entire point of
-    // a timed habit is that running the timer IS the bookkeeping.
-    // Credited against the day's total logged time rather than this session's
-    // minutes, so a retried endSession can't book the same time twice.
-    if (session.taskId) {
-      const occurrence = await prisma.taskOccurrence.findUnique({
-        where: { id: session.occurrenceId },
-        select: { loggedSeconds: true, date: true },
-      });
-
-      if (occurrence) {
-        await creditLoggedTime(
-          user.id,
-          session.taskId,
-          occurrence.date,
-          occurrence.loggedSeconds,
-        );
-      }
-    }
+  // A MINUTES habit fills its own log from the clock — the entire point of
+  // a timed habit is that running the timer IS the bookkeeping.
+  // Credited against the day's total logged time rather than this session's
+  // minutes, so a retried endSession can't book the same time twice.
+  if (occurrence && session.taskId) {
+    await creditLoggedTime(
+      user.id,
+      session.taskId,
+      occurrence.date,
+      occurrence.loggedSeconds,
+    );
   }
 
   if (completedTask && session.taskId) {
@@ -603,41 +613,51 @@ async function completeTaskFromTimer(
   taskId: string,
   occurrenceId: string | null,
 ) {
-  const task = await prisma.task.findFirst({
-    where: { id: taskId, userId },
-    select: { id: true, type: true },
-  });
+  // Three independent reads in one round: the task, the day it ran on, and
+  // the habit bar (null for a todo, or for someone else's task).
+  const [task, occurrence, bar] = await Promise.all([
+    prisma.task.findFirst({
+      where: { id: taskId, userId },
+      select: { id: true, type: true },
+    }),
+    occurrenceId
+      ? prisma.taskOccurrence.findUnique({
+          where: { id: occurrenceId },
+          select: { date: true },
+        })
+      : null,
+    getHabitBar(userId, taskId),
+  ]);
   if (!task) return;
 
+  // The todo's completion and the day's status don't depend on each other.
+  const writes: Promise<unknown>[] = [];
   if (task.type === "TODO") {
-    await prisma.task.update({
-      where: { id: task.id },
-      data: { completedAt: new Date() },
-    });
+    writes.push(
+      prisma.task.update({
+        where: { id: task.id },
+        data: { completedAt: new Date() },
+      }),
+    );
   }
 
-  if (!occurrenceId) return;
-
-  if (task.type === "HABIT") {
-    // Through the claim, so `minimalTaskDone`, `progress` and `status` stay
-    // consistent. Writing status: DONE directly here would leave the day
-    // counting for the streak with no claim behind it.
-    const occurrence = await prisma.taskOccurrence.findUnique({
-      where: { id: occurrenceId },
-      select: { date: true },
-    });
-    const bar = occurrence ? await getHabitBar(userId, task.id) : null;
-
-    if (occurrence && bar) {
-      await toggleHabitDone(userId, bar, occurrence.date, true);
-      return;
+  if (occurrenceId) {
+    if (task.type === "HABIT" && occurrence && bar) {
+      // Through the claim, so `minimalTaskDone`, `progress` and `status` stay
+      // consistent. Writing status: DONE directly here would leave the day
+      // counting for the streak with no claim behind it.
+      writes.push(toggleHabitDone(userId, bar, occurrence.date, true));
+    } else {
+      writes.push(
+        prisma.taskOccurrence.update({
+          where: { id: occurrenceId },
+          data: { status: "DONE", completedAt: new Date() },
+        }),
+      );
     }
   }
 
-  await prisma.taskOccurrence.update({
-    where: { id: occurrenceId },
-    data: { status: "DONE", completedAt: new Date() },
-  });
+  await Promise.all(writes);
 }
 
 function load(userId: string, sessionId: string) {

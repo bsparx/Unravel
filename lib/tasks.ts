@@ -508,26 +508,28 @@ export async function getHabits(
  * each day; every habit gets the time.
  */
 export async function getHabitDayLog(user: User, taskId: string) {
-  const habit = await prisma.task.findFirst({
-    where: { id: taskId, userId: user.id, type: "HABIT" },
-    select: {
-      id: true,
-      title: true,
-      requiresFeedback: true,
-      feedbackPrompt: true,
-    },
-  });
+  // Both scoped by user, so the entries needn't wait for the habit check.
+  const [habit, entries] = await Promise.all([
+    prisma.task.findFirst({
+      where: { id: taskId, userId: user.id, type: "HABIT" },
+      select: {
+        id: true,
+        title: true,
+        requiresFeedback: true,
+        feedbackPrompt: true,
+      },
+    }),
+    prisma.taskOccurrence.findMany({
+      where: {
+        userId: user.id,
+        taskId,
+        OR: [{ loggedSeconds: { gt: 0 } }, { note: { not: null } }],
+      },
+      orderBy: { date: "desc" },
+      select: { date: true, note: true, loggedSeconds: true },
+    }),
+  ]);
   if (!habit) return null;
-
-  const entries = await prisma.taskOccurrence.findMany({
-    where: {
-      userId: user.id,
-      taskId: habit.id,
-      OR: [{ loggedSeconds: { gt: 0 } }, { note: { not: null } }],
-    },
-    orderBy: { date: "desc" },
-    select: { date: true, note: true, loggedSeconds: true },
-  });
 
   return {
     ...habit,

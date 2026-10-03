@@ -76,12 +76,23 @@ export async function createIdentity(
     return { ok: false, message: "Name it in a few words." };
   }
 
+  // Both checks below are independent reads, so they share one round trip.
+  const [existing, exists] = await Promise.all([
+    prisma.identity.findMany({
+      where: { userId: user.id },
+      select: { colorSlot: true },
+    }),
+    prisma.identity.findFirst({
+      where: {
+        userId: user.id,
+        name: { equals: parsed.data.name, mode: "insensitive" },
+      },
+      select: { id: true },
+    }),
+  ]);
+
   // One identity per hue: past six, colours would repeat and the charts and
   // calendar could no longer tell two selves apart. It is also plenty.
-  const existing = await prisma.identity.findMany({
-    where: { userId: user.id },
-    select: { colorSlot: true },
-  });
   if (existing.length >= MAX_IDENTITIES) {
     return {
       ok: false,
@@ -92,13 +103,6 @@ export async function createIdentity(
   // Case-insensitive, like behavior tags: "Writer" and "writer" are one self.
   // Two identities with one name would each hold half the votes and both would
   // read as neglected — a worse failure than refusing the second name.
-  const exists = await prisma.identity.findFirst({
-    where: {
-      userId: user.id,
-      name: { equals: parsed.data.name, mode: "insensitive" },
-    },
-    select: { id: true },
-  });
   if (exists) {
     return { ok: false, message: "That identity already exists." };
   }
@@ -138,24 +142,26 @@ export async function updateIdentity(
     return { ok: false, message: "That didn't look right." };
   }
 
-  const owned = await prisma.identity.findFirst({
-    where: { id: parsed.data.id, userId: user.id },
-    select: { id: true },
-  });
+  // The ownership check and the unique name check, minus the row being
+  // edited ("Writer" may keep its own name while fixing its statement), in
+  // one round. Both are scoped to this user.
+  const [owned, clash] = await Promise.all([
+    prisma.identity.findFirst({
+      where: { id: parsed.data.id, userId: user.id },
+      select: { id: true },
+    }),
+    prisma.identity.findFirst({
+      where: {
+        userId: user.id,
+        id: { not: parsed.data.id },
+        name: { equals: parsed.data.name, mode: "insensitive" },
+      },
+      select: { id: true },
+    }),
+  ]);
   if (!owned) {
     return { ok: false, message: "That identity isn't yours." };
   }
-
-  // The unique name check, minus the row being edited — "Writer" may keep its
-  // own name while fixing its statement.
-  const clash = await prisma.identity.findFirst({
-    where: {
-      userId: user.id,
-      id: { not: owned.id },
-      name: { equals: parsed.data.name, mode: "insensitive" },
-    },
-    select: { id: true },
-  });
   if (clash) {
     return { ok: false, message: "That identity already exists." };
   }
@@ -186,15 +192,14 @@ export async function updateIdentity(
  */
 export async function deleteIdentity(identityId: string): Promise<Result> {
   const user = await requireUser();
-  const identity = await prisma.identity.findFirst({
+  // Scoped by user, so the delete is its own ownership check: one round trip.
+  const { count } = await prisma.identity.deleteMany({
     where: { id: identityId, userId: user.id },
-    select: { id: true },
   });
-  if (!identity) {
+  if (count === 0) {
     return { ok: false, message: "That identity isn't yours to delete." };
   }
 
-  await prisma.identity.delete({ where: { id: identity.id } });
   revalidateIdentityViews();
   return { ok: true };
 }
@@ -217,19 +222,21 @@ export async function setIdentityHabits(
     return { ok: false, message: "Too many habits for one identity." };
   }
 
-  const identity = await prisma.identity.findFirst({
-    where: { id: parsed.data.identityId, userId: user.id },
-    select: { id: true },
-  });
+  const wanted = [...new Set(parsed.data.taskIds)];
+  const [identity, habits] = await Promise.all([
+    prisma.identity.findFirst({
+      where: { id: parsed.data.identityId, userId: user.id },
+      select: { id: true },
+    }),
+    prisma.task.findMany({
+      where: { id: { in: wanted }, userId: user.id, type: "HABIT" },
+      select: { id: true },
+    }),
+  ]);
   if (!identity) {
     return { ok: false, message: "That identity isn't yours." };
   }
 
-  const wanted = [...new Set(parsed.data.taskIds)];
-  const habits = await prisma.task.findMany({
-    where: { id: { in: wanted }, userId: user.id, type: "HABIT" },
-    select: { id: true },
-  });
   const kept = habits.map((habit) => habit.id);
 
   await prisma.$transaction([
@@ -250,6 +257,25 @@ export async function setIdentityHabits(
  * lazily, like every DayLog). Null clears it back to the week's lead.
  */
 export async function setLeadIdentity(identityId: string | null): Promise<Result> {
+  const result = await writeTodaysLead(identityId);
+  if (result.ok) revalidateIdentityViews();
+  return result;
+}
+
+/**
+ * The same write for /day's picker, minus the revalidation.
+ *
+ * Any revalidation makes Next re-render the current route into the action's
+ * response, which is the whole of /day for one radio press. The panel already
+ * holds everything a switch changes, so this returns only the result. The
+ * other screens that show the lead are dynamic and read it again when you
+ * navigate to them.
+ */
+export async function saveTodaysLead(identityId: string | null): Promise<Result> {
+  return writeTodaysLead(identityId);
+}
+
+async function writeTodaysLead(identityId: string | null): Promise<Result> {
   const user = await requireUser();
   const parsed = setLeadSchema.safeParse({ identityId });
   if (!parsed.success) return { ok: false, message: "That didn't look right." };
@@ -268,7 +294,5 @@ export async function setLeadIdentity(identityId: string | null): Promise<Result
     create: { userId: user.id, date, leadIdentityId: parsed.data.identityId },
     update: { leadIdentityId: parsed.data.identityId },
   });
-
-  revalidateIdentityViews();
   return { ok: true };
 }

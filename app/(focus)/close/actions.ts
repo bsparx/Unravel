@@ -64,8 +64,11 @@ export async function saveGratitude(formData: FormData): Promise<void> {
 export async function handOff(): Promise<void> {
   const user = await requireUser();
 
-  await markDayClosed(user.id, todayLocal(user.timezone));
-  await startRecoverySession();
+  // Independent: stamping the day closed and starting the rest.
+  await Promise.all([
+    markDayClosed(user.id, todayLocal(user.timezone)),
+    startRecoverySession(),
+  ]);
 
   revalidatePath("/");
   redirect("/timer");
@@ -132,24 +135,28 @@ async function resolveTask(
     if (capture.promotedTaskId) return capture.promotedTaskId;
 
     const { title, minutes, priority } = parseQuickAdd(capture.body);
-    const task = await prisma.task.create({
-      data: {
-        userId,
-        type: "TODO",
-        title: (title || capture.body).slice(0, 200),
-        priority,
-        estimatedSeconds: minutes ? minutes * 60 : null,
-        dueDate: date,
-        sortOrder: Date.now(),
-      },
-    });
-
-    await prisma.capture.update({
+    // Created through the capture's relation: the task and the "promoted"
+    // mark land in one write.
+    const promoted = await prisma.capture.update({
       where: { id: capture.id },
-      data: { status: "PROMOTED", promotedTaskId: task.id },
+      data: {
+        status: "PROMOTED",
+        promotedTask: {
+          create: {
+            userId,
+            type: "TODO",
+            title: (title || capture.body).slice(0, 200),
+            priority,
+            estimatedSeconds: minutes ? minutes * 60 : null,
+            dueDate: date,
+            sortOrder: Date.now(),
+          },
+        },
+      },
+      select: { promotedTaskId: true },
     });
 
-    return task.id;
+    return promoted.promotedTaskId;
   }
 
   if (input.title) {
