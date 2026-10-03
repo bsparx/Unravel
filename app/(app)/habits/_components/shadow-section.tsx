@@ -1,6 +1,7 @@
 import { Check, Eye, Moon } from "lucide-react";
 
 import { IdentityChip } from "@/components/identity-sigil";
+import { InfoTip } from "@/components/info-tip";
 import { prisma } from "@/lib/db";
 import type { User } from "@/lib/generated/prisma/client";
 import { getShadowWeek } from "@/lib/shadows";
@@ -30,7 +31,7 @@ export async function ShadowSection({ user }: { user: User }) {
       <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
           <h2 id="shadow-title" className="font-sans text-heading font-semibold">
-            The shadow side
+            The shadow side <InfoTip term="shadow" className="ml-1" />
           </h2>
           <p className="text-muted-foreground mt-1 max-w-prose text-label">
             Patterns you&apos;re working with. Noticing one is useful information, never a failure.

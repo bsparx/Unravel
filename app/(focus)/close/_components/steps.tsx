@@ -6,6 +6,7 @@ import { ArrowRight, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { InfoTip } from "@/components/info-tip";
 import type { PassOption } from "@/app/(focus)/_components/morning-pass";
 import { cn } from "@/lib/utils";
 
@@ -37,7 +38,7 @@ function Shell({
   return (
     <main className="mx-auto flex min-h-full w-full max-w-lg flex-1 flex-col justify-center px-6 py-24">
       <p className="text-micro text-muted-foreground mb-6 font-medium tracking-wider uppercase">
-        {eyebrow}
+        {eyebrow} <InfoTip term="close" className="ml-1" />
       </p>
       <h1 className="font-display text-display text-balance">{title}</h1>
       <div className="mt-10">{children}</div>

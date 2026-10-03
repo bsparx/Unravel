@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { EmptyState } from "@/components/empty-state";
 import type { SpreadEntry } from "@/components/journal-spread";
+import { InfoTip } from "@/components/info-tip";
 import {
   completeWithNote,
   logAndComplete,
@@ -16,6 +17,7 @@ import {
   formatDateWithWeekday,
   formatRelativeDate,
 } from "@/lib/dates";
+import type { GlossaryTerm } from "@/lib/glossary";
 import type { TodayItem, TodayView } from "@/lib/tasks";
 import type { WaterToday } from "@/lib/water-data";
 
@@ -120,15 +122,16 @@ export function DayList({
   const sections: {
     key: string;
     heading: string;
+    term: GlossaryTerm;
     items: TodayItem[];
     tone?: "overdue";
     /** Done today, for the section's "2/4" counter. */
     done?: number;
   }[] = [
-    { key: "overdue", heading: "Overdue", items: view.overdue, tone: "overdue" },
-    { key: "habits", heading: "Dailies", items: view.habits, done: doneHabits },
-    { key: "due", heading: "Quests", items: view.dueToday, done: doneDueToday },
-    { key: "undated", heading: "Side quests", items: view.undated, done: doneUndated },
+    { key: "overdue", heading: "Overdue", term: "overdue", items: view.overdue, tone: "overdue" },
+    { key: "habits", heading: "Dailies", term: "dailies", items: view.habits, done: doneHabits },
+    { key: "due", heading: "Quests", term: "quests", items: view.dueToday, done: doneDueToday },
+    { key: "undated", heading: "Side quests", term: "sideQuests", items: view.undated, done: doneUndated },
   ];
 
   const hasAnything = sections.some((section) => section.items.length > 0);
@@ -202,6 +205,7 @@ export function DayList({
                   ? section.items.length
                   : `${section.done ?? 0}/${(section.done ?? 0) + section.items.length}`}
               </span>
+              <InfoTip term={section.term} className="ml-1.5" />
             </h2>
 
             <ul>

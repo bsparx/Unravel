@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import type { IdentityReinforcement } from "@/lib/identity-reinforcement";
 import { cn } from "@/lib/utils";
+import { InfoTip } from "@/components/info-tip";
 
 /**
  * The identity panels for /habits/stats: the tally per identity ("who you
@@ -23,7 +24,9 @@ export function IdentitiesPanel({
 
   return (
     <section>
-      <h2 className="font-display text-title">Who you became</h2>
+      <h2 className="font-display text-title">
+        Who you became <InfoTip term="vote" className="ml-1" />
+      </h2>
       <p className="text-muted-foreground mt-0.5 mb-3 max-w-prose text-label">
         Every habit is a vote for the kind of person you want to become. A vote
         is a due day where the minimal task happened — over the habits in

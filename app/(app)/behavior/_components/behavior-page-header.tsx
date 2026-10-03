@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Tag } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { InfoTip } from "@/components/info-tip";
 
 import { ManageTagsDialog } from "./manage-tags-dialog";
 
@@ -16,7 +17,9 @@ export function BehaviorPageHeader() {
     <header className="mb-8">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-display">Behavior</h1>
+          <h1 className="text-display">
+            Behavior <InfoTip term="behavior" className="ml-1" />
+          </h1>
           <p className="text-muted-foreground mt-1 text-label">
             When the urge hits — daydreaming, music, scrolling — press{" "}
             <kbd className="font-mono">c</kbd> and write what you felt and what

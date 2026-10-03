@@ -3,6 +3,7 @@ import { Check, Moon } from "lucide-react";
 
 import { StepList } from "@/components/step-list";
 import { Button } from "@/components/ui/button";
+import { InfoTip } from "@/components/info-tip";
 import { formatMinutes } from "@/lib/dates";
 import type { DayLogWithSelection } from "@/lib/day-log";
 import { buildTimerHref, RECOVERY_HREF } from "@/lib/timer-url";
@@ -40,6 +41,7 @@ export function OneThingCard({
 
       <p className="text-label text-muted-foreground mt-6 font-medium">
         {done ? "Today's frog — eaten" : "Today, the frog is"}
+        <InfoTip term="frog" className="ml-1.5" />
       </p>
 
       <h1 className="font-display mt-3 text-[1.625rem] leading-snug text-balance">

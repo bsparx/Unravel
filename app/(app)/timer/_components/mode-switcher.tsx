@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Clock, Flame, Minus, Moon, Plus, Zap } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { InfoTip } from "@/components/info-tip";
 import { formatDuration } from "@/lib/dates";
 import {
   clampIntervals,
@@ -76,36 +77,39 @@ export function ModePills({
 
   return (
     <div className={cn("flex flex-col items-center gap-1.5", className)}>
-      <div
-        role="group"
-        aria-label="Timer mode"
-        className="grid grid-cols-2 items-center gap-1 rounded-xl border border-border/70 bg-card/80 p-1 sm:inline-flex"
-      >
-        {modes.map((item) => {
-          const isSelected = config.mode === item.id;
-          const Icon = item.icon;
-          const isRest = item.id === "RECOVERY";
+      <div className="flex items-center gap-2">
+        <div
+          role="group"
+          aria-label="Timer mode"
+          className="grid grid-cols-2 items-center gap-1 rounded-xl border border-border/70 bg-card/80 p-1 sm:inline-flex"
+        >
+          {modes.map((item) => {
+            const isSelected = config.mode === item.id;
+            const Icon = item.icon;
+            const isRest = item.id === "RECOVERY";
 
-          return (
-            <button
-              key={item.id}
-              aria-pressed={isSelected}
-              type="button"
-              onClick={() => selectMode(item.id)}
-              className={cn(
-                "relative flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 py-2 text-label font-medium transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-                isSelected
-                  ? isRest
-                    ? "bg-rest text-rest-foreground font-semibold"
-                    : "bg-primary text-primary-foreground font-semibold"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/60",
-              )}
-            >
-              <Icon className="size-3.5 shrink-0" aria-hidden />
-              <span>{item.label}</span>
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={item.id}
+                aria-pressed={isSelected}
+                type="button"
+                onClick={() => selectMode(item.id)}
+                className={cn(
+                  "relative flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 py-2 text-label font-medium transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                  isSelected
+                    ? isRest
+                      ? "bg-rest text-rest-foreground font-semibold"
+                      : "bg-primary text-primary-foreground font-semibold"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/60",
+                )}
+              >
+                <Icon className="size-3.5 shrink-0" aria-hidden />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        <InfoTip term="timerModes" align="end" />
       </div>
 
       <p className="text-label text-muted-foreground text-center font-normal">

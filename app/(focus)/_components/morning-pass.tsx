@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { TaskForm } from "@/app/(app)/tasks/_components/task-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { InfoTip } from "@/components/info-tip";
 import { formatFullDate, formatMinutes, parseLocalDate } from "@/lib/dates";
 import { idleState } from "@/lib/validation";
 import { cn } from "@/lib/utils";
@@ -98,7 +99,9 @@ export function MorningPass({
   return (
     <div className="w-full">
       <FrogPondLazy mood="waiting" />
-      <h1 className="font-display mt-6 text-display text-balance">{heading}</h1>
+      <h1 className="font-display mt-6 text-display text-balance">
+        {heading} <InfoTip term="frog" className="ml-1" />
+      </h1>
       <p className="text-muted-foreground mt-2 text-body">{hint}</p>
 
       {options.length > 0 && (

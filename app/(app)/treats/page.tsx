@@ -1,6 +1,7 @@
 import { Gift, Lock, Repeat, Scroll } from "lucide-react";
 
 import { IdentitySigil, hueStyle } from "@/components/identity-sigil";
+import { InfoTip } from "@/components/info-tip";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getRewards } from "@/lib/rewards";
@@ -48,7 +49,9 @@ export default async function TreatsPage() {
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <section aria-labelledby="treats-title">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h2 id="treats-title" className="font-sans text-heading font-semibold">Treats</h2>
+            <h2 id="treats-title" className="font-sans text-heading font-semibold">
+              Treats <InfoTip term="treats" className="ml-1" />
+            </h2>
             <AddTreatDialog identities={identities} />
           </div>
           {treats.length === 0 ? (
@@ -107,7 +110,9 @@ export default async function TreatsPage() {
 
         <section aria-labelledby="chapters-title">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h2 id="chapters-title" className="font-sans text-heading font-semibold">Chapters</h2>
+            <h2 id="chapters-title" className="font-sans text-heading font-semibold">
+              Chapters <InfoTip term="chapters" className="ml-1" />
+            </h2>
             <StartChapterDialog identities={identities} habits={habits} />
           </div>
           {chapters.length === 0 ? (

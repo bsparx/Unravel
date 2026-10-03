@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { setLeadIdentity } from "@/app/(app)/identities/actions";
 import { IdentitySigil } from "@/components/identity-sigil";
+import { InfoTip } from "@/components/info-tip";
 import type { Sigil } from "@/lib/identity-look";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +34,9 @@ export function LeadPicker({ options, leadId }: { options: Option[]; leadId: str
 
   return (
     <fieldset aria-busy={pending}>
-      <legend className="text-muted-foreground mb-2.5 text-label font-semibold">Who leads today</legend>
+      <legend className="text-muted-foreground mb-2.5 text-label font-semibold">
+        Who leads today <InfoTip term="lead" className="ml-1" />
+      </legend>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(4.25rem,1fr))] gap-1.5">
         {options.map((option) => {
           const checked = optimisticLead === option.id;

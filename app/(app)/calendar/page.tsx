@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { InfoTip } from "@/components/info-tip";
 import { requireUser } from "@/lib/auth";
 import {
   blockLabel,
@@ -197,7 +198,9 @@ export default async function CalendarPage({
     <div className="w-full px-4 py-6 md:px-6 md:py-8">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-display">Calendar</h1>
+          <h1 className="text-display">
+            Calendar <InfoTip term="blocks" className="ml-1" />
+          </h1>
           <p className="text-muted-foreground mt-1 text-label">
             {view === "day"
               ? formatFullDate(anchor)

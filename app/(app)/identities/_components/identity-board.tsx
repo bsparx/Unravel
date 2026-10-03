@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { InfoTip } from "@/components/info-tip";
 import { ARCHETYPES, MAX_IDENTITIES, isArchetype, stageFor } from "@/lib/identity-look";
 import type { IdentityReinforcement } from "@/lib/identity-reinforcement";
 import { cn } from "@/lib/utils";
@@ -91,7 +92,9 @@ export function IdentityBoard({
 
       {identities.length === 0 ? (
         <section aria-labelledby="starter-title">
-          <h2 id="starter-title" className="font-sans text-xl font-semibold">Begin as someone</h2>
+          <h2 id="starter-title" className="font-sans text-xl font-semibold">
+            Begin as someone <InfoTip term="starter" className="ml-1" />
+          </h2>
           <p className="text-muted-foreground mt-1 mb-5 max-w-prose text-label">
             Pick a character and their first habits come with them, already linked. Keeping a
             habit&apos;s minimum counts as a vote. Or use Add identity to name your own.
@@ -203,6 +206,7 @@ function IdentityCard({
         <div className="flex items-baseline justify-between gap-3 text-label">
           <span className="font-semibold">
             Stage {stage.number} of 5: {stage.name}
+            <InfoTip term="stage" className="ml-1.5" />
           </span>
           <span className="text-muted-foreground">
             <span className="font-mono tabular-nums">{identity.tally.total}</span>{" "}
@@ -415,7 +419,9 @@ function UnlinkedHabitsSection({ habits }: { habits: { id: string; title: string
   return (
     <section className="space-y-3">
       <div className="space-y-1.5">
-        <h2 className="font-sans text-xl font-semibold">Habits without an identity</h2>
+        <h2 className="font-sans text-xl font-semibold">
+          Habits without an identity <InfoTip term="unlinked" className="ml-1" />
+        </h2>
         <p className="text-muted-foreground max-w-prose text-label">
           Linking is optional. Open a habit to choose which identities its kept days support.
         </p>

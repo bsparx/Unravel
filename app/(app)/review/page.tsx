@@ -5,6 +5,7 @@ import { getIdentityVotes } from "@/lib/identity-votes";
 import { reviewWeekStart } from "@/lib/review-week";
 
 import { Council, type CouncilIdentity } from "./_components/council";
+import { InfoTip } from "@/components/info-tip";
 
 export const metadata = { title: "Weekly review" };
 
@@ -53,7 +54,9 @@ export default async function ReviewPage() {
   return (
     <div className="mx-auto w-full max-w-4xl px-5 py-8 md:px-8 md:py-12">
       <header className="mb-8">
-        <h1 className="text-display">The weekly council</h1>
+        <h1 className="text-display">
+          The weekly council <InfoTip term="council" className="ml-1" />
+        </h1>
         <p className="text-muted-foreground mt-2 max-w-prose text-body">
           Once a week, each self gets a hearing. Three short questions, about ten minutes.
         </p>

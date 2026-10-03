@@ -4,6 +4,7 @@ import { Flag, Play, Sprout } from "lucide-react";
 import { IdentitySigil, hueStyle } from "@/components/identity-sigil";
 import { StarterPicker } from "@/components/starter-picker";
 import { Button } from "@/components/ui/button";
+import { InfoTip } from "@/components/info-tip";
 import { formatMinutes } from "@/lib/dates";
 import type { IdentityWithVotes } from "@/lib/identity-votes";
 import type { TodayItem } from "@/lib/tasks";
@@ -55,6 +56,7 @@ export function LeadPanel({
             <h2 id="starter-title" className="flex items-center gap-2 font-sans text-xl font-semibold">
               <Sprout className="text-accent-foreground size-5" aria-hidden />
               Begin as someone
+              <InfoTip term="starter" />
             </h2>
             <p className="text-muted-foreground mt-1 max-w-prose text-label">
               Pick a character. Their first habits come with them, already small, and
@@ -111,7 +113,9 @@ export function LeadPanel({
               <p className="mt-4 flex items-start gap-3 rounded-xl bg-[color-mix(in_srgb,var(--hue)_9%,transparent)] px-3.5 py-3 text-body">
                 <IdentitySigil sigil={lead.sigil} slot={lead.colorSlot} size="sm" />
                 <span>
-                  <span className="text-muted-foreground block text-micro font-semibold">Ask like {lead.short}</span>
+                  <span className="text-muted-foreground block text-micro font-semibold">
+                    Ask like {lead.short} <InfoTip term="question" className="ml-0.5" />
+                  </span>
                   {lead.question}
                 </span>
               </p>
@@ -130,7 +134,9 @@ export function LeadPanel({
 
       <div className="min-w-0 px-1">
         <div className="flex items-baseline justify-between gap-3">
-          <h2 className="font-sans text-title font-semibold">Votes today</h2>
+          <h2 className="font-sans text-title font-semibold">
+            Votes today <InfoTip term="vote" className="ml-1" />
+          </h2>
           <span className="font-mono text-title font-semibold tabular-nums">{votesToday}</span>
         </div>
         <ul className="mt-2 space-y-0.5">

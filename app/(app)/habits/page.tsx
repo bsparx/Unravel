@@ -14,6 +14,7 @@ import { HabitDayControl } from "@/components/habit-day";
 import { IdentityChip } from "@/components/identity-sigil";
 import { MissedYesterdayBadge } from "@/components/missed-yesterday-badge";
 import { Button } from "@/components/ui/button";
+import { InfoTip } from "@/components/info-tip";
 import { requireUser } from "@/lib/auth";
 import {
   addDays,
@@ -99,6 +100,7 @@ export default async function HabitsPage() {
           <h1 className="text-display">Habits</h1>
           <p className="text-muted-foreground mt-1 text-label">
             Your minimum action is enough to complete the day.
+            <InfoTip term="minimum" className="ml-1" />
           </p>
         </div>
         <div className="flex items-center gap-2">

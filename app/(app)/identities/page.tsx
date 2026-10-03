@@ -5,6 +5,7 @@ import { getIdentityVotes, getLeadIdentityId } from "@/lib/identity-votes";
 
 import { IdentityBoard } from "./_components/identity-board";
 import type { BoardIdentity } from "./_components/types";
+import { InfoTip } from "@/components/info-tip";
 
 export const metadata = { title: "Identities" };
 
@@ -68,7 +69,9 @@ export default async function IdentitiesPage() {
   return (
     <div className="mx-auto w-full max-w-4xl px-5 py-8 md:px-8 md:py-12">
       <header className="mb-8">
-        <h1 className="text-display">Identities</h1>
+        <h1 className="text-display">
+          Identities <InfoTip term="identity" className="ml-1" />
+        </h1>
         <p className="text-muted-foreground mt-2 max-w-prose text-body">
           Jung saw one personality as a cast of smaller selves. Name yours
           after someone real or fictional, then let small habits vote for them.
