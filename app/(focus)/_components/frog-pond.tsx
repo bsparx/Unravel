@@ -131,7 +131,7 @@ interface Station {
  */
 export function FrogPond({
   mood,
-  className = "relative mx-auto h-40 w-full max-w-md sm:h-48",
+  className = "relative mx-auto h-40 w-full max-w-md overflow-hidden rounded-2xl sm:h-48",
 }: {
   mood: FrogMood;
   className?: string;

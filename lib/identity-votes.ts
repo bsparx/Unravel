@@ -177,3 +177,33 @@ export const getLeadIdentityId = cache(async (user: User): Promise<string | null
   ]);
   return day?.leadIdentityId ?? review?.leadIdentityId ?? null;
 });
+
+export type LeadLook = { short: string; sigil: Sigil; colorSlot: number };
+
+/**
+ * The same choice as `getLeadIdentityId`, with the face to show for it. The
+ * home screen's greeting needs only that, so this reads it through each row's
+ * relation instead of loading every profile.
+ */
+export const getLeadLook = cache(async (user: User): Promise<LeadLook | null> => {
+  const today = todayLocal(user.timezone);
+  const weekStart = startOfWeek(today, user.weekStart);
+  const look = { select: { name: true, sigil: true, archetype: true, colorSlot: true } } as const;
+  const [day, review] = await Promise.all([
+    prisma.dayLog.findUnique({
+      where: { userId_date: { userId: user.id, date: today } },
+      select: { leadIdentity: look },
+    }),
+    prisma.weeklyReview.findUnique({
+      where: { userId_weekStart: { userId: user.id, weekStart } },
+      select: { leadIdentity: look },
+    }),
+  ]);
+  const lead = day?.leadIdentity ?? review?.leadIdentity;
+  if (!lead) return null;
+  return {
+    short: shortName(lead.name),
+    sigil: sigilFor(lead.sigil, lead.archetype),
+    colorSlot: clampSlot(lead.colorSlot),
+  };
+});

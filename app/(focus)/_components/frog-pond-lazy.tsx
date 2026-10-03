@@ -16,13 +16,14 @@ const Pond = dynamic(() => import("./frog-pond"), {
   loading: () => (
     <div
       aria-hidden
-      className="relative mx-auto flex h-40 w-full max-w-md items-center justify-center sm:h-48"
+      className="relative mx-auto flex h-40 w-full max-w-md items-center justify-center overflow-hidden rounded-2xl sm:h-48"
     >
       <Frog className="h-14 w-auto" />
     </div>
   ),
 });
 
-export function FrogPondLazy({ mood }: { mood: FrogMood }) {
-  return <Pond mood={mood} />;
+/** `className` sizes the pond; the loading frame keeps the default size. */
+export function FrogPondLazy({ mood, className }: { mood: FrogMood; className?: string }) {
+  return <Pond mood={mood} {...(className ? { className } : {})} />;
 }
