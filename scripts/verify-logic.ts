@@ -9,6 +9,13 @@
 
 import assert from "node:assert/strict";
 
+import { nextFreeSlot, stageFor } from "@/lib/identity-look";
+import { reviewWeekStart } from "@/lib/review-week";
+import { activePalette, isEveningHour } from "@/lib/theme";
+import { shadowSource, tallyVotes } from "@/lib/vote-tally";
+import { STARTER_SELVES, isTaken } from "@/lib/starter-selves";
+import { identitySchema } from "@/lib/validation";
+
 import {
   addDays,
   dayOfWeek,
@@ -2693,6 +2700,7 @@ const questBlock = (
   completedAt: overrides.completedAt ?? null,
   cueForId: overrides.cueForId ?? null,
   hasCue: overrides.hasCue ?? false,
+  identity: null,
   tasks: overrides.tasks ?? [],
 });
 
@@ -3147,6 +3155,132 @@ check("the daily strip keeps its columns even on days nothing is due", () => {
   const gap = tally.daily.find((day) => day.dateISO === "2026-03-07");
   assert.equal(gap?.due, 0);
   assert.equal(gap?.touched, false);
+});
+
+
+// ---------------------------------------------------------------- the identity game
+
+console.log("\nidentity votes — the cumulative tally");
+
+check("a habit linked to two identities votes once for each, every count", () => {
+  const tallies = tallyVotes({
+    identityIds: ["sherlock", "musashi"],
+    sources: new Map([["walk", ["sherlock", "musashi"]]]),
+    allTime: new Map([["walk", 40]]),
+    recent: [
+      { source: "walk", dateISO: "2026-10-03" },
+      { source: "walk", dateISO: "2026-09-29" },
+    ],
+    todayISO: "2026-10-03",
+    weekStartISO: "2026-09-28",
+  });
+  for (const id of ["sherlock", "musashi"]) {
+    const tally = tallies.get(id)!;
+    assert.equal(tally.total, 40);
+    assert.equal(tally.month, 2);
+    assert.equal(tally.week, 2);
+    assert.equal(tally.last7, 2);
+    assert.equal(tally.today, 1);
+    assert.equal(tally.quietDays, 0);
+  }
+});
+
+check("a chose-otherwise mark votes for the identity its pattern pulls against", () => {
+  const source = shadowSource("scroll");
+  const tally = tallyVotes({
+    identityIds: ["marcus"],
+    sources: new Map([[source, ["marcus"]]]),
+    allTime: new Map([[source, 3]]),
+    recent: [{ source, dateISO: "2026-10-01" }],
+    todayISO: "2026-10-03",
+    weekStartISO: "2026-09-28",
+  }).get("marcus")!;
+  assert.equal(tally.total, 3);
+  assert.equal(tally.week, 1);
+  assert.equal(tally.today, 0);
+});
+
+check("quiet days count back from yesterday; today never counts against anyone", () => {
+  const tally = tallyVotes({
+    identityIds: ["marcus"],
+    sources: new Map([["notes", ["marcus"]]]),
+    allTime: new Map([["notes", 1]]),
+    recent: [{ source: "notes", dateISO: "2026-09-27" }],
+    todayISO: "2026-10-03",
+    weekStartISO: "2026-09-28",
+  }).get("marcus")!;
+  assert.equal(tally.quietDays, 5); // Sep 28 .. Oct 2
+  assert.equal(tally.strip.length, 14);
+  assert.equal(tally.strip.at(-1), false); // today, still open
+  assert.equal(tally.strip.filter(Boolean).length, 1);
+});
+
+check("unlinked sources and out-of-window rows vote for nobody", () => {
+  const tally = tallyVotes({
+    identityIds: ["leo"],
+    sources: new Map([["sketch", ["leo"]]]),
+    allTime: new Map([["todo-1", 9]]),
+    recent: [
+      { source: "todo-1", dateISO: "2026-10-03" },
+      { source: "sketch", dateISO: "2026-08-01" },
+    ],
+    todayISO: "2026-10-03",
+    weekStartISO: "2026-09-28",
+  }).get("leo")!;
+  assert.deepEqual([tally.total, tally.month, tally.today], [0, 0, 0]);
+});
+
+console.log("\nidentity look — stages, hues, the review week, the evening shift");
+
+check("stages never skip and the last one is final", () => {
+  assert.deepEqual(stageFor(0), { number: 1, name: "Trying it on", next: { name: "Practising", votesToGo: 10 }, progress: 0 });
+  assert.equal(stageFor(64).name, "Dependable");
+  assert.equal(stageFor(64).next?.votesToGo, 36);
+  assert.equal(stageFor(64).progress, 10);
+  assert.equal(stageFor(250).next, null);
+  assert.equal(stageFor(250).progress, 100);
+});
+
+check("a new identity takes the first free hue", () => {
+  assert.equal(nextFreeSlot([]), 1);
+  assert.equal(nextFreeSlot([1, 2, 4]), 3);
+  assert.equal(nextFreeSlot([1, 2, 3, 4, 5, 6]), 1);
+});
+
+check("a review held on the first day plans that week, otherwise the next", () => {
+  const monday = parseLocalDate("2026-09-28")!;
+  const saturday = parseLocalDate("2026-10-03")!;
+  assert.equal(toISODate(reviewWeekStart(monday, 1)), "2026-09-28");
+  assert.equal(toISODate(reviewWeekStart(saturday, 1)), "2026-10-05");
+  assert.equal(toISODate(reviewWeekStart(saturday, 0)), "2026-10-04");
+});
+
+check("the evening shift wraps past midnight and ends at five", () => {
+  assert.equal(isEveningHour(21, 21), true);
+  assert.equal(isEveningHour(23, 21), true);
+  assert.equal(isEveningHour(2, 21), true);
+  assert.equal(isEveningHour(5, 21), false);
+  assert.equal(isEveningHour(20, 21), false);
+  assert.equal(activePalette("sage", { on: true, from: 21 }, 22), "hearth");
+  assert.equal(activePalette("sage", { on: false, from: 21 }, 22), "sage");
+  assert.equal(activePalette("clear", { on: true, from: 21 }, 9), "clear");
+});
+
+check("every starter character passes the identity form's own rules", () => {
+  const names = STARTER_SELVES.map((starter) => starter.name.toLowerCase());
+  assert.equal(new Set(names).size, names.length, "starter names are unique");
+  assert.equal(new Set(STARTER_SELVES.map((starter) => starter.id)).size, STARTER_SELVES.length);
+  for (const starter of STARTER_SELVES) {
+    const parsed = identitySchema.safeParse({ ...starter });
+    assert.ok(parsed.success, `${starter.name}: ${parsed.error?.message}`);
+    assert.ok(starter.habits.length > 0, `${starter.name} brings a habit`);
+    for (const habit of starter.habits) {
+      assert.ok(habit.minimalTask.length > 0 && habit.minimalTask.length <= 120, habit.title);
+      assert.ok(habit.cue.length > 0 && habit.cue.length <= 120, habit.title);
+    }
+  }
+  assert.equal(isTaken(STARTER_SELVES[0], [STARTER_SELVES[0].name.toUpperCase()]), true);
+  assert.equal(isTaken(STARTER_SELVES[0], ["Writer"]), false);
 });
 
 console.log(`\n${passed} checks passed.\n`);

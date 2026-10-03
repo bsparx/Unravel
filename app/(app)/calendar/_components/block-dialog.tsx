@@ -68,6 +68,8 @@ export type BlockDraft = {
   kind: "WORK" | "RECOVERY" | "BUFFER" | "DAYDREAM";
   /** This block already has a cue in front of it, so don't offer to add one. */
   hasCue: boolean;
+  /** The self this time is for, if any. */
+  identityId: string | null;
 };
 
 const KINDS: { value: BlockDraft["kind"]; label: string; hint: string }[] = [
@@ -95,10 +97,12 @@ const LENGTHS = [15, 25, 45, 60, 90];
 export function BlockDialog({
   draft,
   tasks,
+  identities,
   onClose,
 }: {
   draft: BlockDraft;
   tasks: { id: string; title: string; cueTitle: string | null; color: string }[];
+  identities: { id: string; name: string; colorSlot: number }[];
   onClose: () => void;
 }) {
   const editing = Boolean(draft.id);
@@ -327,6 +331,29 @@ export function BlockDialog({
               {KINDS.find((option) => option.value === kind)?.hint}
             </p>
           </div>
+
+          {kind === "WORK" && identities.length > 0 && (
+            <div className="space-y-1.5">
+              <Label htmlFor="block-identity">Time for</Label>
+              <select
+                id="block-identity"
+                name="identityId"
+                defaultValue={draft.identityId ?? ""}
+                className="border-input bg-input-surface text-foreground min-h-11 w-full rounded-[10px] border px-3 text-body"
+                aria-describedby="block-identity-help"
+              >
+                <option value="">Nobody in particular</option>
+                {identities.map((identity) => (
+                  <option key={identity.id} value={identity.id}>
+                    {identity.name}
+                  </option>
+                ))}
+              </select>
+              <p id="block-identity-help" className="text-muted-foreground text-label">
+                The block wears their colour. A plan isn&apos;t a vote; doing the habit is.
+              </p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="block-task">

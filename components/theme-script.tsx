@@ -1,6 +1,10 @@
 import {
-  EGGPLANT_THEME_ATTR,
-  EGGPLANT_THEME_VALUE,
+  DARK_PALETTES,
+  EVENING_ENDS_AT,
+  EVENING_PALETTE,
+  EVENING_STORAGE_KEY,
+  THEMES,
+  THEME_ATTR,
   THEME_STORAGE_KEY,
 } from "@/lib/theme";
 /**
@@ -17,27 +21,32 @@ import {
  * pattern and carries no warning.
  *
  * It is intentionally dependency-free and stringified: it runs before any
- * bundle has loaded, so it cannot import from `lib/theme.ts`. The one thing
- * shared with that module is the storage key, imported above rather than
- * retyped — a drift between the two would present as "my theme resets on every
- * reload", with nothing obviously wrong at either site.
+ * bundle has loaded, so it cannot import from `lib/theme.ts` at runtime. The
+ * constants it shares with that module are interpolated at render time rather
+ * than retyped — a drift between the two would present as "my theme resets on
+ * every reload", with nothing obviously wrong at either site.
  */
 export function ThemeScript() {
   const script = `
 try {
+  var themes = ${JSON.stringify(THEMES)};
+  var darkPalettes = ${JSON.stringify(DARK_PALETTES)};
   var stored = localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});
-  var eggplant = stored === ${JSON.stringify(EGGPLANT_THEME_VALUE)};
-  var theme = stored === "light" || stored === "dark" ? stored
-    : eggplant ? "dark"
+  var palette = themes.indexOf(stored) >= 0 && stored !== "system" ? stored
     : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  var evening = null;
+  try { evening = JSON.parse(localStorage.getItem(${JSON.stringify(EVENING_STORAGE_KEY)}) || "null"); } catch (e) {}
+  var hour = new Date().getHours();
+  if (evening && evening.on === true && (hour >= evening.from || hour < ${EVENING_ENDS_AT})) palette = ${JSON.stringify(EVENING_PALETTE)};
+  var dark = darkPalettes.indexOf(palette) >= 0;
   var root = document.documentElement;
-  root.classList.toggle("dark", theme === "dark");
-  if (eggplant) {
-    root.setAttribute(${JSON.stringify(EGGPLANT_THEME_ATTR)}, ${JSON.stringify(EGGPLANT_THEME_VALUE)});
+  root.classList.toggle("dark", dark);
+  if (palette === "light" || palette === "dark") {
+    root.removeAttribute(${JSON.stringify(THEME_ATTR)});
   } else {
-    root.removeAttribute(${JSON.stringify(EGGPLANT_THEME_ATTR)});
+    root.setAttribute(${JSON.stringify(THEME_ATTR)}, palette);
   }
-  root.style.colorScheme = theme;
+  root.style.colorScheme = dark ? "dark" : "light";
 } catch (error) {}
 `.trim();
 

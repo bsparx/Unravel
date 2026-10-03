@@ -49,6 +49,8 @@ export type CalendarBlock = {
   cueForId: string | null;
   /** This block has a cue in front of it — so moving it has to move two things. */
   hasCue: boolean;
+  /** The self this time is for. Its hue tints the block ahead of any task colour. */
+  identity: { id: string; name: string; colorSlot: number } | null;
   /**
    * What the stretch of time is for. Usually one thing; sometimes three, in no
    * particular order — "in these two hours you need to do these three things".
@@ -68,6 +70,7 @@ const blockSelect = {
   completedAt: true,
   cueForId: true,
   cue: { select: { id: true } },
+  identity: { select: { id: true, name: true, colorSlot: true } },
   tasks: {
     orderBy: { position: "asc" },
     select: {
@@ -98,6 +101,7 @@ type BlockRow = {
   completedAt: Date | null;
   cueForId: string | null;
   cue: { id: string } | null;
+  identity: { id: string; name: string; colorSlot: number } | null;
   /** The join row's own tick, plus the task it points at. */
   tasks: { doneAt: Date | null; task: Omit<BlockTask, "doneAt"> }[];
 };
@@ -113,6 +117,7 @@ const toCalendarBlock = (row: BlockRow): CalendarBlock => ({
   completedAt: row.completedAt,
   cueForId: row.cueForId,
   hasCue: row.cue !== null,
+  identity: row.identity,
   tasks: row.tasks.map((link) => ({ ...link.task, doneAt: link.doneAt })),
 });
 

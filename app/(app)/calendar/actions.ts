@@ -116,6 +116,8 @@ type BlockCreate = {
   startMinute: number;
   endMinute: number;
   kind: "WORK" | "RECOVERY" | "BUFFER" | "DAYDREAM";
+  /** The self this time is for, already checked against the user. */
+  identityId?: string | null;
 };
 
 /**
@@ -284,6 +286,19 @@ async function reflowCue(
   });
 }
 
+/**
+ * An identity id off the wire, checked against the user. A stale or foreign
+ * id finds nothing and the block simply belongs to nobody in particular.
+ */
+async function resolveIdentityId(userId: string, identityId: string | undefined): Promise<string | null> {
+  if (!identityId) return null;
+  const identity = await prisma.identity.findFirst({
+    where: { id: identityId, userId },
+    select: { id: true },
+  });
+  return identity?.id ?? null;
+}
+
 /** Append the cue's name to a success message, when there is one. */
 const withCueNote = (message: string, cue: PlannedCue | null) =>
   cue ? `${message} ${cue.title} is scheduled before it.` : message;
@@ -310,7 +325,10 @@ export async function createBlock(
   if (!date) return { status: "error", message: "That date didn't parse." };
 
   const span = clampSpan(input.startMinute, input.endMinute);
-  const taskIds = await resolveTaskIds(user.id, input.taskIds);
+  const [taskIds, identityId] = await Promise.all([
+    resolveTaskIds(user.id, input.taskIds),
+    resolveIdentityId(user.id, input.identityId),
+  ]);
   const cue = await plannedCueForAny(user.id, taskIds, input.includeCue);
 
   await createBlockWithCue(
@@ -322,6 +340,7 @@ export async function createBlock(
       date,
       ...span,
       kind: input.kind,
+      identityId,
     },
     cue,
   );
@@ -350,7 +369,10 @@ export async function updateBlock(
   if (!date) return { status: "error", message: "That date didn't parse." };
 
   const span = clampSpan(input.startMinute, input.endMinute);
-  const taskIds = await resolveTaskIds(user.id, input.taskIds);
+  const [taskIds, identityId] = await Promise.all([
+    resolveTaskIds(user.id, input.taskIds),
+    resolveIdentityId(user.id, input.identityId),
+  ]);
 
   const { count } = await prisma.timeBlock.updateMany({
     where: { id: input.id, userId: user.id },
@@ -360,6 +382,7 @@ export async function updateBlock(
       date,
       ...span,
       kind: input.kind,
+      identityId,
     },
   });
 

@@ -181,6 +181,16 @@ function applyToggleTask(
   });
 }
 
+/**
+ * A block's tint from the self it is for: the same 12% fill and 45% edge the
+ * task hues use, mixed from the identity token so each theme's own step
+ * applies.
+ */
+const identityChipStyle = (slot: number) => ({
+  backgroundColor: `color-mix(in srgb, var(--id-${slot}) 12%, transparent)`,
+  borderColor: `color-mix(in srgb, var(--id-${slot}) 45%, transparent)`,
+});
+
 export function CalendarGrid({
   days,
   blocks,
@@ -1477,10 +1487,13 @@ function BlockChip({
    * A cue stays quiet — it is part of something else, not a thing with an
    * identity of its own.
    */
-  const tint =
-    !isCue && block.tasks.length === 1 && isCalendarColor(block.tasks[0].color)
-      ? calendarChipStyle(block.tasks[0].color)
-      : null;
+  const tint = isCue
+    ? null
+    : block.identity
+      ? identityChipStyle(block.identity.colorSlot)
+      : block.tasks.length === 1 && isCalendarColor(block.tasks[0].color)
+        ? calendarChipStyle(block.tasks[0].color)
+        : null;
 
   // How much of the body fits at this height, decided in one place. Drawn from
   // the block's real pixel height, because the grid's scale is the only thing

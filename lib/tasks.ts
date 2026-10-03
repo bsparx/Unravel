@@ -392,13 +392,15 @@ export type HabitWithHistory = TaskSummary & {
   requiresFeedback: boolean;
   /** The question asked when closing the day, or null for the default. */
   feedbackPrompt: string | null;
+  /** Temptation bundling: what the habit is paired with, if anything. */
+  pairing: string | null;
   archivedAt: Date | null;
   /** The thing this habit is stacked on, if any. */
   cue: CueSummary | null;
   /** Which parts of the day it belongs to — see lib/habit-slots. */
   slots: HabitSlot[];
   /** The identities this habit is a vote for — see `HabitIdentity`. */
-  identities: { id: string; name: string }[];
+  identities: { id: string; name: string; colorSlot: number; sigil: string | null; archetype: string | null }[];
 };
 
 export async function getHabits(
@@ -417,9 +419,14 @@ export async function getHabits(
         recurrence: true,
         requiresFeedback: true,
         feedbackPrompt: true,
+        pairing: true,
         cue: cueSelect,
         identities: {
-          select: { identity: { select: { id: true, name: true } } },
+          select: {
+            identity: {
+              select: { id: true, name: true, colorSlot: true, sigil: true, archetype: true },
+            },
+          },
         },
       },
       orderBy: [{ archivedAt: "asc" }, { sortOrder: "asc" }],
@@ -482,6 +489,7 @@ export async function getHabits(
       todayNote: todayNote.get(habit.id) ?? null,
       requiresFeedback: habit.requiresFeedback,
       feedbackPrompt: habit.feedbackPrompt,
+      pairing: habit.pairing,
       cue: toCue(habit.cue),
       slots: habit.recurrence!.slots,
       identities: habit.identities.map((link) => link.identity),

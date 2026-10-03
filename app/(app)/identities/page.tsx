@@ -1,8 +1,10 @@
 import { requireUser } from "@/lib/auth";
 import { getHabitStats } from "@/lib/habit-stats";
 import { getIdentityReinforcements } from "@/lib/identity-stats";
+import { getIdentityVotes, getLeadIdentityId } from "@/lib/identity-votes";
 
 import { IdentityBoard } from "./_components/identity-board";
+import type { BoardIdentity } from "./_components/types";
 
 export const metadata = { title: "Identities" };
 
@@ -16,12 +18,32 @@ export const metadata = { title: "Identities" };
  */
 export default async function IdentitiesPage() {
   const user = await requireUser();
-  const stats = await getHabitStats(user, "month");
-  const { identities, focus } = await getIdentityReinforcements(
+  // Independent reads in one round; only the reinforcement needs the stats.
+  const [stats, votes, leadId] = await Promise.all([
+    getHabitStats(user, "month"),
+    getIdentityVotes(user),
+    getLeadIdentityId(user),
+  ]);
+  const { identities: reinforced, focus } = await getIdentityReinforcements(
     user,
     stats.habits,
     "month",
   );
+  const profiles = new Map(votes.identities.map((identity) => [identity.id, identity]));
+  const identities: BoardIdentity[] = reinforced.flatMap((identity) => {
+    const profile = profiles.get(identity.id);
+    if (!profile) return [];
+    return [{
+      ...identity,
+      short: profile.short,
+      kind: profile.kind,
+      archetype: profile.archetype,
+      question: profile.question,
+      colorSlot: profile.colorSlot,
+      sigil: profile.sigil,
+      tally: profile.votes,
+    }];
+  });
 
   // Habits nobody is evidence for. Derived here rather than in the board so
   // the rule ("a habit counts only if some identity lists it") lives next to
@@ -48,8 +70,8 @@ export default async function IdentitiesPage() {
       <header className="mb-8">
         <h1 className="text-display">Identities</h1>
         <p className="text-muted-foreground mt-2 max-w-prose text-body">
-          Who you are becoming, practised in small ways. Every habit minimum
-          you keep is a vote for an identity.
+          Jung saw one personality as a cast of smaller selves. Name yours
+          after someone real or fictional, then let small habits vote for them.
         </p>
       </header>
 
@@ -59,6 +81,7 @@ export default async function IdentitiesPage() {
         habits={stats.allHabits}
         unlinked={unlinked}
         pendingHabitIds={pendingHabitIds}
+        leadId={leadId}
       />
     </div>
   );

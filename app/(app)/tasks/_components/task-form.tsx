@@ -67,6 +67,8 @@ export type TaskFormValues = {
   cueMinutes?: number;
   requiresFeedback?: boolean;
   feedbackPrompt?: string | null;
+  /** Temptation bundling. */
+  pairing?: string | null;
   /** The identities this habit is a vote for. */
   identityIds?: string[];
 };
@@ -391,6 +393,24 @@ export function TaskForm({
             defaultMinutes={values.cueMinutes}
             taskIdError={error("cueTaskId")}
             labelError={error("cueLabel")}
+          />
+        </Field>
+      ) : null}
+
+      {kind === "HABIT" ? (
+        <Field
+          label="Pair it with"
+          htmlFor="pairing"
+          hint="Optional. Make it attractive: something you enjoy that only happens alongside this habit, like the good podcast or the window seat."
+          error={error("pairing")}
+        >
+          <Input
+            id="pairing"
+            name="pairing"
+            maxLength={120}
+            defaultValue={values.pairing ?? ""}
+            placeholder="The good podcast"
+            className="min-h-11"
           />
         </Field>
       ) : null}

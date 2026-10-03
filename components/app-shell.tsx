@@ -6,11 +6,14 @@ import { UserButton } from "@clerk/nextjs";
 import {
   BarChart3,
   CalendarDays,
+  Drama,
   Droplets,
   Dumbbell,
+  Gift,
   Inbox,
   ListChecks,
   ListTodo,
+  MessagesSquare,
   Moon,
   PanelLeft,
   PanelLeftClose,
@@ -18,7 +21,6 @@ import {
   Settings,
   Sun,
   Timer,
-  UserRound,
   Wallet,
 } from "lucide-react";
 
@@ -71,7 +73,9 @@ const RAIL_EXTRA = [
   { href: "/behavior", label: "Behavior", icon: Inbox },
   { href: "/tasks", label: "Tasks", icon: ListTodo },
   { href: "/habits", label: "Habits", icon: Repeat },
-  { href: "/identities", label: "Identities", icon: UserRound },
+  { href: "/identities", label: "Identities", icon: Drama },
+  { href: "/treats", label: "Treats", icon: Gift },
+  { href: "/review", label: "Weekly review", icon: MessagesSquare },
   { href: "/stats", label: "Statistics", icon: BarChart3 },
   { href: "/water", label: "Water", icon: Droplets },
   { href: "/budget", label: "Budget", icon: Wallet },

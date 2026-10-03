@@ -47,6 +47,7 @@ export function TimerScreen({
   initialSteps = [],
   todayLog = null,
   hasActiveSession,
+  lens = null,
 }: {
   initialConfig: TimerConfig;
   initialTask: TimerTask;
@@ -61,6 +62,8 @@ export function TimerScreen({
   /** Today's roll-up for the task in the URL. Null when there isn't one. */
   todayLog?: TodayLogData | null;
   hasActiveSession: boolean;
+  /** "Focusing as", rendered under the title while focusing. */
+  lens?: React.ReactNode;
 }) {
   const router = useRouter();
   const timer = useTimer();
@@ -267,6 +270,7 @@ export function TimerScreen({
             <h1 className="font-display mt-1 text-heading text-balance">
               {state.task.title}
             </h1>
+            {lens}
           </>
         ) : (
           <>

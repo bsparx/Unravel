@@ -283,6 +283,15 @@
   --money-lilac: #8f7ba8;
   --money-peach: #c9976b;
 
+  /* Identity hues, assigned in this order and checked for contrast and
+     colour-blind separation on every light surface. Marks only, never text. */
+  --id-1: #009390;
+  --id-2: #c16302;
+  --id-3: #9065d0;
+  --id-4: #ce5057;
+  --id-5: #088cb9;
+  --id-6: #a27900;
+
   --sidebar: rgba(255, 255, 255, 0.62);
   --sidebar-foreground: #3b3044;
   --sidebar-primary: #654263;
@@ -381,6 +390,14 @@
   --money-lilac: #ad9cc2;
   --money-peach: #d9ab85;
 
+  /* The same six hues, stepped for dark surfaces. */
+  --id-1: #08a4a0;
+  --id-2: #d76f04;
+  --id-3: #9f75e1;
+  --id-4: #e06065;
+  --id-5: #0a9cce;
+  --id-6: #b48701;
+
   --sidebar: rgba(12, 25, 55, 0.62);
   --sidebar-foreground: #dfe7f8;
   --sidebar-primary: #3652e9;
@@ -470,6 +487,186 @@
   --paper-ink-muted: #7c7288;
   --washi: #b3a4c4;
   --washi-2: #c9b89e;
+}
+
+
+/* ---------------------------------------------------------------------------
+   Sage, Grove, Hearth and Clear. Same mechanism as eggplant: light themes
+   add `data-theme` to the root, dark ones add it alongside `.dark`, and only
+   the tokens that differ are restated. Reserved colours (running, rest),
+   charts, money and paper stay as their base theme defines them.
+--------------------------------------------------------------------------- */
+
+/* Sage — mist and sage washes with the app's original teal. */
+:root[data-theme="sage"] {
+  --atmosphere:
+    linear-gradient(32deg, rgba(104, 164, 140, 0.1) 0 20%, transparent 20%),
+    linear-gradient(145deg, transparent 0 82%, rgba(140, 186, 206, 0.1) 82%),
+    radial-gradient(ellipse at 2% 7%, rgba(158, 204, 180, 0.62), transparent 38%),
+    radial-gradient(ellipse at 96% 11%, rgba(176, 211, 228, 0.6), transparent 39%),
+    radial-gradient(ellipse at 84% 82%, rgba(212, 226, 176, 0.56), transparent 42%),
+    radial-gradient(ellipse at 24% 91%, rgba(186, 220, 206, 0.5), transparent 44%),
+    linear-gradient(125deg, #ecf4ef, #f1f6f3 48%, #f4f7ee);
+  --background: #eff5f1;
+  --foreground: #1c2a24;
+  --card: rgba(255, 255, 255, 0.66);
+  --card-foreground: #1c2a24;
+  --popover: rgba(255, 255, 255, 0.9);
+  --popover-foreground: #1c2a24;
+  --primary: #2f6f6a;
+  --primary-foreground: #f8fbfa;
+  --secondary: rgba(255, 255, 255, 0.52);
+  --secondary-foreground: #1c2a24;
+  --muted: rgba(255, 255, 255, 0.5);
+  --muted-foreground: #45574f;
+  --accent: rgba(204, 230, 218, 0.72);
+  --accent-foreground: #205a55;
+  --destructive: #ac3f3a;
+  --border: rgba(46, 94, 80, 0.21);
+  --input: rgba(46, 94, 80, 0.34);
+  --input-surface: #fafdfb;
+  --ring: #2f6f6a;
+  --card-edge: rgba(255, 255, 255, 0.8);
+  --card-shadow:
+    0 20px 54px rgba(52, 104, 88, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --pop-shadow:
+    0 22px 58px rgba(44, 90, 76, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  --arc-track: #dde9e3;
+  --arc-tick: #b6cac0;
+  --sidebar: rgba(255, 255, 255, 0.6);
+  --sidebar-foreground: #26352e;
+  --sidebar-primary: #2f6f6a;
+  --sidebar-primary-foreground: #f8fbfa;
+  --sidebar-accent: rgba(204, 230, 218, 0.72);
+  --sidebar-accent-foreground: #205a55;
+  --sidebar-border: rgba(46, 94, 80, 0.21);
+  --sidebar-ring: #2f6f6a;
+}
+
+/* Grove — a forest at night, moss actions and pale green ink. */
+.dark[data-theme="grove"] {
+  --atmosphere:
+    linear-gradient(32deg, rgba(40, 110, 80, 0.1) 0 19%, transparent 19%),
+    linear-gradient(145deg, transparent 0 85%, rgba(30, 92, 104, 0.1) 85%),
+    radial-gradient(ellipse at 4% 5%, rgba(38, 104, 74, 0.5), transparent 39%),
+    radial-gradient(ellipse at 93% 14%, rgba(24, 82, 96, 0.32), transparent 41%),
+    radial-gradient(ellipse at 83% 85%, rgba(72, 98, 38, 0.28), transparent 45%),
+    linear-gradient(135deg, #07110e, #091612 46%, #060f0c);
+  --background: #07110e;
+  --foreground: #e8f1ea;
+  --card: rgba(13, 34, 27, 0.7);
+  --card-foreground: #e8f1ea;
+  --popover: rgba(11, 29, 23, 0.93);
+  --popover-foreground: #e8f1ea;
+  --primary: #86c9a1;
+  --primary-foreground: #0b1d14;
+  --secondary: rgba(24, 56, 44, 0.6);
+  --secondary-foreground: #e2eee6;
+  --muted: rgba(24, 56, 44, 0.5);
+  --muted-foreground: #a8bfb2;
+  --accent: rgba(60, 130, 96, 0.28);
+  --accent-foreground: #a3dcbb;
+  --destructive: #f2877a;
+  --border: rgba(140, 200, 168, 0.24);
+  --input: rgba(140, 200, 168, 0.32);
+  --input-surface: #0b1a15;
+  --ring: #a3dcbb;
+  --card-edge: rgba(150, 214, 180, 0.2);
+  --card-shadow:
+    0 26px 64px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(226, 255, 238, 0.08);
+  --pop-shadow:
+    0 28px 68px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --arc-track: #15281f;
+  --arc-tick: #2f4a3c;
+  --sidebar: rgba(10, 28, 22, 0.64);
+  --sidebar-foreground: #d9e8de;
+  --sidebar-primary: #86c9a1;
+  --sidebar-primary-foreground: #0b1d14;
+  --sidebar-accent: rgba(60, 130, 96, 0.28);
+  --sidebar-accent-foreground: #a3dcbb;
+  --sidebar-border: rgba(140, 200, 168, 0.22);
+  --sidebar-ring: #a3dcbb;
+}
+
+/* Hearth — ember on a warm dark, for the evening close. */
+.dark[data-theme="hearth"] {
+  --atmosphere:
+    radial-gradient(ellipse at 4% 5%, rgba(122, 54, 30, 0.42), transparent 40%),
+    radial-gradient(ellipse at 93% 14%, rgba(112, 38, 56, 0.28), transparent 42%),
+    radial-gradient(ellipse at 80% 88%, rgba(150, 84, 30, 0.3), transparent 46%),
+    linear-gradient(135deg, #110c0a, #140e0b 46%, #0e0a08);
+  --background: #110c0a;
+  --foreground: #f2e8de;
+  --card: rgba(30, 21, 17, 0.8);
+  --card-foreground: #f2e8de;
+  --popover: rgba(28, 20, 17, 0.95);
+  --popover-foreground: #f2e8de;
+  --primary: #e29b62;
+  --primary-foreground: #24140a;
+  --secondary: rgba(46, 32, 25, 0.66);
+  --secondary-foreground: #ecdfd2;
+  --muted: rgba(46, 32, 25, 0.5);
+  --muted-foreground: #c2b0a1;
+  --accent: rgba(150, 84, 44, 0.26);
+  --accent-foreground: #f1bc8f;
+  --destructive: #f28c82;
+  --border: rgba(226, 178, 140, 0.2);
+  --input: rgba(226, 178, 140, 0.3);
+  --input-surface: #18110e;
+  --ring: #f1bc8f;
+  --card-edge: rgba(240, 190, 150, 0.18);
+  --card-shadow:
+    0 26px 64px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 236, 220, 0.06);
+  --pop-shadow:
+    0 28px 68px rgba(0, 0, 0, 0.46), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --arc-track: #261c16;
+  --arc-tick: #4b392d;
+  --sidebar: rgba(20, 14, 11, 0.72);
+  --sidebar-foreground: #e9ddd1;
+  --sidebar-primary: #e29b62;
+  --sidebar-primary-foreground: #24140a;
+  --sidebar-accent: rgba(150, 84, 44, 0.26);
+  --sidebar-accent-foreground: #f1bc8f;
+  --sidebar-border: rgba(226, 178, 140, 0.18);
+  --sidebar-ring: #f1bc8f;
+}
+
+/* Clear — flat, monochrome, high contrast. No atmosphere and no glass, so
+   colour is left for identities and live time. Also the cheapest to paint. */
+:root[data-theme="clear"] {
+  --atmosphere: none;
+  --background: #f3f3f1;
+  --foreground: #141416;
+  --card: #fcfcfb;
+  --card-foreground: #141416;
+  --popover: #fcfcfb;
+  --popover-foreground: #141416;
+  --primary: #1b1b1f;
+  --primary-foreground: #fafaf8;
+  --secondary: #ebebe8;
+  --secondary-foreground: #141416;
+  --muted: #efefec;
+  --muted-foreground: #48484e;
+  --accent: #e3e3df;
+  --accent-foreground: #141416;
+  --destructive: #b42318;
+  --border: #d2d2cc;
+  --input: #85857f;
+  --input-surface: #fdfdfc;
+  --ring: #141416;
+  --card-edge: #d2d2cc;
+  --card-shadow: none;
+  --pop-shadow: 0 18px 48px rgba(20, 20, 22, 0.14);
+  --arc-track: #e2e2de;
+  --arc-tick: #b5b5ae;
+  --sidebar: #fafaf9;
+  --sidebar-foreground: #26262a;
+  --sidebar-primary: #1b1b1f;
+  --sidebar-primary-foreground: #fafaf8;
+  --sidebar-accent: #e3e3df;
+  --sidebar-accent-foreground: #141416;
+  --sidebar-border: #d2d2cc;
+  --sidebar-ring: #141416;
 }
 
 @layer base {
@@ -605,6 +802,13 @@
   -webkit-backdrop-filter: blur(22px) saturate(1.3);
 }
 
+/* Clear is opaque by design, so there is nothing to blur. Dropping the filter
+   there also saves the most expensive paint the app does. */
+:root[data-theme="clear"] :is([data-slot="card"], [data-slot="dialog-content"], [data-slot="popover-content"], [data-slot="dropdown-menu-content"], [data-slot="dropdown-menu-sub-content"], [data-slot="select-content"], [data-slot="sheet-content"], [data-slot="sidebar-inner"], .bg-card, .bg-popover, .bg-sidebar) {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 /* Frosted edge and soft elevation, replacing the flat hairline ring. */
 [data-slot="card"] {
   border: 1px solid var(--card-edge);
@@ -622,13 +826,13 @@
   box-shadow: 0 4px 12px rgba(89, 50, 89, 0.2);
 }
 
-.dark:not([data-theme="eggplant"]) [data-slot="button"].bg-primary {
+.dark:not([data-theme]) [data-slot="button"].bg-primary {
   background-image: linear-gradient(100deg, #284be3, #5e31d3);
   border-color: #4c54e6;
   box-shadow: 0 3px 0 #1b2374;
 }
 
-.dark:not([data-theme="eggplant"]) [data-slot="button"].bg-primary:hover {
+.dark:not([data-theme]) [data-slot="button"].bg-primary:hover {
   background-image: linear-gradient(100deg, #345bff, #7040ea);
   border-color: #6674ff;
 }
@@ -716,6 +920,32 @@
     --accent: #1d3164;
     --sidebar: #0e1b37;
   }
+  :root[data-theme="sage"] {
+    --card: #fafdfb;
+    --popover: #fcfefd;
+    --secondary: #eef5f1;
+    --muted: #ecf3ef;
+    --accent: #dcece4;
+    --sidebar: #fafdfb;
+  }
+
+  .dark[data-theme="grove"] {
+    --card: #0d1d17;
+    --popover: #0b1a15;
+    --secondary: #14291f;
+    --muted: #12251d;
+    --accent: #183527;
+    --sidebar: #0d1d17;
+  }
+
+  .dark[data-theme="hearth"] {
+    --card: #1a1310;
+    --popover: #18110e;
+    --secondary: #241a15;
+    --muted: #211813;
+    --accent: #2e1f16;
+    --sidebar: #1a1310;
+  }
 }
 
 @media (prefers-reduced-transparency: reduce) {
@@ -735,6 +965,33 @@
     --muted: #152648;
     --accent: #1d3164;
     --sidebar: #0e1b37;
+  }
+
+  :root[data-theme="sage"] {
+    --card: #fafdfb;
+    --popover: #fcfefd;
+    --secondary: #eef5f1;
+    --muted: #ecf3ef;
+    --accent: #dcece4;
+    --sidebar: #fafdfb;
+  }
+
+  .dark[data-theme="grove"] {
+    --card: #0d1d17;
+    --popover: #0b1a15;
+    --secondary: #14291f;
+    --muted: #12251d;
+    --accent: #183527;
+    --sidebar: #0d1d17;
+  }
+
+  .dark[data-theme="hearth"] {
+    --card: #1a1310;
+    --popover: #18110e;
+    --secondary: #241a15;
+    --muted: #211813;
+    --accent: #2e1f16;
+    --sidebar: #1a1310;
   }
 
   [data-slot="card"],

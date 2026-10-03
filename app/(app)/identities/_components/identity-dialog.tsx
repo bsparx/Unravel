@@ -23,7 +23,21 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { IdentityReinforcement } from "@/lib/identity-reinforcement";
+import { IdentitySigil } from "@/components/identity-sigil";
+import {
+  ARCHETYPES,
+  ARCHETYPE_NAMES,
+  ARCHETYPE_SIGIL,
+  IDENTITY_HUES,
+  SIGILS,
+  SIGIL_NAMES,
+  isArchetype,
+  nextFreeSlot,
+  type Sigil,
+} from "@/lib/identity-look";
+import { cn } from "@/lib/utils";
+
+import type { BoardIdentity } from "./types";
 
 /**
  * Add or edit one identity: its name, its statement, its characteristics, and
@@ -34,16 +48,30 @@ import type { IdentityReinforcement } from "@/lib/identity-reinforcement";
 export function IdentityDialog({
   identity,
   habits,
+  usedSlots,
+  preselectHabitId,
   onOpenChange,
 }: {
   /** Null for a new identity. */
-  identity: IdentityReinforcement | null;
+  identity: BoardIdentity | null;
   habits: { id: string; title: string; archived: boolean }[];
+  /** Colours other identities hold, so a new one starts on a free hue. */
+  usedSlots: number[];
+  preselectHabitId?: string;
   onOpenChange: (open: boolean) => void;
 }) {
   const [selected, setSelected] = useState<string[]>(
-    identity ? identity.linked.map((habit) => habit.habitId) : [],
+    identity
+      ? identity.linked.map((habit) => habit.habitId)
+      : preselectHabitId
+        ? [preselectHabitId]
+        : [],
   );
+  const [archetype, setArchetype] = useState<string>(identity?.archetype ?? "");
+  const [slot, setSlot] = useState<number>(identity?.colorSlot ?? nextFreeSlot(usedSlots));
+  // Untouched, the sigil follows the archetype; once picked, it stays.
+  const [sigil, setSigil] = useState<Sigil | null>(identity ? identity.sigil : null);
+  const shownSigil: Sigil = sigil ?? (isArchetype(archetype) ? ARCHETYPE_SIGIL[archetype] : "sprout");
   const [pending, startTransition] = useTransition();
   const [nameError, setNameError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -63,11 +91,20 @@ export function IdentityDialog({
     const name = String(form.get("name") ?? "").trim();
     const statement = String(form.get("statement") ?? "").trim();
     const characteristics = String(form.get("characteristics") ?? "").trim();
+    const question = String(form.get("question") ?? "").trim();
+    const kindValue = String(form.get("kind") ?? "");
+    const profile = {
+      kind: kindValue === "REAL" || kindValue === "FICTIONAL" ? kindValue : null,
+      archetype: isArchetype(archetype) ? archetype : null,
+      question: question || null,
+      colorSlot: slot,
+      sigil: shownSigil,
+    } as const;
     setNameError(null);
     setSaveError(null);
 
     if (!name) {
-      setNameError("Give this identity a name, such as Writer.");
+      setNameError("Give this identity a name, like a character you admire.");
       return;
     }
 
@@ -81,6 +118,7 @@ export function IdentityDialog({
             name,
             statement: statement || null,
             characteristics: characteristics || null,
+            ...profile,
           });
           if (!result.ok) {
             setSaveError(result.message);
@@ -91,6 +129,7 @@ export function IdentityDialog({
             name,
             statement || null,
             characteristics || null,
+            profile,
           );
           if (!result.ok) {
             setSaveError(result.message);
@@ -124,29 +163,76 @@ export function IdentityDialog({
             {identity ? identity.name : "Add identity"}
           </DialogTitle>
           <DialogDescription>
-            Link habits that help you practise this identity. Keeping a
-            habit&apos;s minimum counts as a vote.
+            Borrow someone you admire, real or fictional. Keeping a linked
+            habit&apos;s minimum counts as a vote for them.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={submit} className="space-y-5" aria-busy={pending}>
           <div className="space-y-2">
             <Label htmlFor="identity-name" className="text-label font-medium">
-              Name
+              Character
             </Label>
             <Input
               id="identity-name"
               name="name"
               required
-              maxLength={24}
+              maxLength={40}
               defaultValue={identity?.name ?? ""}
-              placeholder="Writer"
+              placeholder="Ada Lovelace, or Writer"
               className="min-h-11"
               aria-invalid={!!nameError}
               aria-describedby={nameError ? "identity-name-error" : undefined}
               disabled={pending}
             />
             {nameError && <p id="identity-name-error" role="alert" className="text-destructive text-label">{nameError}</p>}
+          </div>
+
+          <fieldset className="space-y-2" disabled={pending}>
+            <legend className="text-label font-medium">This character is</legend>
+            <div className="flex flex-wrap gap-2">
+              {([["REAL", "Real"], ["FICTIONAL", "Fictional"], ["", "Just a role"]] as const).map(([value, label]) => (
+                <label
+                  key={label}
+                  className="border-input bg-input-surface has-[:checked]:border-primary has-[:checked]:bg-accent has-[:focus-visible]:ring-ring relative inline-flex min-h-11 cursor-pointer items-center rounded-lg border px-3 text-label has-[:checked]:font-semibold has-[:focus-visible]:ring-2"
+                >
+                  <input
+                    type="radio"
+                    name="kind"
+                    value={value}
+                    defaultChecked={(identity?.kind ?? "") === value}
+                    className="absolute inset-0 cursor-pointer opacity-0"
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          <div className="space-y-2">
+            <Label htmlFor="identity-archetype" className="text-label font-medium">
+              Archetype
+            </Label>
+            <select
+              id="identity-archetype"
+              value={archetype}
+              onChange={(event) => setArchetype(event.target.value)}
+              aria-describedby="identity-archetype-help"
+              disabled={pending}
+              className="border-input bg-input-surface text-foreground min-h-11 w-full rounded-lg border px-3 text-body"
+            >
+              <option value="">None</option>
+              {ARCHETYPE_NAMES.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <p id="identity-archetype-help" className="text-muted-foreground text-label">
+              {isArchetype(archetype)
+                ? ARCHETYPES[archetype]
+                : "Optional. Jung's patterns of character, as a prompt for reflection."}
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -169,8 +255,75 @@ export function IdentityDialog({
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="identity-question" className="text-label font-medium">
+              Their question
+            </Label>
+            <Input
+              id="identity-question"
+              name="question"
+              maxLength={140}
+              defaultValue={identity?.question ?? ""}
+              placeholder="What am I not noticing yet?"
+              className="min-h-11"
+              aria-describedby="identity-question-help"
+              disabled={pending}
+            />
+            <p id="identity-question-help" className="text-muted-foreground text-label">
+              Optional. One question this self asks before starting. It appears on the timer.
+            </p>
+          </div>
+
+          <fieldset className="space-y-2" disabled={pending}>
+            <legend className="text-label font-medium">Color and sigil</legend>
+            <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Color">
+              {IDENTITY_HUES.map((hue, index) => {
+                const value = index + 1;
+                const taken = usedSlots.includes(value) && value !== identity?.colorSlot;
+                return (
+                  <button
+                    key={hue}
+                    type="button"
+                    role="radio"
+                    aria-checked={slot === value}
+                    aria-label={`${hue}${taken ? ", used by another identity" : ""}`}
+                    onClick={() => setSlot(value)}
+                    className={cn(
+                      "border-input bg-input-surface focus-visible:ring-ring grid size-11 place-items-center rounded-lg border focus-visible:ring-2 focus-visible:outline-none",
+                      slot === value && "border-ring ring-ring ring-2",
+                    )}
+                  >
+                    <span
+                      aria-hidden
+                      className="size-6 rounded-md"
+                      style={{ background: `var(--id-${value})` }}
+                    />
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Sigil">
+              {SIGIL_NAMES.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  role="radio"
+                  aria-checked={shownSigil === name}
+                  aria-label={SIGILS[name]}
+                  onClick={() => setSigil(name)}
+                  className={cn(
+                    "focus-visible:ring-ring rounded-xl focus-visible:ring-2 focus-visible:outline-none",
+                    shownSigil === name && "ring-ring ring-2",
+                  )}
+                >
+                  <IdentitySigil sigil={name} slot={slot} />
+                </button>
+              ))}
+            </div>
+          </fieldset>
+
+          <div className="space-y-2">
             <Label htmlFor="identity-characteristics" className="text-label font-medium">
-              Characteristics of this identity
+              How they move
             </Label>
             <Textarea
               id="identity-characteristics"
@@ -178,7 +331,7 @@ export function IdentityDialog({
               rows={5}
               maxLength={5000}
               defaultValue={identity?.characteristics ?? ""}
-              placeholder="The choices and qualities you want to practise."
+              placeholder="Looks before concluding. Keeps a notebook. Comes back to unfinished work."
               className="resize-none text-body"
               aria-describedby="identity-characteristics-help"
               disabled={pending}

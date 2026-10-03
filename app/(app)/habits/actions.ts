@@ -160,6 +160,7 @@ export async function createHabit(
       color: input.color,
       requiresFeedback: input.requiresFeedback,
       feedbackPrompt: input.feedbackPrompt ?? null,
+      pairing: input.pairing ?? null,
       steps: { create: stepCreateRows(user.id, input.steps) },
       recurrence: {
         create: {
@@ -242,6 +243,7 @@ export async function updateHabit(
       color: input.color,
       requiresFeedback: input.requiresFeedback,
       feedbackPrompt: input.feedbackPrompt ?? null,
+      pairing: input.pairing ?? null,
       recurrence: {
         upsert: {
           create: {

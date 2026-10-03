@@ -3,11 +3,16 @@
 import { useSyncExternalStore } from "react";
 
 import {
+  activePalette,
+  getEvening,
+  getServerEvening,
   getServerTheme,
   getTheme,
   resolveTheme,
+  setEvening,
   setTheme,
   subscribe,
+  type EveningShift,
   type ResolvedTheme,
   type Theme,
 } from "@/lib/theme";
@@ -33,13 +38,24 @@ export function useTheme(): {
   setTheme: (theme: Theme) => void;
 } {
   const theme = useSyncExternalStore(subscribe, getTheme, getServerTheme);
+  const evening = useSyncExternalStore(subscribe, getEvening, getServerEvening);
 
   return {
     theme,
-    // Safe during SSR: resolveTheme falls back to "light" without a window.
-    resolvedTheme: resolveTheme(theme),
+    // Safe during SSR: the evening shift reads as off and resolveTheme falls
+    // back to "light" without a window.
+    resolvedTheme: resolveTheme(evening.on ? activePalette(theme, evening) : theme),
     setTheme,
   };
+}
+
+/** The evening shift, and a way to change it. Same store as the theme. */
+export function useEveningShift(): {
+  evening: EveningShift;
+  setEvening: (next: EveningShift) => void;
+} {
+  const evening = useSyncExternalStore(subscribe, getEvening, getServerEvening);
+  return { evening, setEvening };
 }
 
 /**

@@ -10,6 +10,12 @@ import { z } from "zod";
 
 import { MINUTES_PER_DAY, MIN_BLOCK_MINUTES } from "@/lib/block-math";
 import { CALENDAR_COLOR_NAMES } from "@/lib/calendar-colors";
+import {
+  ARCHETYPE_NAMES,
+  HUE_COUNT,
+  SHADOW_LAWS,
+  SIGIL_NAMES,
+} from "@/lib/identity-look";
 import { MAX_FEEDBACK_LENGTH } from "@/lib/feedback";
 import type { HabitSlot } from "@/lib/generated/prisma/client";
 import { MONEY_COLOR_NAMES } from "@/lib/money-palette";
@@ -193,6 +199,8 @@ export const createHabitSchema = createTodoSchema
       .transform((value) => value === "true"),
     /** The question asked when closing the day. Empty -> the default prompt. */
     feedbackPrompt: emptyToUndefined(z.string().trim().max(200)),
+    /** Temptation bundling: what this habit is paired with. Display only. */
+    pairing: emptyToUndefined(z.string().trim().max(120)),
 
     /**
      * Habit stacking. `cueMode` discriminates rather than "whichever field came
@@ -240,10 +248,17 @@ export const identitySchema = z.object({
   name: z
     .string()
     .trim()
-    .min(1, "Name it — the noun, like \"Writer\".")
-    .max(24, "Keep the name to a word or two."),
+    .min(1, "Name it — a character, or a noun like \"Writer\".")
+    .max(40, "Keep the name to a few words."),
   statement: emptyToUndefined(z.string().trim().max(200)),
   characteristics: emptyToUndefined(z.string().trim().max(5000)),
+  /** Who this self is modelled on: someone real or a character from a story. */
+  kind: z.enum(["REAL", "FICTIONAL"]).nullish(),
+  archetype: z.enum(ARCHETYPE_NAMES as [string, ...string[]]).nullish(),
+  /** The one question this self asks before starting. */
+  question: emptyToUndefined(z.string().trim().max(140)),
+  colorSlot: z.coerce.number().int().min(1).max(HUE_COUNT).optional(),
+  sigil: z.enum(SIGIL_NAMES as [string, ...string[]]).nullish(),
 });
 
 export const updateIdentitySchema = identitySchema.extend({ id: cuid });
@@ -252,6 +267,63 @@ export const updateIdentitySchema = identitySchema.extend({ id: cuid });
 export const setIdentityHabitsSchema = z.object({
   identityId: cuid,
   taskIds: z.array(cuid).max(MAX_HABITS_PER_IDENTITY),
+});
+
+// ---------------------------------------------------------------- the identity game
+
+/** Who leads today. Null clears the day's choice back to the week's. */
+export const setLeadSchema = z.object({ identityId: cuid.nullable() });
+
+export const shadowPatternSchema = z.object({
+  name: z.string().trim().min(1, "Name the pattern.").max(80),
+  law: z.enum(SHADOW_LAWS).nullish(),
+  plan: emptyToUndefined(z.string().trim().max(200)),
+  identityId: cuid.nullish(),
+});
+export const updateShadowPatternSchema = shadowPatternSchema.extend({ id: cuid });
+
+/** Today's mark on a pattern. Null clears it. */
+export const markShadowSchema = z.object({
+  patternId: cuid,
+  mark: z.enum(["NOTICED", "CHOSE"]).nullable(),
+});
+
+export const treatSchema = z.object({
+  name: z.string().trim().min(1, "Name the treat.").max(80),
+  identityId: cuid.nullish(),
+  votesNeeded: z.coerce.number().int().min(1).max(1000),
+});
+
+export const MAX_OBJECTIVES = 5;
+export const chapterSchema = z.object({
+  identityId: cuid,
+  title: z.string().trim().min(1, "Give the chapter a title.").max(80),
+  intro: emptyToUndefined(z.string().trim().max(300)),
+  lengthDays: z.coerce.number().int().min(3).max(60),
+  reward: emptyToUndefined(z.string().trim().max(80)),
+  objectives: z
+    .array(
+      z.object({
+        text: z.string().trim().min(1).max(120),
+        target: z.coerce.number().int().min(1).max(60),
+        habitId: cuid.nullish(),
+      }),
+    )
+    .min(1, "Add at least one objective.")
+    .max(MAX_OBJECTIVES),
+});
+
+export const logObjectiveSchema = z.object({
+  objectiveId: cuid,
+  delta: z.union([z.literal(1), z.literal(-1)]),
+});
+
+export const weeklyReviewSchema = z.object({
+  leadIdentityId: cuid.nullable(),
+  statement: emptyToUndefined(z.string().trim().max(200)),
+  /** The quiet habit and its new, smaller minimum. Both or neither. */
+  habitId: cuid.nullish(),
+  newMinimum: emptyToUndefined(z.string().trim().max(120)),
 });
 
 /** The dump box. Text plus the tag that names the moment — both required. */
@@ -409,6 +481,8 @@ const blockShape = {
   startMinute: minuteOfDay,
   endMinute: minuteOfDay,
   kind: z.enum(["WORK", "RECOVERY", "BUFFER", "DAYDREAM"]).default("WORK"),
+  /** The self this time is for. Empty means nobody in particular. */
+  identityId: emptyToUndefined(cuid),
   includeCue,
 };
 

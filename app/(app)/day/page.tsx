@@ -9,13 +9,16 @@ import {
   formatFullDate,
   minuteOfDayLocal,
   toISODate,
+  todayLocal,
 } from "@/lib/dates";
+import { getIdentityVotes, getLeadIdentityId } from "@/lib/identity-votes";
 import { getPrayerCycle } from "@/lib/prayers";
 import { getTodayView } from "@/lib/tasks";
 import { getBlocks } from "@/lib/time-blocks";
 import { getWaterToday } from "@/lib/water-data";
 
 import { DayList } from "./_components/day-list";
+import { LeadPanel } from "./_components/lead-panel";
 import { PrayerSection } from "./_components/prayer-section";
 import { QuestHero } from "./_components/quest-hero";
 import { QuestLog } from "./_components/quest-log";
@@ -24,14 +27,20 @@ export const metadata = { title: "Your day" };
 
 export default async function TodayPage() {
   const user = await requireUser();
-  const view = await getTodayView(user);
-  const blocks = await getBlocks(user, view.date, 1);
+  // Every section only needs today's date, so the whole page loads in one
+  // parallel round rather than one waterfall step per section.
+  const today = todayLocal(user.timezone);
+  const [view, blocks, water, prayers, votes, leadId] = await Promise.all([
+    getTodayView(user),
+    getBlocks(user, today, 1),
+    getWaterToday(user, today),
+    user.prayerRemindersEnabled ? getPrayerCycle(user) : null,
+    getIdentityVotes(user),
+    getLeadIdentityId(user),
+  ]);
   // Daydream blocks live on /calendar only — /day never sees them.
   const plannedBlocks = blocks.filter((block) => block.kind !== "DAYDREAM");
-  const water = await getWaterToday(user, view.date);
   const todayISO = toISODate(view.date);
-
-  const prayers = user.prayerRemindersEnabled ? await getPrayerCycle(user) : null;
 
   return (
     <div className="mx-auto w-full max-w-4xl px-5 py-8 md:px-8 md:py-12">
@@ -63,6 +72,8 @@ export default async function TodayPage() {
           )}
         </p>
       </header>
+
+      <LeadPanel identities={votes.identities} leadId={leadId} habits={view.habits} />
 
       {/* One obvious quest, then the day's shape. Everything below is
           optional. The hero reads the calendar's blocks and the anchored

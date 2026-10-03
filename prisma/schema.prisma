@@ -14,6 +14,20 @@ datasource db {
 
 // ---------------------------------------------------------------- enums
 
+/// Who an identity is modelled on. A real person or a character from a story;
+/// the distinction only changes how the card describes them.
+enum IdentityKind {
+  REAL
+  FICTIONAL
+}
+
+/// One day of one shadow pattern. Noticing is information; choosing otherwise
+/// is a vote for the identity the pattern pulls against.
+enum ShadowMark {
+  NOTICED
+  CHOSE
+}
+
 enum TaskType {
   TODO
   HABIT
@@ -363,24 +377,29 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  projects        Project[]
-  tasks           Task[]
-  occurrences     TaskOccurrence[]
-  sessions        FocusSession[]
-  captures        Capture[]
-  waterLog        WaterGlass[]
-  dayLogs         DayLog[]
-  journal         JournalEntry[]
-  steps           TaskStep[]
-  blocks          TimeBlock[]
-  moneyCategories MoneyCategory[]
-  transactions    MoneyTransaction[]
-  moneyBudgets    MoneyBudget[]
-  moneyAccounts   MoneyAccount[]
-  transfers       AccountTransfer[]
-  moneyDebts      MoneyDebt[]
+  projects         Project[]
+  tasks            Task[]
+  occurrences      TaskOccurrence[]
+  sessions         FocusSession[]
+  captures         Capture[]
+  waterLog         WaterGlass[]
+  dayLogs          DayLog[]
+  journal          JournalEntry[]
+  steps            TaskStep[]
+  blocks           TimeBlock[]
+  moneyCategories  MoneyCategory[]
+  transactions     MoneyTransaction[]
+  moneyBudgets     MoneyBudget[]
+  moneyAccounts    MoneyAccount[]
+  transfers        AccountTransfer[]
+  moneyDebts       MoneyDebt[]
   exerciseRoutines ExerciseRoutine[]
-  prayerChecks    PrayerCheck[]
+  prayerChecks     PrayerCheck[]
+  shadowPatterns   ShadowPattern[]
+  shadowLogs       ShadowLog[]
+  treats           Treat[]
+  chapters         Chapter[]
+  weeklyReviews    WeeklyReview[]
 }
 
 // ---------------------------------------------------------------- lists
@@ -450,7 +469,12 @@ model Task {
   requiresFeedback Boolean @default(false)
   /// Habits only: the question asked when closing the day, e.g. "What did you
   /// learn?" or "What are you grateful for?". Empty falls back to a default.
-  feedbackPrompt String?
+  feedbackPrompt   String?
+
+  /// Habits only: temptation bundling, the "make it attractive" law. Something
+  /// enjoyable that only happens alongside the habit ("the good podcast").
+  /// Display only; nothing is enforced.
+  pairing String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -478,6 +502,9 @@ model Task {
   /// one self is served by several habits. Habits only — a todo is a one-off
   /// and casts no standing vote.
   identities HabitIdentity[]
+
+  /// Chapter objectives that count this habit's done days.
+  chapterObjectives ChapterObjective[]
 
   @@index([userId, type, completedAt, archivedAt, dueDate])
   @@index([userId, projectId, sortOrder])
@@ -536,18 +563,18 @@ model HabitRecurrence {
   unit        HabitUnit @default(MINUTES)
   minimalTask String    @default("")
   /// The habit is inert outside this window. startDate also anchors streaks.
-  startDate    DateTime  @db.Date
-  endDate      DateTime? @db.Date
+  startDate   DateTime  @db.Date
+  endDate     DateTime? @db.Date
 
   /// The implementation intention: "I will do this at 07:00". Minutes from
   /// midnight in User.timezone. Null means no time plan yet — the habit
   /// sorts after anchored ones and is never the time-aware "Start here" pick.
-  timeAnchor   Int?
+  timeAnchor Int?
 
   /// Which parts of the day this habit belongs to. [ALWAYS] by default so
   /// existing habits stay visible everywhere; a habit shows on /day and the
   /// calendar's scheduling panel only inside a selected window.
-  slots        HabitSlot[] @default([ALWAYS])
+  slots HabitSlot[] @default([ALWAYS])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -619,18 +646,38 @@ model Identity {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  name      String
-  statement String?
+  name            String
+  statement       String?
   /// What this one looks like. How it moves, speaks, decides. What it does
   /// that none of the others do. Optional, and fine empty.
   characteristics String?
+
+  /// Real or fictional. Null for identities made before characters existed,
+  /// which read as plain roles ("Writer").
+  kind      IdentityKind?
+  /// A Jungian archetype name from lib/identity-look.ts ("Sage", "Hero").
+  /// Free text in the database so the list can grow without a migration.
+  archetype String?
+  /// The one question this self asks before starting. Shown on the timer.
+  question  String?
+  /// 1..6, an index into the identity hues (`--id-1` .. `--id-6`). Assigned in
+  /// order so neighbours stay distinguishable in charts and on the calendar.
+  colorSlot Int           @default(1)
+  /// A lucide icon name from the sigil set in lib/identity-look.ts.
+  sigil     String?
 
   sortOrder Float @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  habits HabitIdentity[]
+  habits   HabitIdentity[]
+  blocks   TimeBlock[]
+  shadows  ShadowPattern[]
+  treats   Treat[]
+  chapters Chapter[]
+  ledDays  DayLog[]        @relation("DayLogLead")
+  ledWeeks WeeklyReview[]
 
   /// One name per user. Two "Writer"s would each hold half the votes and both
   /// would read as neglected — a worse failure than refusing the second name.
@@ -859,7 +906,7 @@ model Capture {
   /// What was behind the moment, picked from the tag set. SetNull on delete:
   /// removing a custom tag keeps the record — it just loses its label.
   tagId String?
-  tag   Tag?   @relation(fields: [tagId], references: [id], onDelete: SetNull)
+  tag   Tag?    @relation(fields: [tagId], references: [id], onDelete: SetNull)
 
   /// Set when triage turns this into a task. SetNull rather than Cascade: the
   /// record that the thought existed should outlive the task it became.
@@ -893,13 +940,13 @@ model Tag {
   user User?  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   /// Null means shared/system — the built-in set, created by the seed script.
-  userId String?
-  name  String
+  userId      String?
+  name        String
   /// The tooltip text: what this state actually feels like, so a logged urge
   /// is classified against a definition, not a memory.
   description String?
   /// True for the built-ins, which a user can never edit or delete.
-  system Boolean @default(false)
+  system      Boolean @default(false)
 
   captures Capture[]
 
@@ -945,13 +992,13 @@ model WaterGlass {
 /// older than the current day at 04:00 Asia/Karachi, so a cycle lives roughly
 /// fajr-to-fajr and there is no history.
 model PrayerCheck {
-  id     String    @id @default(cuid())
+  id     String @id @default(cuid())
   userId String
-  user   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   /// The local day the prayer *belongs* to (the day of its own start time —
   /// Isha of day D is checkable until Fajr(D+1) − 30, past midnight).
-  date   DateTime  @db.Date
+  date   DateTime   @db.Date
   prayer PrayerKind
 
   checkedAt DateTime @default(now())
@@ -1002,6 +1049,11 @@ model DayLog {
   /// finished" means.
   closedAt DateTime?
 
+  /// Who leads today: the identity whose habits come first. Null falls back
+  /// to the lead the weekly review chose for this week, then to nobody.
+  leadIdentityId String?
+  leadIdentity   Identity? @relation("DayLogLead", fields: [leadIdentityId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1047,6 +1099,11 @@ model TimeBlock {
 
   kind BlockKind @default(WORK)
 
+  /// The self this time is for. When set it decides the block's colour, ahead
+  /// of the task colour; it never casts a vote (a plan is not a log).
+  identityId String?
+  identity   Identity? @relation(fields: [identityId], references: [id], onDelete: SetNull)
+
   /// Ticked off from the calendar. Distinct from Task.completedAt: finishing
   /// the 9am block on a task is not finishing the task. Ticking it also ticks
   /// every task inside it, because "the whole stretch is done" can't leave a
@@ -1073,6 +1130,7 @@ model TimeBlock {
   /// Serves both "one day's blocks in order" and the week fetch (a date range
   /// scan), which are the only two reads.
   @@index([userId, date, startMinute])
+  @@index([identityId])
 }
 
 /// One task on one block. The block is the time; these are the things the time
@@ -1148,13 +1206,13 @@ model MoneyAccount {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  name String
+  name         String
   /// Palette token, resolved to a CSS variable in the UI — the same four as
   /// categories, so an account's dot reads against them.
-  color String @default("teal")
+  color        String @default("teal")
   /// Integer minor units (paise). Money already in the account when you
   /// started tracking, added to the running balance like an income.
-  openingCents Int @default(0)
+  openingCents Int    @default(0)
 
   sortOrder  Float     @default(0)
   archivedAt DateTime?
@@ -1163,8 +1221,8 @@ model MoneyAccount {
   updatedAt DateTime @updatedAt
 
   transactions MoneyTransaction[]
-  transfersOut AccountTransfer[] @relation("TransferOut")
-  transfersIn  AccountTransfer[] @relation("TransferIn")
+  transfersOut AccountTransfer[]  @relation("TransferOut")
+  transfersIn  AccountTransfer[]  @relation("TransferIn")
 
   @@unique([userId, name])
   @@index([userId, archivedAt, sortOrder])
@@ -1335,11 +1393,11 @@ model MoneyDebt {
   /// What it was for, when the name alone doesn't say. Optional.
   note         String?
   /// Integer minor units (paise), like every other amount.
-  amountCents Int
+  amountCents  Int
   /// When it happened. Local calendar day in User.timezone, UTC-midnight DATE.
-  date DateTime @db.Date
+  date         DateTime      @db.Date
   /// Set when the IOU is crossed off. The row stays, muted, for history.
-  settledAt DateTime?
+  settledAt    DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1361,26 +1419,26 @@ model MoneyDebt {
 /// that matters for corrective work is written the way a coach says it, not
 /// the way a machine counts it. The generator only needs the tags.
 model Exercise {
-  id       String @id @default(cuid())
-  name     String
+  id           String             @id @default(cuid())
+  name         String
   /// Yoga: mat only. DUMBBELL: a pair of light dumbbells.
-  equipment ExerciseEquipment
+  equipment    ExerciseEquipment
   /// The primary corrective job. The generator composes days from this.
-  goal    ExerciseGoal
+  goal         ExerciseGoal
   /// STRENGTH / MOBILITY / FLOW — the shape the body is doing. Day
   /// composition draws on this, so a workout day can never be all stretches.
-  type    ExerciseType
+  type         ExerciseType
   /// How hard it is to do this well. Drives the gentle-week pool filter.
-  difficulty ExerciseDifficulty @default(MODERATE)
+  difficulty   ExerciseDifficulty @default(MODERATE)
   /// Muscle groups worked, for catalog filters. `goal` is the intent, this is
   /// the territory.
-  bodyParts BodyPart[]
+  bodyParts    BodyPart[]
   /// Step-by-step lines, in order, as a coach would say them.
   instructions String[]
   /// "3 × 12–15 each side" / "Hold 60s per side" / "10 breaths each side".
   prescription String
   /// YouTube embed, supplied later. The detail dialog renders it when set.
-  videoUrl String?
+  videoUrl     String?
 
   sortOrder Float   @default(0)
   active    Boolean @default(true)
@@ -1460,4 +1518,139 @@ model RoutineExercise {
   @@unique([routineId, dayOfWeek, position])
   @@index([routineId, dayOfWeek])
   @@index([exerciseId])
+}
+
+// ---------------------------------------------------------------- the identity game
+
+/// A pattern being broken: Jung's shadow, Habitica's negative habit, without
+/// the damage. It names what pulls against an identity and the plan that makes
+/// it harder (Atomic Habits' four laws, inverted).
+model ShadowPattern {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name String
+  /// Which inverted law the plan uses ("Make it invisible").
+  law  String?
+  plan String?
+
+  /// The self this pattern pulls against. Choosing otherwise is a vote for it.
+  identityId String?
+  identity   Identity? @relation(fields: [identityId], references: [id], onDelete: SetNull)
+
+  sortOrder  Float     @default(0)
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  marks ShadowLog[]
+
+  @@index([userId, archivedAt])
+}
+
+/// SPARSE, like TaskOccurrence: one row per pattern per local day that was
+/// marked. One mark a day keeps the week strip honest and the write an upsert.
+model ShadowLog {
+  id        String        @id @default(cuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  patternId String
+  pattern   ShadowPattern @relation(fields: [patternId], references: [id], onDelete: Cascade)
+
+  /// Local calendar date in User.timezone, as a UTC-midnight DATE.
+  date DateTime   @db.Date
+  mark ShadowMark
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([patternId, date])
+  @@index([userId, date])
+}
+
+/// A reward that unlocks with votes. Nothing is spent: a treat reads the vote
+/// count, it never subtracts from it, so enjoying one costs no progress.
+model Treat {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String
+  /// For one identity: unlocks at that identity's all-time votes. Null is the
+  /// whole cast: unlocks at this week's votes and resets every week.
+  identityId  String?
+  identity    Identity? @relation(fields: [identityId], references: [id], onDelete: SetNull)
+  votesNeeded Int
+  /// For a weekly treat only the current week's stamp counts as enjoyed.
+  enjoyedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+/// A short story arc for one identity: a few objectives over a few days.
+/// Habitica's quest without the boss. A missed day simply waits.
+model Chapter {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  identityId String
+  identity   Identity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+
+  title      String
+  intro      String?
+  /// Local calendar date the chapter began, as a UTC-midnight DATE.
+  startDate  DateTime @db.Date
+  lengthDays Int      @default(10)
+  /// Optional treat named in the story; display only.
+  reward     String?
+
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  objectives ChapterObjective[]
+
+  @@index([userId, completedAt])
+}
+
+/// One objective. Linked to a habit, it counts that habit's done days inside
+/// the chapter (derived, never stored). Unlinked, it counts manual logs.
+model ChapterObjective {
+  id        String  @id @default(cuid())
+  chapterId String
+  chapter   Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  text     String
+  target   Int     @default(1)
+  habitId  String?
+  habit    Task?   @relation(fields: [habitId], references: [id], onDelete: SetNull)
+  logged   Int     @default(0)
+  position Int     @default(0)
+
+  @@index([chapterId])
+}
+
+/// The weekly council: one per week planned. `weekStart` is the first day of
+/// the week the review is *for*, so the lead it chooses applies from then.
+model WeeklyReview {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  weekStart      DateTime  @db.Date
+  leadIdentityId String?
+  leadIdentity   Identity? @relation(fields: [leadIdentityId], references: [id], onDelete: SetNull)
+  /// The lead's sentence for the week.
+  statement      String?
+  /// A plain record of what changed ("Evening notes: minimum is now …").
+  adjustment     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, weekStart])
 }

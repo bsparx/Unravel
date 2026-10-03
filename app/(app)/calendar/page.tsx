@@ -23,6 +23,7 @@ import {
   todayLocal,
   WEEKDAYS,
 } from "@/lib/dates";
+import { prisma } from "@/lib/db";
 import { getBlockedDays, getBlocks, getSchedulableItems } from "@/lib/time-blocks";
 import { getPrayerBands } from "@/lib/prayers";
 import { tightCount, transitionsForDay } from "@/lib/transitions";
@@ -32,6 +33,7 @@ import { CalendarView } from "./_components/calendar-view";
 import type { GridDay } from "./_components/calendar-grid";
 import { MonthStrip } from "./_components/month-strip";
 import { SchedulePanel } from "./_components/schedule-panel";
+import { WeekInsights } from "./_components/week-insights";
 
 export const metadata = { title: "Calendar" };
 
@@ -65,8 +67,17 @@ export default async function CalendarPage({
   const start = view === "week" ? startOfWeek(anchor, user.weekStart) : anchor;
   const length = view === "week" ? 7 : 1;
 
-  const [blocks, schedulable, blockedDays, prayerBands] = await Promise.all([
+  // The week the anchor sits in, for "Where the week goes". In week view it is
+  // the same read as the grid's, so it is only fetched separately for a day.
+  const weekStart = startOfWeek(anchor, user.weekStart);
+  const [blocks, weekBlocks, identities, schedulable, blockedDays, prayerBands] = await Promise.all([
     getBlocks(user, start, length),
+    view === "week" ? null : getBlocks(user, weekStart, 7),
+    prisma.identity.findMany({
+      where: { userId: user.id },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      select: { id: true, name: true, colorSlot: true },
+    }),
     getSchedulableItems(user, anchor),
     // The mini-month navigator's dots: which days in the anchor's month
     // already carry a block.
@@ -260,6 +271,7 @@ export default async function CalendarPage({
             cueTitle: task.cueTitle,
             color: task.color,
           }))}
+          identities={identities}
         />
 
         <aside className="space-y-6">
@@ -292,6 +304,12 @@ export default async function CalendarPage({
           </section>
         </aside>
       </div>
+
+      <WeekInsights
+        blocks={weekBlocks ?? blocks}
+        identities={identities}
+        rangeLabel={`${formatDate(weekStart)} - ${formatDate(addDays(weekStart, 6))}`}
+      />
 
       <p className="text-muted-foreground mt-6 text-label">
         Blocks show planned time. Sessions show what happened, so{" "}

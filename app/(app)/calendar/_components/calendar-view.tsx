@@ -24,6 +24,7 @@ export function CalendarView({
   anchorISO,
   timeZone,
   tasks,
+  identities,
 }: {
   days: GridDay[];
   blocks: CalendarBlock[];
@@ -39,6 +40,8 @@ export function CalendarView({
     cueTitle: string | null;
     color: string;
   }[];
+  /** For the editor's "Time for" field. */
+  identities: { id: string; name: string; colorSlot: number }[];
 }) {
   const [draft, setDraft] = useState<BlockDraft | null>(null);
   const [, startTransition] = useTransition();
@@ -89,6 +92,7 @@ export function CalendarView({
             taskColor: null,
             kind: "WORK",
             hasCue: false,
+            identityId: null,
           });
         }}
         onEdit={(block: CalendarBlock) =>
@@ -115,6 +119,7 @@ export function CalendarView({
                 : null,
             kind: block.kind,
             hasCue: block.hasCue,
+            identityId: block.identity?.id ?? null,
           })
         }
         onDropOnBlock={(item, block) => {
@@ -151,6 +156,7 @@ export function CalendarView({
           key={draft.id ?? `new-${draft.dateISO}-${draft.startMinute}`}
           draft={draft}
           tasks={tasks}
+          identities={identities}
           onClose={closeDialog}
         />
       )}

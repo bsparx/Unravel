@@ -3,12 +3,25 @@
 import { revalidatePath } from "next/cache";
 
 import { requireUser } from "@/lib/auth";
+import { todayLocal } from "@/lib/dates";
 import { prisma } from "@/lib/db";
+import type { IdentityKind } from "@/lib/generated/prisma/client";
+import { MAX_IDENTITIES, nextFreeSlot } from "@/lib/identity-look";
 import {
   identitySchema,
   setIdentityHabitsSchema,
+  setLeadSchema,
   updateIdentitySchema,
 } from "@/lib/validation";
+
+/** The character half of an identity. Every field optional. */
+export type IdentityProfileInput = {
+  kind?: IdentityKind | null;
+  archetype?: string | null;
+  question?: string | null;
+  colorSlot?: number;
+  sigil?: string | null;
+};
 
 export type IdentityRecord = {
   id: string;
@@ -26,6 +39,10 @@ function revalidateIdentityViews() {
   revalidatePath("/habits");
   revalidatePath("/habits/stats");
   revalidatePath("/day");
+  revalidatePath("/calendar");
+  revalidatePath("/timer");
+  revalidatePath("/treats");
+  revalidatePath("/review");
   revalidatePath("/");
 }
 
@@ -51,11 +68,25 @@ export async function createIdentity(
   name: string,
   statement?: string | null,
   characteristics?: string | null,
+  profile: IdentityProfileInput = {},
 ): Promise<{ ok: true; identity: IdentityRecord } | { ok: false; message: string }> {
   const user = await requireUser();
-  const parsed = identitySchema.safeParse({ name, statement, characteristics });
+  const parsed = identitySchema.safeParse({ name, statement, characteristics, ...profile });
   if (!parsed.success) {
     return { ok: false, message: "Name it in a few words." };
+  }
+
+  // One identity per hue: past six, colours would repeat and the charts and
+  // calendar could no longer tell two selves apart. It is also plenty.
+  const existing = await prisma.identity.findMany({
+    where: { userId: user.id },
+    select: { colorSlot: true },
+  });
+  if (existing.length >= MAX_IDENTITIES) {
+    return {
+      ok: false,
+      message: "Six identities is the most Unravel holds. Fewer selves means more votes for each.",
+    };
   }
 
   // Case-insensitive, like behavior tags: "Writer" and "writer" are one self.
@@ -78,6 +109,12 @@ export async function createIdentity(
       name: parsed.data.name,
       statement: parsed.data.statement ?? null,
       characteristics: parsed.data.characteristics ?? null,
+      kind: parsed.data.kind ?? null,
+      archetype: parsed.data.archetype ?? null,
+      question: parsed.data.question ?? null,
+      sigil: parsed.data.sigil ?? null,
+      colorSlot:
+        parsed.data.colorSlot ?? nextFreeSlot(existing.map((row) => row.colorSlot)),
       sortOrder: Date.now(),
     },
     select: { id: true, name: true, statement: true, characteristics: true },
@@ -87,12 +124,14 @@ export async function createIdentity(
   return { ok: true, identity };
 }
 
-export async function updateIdentity(input: {
-  id: string;
-  name: string;
-  statement?: string | null;
-  characteristics?: string | null;
-}): Promise<Result> {
+export async function updateIdentity(
+  input: {
+    id: string;
+    name: string;
+    statement?: string | null;
+    characteristics?: string | null;
+  } & IdentityProfileInput,
+): Promise<Result> {
   const user = await requireUser();
   const parsed = updateIdentitySchema.safeParse(input);
   if (!parsed.success) {
@@ -127,6 +166,11 @@ export async function updateIdentity(input: {
       name: parsed.data.name,
       statement: parsed.data.statement ?? null,
       characteristics: parsed.data.characteristics ?? null,
+      kind: parsed.data.kind ?? null,
+      archetype: parsed.data.archetype ?? null,
+      question: parsed.data.question ?? null,
+      sigil: parsed.data.sigil ?? null,
+      ...(parsed.data.colorSlot ? { colorSlot: parsed.data.colorSlot } : {}),
     },
   });
 
@@ -197,6 +241,33 @@ export async function setIdentityHabits(
       skipDuplicates: true,
     }),
   ]);
+
+  revalidateIdentityViews();
+  return { ok: true };
+}
+/**
+ * Who leads today. Writes the day's own choice onto the DayLog (created
+ * lazily, like every DayLog). Null clears it back to the week's lead.
+ */
+export async function setLeadIdentity(identityId: string | null): Promise<Result> {
+  const user = await requireUser();
+  const parsed = setLeadSchema.safeParse({ identityId });
+  if (!parsed.success) return { ok: false, message: "That didn't look right." };
+
+  if (parsed.data.identityId) {
+    const owned = await prisma.identity.findFirst({
+      where: { id: parsed.data.identityId, userId: user.id },
+      select: { id: true },
+    });
+    if (!owned) return { ok: false, message: "That identity isn't yours." };
+  }
+
+  const date = todayLocal(user.timezone);
+  await prisma.dayLog.upsert({
+    where: { userId_date: { userId: user.id, date } },
+    create: { userId: user.id, date, leadIdentityId: parsed.data.identityId },
+    update: { leadIdentityId: parsed.data.identityId },
+  });
 
   revalidateIdentityViews();
   return { ok: true };

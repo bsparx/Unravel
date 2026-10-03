@@ -1,4 +1,7 @@
 import { requireUser } from "@/lib/auth";
+import { prisma } from "@/lib/db";
+import { clampSlot, shortName, sigilFor } from "@/lib/identity-look";
+import { getLeadIdentityId } from "@/lib/identity-votes";
 import { getTask } from "@/lib/tasks";
 import {
   clampIntervals,
@@ -8,6 +11,7 @@ import {
 } from "@/lib/timer-math";
 import { parseTimerParams, toTimerMode } from "@/lib/timer-url";
 
+import { FocusLens } from "./_components/focus-lens";
 import { TimerScreen } from "./_components/timer-screen";
 import { getActiveSession } from "./_lib/session-hydrate";
 import { getTodayLog } from "./_lib/today-log";
@@ -23,8 +27,28 @@ export default async function TimerPage({
   // hostile query string degrades to "no preferences expressed".
   const params = parseTimerParams(await searchParams);
 
-  // Always scoped by user: an id off the wire is a request, not a fact.
-  const task = params.taskId ? await getTask(user, params.taskId) : null;
+  // Always scoped by user: an id off the wire is a request, not a fact. The
+  // other reads don't depend on the task, so they share its round trip.
+  const [task, active, identities, leadId] = await Promise.all([
+    params.taskId ? getTask(user, params.taskId) : null,
+    getActiveSession(user),
+    prisma.identity.findMany({
+      where: { userId: user.id },
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+      select: {
+        id: true,
+        name: true,
+        question: true,
+        sigil: true,
+        archetype: true,
+        colorSlot: true,
+        // Only the link to this task, if any: who the session votes for.
+        habits: params.taskId ? { where: { taskId: params.taskId }, select: { taskId: true } } : false,
+      },
+    }),
+    getLeadIdentityId(user),
+  ]);
+  const voter = identities.find((identity) => (identity.habits?.length ?? 0) > 0);
 
   const focusSeconds = params.focus ?? user.pomodoroSeconds;
 
@@ -57,7 +81,6 @@ export default async function TimerPage({
     longBreakEvery: user.longBreakEvery,
   };
 
-  const active = await getActiveSession(user);
 
   // Only for the task the page was opened for. A live session belonging to a
   // *different* task is guarded in the screen, exactly as the step list is.
@@ -74,6 +97,18 @@ export default async function TimerPage({
       initialSteps={task?.steps ?? []}
       todayLog={todayLog}
       hasActiveSession={active !== null}
+      lens={
+        <FocusLens
+          options={identities.map((identity) => ({
+            id: identity.id,
+            short: shortName(identity.name),
+            question: identity.question,
+            sigil: sigilFor(identity.sigil, identity.archetype),
+            colorSlot: clampSlot(identity.colorSlot),
+          }))}
+          initialId={voter?.id ?? leadId}
+        />
+      }
     />
   );
 }

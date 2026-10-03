@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import {
   BarChart3,
@@ -10,6 +11,7 @@ import {
 import { ConfirmDelete } from "@/components/confirm-delete";
 import { EmptyState } from "@/components/empty-state";
 import { HabitDayControl } from "@/components/habit-day";
+import { IdentityChip } from "@/components/identity-sigil";
 import { MissedYesterdayBadge } from "@/components/missed-yesterday-badge";
 import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth";
@@ -23,6 +25,7 @@ import {
 import { chainOf, cueEdges } from "@/lib/habit-cue";
 import { describeSlots } from "@/lib/habit-slots";
 import { describeBar, showedUp } from "@/lib/habit-bar";
+import { shortName, sigilFor } from "@/lib/identity-look";
 import { getHabits } from "@/lib/tasks";
 import {
   describeRecurrence,
@@ -38,6 +41,7 @@ import { HabitCueLine, HabitStackTrail } from "./_components/habit-cue-line";
 import { HabitFeedbackButton } from "./_components/habit-feedback-button";
 import { HabitGrid } from "./_components/habit-grid";
 import { HabitMoreMenu } from "./_components/habit-more-menu";
+import { ShadowSection } from "./_components/shadow-section";
 
 export const metadata = { title: "Habits" };
 
@@ -228,13 +232,14 @@ export default async function HabitsPage() {
                               </div>
                               <p className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-label">
                                 {habit.identities.map((identity) => (
-                                  <span
+                                  <IdentityChip
                                     key={identity.id}
-                                    className="border-border rounded-full border px-2 py-0.5 text-micro"
-                                  >
-                                    {identity.name}
-                                  </span>
+                                    name={shortName(identity.name)}
+                                    sigil={sigilFor(identity.sigil, identity.archetype)}
+                                    slot={identity.colorSlot}
+                                  />
                                 ))}
+                                {habit.pairing && <span>With {habit.pairing}</span>}
                                 <span>{describeRecurrence(habit.daysOfWeek)}</span>
                                 <span>{describeSlots(habit.slots)}</span>
                                 <span>{describeBar(habit.bar)}</span>
@@ -265,6 +270,12 @@ export default async function HabitsPage() {
           ))}
         </div>
       )}
+
+      {/* Streams in after the habit list: it is secondary, and its two reads
+          shouldn't hold up the first paint of today's check-ins. */}
+      <Suspense fallback={<div className="bg-muted mt-12 h-40 rounded-[20px]" aria-hidden />}>
+        <ShadowSection user={user} />
+      </Suspense>
 
       {archived.length > 0 && (
         <section className="mt-10">

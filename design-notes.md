@@ -692,3 +692,41 @@ Decisions, so they don't get re-derived:
 - **The habit form can create an identity inline with just a name.** The
   statement can wait until /identities; stopping mid-form to write an essay is
   the wrong trade for this audience.
+
+## The identity game — 3 October 2026
+
+The specimen's proposals, now in the app. Goal, in the user's words: combine
+Google Calendar, Habitica and a Pomodoro timer around Atomic Habits' identity
+votes, with identities named after real or fictional characters (Jung's many
+selves). Migration `20261003120000_identity_game` is additive only.
+
+- **Themes.** Sage, Grove, Hearth and Clear join Light, Dark and Eggplant.
+  Every palette except light and dark sets `data-theme` on `<html>`; dark ones
+  also keep `.dark`. The evening shift (Settings) switches to Hearth from a
+  chosen hour until 05:00; a one-minute clock runs only while it is on and
+  touches the DOM only when the palette changes. Clear drops `backdrop-filter`.
+- **Identity hues.** `--id-1..6` in globals.css, assigned in order
+  (`colorSlot`), checked for contrast and colour-blind separation in every
+  theme. Colour marks identity; text stays in text colours. Six identities max.
+- **Votes.** `lib/identity-votes.ts` counts all-time, 28-day, week, rolling
+  7-day and today votes in one parallel round (two `groupBy`s plus 28 days of
+  rows), request-cached. Pure tally in `lib/vote-tally.ts`, checked by
+  `pnpm verify`. Stages (`lib/identity-look.ts`) read the all-time total, so a
+  stage is never lost.
+- **Who leads today** (`/day`): `DayLog.leadIdentityId`, falling back to the
+  weekly review's lead. Shows the lead's next habit and their question.
+- **Shadow side** (`/habits`): patterns being broken, one mark per day.
+  "Chose otherwise" is a vote for the identity the pattern pulls against;
+  "noticed" is neutral. No penalties.
+- **Pair it with** (habit form): temptation bundling, display only.
+- **Calendar**: a block can be "time for" an identity, which tints it ahead of
+  the task colour. A plan never votes. "Where the week goes" sums planned time
+  by identity, with recovery and buffer kept visible.
+- **Timer**: "Focusing as" shows an identity's question. A lens only; nothing
+  is stored on the session.
+- **Treats and chapters** (`/treats`): treats unlock with votes and spend
+  nothing. Chapters are short arcs with up to five objectives, counted from a
+  habit's done days or logged by hand. A missed day simply waits.
+- **Weekly council** (`/review`): look back, make the quiet habit's minimum
+  smaller, choose the coming week's lead. Changing a minimum never rewrites
+  past days, because tiers are stored on occurrences.
