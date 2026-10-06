@@ -56,6 +56,7 @@ import { cn } from "@/lib/utils";
 
 import { deleteBlock, moveBlock, toggleBlockDone, toggleBlockTask } from "../actions";
 import { PrayerBands } from "./prayer-bands";
+import { PrayerTimes } from "./prayer-times";
 import { TransitionStrip } from "./transition-strip";
 
 /**
@@ -204,7 +205,7 @@ export function CalendarGrid({
 }: {
   days: GridDay[];
   blocks: CalendarBlock[];
-  /** Tinted prayer windows per day ISO — see lib/prayers.ts. */
+  /** Prayer windows per day ISO — see lib/prayers.ts. */
   prayerBands: Record<string, PrayerBand[]>;
   todayISO: string;
   /** The URL's selected date, also the initial day in the mobile week view. */
@@ -452,6 +453,11 @@ export function CalendarGrid({
               blocks={blocksFor(day.dateISO)}
               isToday={day.dateISO === todayISO}
               index={index}
+            />
+            <PrayerTimes
+              bands={prayerBands[day.dateISO] ?? []}
+              isToday={day.dateISO === todayISO}
+              dayLabel={`${day.weekday}, ${day.label}`}
             />
           </div>
         ))}
@@ -1187,10 +1193,8 @@ function DayColumn({
         />
       ))}
 
-      {/* The prayer windows of the day, behind the plan. Painted before the
-          blocks so a block always wins the z-stack, and pointer-events-none so
-          the empty slots underneath stay clickable — the check button is the
-          only interactive thing here. */}
+      {/* Prayer annotations sit behind blocks and let every calendar gesture
+          through. Timings and check-off actions are in the day header. */}
       <PrayerBands bands={prayerBands} isToday={isToday} minutePx={MINUTE_PX} />
 
       {laid.map(({ block, column, columns }) => (
