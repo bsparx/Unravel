@@ -103,7 +103,9 @@ export function AppShell({
   // `startsWith("//")` is never true. Don't "fix" this into `startsWith(href)`
   // — that would light up Today on every single route.
   const isActive = (href: string) =>
-    pathname === href || pathname.startsWith(`${href}/`);
+    pathname === href ||
+    pathname.startsWith(`${href}/`) ||
+    (href === "/day" && pathname === "/days");
 
   return (
     <SidebarProvider defaultOpen={defaultOpen}>

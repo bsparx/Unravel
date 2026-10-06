@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  ArrowLeft,
   Check,
   Pause,
   Play,
@@ -229,15 +230,19 @@ export function TimerScreen({
         elapsedSeconds={focusElapsedSeconds}
         targetSeconds={state.config.targetSeconds}
         onAgain={() => reset(state.config, state.task)}
-        onDone={async () => {
-          router.push("/");
-        }}
       />
     );
   }
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col items-center px-4 py-8 md:px-6 md:py-12">
+      <Button asChild variant="ghost" size="sm" className="mb-6 self-start">
+        <Link href="/days">
+          <ArrowLeft className="size-4" aria-hidden />
+          Back to days
+        </Link>
+      </Button>
+
       {hasActiveSession && state.sessionId && (
         <ResumeBanner onDiscard={discard} />
       )}
@@ -598,7 +603,6 @@ function SessionSummary({
   elapsedSeconds,
   targetSeconds,
   onAgain,
-  onDone,
 }: {
   mode: TimerMode;
   task: TimerTask;
@@ -606,7 +610,6 @@ function SessionSummary({
   elapsedSeconds: number;
   targetSeconds: number;
   onAgain: () => void;
-  onDone: () => Promise<void>;
 }) {
   const recovery = mode === "RECOVERY";
 
@@ -683,11 +686,8 @@ function SessionSummary({
       </p>
 
       <div className="mt-8 flex items-center gap-3">
-        <Button
-          onClick={() => void onDone()}
-          className="px-6"
-        >
-          Back to today
+        <Button asChild className="px-6">
+          <Link href="/days">Back to days</Link>
         </Button>
         <Button
           variant="outline"
