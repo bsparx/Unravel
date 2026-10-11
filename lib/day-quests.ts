@@ -14,6 +14,13 @@
  * line, watching a number that only goes down — and invents no score.
  */
 
+import {
+  allBeatsDone,
+  beatCount,
+  beatIndexAt,
+  beatWindow,
+  doneBeatIndices,
+} from "@/lib/block-beats";
 import { blockLabel } from "@/lib/block-math";
 import { START_HERE_LOOKAHEAD_MINUTES } from "@/lib/habit-timeline";
 import type { TodayItem } from "@/lib/tasks";
@@ -33,6 +40,26 @@ export type QuestObjective = {
   estimatedSeconds: number | null;
   defaultMode: "POMODORO" | "BASIC" | "FLOW" | "RECOVERY";
   plannedIntervals: number | null;
+  /** The task's first unticked step — an interval's natural one thing. */
+  nextStep: { id: string; title: string } | null;
+};
+
+/**
+ * An interval block's cadence, read against now. Null on ordinary blocks.
+ *
+ * `current` is the open interval's index (null outside the block's window);
+ * `currentLabel` is what earned it, when it already has been.
+ */
+export type QuestBeat = {
+  minutes: number;
+  count: number;
+  done: number[];
+  current: number | null;
+  currentDone: boolean;
+  currentLabel: string | null;
+  /** When the open interval hands over to the next — the rest's end. */
+  currentStart: number | null;
+  currentEnd: number | null;
 };
 
 export type Quest = {
@@ -49,6 +76,8 @@ export type Quest = {
   objectives: QuestObjective[];
   /** The habit behind a HABIT quest, for the timer link and quota meta. */
   habit: TodayItem | null;
+  /** Interval mode, for blocks that have it. */
+  beat: QuestBeat | null;
 };
 
 /**
@@ -87,11 +116,44 @@ const toObjectives = (tasks: BlockTask[]): QuestObjective[] =>
     estimatedSeconds: task.estimatedSeconds,
     defaultMode: task.defaultMode,
     plannedIntervals: task.plannedIntervals,
+    nextStep: (() => {
+      const step = task.steps.find((candidate) => candidate.completedAt === null);
+      return step ? { id: step.id, title: step.title } : null;
+    })(),
   }));
 
+function blockBeat(block: CalendarBlock, nowMinute: number): QuestBeat | null {
+  if (!block.beatMinutes || block.cueForId !== null) return null;
+
+  const minutes = block.beatMinutes;
+  const count = beatCount(block, minutes);
+  const done = doneBeatIndices(block.beats, count);
+  const current = beatIndexAt(block, minutes, nowMinute);
+  const span = current === null ? null : beatWindow(block, minutes, current);
+  const earned =
+    current === null ? null : block.beats.find((beat) => beat.index === current);
+
+  return {
+    minutes,
+    count,
+    done,
+    current,
+    currentDone: earned !== null && earned !== undefined,
+    currentLabel: earned?.label ?? null,
+    currentStart: span?.startMinute ?? null,
+    currentEnd: span?.endMinute ?? null,
+  };
+}
+
 function blockQuest(block: CalendarBlock, nowMinute: number): Quest {
+  const beat = blockBeat(block, nowMinute);
+  // An interval block is complete when its intervals are — the server keeps
+  // `completedAt` to that rule, and this reads the same facts directly.
+  const complete = beat
+    ? allBeatsDone(beat.done.map((index) => ({ index })), beat.count)
+    : block.completedAt !== null;
   const state: QuestState =
-    block.completedAt !== null
+    complete
       ? "COMPLETE"
       : block.startMinute <= nowMinute && nowMinute < block.endMinute
         ? "ACTIVE"
@@ -112,6 +174,7 @@ function blockQuest(block: CalendarBlock, nowMinute: number): Quest {
     state,
     objectives: toObjectives(block.tasks),
     habit: null,
+    beat,
   };
 }
 
@@ -155,6 +218,7 @@ export function buildQuestTimeline({
         state: (anchor <= nowMinute ? "ACTIVE" : "UPCOMING") as QuestState,
         objectives: [],
         habit,
+        beat: null,
       };
     });
 

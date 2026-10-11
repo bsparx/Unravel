@@ -93,6 +93,7 @@ export function CalendarView({
             kind: "WORK",
             hasCue: false,
             identityId: null,
+            beatMinutes: null,
           });
         }}
         onEdit={(block: CalendarBlock) =>
@@ -120,6 +121,7 @@ export function CalendarView({
             kind: block.kind,
             hasCue: block.hasCue,
             identityId: block.identity?.id ?? null,
+            beatMinutes: block.beatMinutes,
           })
         }
         onDropOnBlock={(item, block) => {

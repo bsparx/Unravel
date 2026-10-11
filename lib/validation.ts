@@ -9,6 +9,7 @@
 import { z } from "zod";
 
 import { MINUTES_PER_DAY, MIN_BLOCK_MINUTES } from "@/lib/block-math";
+import { BEAT_MINUTES } from "@/lib/block-beats";
 import { CALENDAR_COLOR_NAMES } from "@/lib/calendar-colors";
 import {
   ARCHETYPE_NAMES,
@@ -484,6 +485,18 @@ const blockShape = {
   /** The self this time is for. Empty means nobody in particular. */
   identityId: emptyToUndefined(cuid),
   includeCue,
+  /**
+   * Interval mode. Empty is an ordinary block; otherwise 15 or 30 and nothing
+   * else — see BEAT_MINUTES.
+   */
+  beatMinutes: emptyToUndefined(
+    z.coerce
+      .number()
+      .int()
+      .refine((value) => (BEAT_MINUTES as readonly number[]).includes(value), {
+        message: "Intervals are 15 or 30 minutes.",
+      }),
+  ),
 };
 
 /**
@@ -542,6 +555,20 @@ export const moveBlockSchema = z.object({
 export const toggleBlockTaskSchema = z.object({
   blockId: cuid,
   taskId: cuid,
+  done: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true"),
+});
+
+/**
+ * Ticking one interval of a beat block by hand — the "did something else"
+ * path, and the way to fix a tick after the fact. The index is checked against
+ * the block's own length on the server; this only bounds it.
+ */
+export const toggleBlockBeatSchema = z.object({
+  blockId: cuid,
+  index: z.coerce.number().int().min(0).max(MINUTES_PER_DAY),
   done: z
     .enum(["true", "false"])
     .default("true")

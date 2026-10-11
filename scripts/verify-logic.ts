@@ -131,6 +131,16 @@ import {
   TASK_LINE_PX,
 } from "@/lib/block-math";
 import { planMinutes } from "@/lib/plan-drag";
+import {
+  allBeatsDone,
+  beatCount,
+  beatIndexAt,
+  beatStates,
+  beatWindow,
+  dayRelation,
+  doneBeatIndices,
+  isBeatMinutes,
+} from "@/lib/block-beats";
 import { resolveTheme, systemTheme, THEMES } from "@/lib/theme";
 import {
   anchorTitleOf,
@@ -2701,6 +2711,8 @@ const questBlock = (
   cueForId: overrides.cueForId ?? null,
   hasCue: overrides.hasCue ?? false,
   identity: null,
+  beatMinutes: overrides.beatMinutes ?? null,
+  beats: overrides.beats ?? [],
   tasks: overrides.tasks ?? [],
 });
 
@@ -2925,7 +2937,7 @@ check("a habit scheduled into a block is spoken for by the block alone", () => {
       questBlock({
         startMinute: 9 * 60,
         endMinute: 9 * 60 + 30,
-        tasks: [{ id: "walk", title: "Morning walk", color: "#2f6f6a", estimatedSeconds: null, defaultMode: "BASIC", plannedIntervals: null, completedAt: null, doneAt: null }],
+        tasks: [{ id: "walk", title: "Morning walk", color: "#2f6f6a", estimatedSeconds: null, defaultMode: "BASIC", plannedIntervals: null, completedAt: null, doneAt: null, steps: [] }],
       }),
     ],
     habits: [walk],
@@ -3281,6 +3293,68 @@ check("every starter character passes the identity form's own rules", () => {
   }
   assert.equal(isTaken(STARTER_SELVES[0], [STARTER_SELVES[0].name.toUpperCase()]), true);
   assert.equal(isTaken(STARTER_SELVES[0], ["Writer"]), false);
+});
+
+check("interval blocks split into whole-or-short intervals", () => {
+  const hour = { startMinute: 600, endMinute: 660 };
+  assert.equal(beatCount(hour, 15), 4);
+  assert.equal(beatCount(hour, 30), 2);
+  // 50 minutes at 15: a short fourth interval, not ten unclaimed minutes.
+  const fifty = { startMinute: 600, endMinute: 650 };
+  assert.equal(beatCount(fifty, 15), 4);
+  assert.deepEqual(beatWindow(fifty, 15, 3), { startMinute: 645, endMinute: 650 });
+  assert.deepEqual(beatWindow(hour, 15, 1), { startMinute: 615, endMinute: 630 });
+  assert.equal(beatCount(hour, 0), 0);
+});
+
+check("the current interval is half-open, like every span", () => {
+  const hour = { startMinute: 600, endMinute: 660 };
+  assert.equal(beatIndexAt(hour, 15, 600), 0);
+  assert.equal(beatIndexAt(hour, 15, 614), 0);
+  assert.equal(beatIndexAt(hour, 15, 615), 1);
+  assert.equal(beatIndexAt(hour, 15, 659), 3);
+  assert.equal(beatIndexAt(hour, 15, 660), null);
+  assert.equal(beatIndexAt(hour, 15, 599), null);
+});
+
+check("marks past a shortened block's end are hidden, not counted", () => {
+  const beats = [{ index: 0 }, { index: 1 }, { index: 3 }, { index: 1 }];
+  assert.deepEqual(doneBeatIndices(beats, 4), [0, 1, 3]);
+  assert.deepEqual(doneBeatIndices(beats, 2), [0, 1]);
+  assert.equal(allBeatsDone(beats, 2), true);
+  assert.equal(allBeatsDone(beats, 4), false);
+  assert.equal(allBeatsDone([], 0), false);
+  assert.equal(isBeatMinutes(15), true);
+  assert.equal(isBeatMinutes(30), true);
+  assert.equal(isBeatMinutes(20), false);
+});
+
+check("intervals read done, current, past or upcoming — never missed", () => {
+  const hour = { startMinute: 600, endMinute: 660 };
+  assert.deepEqual(
+    beatStates({ span: hour, minutes: 15, done: [0], day: "today", nowMinute: 640 }),
+    ["done", "past", "current", "upcoming"],
+  );
+  // After the block: everything open is past. Before it: upcoming.
+  assert.deepEqual(
+    beatStates({ span: hour, minutes: 15, done: [], day: "today", nowMinute: 700 }),
+    ["past", "past", "past", "past"],
+  );
+  assert.deepEqual(
+    beatStates({ span: hour, minutes: 30, done: [], day: "today", nowMinute: 500 }),
+    ["upcoming", "upcoming"],
+  );
+  assert.deepEqual(
+    beatStates({ span: hour, minutes: 30, done: [1], day: "past", nowMinute: 0 }),
+    ["past", "done"],
+  );
+  assert.deepEqual(
+    beatStates({ span: hour, minutes: 30, done: [], day: "today", nowMinute: null }),
+    ["upcoming", "upcoming"],
+  );
+  assert.equal(dayRelation("2026-10-11", "2026-10-12"), "past");
+  assert.equal(dayRelation("2026-10-12", "2026-10-12"), "today");
+  assert.equal(dayRelation("2026-10-13", "2026-10-12"), "future");
 });
 
 console.log(`\n${passed} checks passed.\n`);

@@ -33,6 +33,7 @@ import {
   parseMinuteOfDay,
   spanOfLength,
 } from "@/lib/block-math";
+import { BEAT_MINUTES, beatCount } from "@/lib/block-beats";
 import { idleState, MAX_BLOCK_TASKS } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 
@@ -70,6 +71,8 @@ export type BlockDraft = {
   hasCue: boolean;
   /** The self this time is for, if any. */
   identityId: string | null;
+  /** Interval mode: one thing every this many minutes. Null is off. */
+  beatMinutes: number | null;
 };
 
 const KINDS: { value: BlockDraft["kind"]; label: string; hint: string }[] = [
@@ -85,6 +88,11 @@ const KINDS: { value: BlockDraft["kind"]; label: string; hint: string }[] = [
 
 /** Quick lengths, in minutes. Long enough a list, short enough to scan. */
 const LENGTHS = [15, 25, 45, 60, 90];
+
+const PACES: { value: number | null; label: string }[] = [
+  { value: null, label: "Off" },
+  ...BEAT_MINUTES.map((minutes) => ({ value: minutes, label: `${minutes} min` })),
+];
 
 /**
  * Always mounted with a `key` derived from the draft — see the call site.
@@ -122,6 +130,15 @@ export function BlockDialog({
     draft.taskColor ?? "teal",
   );
   const [includeCue, setIncludeCue] = useState(true);
+  const [beatMinutes, setBeatMinutes] = useState<number | null>(
+    draft.beatMinutes,
+  );
+  // Intervals are a way of spending work time; the rest kinds don't offer it,
+  // and the server drops it for them too.
+  const paced = kind === "WORK" && beatMinutes !== null;
+  const intervals = paced && end > start
+    ? beatCount({ startMinute: start, endMinute: end }, beatMinutes)
+    : 0;
 
   const linked = taskIds
     .map(
@@ -203,6 +220,11 @@ export function BlockDialog({
           <input type="hidden" name="startMinute" value={start} />
           <input type="hidden" name="endMinute" value={end} />
           <input type="hidden" name="kind" value={kind} />
+          <input
+            type="hidden"
+            name="beatMinutes"
+            value={paced ? String(beatMinutes) : ""}
+          />
 
           <div className="space-y-1.5">
             <Label htmlFor="block-title">
@@ -331,6 +353,52 @@ export function BlockDialog({
               {KINDS.find((option) => option.value === kind)?.hint}
             </p>
           </div>
+
+          {kind === "WORK" && (
+            <div className="space-y-1.5">
+              <Label id="block-pace-label">One thing every</Label>
+              <div
+                role="group"
+                aria-labelledby="block-pace-label"
+                aria-describedby="block-pace-help"
+                className="grid grid-cols-3 gap-1.5"
+              >
+                {PACES.map((option) => (
+                  <button
+                    key={option.label}
+                    type="button"
+                    onClick={() => setBeatMinutes(option.value)}
+                    aria-pressed={beatMinutes === option.value}
+                    className={cn(
+                      "focus-visible:ring-ring min-h-11 rounded-[10px] border px-2 py-2 font-mono text-label tabular-nums transition-colors focus-visible:ring-2 focus-visible:outline-none",
+                      beatMinutes === option.value
+                        ? "border-primary bg-accent"
+                        : "border-border text-muted-foreground hover:border-primary/40",
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              <p id="block-pace-help" className="text-muted-foreground text-label">
+                {paced ? (
+                  <>
+                    <span className="text-foreground tabular-nums">
+                      {intervals} interval{intervals === 1 ? "" : "s"}
+                    </span>
+                    . One thing in each, a step or a task, however small.
+                    Then rest until the next one.
+                    {draft.id &&
+                      draft.beatMinutes !== null &&
+                      draft.beatMinutes !== beatMinutes &&
+                      " Changing the interval clears this block's ticks."}
+                  </>
+                ) : (
+                  "Split the block into intervals and do one small thing in each."
+                )}
+              </p>
+            </div>
+          )}
 
           {kind === "WORK" && identities.length > 0 && (
             <div className="space-y-1.5">

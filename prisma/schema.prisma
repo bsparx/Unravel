@@ -1121,11 +1121,22 @@ model TimeBlock {
   cueFor   TimeBlock? @relation("BlockCue", fields: [cueForId], references: [id], onDelete: Cascade)
   cue      TimeBlock? @relation("BlockCue")
 
+  /// Interval mode: one thing every `beatMinutes`, then rest until the next.
+  /// Null is an ordinary block. 15 or 30 — the cadence is the whole feature,
+  /// and a free-form number would turn it back into a setting to fiddle with.
+  ///
+  /// "Beat" in code because `SessionInterval` already means a timer interval;
+  /// the UI says "interval". A beat block is done when every beat is, not when
+  /// its tasks are — see `reconcileBlockCompletion`.
+  beatMinutes Int?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   /// What this stretch of time is for. Usually one thing; sometimes three.
   tasks TimeBlockTask[]
+  /// The intervals actually hit. Sparse — see TimeBlockBeat.
+  beats TimeBlockBeat[]
 
   /// Serves both "one day's blocks in order" and the week fetch (a date range
   /// scan), which are the only two reads.
@@ -1164,6 +1175,28 @@ model TimeBlockTask {
   /// "Which blocks is this task on" — the reverse read, used when a task or a
   /// habit is deleted and its join rows have to go first.
   @@index([taskId, blockId])
+}
+
+/// One interval of a beat block that got its one thing. SPARSE, like
+/// TaskOccurrence: absence means "not done", and nothing is pre-generated.
+///
+/// Keyed by index from the block's start rather than by clock time, so moving
+/// the block carries its ticks with it. Shortening it hides the indices past
+/// the new end without deleting them — resizing back gives them back. Changing
+/// the cadence is the one thing that clears them, because index 2 of a 15m
+/// block and index 2 of a 30m block are different stretches of time.
+model TimeBlockBeat {
+  blockId String
+  block   TimeBlock @relation(fields: [blockId], references: [id], onDelete: Cascade)
+
+  /// 0-based interval within the block.
+  index  Int
+  doneAt DateTime @default(now())
+  /// What was ticked to earn it — a step or task title, snapshotted. Null for
+  /// a bare tap ("did something else").
+  label  String?
+
+  @@id([blockId, index])
 }
 
 /// Journal, not inbox.

@@ -1,9 +1,13 @@
 "use client";
 
+import { useTransition } from "react";
 import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 
-import { toggleBlockTask } from "@/app/(app)/calendar/actions";
+import { toggleBlockBeat, toggleBlockTask } from "@/app/(app)/calendar/actions";
+import { toggleStep } from "@/app/(app)/tasks/actions";
+import { BeatSquare } from "@/components/beat-square";
+import { Button } from "@/components/ui/button";
 import { TaskCheckbox } from "@/components/task-checkbox";
 import { useNowMinute } from "@/hooks/use-now-minute";
 import {
@@ -11,11 +15,13 @@ import {
   formatMinuteLength,
   formatSpanLength,
 } from "@/lib/block-math";
+import { beatStates } from "@/lib/block-beats";
 import {
   buildQuestTimeline,
   pickHeroQuest,
   type AvailablePool,
   type Quest,
+  type QuestBeat,
   type QuestObjective,
 } from "@/lib/day-quests";
 import { formatMinutes } from "@/lib/dates";
@@ -67,6 +73,13 @@ export function QuestHero({
     case "ACTIVE_QUEST":
       return hero.quest.kind === "HABIT" ? (
         <HabitQuestCard quest={hero.quest} />
+      ) : hero.quest.beat && hero.quest.beat.current !== null ? (
+        <IntervalQuestCard
+          quest={hero.quest}
+          beat={hero.quest.beat}
+          nowMinute={nowMinute}
+          moreActive={hero.moreActive}
+        />
       ) : (
         <BlockQuestCard
           quest={hero.quest}
@@ -252,6 +265,203 @@ function BlockQuestCard({
           </p>
         )}
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- active: interval
+
+/**
+ * An interval block whose window is open: one thing in this interval, then rest.
+ *
+ * The card has two moods and the current minute picks between them. Before the
+ * interval has its thing, it offers the smallest candidates first — each
+ * task's next unticked step, then the tasks themselves — plus a quiet way to
+ * say "I did something else". Any one of them earns the interval; the server
+ * stamps it on whichever came first. After, it says so and tells you when the
+ * next one opens, and the drain bar follows the interval, not the whole block:
+ * the rest is the point, and it should look like it ends.
+ */
+function IntervalQuestCard({
+  quest,
+  beat,
+  nowMinute,
+  moreActive,
+}: {
+  quest: Quest;
+  beat: QuestBeat;
+  nowMinute: number;
+  moreActive: number;
+}) {
+  const current = beat.current ?? 0;
+  const windowStart = beat.currentStart ?? quest.startMinute;
+  const windowEnd = beat.currentEnd ?? quest.endMinute;
+  const last = current === beat.count - 1;
+  const untilNext = Math.max(0, windowEnd - nowMinute);
+  const elapsed = Math.min(
+    1,
+    Math.max(0, (nowMinute - windowStart) / Math.max(1, windowEnd - windowStart)),
+  );
+
+  const states = beatStates({
+    span: quest,
+    minutes: beat.minutes,
+    done: beat.done,
+    day: "today",
+    nowMinute,
+  });
+
+  const toggleBeat = async (index: number, done: boolean) => {
+    const formData = new FormData();
+    formData.set("blockId", quest.id);
+    formData.set("index", String(index));
+    formData.set("done", String(done));
+    await toggleBlockBeat(formData);
+  };
+
+  const tickStep = async (stepId: string, done: boolean) => {
+    const formData = new FormData();
+    formData.set("stepId", stepId);
+    formData.set("done", String(done));
+    await toggleStep(formData);
+  };
+
+  const toggleObjective = async (taskId: string, done: boolean) => {
+    const formData = new FormData();
+    formData.set("blockId", quest.id);
+    formData.set("taskId", taskId);
+    formData.set("done", String(done));
+    await toggleBlockTask(formData);
+  };
+
+  const [marking, startMarking] = useTransition();
+
+  const steps = quest.objectives.filter((objective) => objective.nextStep);
+  const open = quest.objectives.filter((objective) => objective.doneAt === null);
+
+  return (
+    <div
+      className={cn(
+        cardShell,
+        "border-primary/35 bg-accent/40 focus-within:ring-ring focus-within:ring-2 focus-within:outline-none",
+      )}
+    >
+      <div className={eyebrowRow}>
+        <p className={cn(eyebrow, "text-primary")}>
+          Interval{" "}
+          <span className="tabular-nums">
+            {current + 1} of {beat.count}
+          </span>
+          <span className="text-primary/80 ml-2 normal-case tabular-nums">
+            {last
+              ? `${formatMinuteLength(untilNext)} left · ends ${formatMinuteOfDay(windowEnd)}`
+              : `next in ${formatMinuteLength(untilNext)}`}
+          </span>
+        </p>
+      </div>
+
+      <p className={title}>{quest.title}</p>
+
+      <div className="-ml-3 mt-1 flex flex-wrap" role="group" aria-label="Intervals">
+        {states.map((state, index) => (
+          <BeatSquare
+            key={index}
+            state={state}
+            label={`Interval ${index + 1} of ${beat.count}`}
+            onToggle={() => toggleBeat(index, state !== "done")}
+            className="text-foreground size-9"
+          />
+        ))}
+      </div>
+
+      {beat.currentDone ? (
+        <div className="mt-2">
+          <p className="text-body">
+            That&apos;s this interval.{" "}
+            {last ? "That was the last one." : `Rest until ${formatMinuteOfDay(windowEnd)}.`}
+          </p>
+          {beat.currentLabel && (
+            <p className="text-muted-foreground mt-0.5 truncate text-label">
+              Done: {beat.currentLabel}
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="mt-2">
+          <p className="text-body">
+            Do one thing. Small counts, rushed counts.
+          </p>
+
+          {(steps.length > 0 || open.length > 0) && (
+            <ul className="mt-3 space-y-2">
+              {steps.map((objective) => (
+                <li
+                  key={`step-${objective.nextStep!.id}`}
+                  className="pending-sweep flex items-center gap-3"
+                >
+                  <TaskCheckbox
+                    done={false}
+                    label={objective.nextStep!.title}
+                    onToggle={(next) => tickStep(objective.nextStep!.id, next)}
+                  />
+                  <span className="min-w-0">
+                    <span className="text-body block truncate">
+                      {objective.nextStep!.title}
+                    </span>
+                    <span className="text-muted-foreground block truncate text-micro">
+                      Next step of {objective.title}
+                    </span>
+                  </span>
+                </li>
+              ))}
+              {open.map((objective) => (
+                <li
+                  key={objective.id}
+                  className="pending-sweep flex items-center gap-3"
+                >
+                  <TaskCheckbox
+                    done={false}
+                    label={objective.title}
+                    onToggle={(next) => toggleObjective(objective.id, next)}
+                  />
+                  <span className="text-body min-w-0 truncate">
+                    {objective.title}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <Button
+            type="button"
+            variant="ghost"
+            className="text-muted-foreground mt-2 -ml-3 min-h-11"
+            disabled={marking}
+            onClick={() => startMarking(() => toggleBeat(current, true))}
+          >
+            {marking ? "Marking…" : "Did something else"}
+          </Button>
+        </div>
+      )}
+
+      <div
+        aria-hidden
+        className="bg-muted mt-4 h-0.5 w-full overflow-hidden rounded-full"
+      >
+        <div
+          className={cn(
+            "h-full rounded-full transition-[width] duration-300 motion-reduce:transition-none",
+            beat.currentDone ? "bg-rest/70" : "bg-primary/70",
+          )}
+          style={{ width: `${Math.round(elapsed * 100)}%` }}
+        />
+      </div>
+
+      {moreActive > 0 && (
+        <p className="text-muted-foreground mt-3 text-micro">
+          +{moreActive} more quest{moreActive === 1 ? "" : "s"} live now
+        </p>
+      )}
     </div>
   );
 }

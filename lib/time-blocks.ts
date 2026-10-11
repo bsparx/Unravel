@@ -29,7 +29,21 @@ export type BlockTask = {
   completedAt: Date | null;
   /** Ticked off inside this block. Block-scoped — see TimeBlockTask.doneAt. */
   doneAt: Date | null;
+  /**
+   * The task's own checklist, in order. An interval block offers the next
+   * unticked one as "the one thing" — a habit step is the natural size for it.
+   */
+  steps: BlockTaskStep[];
 };
+
+export type BlockTaskStep = {
+  id: string;
+  title: string;
+  completedAt: Date | null;
+};
+
+/** One interval of a beat block that got its one thing. */
+export type BlockBeat = { index: number; doneAt: Date; label: string | null };
 
 export type CalendarBlock = {
   id: string;
@@ -51,6 +65,10 @@ export type CalendarBlock = {
   hasCue: boolean;
   /** The self this time is for. Its hue tints the block ahead of any task colour. */
   identity: { id: string; name: string; colorSlot: number } | null;
+  /** Interval mode: one thing every this many minutes. Null is an ordinary block. */
+  beatMinutes: number | null;
+  /** The intervals hit, sparse. May hold indices past a shortened block's end. */
+  beats: BlockBeat[];
   /**
    * What the stretch of time is for. Usually one thing; sometimes three, in no
    * particular order — "in these two hours you need to do these three things".
@@ -71,6 +89,11 @@ const blockSelect = {
   cueForId: true,
   cue: { select: { id: true } },
   identity: { select: { id: true, name: true, colorSlot: true } },
+  beatMinutes: true,
+  beats: {
+    orderBy: { index: "asc" },
+    select: { index: true, doneAt: true, label: true },
+  },
   tasks: {
     orderBy: { position: "asc" },
     select: {
@@ -84,6 +107,10 @@ const blockSelect = {
           defaultMode: true,
           plannedIntervals: true,
           completedAt: true,
+          steps: {
+            orderBy: { position: "asc" },
+            select: { id: true, title: true, completedAt: true },
+          },
         },
       },
     },
@@ -102,6 +129,8 @@ type BlockRow = {
   cueForId: string | null;
   cue: { id: string } | null;
   identity: { id: string; name: string; colorSlot: number } | null;
+  beatMinutes: number | null;
+  beats: BlockBeat[];
   /** The join row's own tick, plus the task it points at. */
   tasks: { doneAt: Date | null; task: Omit<BlockTask, "doneAt"> }[];
 };
@@ -118,6 +147,8 @@ const toCalendarBlock = (row: BlockRow): CalendarBlock => ({
   cueForId: row.cueForId,
   hasCue: row.cue !== null,
   identity: row.identity,
+  beatMinutes: row.beatMinutes,
+  beats: row.beats,
   tasks: row.tasks.map((link) => ({ ...link.task, doneAt: link.doneAt })),
 });
 

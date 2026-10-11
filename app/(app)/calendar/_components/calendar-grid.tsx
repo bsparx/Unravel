@@ -13,6 +13,7 @@ import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import { Check, CornerDownRight, GripHorizontal, Play, X } from "lucide-react";
 
+import { BeatSquare } from "@/components/beat-square";
 import { Button } from "@/components/ui/button";
 
 import {
@@ -37,6 +38,15 @@ import {
   TIGHT_MINUTES,
 } from "@/lib/block-math";
 import {
+  allBeatsDone,
+  beatCount,
+  beatIndexAt,
+  beatStates,
+  beatWindow,
+  dayRelation,
+  doneBeatIndices,
+} from "@/lib/block-beats";
+import {
   calendarChipStyle,
   calendarInkStyle,
   isCalendarColor,
@@ -54,7 +64,13 @@ import { toWorkMode } from "@/lib/timer-math";
 import { abutsNeighbour, transitionsForDay } from "@/lib/transitions";
 import { cn } from "@/lib/utils";
 
-import { deleteBlock, moveBlock, toggleBlockDone, toggleBlockTask } from "../actions";
+import {
+  deleteBlock,
+  moveBlock,
+  toggleBlockBeat,
+  toggleBlockDone,
+  toggleBlockTask,
+} from "../actions";
 import { PrayerBands } from "./prayer-bands";
 import { PrayerTimes } from "./prayer-times";
 import { TransitionStrip } from "./transition-strip";
@@ -153,7 +169,14 @@ type BlockPatch =
     }
   | { kind: "remove"; id: string }
   | { kind: "toggleBlock"; id: string }
-  | { kind: "toggleTask"; blockId: string; taskId: string };
+  | {
+      kind: "toggleTask";
+      blockId: string;
+      taskId: string;
+      /** The live interval a tick would earn, when the block has one open. */
+      beatIndex: number | null;
+    }
+  | { kind: "toggleBeat"; blockId: string; index: number };
 
 /**
  * The block's tick, restated from its task list.
@@ -163,6 +186,12 @@ type BlockPatch =
  * flickers back on the round trip.
  */
 function withDerivedCompletion(block: CalendarBlock): CalendarBlock {
+  // An interval block answers to its intervals instead — the same split as
+  // the server's rule.
+  if (block.beatMinutes) {
+    const allDone = allBeatsDone(block.beats, beatCount(block, block.beatMinutes));
+    return { ...block, completedAt: allDone ? block.completedAt ?? new Date() : null };
+  }
   if (block.tasks.length === 0) return block;
   const allDone = block.tasks.every((task) => task.doneAt !== null);
   return { ...block, completedAt: allDone ? block.completedAt ?? new Date() : null };
@@ -171,7 +200,17 @@ function withDerivedCompletion(block: CalendarBlock): CalendarBlock {
 function applyToggleTask(
   block: CalendarBlock,
   taskId: string,
+  beatIndex: number | null,
 ): CalendarBlock {
+  const task = block.tasks.find((candidate) => candidate.id === taskId);
+  const ticking = task?.doneAt === null;
+  // Ticking a line while an interval is open earns that interval; un-ticking
+  // never takes it back. `markCurrentBeat` on the server says the same.
+  const earns =
+    ticking &&
+    beatIndex !== null &&
+    !block.beats.some((beat) => beat.index === beatIndex);
+
   return withDerivedCompletion({
     ...block,
     tasks: block.tasks.map((task) =>
@@ -179,7 +218,32 @@ function applyToggleTask(
         ? { ...task, doneAt: task.doneAt === null ? new Date() : null }
         : task,
     ),
+    beats: earns
+      ? [...block.beats, { index: beatIndex, doneAt: new Date(), label: task?.title ?? null }]
+      : block.beats,
   });
+}
+
+function applyToggleBeat(block: CalendarBlock, index: number): CalendarBlock {
+  const had = block.beats.some((beat) => beat.index === index);
+  return withDerivedCompletion({
+    ...block,
+    beats: had
+      ? block.beats.filter((beat) => beat.index !== index)
+      : [...block.beats, { index, doneAt: new Date(), label: null }],
+  });
+}
+
+/** The interval open on this block right now, if it is today's and live. */
+function liveBeatIndex(
+  block: CalendarBlock,
+  todayISO: string,
+  nowMinute: number | null,
+): number | null {
+  if (!block.beatMinutes || block.dateISO !== todayISO || nowMinute === null) {
+    return null;
+  }
+  return beatIndexAt(block, block.beatMinutes, nowMinute);
 }
 
 /**
@@ -238,7 +302,13 @@ export function CalendarGrid({
     return current.map((block) => {
       if (patch.kind === "toggleTask") {
         return block.id === patch.blockId
-          ? applyToggleTask(block, patch.taskId)
+          ? applyToggleTask(block, patch.taskId, patch.beatIndex)
+          : block;
+      }
+
+      if (patch.kind === "toggleBeat") {
+        return block.id === patch.blockId
+          ? applyToggleBeat(block, patch.index)
           : block;
       }
 
@@ -353,13 +423,27 @@ export function CalendarGrid({
    */
   const toggleTask = (block: CalendarBlock, taskId: string) => {
     const done = block.tasks.find((task) => task.id === taskId)?.doneAt === null;
+    const beatIndex = liveBeatIndex(block, todayISO, nowMinute);
     startTransition(async () => {
-      applyPatch({ kind: "toggleTask", blockId: block.id, taskId });
+      applyPatch({ kind: "toggleTask", blockId: block.id, taskId, beatIndex });
       const formData = new FormData();
       formData.set("blockId", block.id);
       formData.set("taskId", taskId);
       formData.set("done", String(done));
       await toggleBlockTask(formData);
+    });
+  };
+
+  /** One interval of an interval block, tapped by hand. Either direction. */
+  const toggleBeat = (block: CalendarBlock, index: number) => {
+    const done = !block.beats.some((beat) => beat.index === index);
+    startTransition(async () => {
+      applyPatch({ kind: "toggleBeat", blockId: block.id, index });
+      const formData = new FormData();
+      formData.set("blockId", block.id);
+      formData.set("index", String(index));
+      formData.set("done", String(done));
+      await toggleBlockBeat(formData);
     });
   };
 
@@ -482,6 +566,7 @@ export function CalendarGrid({
               blocks={shown.filter((block) => block.dateISO === day.dateISO)}
               prayerBands={prayerBands[day.dateISO] ?? []}
               isToday={day.dateISO === todayISO}
+              relation={dayRelation(day.dateISO, todayISO)}
               dayView={days.length === 1}
               selected={day.dateISO === selectedDay.dateISO}
               drag={drag}
@@ -491,6 +576,7 @@ export function CalendarGrid({
               onEdit={onEdit}
               onToggleDone={toggleDone}
               onToggleTask={toggleTask}
+              onToggleBeat={toggleBeat}
               onDropCue={dropCue}
               onDropItem={onDropItem}
               onDropOnBlock={onDropOnBlock}
@@ -503,10 +589,12 @@ export function CalendarGrid({
       <SelectedDayAgenda
         day={selectedDay}
         blocks={blocksFor(selectedDay.dateISO)}
+        relation={dayRelation(selectedDay.dateISO, todayISO)}
         onCreate={onCreate}
         onEdit={onEdit}
         onToggleDone={toggleDone}
         onToggleTask={toggleTask}
+        onToggleBeat={toggleBeat}
         onDropCue={dropCue}
       />
     </div>
@@ -532,14 +620,18 @@ const KIND_LABELS: Record<CalendarBlock["kind"], string> = {
 function SelectedDayAgenda({
   day,
   blocks,
+  relation,
   onCreate,
   onEdit,
   onToggleDone,
   onToggleTask,
+  onToggleBeat,
   onDropCue,
 }: {
   day: GridDay;
   blocks: CalendarBlock[];
+  relation: DayRelation;
+  onToggleBeat: (block: CalendarBlock, index: number) => void;
   onCreate: (dateISO: string, span: { startMinute: number; endMinute: number }) => void;
   onEdit: (block: CalendarBlock) => void;
   onToggleDone: (block: CalendarBlock) => void;
@@ -547,6 +639,7 @@ function SelectedDayAgenda({
   onDropCue: (block: CalendarBlock) => void;
 }) {
   const sorted = [...blocks].sort((a, b) => a.startMinute - b.startMinute);
+  const nowMinute = useContext(NowContext);
 
   return (
     <section className="space-y-4 lg:hidden" aria-label={`${day.label} agenda`}>
@@ -600,6 +693,15 @@ function SelectedDayAgenda({
                     </Button>
                   </div>
 
+                  {block.beatMinutes && (
+                    <AgendaBeats
+                      block={block}
+                      relation={relation}
+                      nowMinute={nowMinute}
+                      onToggleBeat={(index) => onToggleBeat(block, index)}
+                    />
+                  )}
+
                   {block.tasks.length > 1 && (
                     <ul className="mt-3 space-y-1 border-t border-current/10 pt-2">
                       {block.tasks.map((task) => (
@@ -626,7 +728,9 @@ function SelectedDayAgenda({
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     {cue ? (
                       <Button variant="ghost" className="min-h-11" onClick={() => onDropCue(block)}>Skip cue today</Button>
-                    ) : (
+                    ) : block.beatMinutes ? null : (
+                      // An interval block is done when its intervals are;
+                      // there is no "the whole hour" tick to offer.
                       <Button variant="ghost" className="min-h-11" onClick={() => onToggleDone(block)} aria-pressed={done}>
                         <Check className="size-4" aria-hidden />
                         {done ? "Undo completion" : "Mark done"}
@@ -641,6 +745,112 @@ function SelectedDayAgenda({
         </ol>
       )}
     </section>
+  );
+}
+
+type DayRelation = ReturnType<typeof dayRelation>;
+
+/** "Interval 3 of 8, 10:30 to 10:45" — the name every square speaks. */
+const beatLabel = (block: CalendarBlock, index: number, count: number) => {
+  const span = beatWindow(block, block.beatMinutes ?? 0, index);
+  return `Interval ${index + 1} of ${count}, ${formatMinuteOfDay(span.startMinute)} to ${formatMinuteOfDay(span.endMinute)}`;
+};
+
+/** The interval states for one block, read against now. */
+function blockBeatStates(
+  block: CalendarBlock,
+  relation: DayRelation,
+  nowMinute: number | null,
+) {
+  const minutes = block.beatMinutes ?? 0;
+  const count = beatCount(block, minutes);
+  const done = doneBeatIndices(block.beats, count);
+  return {
+    minutes,
+    count,
+    done: done.length,
+    states: beatStates({ span: block, minutes, done, day: relation, nowMinute }),
+  };
+}
+
+/** The agenda's interval row: full-size targets, and the tally said in words. */
+function AgendaBeats({
+  block,
+  relation,
+  nowMinute,
+  onToggleBeat,
+}: {
+  block: CalendarBlock;
+  relation: DayRelation;
+  nowMinute: number | null;
+  onToggleBeat: (index: number) => void;
+}) {
+  const { minutes, count, done, states } = blockBeatStates(block, relation, nowMinute);
+
+  return (
+    <div className="mt-3 border-t border-current/10 pt-2">
+      <div className="-ml-3 flex flex-wrap" role="group" aria-label="Intervals">
+        {states.map((state, index) => (
+          <BeatSquare
+            key={index}
+            state={state}
+            label={beatLabel(block, index, count)}
+            onToggle={() => onToggleBeat(index)}
+            className="size-11"
+            markClassName="size-4"
+          />
+        ))}
+      </div>
+      <p className="text-muted-foreground text-sm">
+        <span className="text-foreground tabular-nums">{done}</span> of{" "}
+        <span className="tabular-nums">{count}</span> intervals · one thing every{" "}
+        {minutes} min
+      </p>
+    </div>
+  );
+}
+
+/**
+ * An interval block's time, drawn as time: a faint dashed seam at every
+ * interval boundary, and a square at the top of each interval down the right
+ * edge. Vertical space is minutes on this grid, so the seams land exactly where
+ * one interval hands over to the next.
+ */
+function BeatRail({
+  block,
+  relation,
+  onToggleBeat,
+}: {
+  block: CalendarBlock;
+  relation: DayRelation;
+  onToggleBeat: (index: number) => void;
+}) {
+  const nowMinute = useContext(NowContext);
+  const { minutes, count, states } = blockBeatStates(block, relation, nowMinute);
+  // Inside the chip's 1px border, so the seams sit on the grid's own minutes.
+  const step = minutes * MINUTE_PX;
+
+  return (
+    <>
+      {states.slice(1).map((_, index) => (
+        <div
+          key={`seam-${index}`}
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 border-t border-dashed border-current/15"
+          style={{ top: (index + 1) * step - 1 }}
+        />
+      ))}
+      {states.map((state, index) => (
+        <BeatSquare
+          key={index}
+          state={state}
+          label={beatLabel(block, index, count)}
+          onToggle={() => onToggleBeat(index)}
+          className="absolute right-1 size-4 before:absolute before:-inset-1.5"
+          style={{ top: index * step + 3 }}
+        />
+      ))}
+    </>
   );
 }
 
@@ -784,6 +994,7 @@ function DayColumn({
   blocks,
   prayerBands,
   isToday,
+  relation,
   dayView,
   selected,
   drag,
@@ -793,6 +1004,7 @@ function DayColumn({
   onEdit,
   onToggleDone,
   onToggleTask,
+  onToggleBeat,
   onDropCue,
   onDropItem,
   onDropOnBlock,
@@ -801,6 +1013,8 @@ function DayColumn({
   blocks: CalendarBlock[];
   prayerBands: PrayerBand[];
   isToday: boolean;
+  relation: DayRelation;
+  onToggleBeat: (block: CalendarBlock, index: number) => void;
   /** The grid is showing exactly one day — the invitation may speak. */
   dayView: boolean;
   selected: boolean;
@@ -1209,6 +1423,8 @@ function DayColumn({
           onPointerDown={(event, mode) => beginDrag(event, block, mode)}
           onToggleDone={() => onToggleDone(block)}
           onToggleTask={(taskId) => onToggleTask(block, taskId)}
+          relation={relation}
+          onToggleBeat={(index) => onToggleBeat(block, index)}
           onDropCue={() => onDropCue(block)}
           onEdit={() => onEdit(block)}
         />
@@ -1428,10 +1644,14 @@ function BlockChip({
   onPointerDown,
   onToggleDone,
   onToggleTask,
+  relation,
+  onToggleBeat,
   onDropCue,
   onEdit,
 }: {
   block: CalendarBlock;
+  relation: DayRelation;
+  onToggleBeat: (index: number) => void;
   column: number;
   columns: number;
   dragging: boolean;
@@ -1450,6 +1670,10 @@ function BlockChip({
   const done = block.completedAt !== null;
   /** This block is the cue in front of another one. */
   const isCue = block.cueForId !== null;
+  /** Interval mode: one thing every `beatMinutes`. A cue never is. */
+  const paced = !isCue && block.beatMinutes !== null;
+  const beatTotal = paced ? beatCount(block, block.beatMinutes ?? 0) : 0;
+  const beatsDone = paced ? doneBeatIndices(block.beats, beatTotal).length : 0;
 
   /**
    * One task reads exactly as it always did — the block *is* that task, so its
@@ -1522,8 +1746,10 @@ function BlockChip({
   return (
     <div
       className={cn(
-        "group focus-visible:ring-ring absolute z-10 flex flex-col overflow-hidden rounded-xl border px-2 select-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
+        "group focus-visible:ring-ring absolute z-10 flex flex-col overflow-hidden rounded-xl border select-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
         tight ? "py-0" : "py-1",
+        // The interval rail lives in the right padding, clear of the text.
+        paced ? "pr-6 pl-2" : "px-2",
         "transition-shadow duration-150 hover:shadow-sm",
         // A task-coloured block sheds the kind's tint and the buffer's
         // dashed "empty on purpose" reading — it has a thing behind it now.
@@ -1547,7 +1773,7 @@ function BlockChip({
       }}
       role="group"
       tabIndex={0}
-      aria-label={`${label}. ${KIND_LABELS[block.kind]}, ${formatMinuteOfDay(block.startMinute)} to ${formatMinuteOfDay(block.endMinute)}${done ? ", completed" : ""}. Press Enter for details.`}
+      aria-label={`${label}. ${KIND_LABELS[block.kind]}, ${formatMinuteOfDay(block.startMinute)} to ${formatMinuteOfDay(block.endMinute)}${paced ? `, ${beatsDone} of ${beatTotal} intervals` : ""}${done ? ", completed" : ""}. Press Enter for details.`}
       onKeyDown={(event) => {
         if (event.target !== event.currentTarget) return;
         if (event.key === "Enter" || event.key === " ") {
@@ -1591,6 +1817,14 @@ function BlockChip({
               compact && "items-center",
             )}
           >
+            {paced ? (
+              // Its intervals are its tick, so the tally sits where the
+              // circle would.
+              <span className="mt-px shrink-0 font-mono text-micro leading-4 tabular-nums">
+                <span className="font-medium">{beatsDone}</span>
+                <span className="text-muted-foreground">/{beatTotal}</span>
+              </span>
+            ) : (
             <button
               type="button"
               aria-label={done ? `Untick ${label}` : `Tick off ${label}`}
@@ -1618,6 +1852,7 @@ function BlockChip({
                 aria-hidden
               />
             </button>
+            )}
 
             {/* An unnamed group's heading *is* its progress, set in the mono
                 face this app keeps for numerals. Two reasons it reads as a
@@ -1720,6 +1955,7 @@ function BlockChip({
         <div className="mt-auto flex min-h-7 shrink-0 items-center justify-between gap-1 pt-0.5">
           <p className="text-muted-foreground min-w-0 truncate font-mono text-micro leading-[14px] tabular-nums">
             {KIND_LABELS[block.kind]} {formatMinuteOfDay(block.startMinute)} · {formatSpanLength(block)}
+            {paced && ` · every ${block.beatMinutes}m`}
           </p>
           <button
             type="button"
@@ -1731,6 +1967,10 @@ function BlockChip({
             Details
           </button>
         </div>
+      )}
+
+      {paced && (
+        <BeatRail block={block} relation={relation} onToggleBeat={onToggleBeat} />
       )}
 
       {/* Resize handle. Only appears on hover, so it never competes with the

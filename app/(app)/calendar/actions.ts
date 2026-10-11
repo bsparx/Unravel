@@ -12,6 +12,8 @@ import {
   type Span,
   spanOfLength,
 } from "@/lib/block-math";
+import { beatCount } from "@/lib/block-beats";
+import { markCurrentBeat, reconcileBlockCompletion } from "@/lib/block-beats-server";
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { parseLocalDate } from "@/lib/dates";
@@ -26,6 +28,7 @@ import {
   MAX_BLOCK_TASKS,
   moveBlockSchema,
   scheduleTaskSchema,
+  toggleBlockBeatSchema,
   toggleBlockTaskSchema,
   updateBlockSchema,
 } from "@/lib/validation";
@@ -134,6 +137,8 @@ type BlockCreate = {
   kind: "WORK" | "RECOVERY" | "BUFFER" | "DAYDREAM";
   /** The self this time is for, already checked against the user. */
   identityId?: string | null;
+  /** Interval mode, already narrowed to WORK blocks. */
+  beatMinutes?: number | null;
 };
 
 /**
@@ -248,34 +253,6 @@ async function syncBlockTasks(
   await reconcileBlockCompletion(userId, blockId);
 }
 
-/**
- * Keep the block's own tick agreeing with the tasks inside it.
- *
- * One rule, three states: a block with tasks is done exactly when all of them
- * are ticked. Ticking the last one closes the block; un-ticking one reopens it.
- * A block with no tasks is left alone — its tick is the only thing that can
- * speak for it, and "lunch" has no lines to tally.
- */
-async function reconcileBlockCompletion(
-  userId: string,
-  blockId: string,
-): Promise<void> {
-  const block = await prisma.timeBlock.findFirst({
-    where: { id: blockId, userId },
-    select: { completedAt: true, tasks: { select: { doneAt: true } } },
-  });
-
-  if (!block || block.tasks.length === 0) return;
-
-  const allDone = block.tasks.every((link) => link.doneAt !== null);
-  if (allDone === (block.completedAt !== null)) return;
-
-  await prisma.timeBlock.update({
-    where: { id: blockId },
-    data: { completedAt: allDone ? new Date() : null },
-  });
-}
-
 /** The cue block glued to the front of `blockId`, if it has one. */
 function findCue(userId: string, blockId: string) {
   return prisma.timeBlock.findFirst({
@@ -320,6 +297,16 @@ async function resolveIdentityId(userId: string, identityId: string | undefined)
   return identity?.id ?? null;
 }
 
+/**
+ * Intervals are a way of spending work time. Recovery, buffer and daydream
+ * blocks are already the rest half, so the cadence is dropped for them rather
+ * than refused — switching a block's kind shouldn't fail on a hidden field.
+ */
+const beatMinutesFor = (
+  kind: BlockCreate["kind"],
+  beatMinutes: number | undefined,
+): number | null => (kind === "WORK" ? (beatMinutes ?? null) : null);
+
 /** Append the cue's name to a success message, when there is one. */
 const withCueNote = (message: string, cue: PlannedCue | null) =>
   cue ? `${message} ${cue.title} is scheduled before it.` : message;
@@ -362,6 +349,7 @@ export async function createBlock(
       ...span,
       kind: input.kind,
       identityId,
+      beatMinutes: beatMinutesFor(input.kind, input.beatMinutes),
     },
     cue,
   );
@@ -395,6 +383,20 @@ export async function updateBlock(
     resolveIdentityId(user.id, input.identityId),
   ]);
 
+  const beatMinutes = beatMinutesFor(input.kind, input.beatMinutes);
+
+  // A new cadence clears the old ticks: index 2 of a 15-minute block and index
+  // 2 of a 30-minute one are different stretches of time. Moving or resizing
+  // keeps them. Has to run before the update, while the old cadence is still
+  // there to compare against; `not` never matches a null column, which is
+  // right — a block that had no cadence has no ticks to clear.
+  await prisma.timeBlockBeat.deleteMany({
+    where: {
+      blockId: input.id,
+      block: { userId: user.id, beatMinutes: { not: beatMinutes } },
+    },
+  });
+
   const { count } = await prisma.timeBlock.updateMany({
     where: { id: input.id, userId: user.id },
     data: {
@@ -404,6 +406,7 @@ export async function updateBlock(
       ...span,
       kind: input.kind,
       identityId,
+      beatMinutes,
     },
   });
 
@@ -492,8 +495,15 @@ export async function moveBlock(formData: FormData): Promise<void> {
     findCue(user.id, parsed.data.id),
   ]);
 
-  // Skipped entirely when nothing was updated: not this user's block.
-  if (count > 0) await reflowCue(cue, date, span);
+  // Skipped entirely when nothing was updated: not this user's block. A new
+  // length can change how many intervals a beat block has, and so whether
+  // they're all done.
+  if (count > 0) {
+    await Promise.all([
+      reflowCue(cue, date, span),
+      reconcileBlockCompletion(user.id, parsed.data.id),
+    ]);
+  }
 
   revalidateCalendar();
 }
@@ -703,6 +713,59 @@ export async function toggleBlockTask(formData: FormData): Promise<void> {
     return;
   }
 
+  // In an interval block, a line ticked while an interval is open is that
+  // interval's one thing. Outside one, nothing is marked and the reconcile
+  // below is the only write.
+  if (done) {
+    const task = await prisma.task.findFirst({
+      where: { id: taskId, userId: user.id },
+      select: { title: true },
+    });
+    await markCurrentBeat(user, { blockId, label: task?.title ?? null });
+  }
+  await reconcileBlockCompletion(user.id, blockId);
+
+  revalidateCalendar();
+}
+
+/**
+ * Tick one interval of a beat block by hand.
+ *
+ * The "did something else" path — the one thing happened off the list — and
+ * the way to correct a tick after the fact, in either direction. Any interval
+ * of the block can be tapped, not only the live one: an honest log of the
+ * afternoon is worth more than a rule about when you were allowed to write it.
+ */
+export async function toggleBlockBeat(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const parsed = toggleBlockBeatSchema.safeParse(formValues(formData));
+  if (!parsed.success) {
+    revalidateCalendar();
+    return;
+  }
+
+  const { blockId, index, done } = parsed.data;
+
+  const block = await prisma.timeBlock.findFirst({
+    where: { id: blockId, userId: user.id },
+    select: { startMinute: true, endMinute: true, beatMinutes: true },
+  });
+
+  if (!block?.beatMinutes || index >= beatCount(block, block.beatMinutes)) {
+    revalidateCalendar();
+    return;
+  }
+
+  if (done) {
+    await prisma.timeBlockBeat.upsert({
+      where: { blockId_index: { blockId, index } },
+      update: {},
+      create: { blockId, index },
+    });
+  } else {
+    await prisma.timeBlockBeat.deleteMany({ where: { blockId, index } });
+  }
+
   await reconcileBlockCompletion(user.id, blockId);
 
   revalidateCalendar();
@@ -752,7 +815,10 @@ export async function toggleBlockDone(formData: FormData): Promise<void> {
 
   await prisma.$transaction(async (tx) => {
     const { count } = await tx.timeBlock.updateMany({
-      where: { id, userId: user.id },
+      // Not for interval blocks: their tick is the intervals', and ticking the
+      // whole hour would claim intervals nobody spent. The grid doesn't offer
+      // it; this keeps a stale client from doing it anyway.
+      where: { id, userId: user.id, beatMinutes: null },
       data: { completedAt: done ? new Date() : null },
     });
 
