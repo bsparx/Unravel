@@ -18,6 +18,7 @@ import { adjustSessionSeconds } from "@/lib/sessions";
 import { adjustSessionSchema } from "@/lib/validation";
 import {
   buildIntervalPlan,
+  clampBreak,
   clampIntervals,
   clampTarget,
   isBreakKind,
@@ -40,6 +41,8 @@ type StartInput = {
   mode: TimerMode;
   targetSeconds: number;
   intervals: number;
+  /** Pomodoro short break, chosen on the timer. Falls back to the user default. */
+  shortBreakSeconds?: number;
 };
 
 export type SessionSnapshot = {
@@ -85,6 +88,10 @@ export async function startSession(
   const targetSeconds =
     mode === "RECOVERY" ? 0 : clampTarget(input.targetSeconds);
   const intervals = mode === "POMODORO" ? clampIntervals(input.intervals) : 1;
+  const shortBreakSeconds =
+    input.shortBreakSeconds === undefined
+      ? user.shortBreakSeconds
+      : clampBreak(input.shortBreakSeconds);
 
   // Idempotent: a retry, a double submit, or a StrictMode double-effect all
   // resolve to the same row rather than two sessions.
@@ -116,7 +123,7 @@ export async function startSession(
     targetSeconds,
     intervals,
     focusSeconds: user.pomodoroSeconds,
-    shortBreakSeconds: user.shortBreakSeconds,
+    shortBreakSeconds,
     longBreakSeconds: user.longBreakSeconds,
     longBreakEvery: user.longBreakEvery,
   });
@@ -133,7 +140,7 @@ export async function startSession(
       targetSeconds,
       plannedIntervals: intervals,
       focusSeconds: user.pomodoroSeconds,
-      shortBreakSeconds: user.shortBreakSeconds,
+      shortBreakSeconds,
       longBreakSeconds: user.longBreakSeconds,
       status: "RUNNING",
       startedAt: now,

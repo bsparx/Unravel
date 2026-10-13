@@ -4,6 +4,7 @@ import { clampSlot, shortName, sigilFor } from "@/lib/identity-look";
 import { getLeadIdentityId } from "@/lib/identity-votes";
 import { getTask } from "@/lib/tasks";
 import {
+  clampBreak,
   clampIntervals,
   clampTarget,
   suggestIntervals,
@@ -79,7 +80,7 @@ export default async function TimerPage({
     targetSeconds,
     intervals,
     focusSeconds,
-    shortBreakSeconds: params.break ?? user.shortBreakSeconds,
+    shortBreakSeconds: clampBreak(params.break ?? user.shortBreakSeconds),
     longBreakSeconds: user.longBreakSeconds,
     longBreakEvery: user.longBreakEvery,
   };

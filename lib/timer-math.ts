@@ -48,6 +48,8 @@ export type TimerConfig = {
 export const MIN_TARGET_SECONDS = 60;
 export const MAX_TARGET_SECONDS = 8 * 60 * 60;
 export const MAX_INTERVALS = 12;
+export const MIN_BREAK_SECONDS = 60;
+export const MAX_BREAK_SECONDS = 60 * 60;
 
 export const DEFAULTS = {
   targetSeconds: 25 * 60,
@@ -60,6 +62,11 @@ export const DEFAULTS = {
 export function clampTarget(seconds: number): number {
   if (!Number.isFinite(seconds)) return DEFAULTS.targetSeconds;
   return Math.min(MAX_TARGET_SECONDS, Math.max(MIN_TARGET_SECONDS, Math.round(seconds)));
+}
+
+export function clampBreak(seconds: number): number {
+  if (!Number.isFinite(seconds)) return DEFAULTS.shortBreakSeconds;
+  return Math.min(MAX_BREAK_SECONDS, Math.max(MIN_BREAK_SECONDS, Math.round(seconds)));
 }
 
 export function clampIntervals(count: number): number {

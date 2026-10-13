@@ -407,6 +407,7 @@ export function TimerProvider({
       mode: state.config.mode,
       targetSeconds: state.config.targetSeconds,
       intervals: state.config.intervals,
+      shortBreakSeconds: state.config.shortBreakSeconds,
     }).then((snapshot) => {
       if (snapshot) dispatch({ type: "ATTACH", sessionId: snapshot.id });
     });

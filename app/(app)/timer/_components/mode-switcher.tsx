@@ -7,9 +7,12 @@ import { Button } from "@/components/ui/button";
 import { InfoTip } from "@/components/info-tip";
 import { formatDuration } from "@/lib/dates";
 import {
+  clampBreak,
   clampIntervals,
   clampTarget,
+  MAX_BREAK_SECONDS,
   MAX_INTERVALS,
+  MIN_BREAK_SECONDS,
   MODE_DESCRIPTIONS,
   sessionKind,
   suggestIntervals,
@@ -277,6 +280,58 @@ export function DurationDial({
               disabled={config.intervals >= MAX_INTERVALS}
               onClick={() =>
                 onChange({ intervals: clampIntervals(config.intervals + 1) })
+              }
+            >
+              <Plus className="size-3.5" aria-hidden />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Pomodoro Break Length. Only meaningful once there is a gap between blocks. */}
+      {isPomodoro && config.intervals > 1 && (
+        <div className="flex items-center justify-between border-t border-border/50 pt-3">
+          <div className="flex flex-col">
+            <span className="text-label font-medium text-muted-foreground">
+              Break
+            </span>
+            <span className="text-micro text-muted-foreground">
+              between blocks
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="border-border/80 hover:border-primary/50"
+              aria-label="One minute less break"
+              disabled={config.shortBreakSeconds <= MIN_BREAK_SECONDS}
+              onClick={() =>
+                onChange({
+                  shortBreakSeconds: clampBreak(config.shortBreakSeconds - 60),
+                })
+              }
+            >
+              <Minus className="size-3.5" aria-hidden />
+            </Button>
+
+            <span className="min-w-16 text-center font-mono text-label font-medium tabular-nums">
+              {formatDuration(config.shortBreakSeconds)}
+            </span>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="border-border/80 hover:border-primary/50"
+              aria-label="One minute more break"
+              disabled={config.shortBreakSeconds >= MAX_BREAK_SECONDS}
+              onClick={() =>
+                onChange({
+                  shortBreakSeconds: clampBreak(config.shortBreakSeconds + 60),
+                })
               }
             >
               <Plus className="size-3.5" aria-hidden />
