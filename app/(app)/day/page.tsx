@@ -13,6 +13,7 @@ import {
 } from "@/lib/dates";
 import { getIdentityVotes, getLeadIdentityId } from "@/lib/identity-votes";
 import { getPrayerCycle } from "@/lib/prayers";
+import { getRenewingSoon } from "@/lib/subscriptions-data";
 import { getTodayView } from "@/lib/tasks";
 import { getBlocks } from "@/lib/time-blocks";
 import { getWaterToday } from "@/lib/water-data";
@@ -22,6 +23,7 @@ import { LeadPanel } from "./_components/lead-panel";
 import { PrayerSection } from "./_components/prayer-section";
 import { QuestHero } from "./_components/quest-hero";
 import { QuestLog } from "./_components/quest-log";
+import { RenewalsAlert } from "./_components/renewals-alert";
 
 export const metadata = { title: "Your day" };
 
@@ -30,13 +32,14 @@ export default async function TodayPage() {
   // Every section only needs today's date, so the whole page loads in one
   // parallel round rather than one waterfall step per section.
   const today = todayLocal(user.timezone);
-  const [view, blocks, water, prayers, votes, leadId] = await Promise.all([
+  const [view, blocks, water, prayers, votes, leadId, renewals] = await Promise.all([
     getTodayView(user),
     getBlocks(user, today, 1),
     getWaterToday(user, today),
     user.prayerRemindersEnabled ? getPrayerCycle(user) : null,
     getIdentityVotes(user),
     getLeadIdentityId(user),
+    getRenewingSoon(user),
   ]);
   // Daydream blocks live on /calendar only — /day never sees them.
   const plannedBlocks = blocks.filter((block) => block.kind !== "DAYDREAM");
@@ -72,6 +75,8 @@ export default async function TodayPage() {
           )}
         </p>
       </header>
+
+      <RenewalsAlert rows={renewals.rows} today={renewals.today} />
 
       <LeadPanel identities={votes.identities} leadId={leadId} habits={view.habits} />
 

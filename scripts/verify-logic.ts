@@ -14,7 +14,13 @@ import { reviewWeekStart } from "@/lib/review-week";
 import { activePalette, isEveningHour } from "@/lib/theme";
 import { shadowSource, tallyVotes } from "@/lib/vote-tally";
 import { STARTER_SELVES, isTaken } from "@/lib/starter-selves";
-import { identitySchema } from "@/lib/validation";
+import { identitySchema, subscriptionSchema } from "@/lib/validation";
+import {
+  isRenewingSoon,
+  monthlyCostCents,
+  nextRenewal,
+  renewalLabel,
+} from "@/lib/subscriptions";
 
 import {
   addDays,
@@ -3355,6 +3361,75 @@ check("intervals read done, current, past or upcoming — never missed", () => {
   assert.equal(dayRelation("2026-10-11", "2026-10-12"), "past");
   assert.equal(dayRelation("2026-10-12", "2026-10-12"), "today");
   assert.equal(dayRelation("2026-10-13", "2026-10-12"), "future");
+});
+
+check("subscriptions roll forward from their anchor", () => {
+  const d = (iso: string) => parseLocalDate(iso)!;
+  const iso = (date: Date) => toISODate(date);
+  const today = d("2026-10-13");
+
+  // An anchor today or ahead is the next renewal as-is.
+  assert.equal(iso(nextRenewal(d("2026-10-13"), "MONTHLY", today)), "2026-10-13");
+  assert.equal(iso(nextRenewal(d("2027-01-05"), "YEARLY", today)), "2027-01-05");
+
+  // A past anchor rolls by its cycle to the first renewal on or after today.
+  assert.equal(iso(nextRenewal(d("2026-08-20"), "MONTHLY", today)), "2026-10-20");
+  assert.equal(iso(nextRenewal(d("2026-09-13"), "MONTHLY", today)), "2026-10-13");
+  assert.equal(iso(nextRenewal(d("2024-03-01"), "YEARLY", today)), "2027-03-01");
+  assert.equal(iso(nextRenewal(d("2025-11-02"), "YEARLY", today)), "2026-11-02");
+  assert.equal(iso(nextRenewal(d("2026-10-01"), "WEEKLY", today)), "2026-10-15");
+  assert.equal(iso(nextRenewal(d("2026-10-06"), "WEEKLY", today)), "2026-10-13");
+
+  // Month ends clamp, but always from the anchor: 31 Jan never drifts to 28th.
+  assert.equal(iso(nextRenewal(d("2026-01-31"), "MONTHLY", d("2026-02-01"))), "2026-02-28");
+  assert.equal(iso(nextRenewal(d("2026-01-31"), "MONTHLY", d("2026-03-01"))), "2026-03-31");
+  assert.equal(iso(nextRenewal(d("2026-08-31"), "MONTHLY", today)), "2026-10-31");
+  // Leap day renews on 28 Feb in ordinary years, and 29 Feb when it exists.
+  assert.equal(iso(nextRenewal(d("2024-02-29"), "YEARLY", d("2026-01-01"))), "2026-02-28");
+  assert.equal(iso(nextRenewal(d("2024-02-29"), "YEARLY", d("2027-03-01"))), "2028-02-29");
+  // Across a year boundary.
+  assert.equal(iso(nextRenewal(d("2026-11-15"), "MONTHLY", d("2027-01-20"))), "2027-02-15");
+});
+
+check("renewal reminders open N days out, today included", () => {
+  const d = (iso: string) => parseLocalDate(iso)!;
+  const today = d("2026-10-13");
+  assert.equal(isRenewingSoon(d("2026-10-13"), today, 0), true);
+  assert.equal(isRenewingSoon(d("2026-10-14"), today, 0), false);
+  assert.equal(isRenewingSoon(d("2026-10-20"), today, 7), true);
+  assert.equal(isRenewingSoon(d("2026-10-21"), today, 7), false);
+  assert.equal(renewalLabel(d("2026-10-13"), today), "Today");
+  assert.equal(renewalLabel(d("2026-10-14"), today), "Tomorrow");
+  assert.equal(renewalLabel(d("2026-10-17"), today), "in 4 days");
+  assert.equal(monthlyCostCents(120_000, "YEARLY"), 10_000);
+  assert.equal(monthlyCostCents(30_000, "WEEKLY"), 130_000);
+  assert.equal(monthlyCostCents(110_000, "MONTHLY"), 110_000);
+});
+
+check("subscription form: email optional, but real when given", () => {
+  const base = {
+    name: "Netflix",
+    amount: "1100",
+    cycle: "MONTHLY",
+    renewsOn: "2026-10-20",
+    remindDaysBefore: "7",
+  };
+  assert.equal(subscriptionSchema.safeParse(base).success, true);
+  assert.equal(subscriptionSchema.safeParse({ ...base, accountEmail: "" }).success, true);
+  assert.equal(
+    subscriptionSchema.safeParse({ ...base, accountEmail: "me@work.pk" }).success,
+    true,
+  );
+  assert.equal(
+    subscriptionSchema.safeParse({ ...base, accountEmail: "not-an-email" }).success,
+    false,
+  );
+  assert.equal(subscriptionSchema.safeParse({ ...base, name: " " }).success, false);
+  assert.equal(subscriptionSchema.safeParse({ ...base, renewsOn: "" }).success, false);
+  assert.equal(
+    subscriptionSchema.safeParse({ ...base, remindDaysBefore: "200" }).success,
+    false,
+  );
 });
 
 console.log(`\n${passed} checks passed.\n`);

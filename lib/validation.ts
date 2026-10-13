@@ -28,6 +28,7 @@ import {
   MAX_MANUAL_LOG_MINUTES,
   MAX_TARGET_SECONDS,
 } from "@/lib/timer-math";
+import { MAX_REMIND_DAYS } from "@/lib/subscriptions";
 import {
   MAX_GOAL,
   MAX_INTERVAL_MIN,
@@ -834,6 +835,42 @@ export const deleteDebtSchema = z.object({ id: cuid });
 export const settleDebtTransactionSchema = moneyTransactionSchema.extend({
   debtId: cuid,
 });
+
+/**
+ * A subscription. `renewsOn` is any known renewal day; the next one is
+ * derived from it by the cycle, so it may be in the past. The account email
+ * is optional, but when it's there it should be one.
+ */
+export const subscriptionSchema = z.object({
+  /** Present when editing an existing subscription. */
+  id: cuid.optional(),
+  name: z
+    .string()
+    .trim()
+    .min(1, "What's it called?")
+    .max(80, "Keep the name under 80 characters."),
+  amount: moneyAmount,
+  cycle: z.enum(["WEEKLY", "MONTHLY", "YEARLY"]),
+  renewsOn: isoDate,
+  accountEmail: z.preprocess(
+    (value) =>
+      typeof value === "string" && value.trim() === "" ? undefined : value,
+    z
+      .string()
+      .trim()
+      .max(120, "Keep the email under 120 characters.")
+      .pipe(z.email("That doesn't look like an email."))
+      .optional(),
+  ),
+  remindDaysBefore: z.coerce
+    .number("Enter a number of days.")
+    .int("Whole days only.")
+    .min(0, "Can't remind you after it renews.")
+    .max(MAX_REMIND_DAYS, `Up to ${MAX_REMIND_DAYS} days.`),
+  note: notes,
+});
+
+export const subscriptionIdSchema = z.object({ id: cuid });
 
 // ---------------------------------------------------------------- action result
 

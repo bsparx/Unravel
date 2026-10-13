@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import {
   BarChart3,
+  CalendarClock,
   CalendarDays,
   Drama,
   Droplets,
@@ -79,6 +80,7 @@ const RAIL_EXTRA = [
   { href: "/stats", label: "Statistics", icon: BarChart3 },
   { href: "/water", label: "Water", icon: Droplets },
   { href: "/budget", label: "Budget", icon: Wallet },
+  { href: "/subscriptions", label: "Subscriptions", icon: CalendarClock },
   { href: "/close", label: "Close the day", icon: Moon },
 ] as const;
 

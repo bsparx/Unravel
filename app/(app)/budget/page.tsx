@@ -11,6 +11,7 @@ import {
   todayLocal,
 } from "@/lib/dates";
 import { formatMoneyCompact } from "@/lib/money";
+import { getSubscriptions } from "@/lib/subscriptions-data";
 
 import { AccountsStrip } from "./_components/accounts-strip";
 import { BalanceChart } from "./_components/balance-chart";
@@ -20,6 +21,7 @@ import { CategoryDonut } from "./_components/category-donut";
 import { DebtsSection } from "./_components/debts-section";
 import { FlowChart } from "./_components/flow-chart";
 import { ResetBudgetsButton } from "./_components/reset-budgets-button";
+import { SubscriptionsStrip } from "./_components/subscriptions-strip";
 import { TransactionsSection } from "./_components/transactions-section";
 import {
   getAccounts,
@@ -120,12 +122,13 @@ export default async function BudgetPage({
     ),
   ]);
 
-  const [month, categories, budgets, accounts, debts] = await Promise.all([
+  const [month, categories, budgets, accounts, debts, subscriptions] = await Promise.all([
     getBudgetMonth(user, anchor),
     getBudgetCategories(user),
     getBudgets(user),
     getAccounts(user),
     getDebts(user),
+    getSubscriptions(user),
   ]);
 
   const prev = addMonths(anchor, -1);
@@ -188,6 +191,8 @@ export default async function BudgetPage({
       />
 
       <AccountsStrip accounts={accounts} />
+
+      <SubscriptionsStrip overview={subscriptions} />
 
       {month.hasData && (
         <>

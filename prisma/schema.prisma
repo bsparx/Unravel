@@ -393,6 +393,7 @@ model User {
   moneyAccounts    MoneyAccount[]
   transfers        AccountTransfer[]
   moneyDebts       MoneyDebt[]
+  subscriptions    Subscription[]
   exerciseRoutines ExerciseRoutine[]
   prayerChecks     PrayerCheck[]
   shadowPatterns   ShadowPattern[]
@@ -1438,6 +1439,46 @@ model MoneyDebt {
   /// The two pockets are reads, so the index covers them: one side of the
   /// ledger, outstanding first, oldest first within it.
   @@index([userId, direction, settledAt, date])
+}
+
+enum SubscriptionCycle {
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+/// Something that bills you on a cycle: Netflix, a domain, a gym.
+///
+/// `renewsOn` is an anchor, not "the next date": one renewal day you know,
+/// from which every later one is derived by the cycle (lib/subscriptions.ts).
+/// That way a subscription never goes stale after it renews. Editing the
+/// date is only for when the real schedule moves.
+///
+/// Rupees only, like the rest of the money code. Not a MoneyTransaction:
+/// a renewal that hasn't happened yet has moved no money.
+model Subscription {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name             String
+  /// What the next renewal will charge, in paise.
+  amountCents      Int
+  cycle            SubscriptionCycle @default(MONTHLY)
+  /// A known renewal day. Local calendar day in User.timezone, UTC-midnight DATE.
+  renewsOn         DateTime          @db.Date
+  /// Which account it's billed under, e.g. a personal vs work email.
+  accountEmail     String?
+  /// /day starts warning this many days before a renewal. 0 = only on the day.
+  remindDaysBefore Int               @default(7)
+  note             String?
+  /// Set when cancelled. The row stays, struck through, and never alerts.
+  cancelledAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, cancelledAt, renewsOn])
 }
 
 // ---------------------------------------------------------------- exercises
