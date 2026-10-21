@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 
 import { requireUser } from "@/lib/auth";
-import { markCurrentBeat } from "@/lib/block-beats-server";
 import { prisma } from "@/lib/db";
 import { parseLocalDate, todayLocal } from "@/lib/dates";
 import { getHabitBar, toggleHabitDone, creditLoggedTime } from "@/lib/habit-progress";
@@ -160,22 +159,12 @@ export async function toggleStep(formData: FormData): Promise<void> {
 
   if (!parsed.success) return;
 
+  // A step never earns an interval: in an interval block the one thing is a
+  // whole task or habit, ticked on the block itself.
   await prisma.taskStep.updateMany({
     where: { id: parsed.data.stepId, userId: user.id },
     data: { completedAt: parsed.data.done ? new Date() : null },
   });
-
-  // A step is the natural size for an interval's one thing: ticking it while
-  // an interval block holding its task is live earns that interval.
-  if (parsed.data.done) {
-    const step = await prisma.taskStep.findFirst({
-      where: { id: parsed.data.stepId, userId: user.id },
-      select: { taskId: true, title: true },
-    });
-    if (step) {
-      await markCurrentBeat(user, { taskId: step.taskId, label: step.title });
-    }
-  }
 
   revalidateTaskViews();
 }

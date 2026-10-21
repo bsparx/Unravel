@@ -2943,7 +2943,7 @@ check("a habit scheduled into a block is spoken for by the block alone", () => {
       questBlock({
         startMinute: 9 * 60,
         endMinute: 9 * 60 + 30,
-        tasks: [{ id: "walk", title: "Morning walk", color: "#2f6f6a", estimatedSeconds: null, defaultMode: "BASIC", plannedIntervals: null, completedAt: null, doneAt: null, steps: [] }],
+        tasks: [{ id: "walk", title: "Morning walk", color: "#2f6f6a", estimatedSeconds: null, defaultMode: "BASIC", plannedIntervals: null, completedAt: null, doneAt: null }],
       }),
     ],
     habits: [walk],

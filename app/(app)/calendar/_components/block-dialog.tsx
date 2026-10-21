@@ -386,7 +386,7 @@ export function BlockDialog({
                     <span className="text-foreground tabular-nums">
                       {intervals} interval{intervals === 1 ? "" : "s"}
                     </span>
-                    . One thing in each, a step or a task, however small.
+                    . One whole task or habit in each, not a step of one.
                     Then rest until the next one.
                     {draft.id &&
                       draft.beatMinutes !== null &&
@@ -394,7 +394,7 @@ export function BlockDialog({
                       " Changing the interval clears this block's ticks."}
                   </>
                 ) : (
-                  "Split the block into intervals and do one small thing in each."
+                  "Split the block into intervals and finish one task or habit in each."
                 )}
               </p>
             </div>

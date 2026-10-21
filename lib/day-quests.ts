@@ -40,8 +40,6 @@ export type QuestObjective = {
   estimatedSeconds: number | null;
   defaultMode: "POMODORO" | "BASIC" | "FLOW" | "RECOVERY";
   plannedIntervals: number | null;
-  /** The task's first unticked step — an interval's natural one thing. */
-  nextStep: { id: string; title: string } | null;
 };
 
 /**
@@ -116,10 +114,6 @@ const toObjectives = (tasks: BlockTask[]): QuestObjective[] =>
     estimatedSeconds: task.estimatedSeconds,
     defaultMode: task.defaultMode,
     plannedIntervals: task.plannedIntervals,
-    nextStep: (() => {
-      const step = task.steps.find((candidate) => candidate.completedAt === null);
-      return step ? { id: step.id, title: step.title } : null;
-    })(),
   }));
 
 function blockBeat(block: CalendarBlock, nowMinute: number): QuestBeat | null {

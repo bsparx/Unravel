@@ -8,8 +8,7 @@ import type { User } from "@/lib/generated/prisma/client";
 /**
  * A plain module rather than exports from a `"use server"` file, for the same
  * reason as `lib/step-sync.ts`: these take a `userId`, and as endpoints they
- * would let anyone tick anyone's calendar. Shared by the calendar's actions and
- * the task actions (a step ticked anywhere can earn an interval).
+ * would let anyone tick anyone's calendar.
  */
 
 /**
@@ -19,7 +18,7 @@ import type { User } from "@/lib/generated/prisma/client";
  *
  * - A **beat block** is done exactly when every interval is. Its task lines
  *   still tick, but they are the things you did *in* an interval — finishing
- *   the habit's last step at 10:05 does not mean the hour is over.
+ *   one habit at 10:05 does not mean the hour is over.
  * - Any other block with tasks is done exactly when all of them are ticked.
  *   Ticking the last one closes the block; un-ticking one reopens it.
  *
@@ -61,12 +60,11 @@ export async function reconcileBlockCompletion(
 }
 
 /**
- * Something was just ticked: if an interval is open on it, that interval got
- * its one thing.
+ * A whole task or habit was just ticked in a block: if an interval is open on
+ * it, that interval got its one thing. Steps never come through here.
  *
  * "Open" means today, in the user's own zone, with the current minute inside
- * the block. Narrowed by `blockId` (a line ticked inside a block) or `taskId`
- * (a step ticked anywhere — every live beat block holding that task hears it).
+ * the block.
  *
  * `update: {}` keeps the first tick of an interval as its label: the interval
  * was earned by that one, and a second tick in the same window is just more.
@@ -75,7 +73,7 @@ export async function reconcileBlockCompletion(
  */
 export async function markCurrentBeat(
   user: Pick<User, "id" | "timezone">,
-  target: { blockId?: string; taskId?: string; label: string | null },
+  target: { blockId: string; label: string | null },
 ): Promise<void> {
   const minute = minuteOfDayLocal(user.timezone);
 
@@ -86,8 +84,7 @@ export async function markCurrentBeat(
       beatMinutes: { not: null },
       startMinute: { lte: minute },
       endMinute: { gt: minute },
-      ...(target.blockId ? { id: target.blockId } : {}),
-      ...(target.taskId ? { tasks: { some: { taskId: target.taskId } } } : {}),
+      id: target.blockId,
     },
     select: { id: true, startMinute: true, endMinute: true, beatMinutes: true },
   });

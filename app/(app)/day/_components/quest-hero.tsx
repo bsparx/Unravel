@@ -5,7 +5,6 @@ import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 
 import { toggleBlockBeat, toggleBlockTask } from "@/app/(app)/calendar/actions";
-import { toggleStep } from "@/app/(app)/tasks/actions";
 import { BeatSquare } from "@/components/beat-square";
 import { Button } from "@/components/ui/button";
 import { TaskCheckbox } from "@/components/task-checkbox";
@@ -319,13 +318,6 @@ function IntervalQuestCard({
     await toggleBlockBeat(formData);
   };
 
-  const tickStep = async (stepId: string, done: boolean) => {
-    const formData = new FormData();
-    formData.set("stepId", stepId);
-    formData.set("done", String(done));
-    await toggleStep(formData);
-  };
-
   const toggleObjective = async (taskId: string, done: boolean) => {
     const formData = new FormData();
     formData.set("blockId", quest.id);
@@ -336,7 +328,7 @@ function IntervalQuestCard({
 
   const [marking, startMarking] = useTransition();
 
-  const steps = quest.objectives.filter((objective) => objective.nextStep);
+  // Whole tasks and habits only: an interval's one thing is never a step.
   const open = quest.objectives.filter((objective) => objective.doneAt === null);
 
   return (
@@ -389,31 +381,11 @@ function IntervalQuestCard({
       ) : (
         <div className="mt-2">
           <p className="text-body">
-            Do one thing. Small counts, rushed counts.
+            Finish one task or habit. Rushed counts.
           </p>
 
-          {(steps.length > 0 || open.length > 0) && (
+          {open.length > 0 && (
             <ul className="mt-3 space-y-2">
-              {steps.map((objective) => (
-                <li
-                  key={`step-${objective.nextStep!.id}`}
-                  className="pending-sweep flex items-center gap-3"
-                >
-                  <TaskCheckbox
-                    done={false}
-                    label={objective.nextStep!.title}
-                    onToggle={(next) => tickStep(objective.nextStep!.id, next)}
-                  />
-                  <span className="min-w-0">
-                    <span className="text-body block truncate">
-                      {objective.nextStep!.title}
-                    </span>
-                    <span className="text-muted-foreground block truncate text-micro">
-                      Next step of {objective.title}
-                    </span>
-                  </span>
-                </li>
-              ))}
               {open.map((objective) => (
                 <li
                   key={objective.id}

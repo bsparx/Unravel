@@ -27,19 +27,12 @@ export type BlockTask = {
   plannedIntervals: number | null;
   /** The *task's* terminal completion, which is a different fact. */
   completedAt: Date | null;
-  /** Ticked off inside this block. Block-scoped — see TimeBlockTask.doneAt. */
-  doneAt: Date | null;
   /**
-   * The task's own checklist, in order. An interval block offers the next
-   * unticked one as "the one thing" — a habit step is the natural size for it.
+   * Ticked off inside this block. Block-scoped — see TimeBlockTask.doneAt. In
+   * an interval block this is what earns an interval: the whole task or habit,
+   * never one of its steps.
    */
-  steps: BlockTaskStep[];
-};
-
-export type BlockTaskStep = {
-  id: string;
-  title: string;
-  completedAt: Date | null;
+  doneAt: Date | null;
 };
 
 /** One interval of a beat block that got its one thing. */
@@ -107,10 +100,6 @@ const blockSelect = {
           defaultMode: true,
           plannedIntervals: true,
           completedAt: true,
-          steps: {
-            orderBy: { position: "asc" },
-            select: { id: true, title: true, completedAt: true },
-          },
         },
       },
     },
