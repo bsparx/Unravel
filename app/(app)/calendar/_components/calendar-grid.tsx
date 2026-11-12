@@ -2,8 +2,11 @@
 
 import {
   createContext,
+  memo,
+  useCallback,
   useContext,
   useEffect,
+  useMemo,
   useOptimistic,
   useRef,
   useState,
@@ -33,6 +36,7 @@ import {
   SNAP_MINUTES,
   spanMinutes,
   spanOfLength,
+  type Span,
   TASK_LINE_PX,
   TASK_ROW_MAX_PX,
   TIGHT_MINUTES,
@@ -256,12 +260,45 @@ const identityChipStyle = (slot: number) => ({
   borderColor: `color-mix(in srgb, var(--id-${slot}) 45%, transparent)`,
 });
 
+type DragState = {
+  id: string;
+  mode: "move" | "resize";
+  dateISO: string;
+  startMinute: number;
+  endMinute: number;
+};
+
+type BeginDrag = (
+  event: React.PointerEvent,
+  block: CalendarBlock,
+  mode: "move" | "resize",
+) => void;
+
+/** Stable empties, so a day with nothing on it never looks "changed" to memo. */
+const NO_BLOCKS: CalendarBlock[] = [];
+const NO_BANDS: PrayerBand[] = [];
+
+/** How close to the scroller's edge a drag starts pulling the day along. */
+const AUTOSCROLL_EDGE_PX = 48;
+const AUTOSCROLL_MAX_PX = 24;
+
+function groupByDay(blocks: CalendarBlock[]): Map<string, CalendarBlock[]> {
+  const grouped = new Map<string, CalendarBlock[]>();
+  for (const block of blocks) {
+    const list = grouped.get(block.dateISO);
+    if (list) list.push(block);
+    else grouped.set(block.dateISO, [block]);
+  }
+  return grouped;
+}
+
 export function CalendarGrid({
   days,
   blocks,
   prayerBands,
   todayISO,
   anchorISO,
+  focusBlockId,
   onCreate,
   onEdit,
   onDropItem,
@@ -274,11 +311,10 @@ export function CalendarGrid({
   todayISO: string;
   /** The URL's selected date, also the initial day in the mobile week view. */
   anchorISO: string;
+  /** A block `/day` linked straight to: opened onto, and ringed for a moment. */
+  focusBlockId: string | null;
   /** A slot was clicked or dragged into a span: open the editor on it. */
-  onCreate: (
-    dateISO: string,
-    span: { startMinute: number; endMinute: number },
-  ) => void;
+  onCreate: (dateISO: string, span: Span) => void;
   onEdit: (block: CalendarBlock) => void;
   /** Something was dragged in from the panel and let go at `startMinute`. */
   onDropItem: (item: PlanDragItem, dateISO: string, startMinute: number) => void;
@@ -286,9 +322,15 @@ export function CalendarGrid({
   onDropOnBlock: (item: PlanDragItem, block: CalendarBlock) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
   const scrolledDayRef = useRef<string | null>(null);
   const selectedDay = days.find((day) => day.dateISO === anchorISO) ?? days[0];
   const nowMinute = useContext(NowContext);
+  // Read by handlers that must keep their identity across the 30-second tick.
+  const nowRef = useRef(nowMinute);
+  useEffect(() => {
+    nowRef.current = nowMinute;
+  }, [nowMinute]);
   const [, startTransition] = useTransition();
 
   // The optimistic layer is what makes dragging feel like moving an object
@@ -350,18 +392,52 @@ export function CalendarGrid({
     });
   });
 
-  const [drag, setDrag] = useState<{
-    id: string;
-    mode: "move" | "resize";
-    dateISO: string;
-    startMinute: number;
-    endMinute: number;
-  } | null>(null);
+  const [drag, setDrag] = useState<DragState | null>(null);
 
-  // The header strips track the optimistic layer too, so a block in motion
-  // is a strip in motion.
-  const blocksFor = (dateISO: string) =>
-    shown.filter((block) => block.dateISO === dateISO);
+  // One array per day, each keeping its identity until that day's blocks
+  // change — which is what lets a memoised column skip a render that is about
+  // some other day.
+  const byDay = useMemo(() => groupByDay(shown), [shown]);
+
+  // The same, with the block in flight where the pointer has it — on another
+  // day entirely, if that is where it has been carried. Only the day it left
+  // and the day it is over get a new array.
+  const arranged = useMemo(() => {
+    if (!drag) return byDay;
+    const dragged = shown.find((block) => block.id === drag.id);
+    if (!dragged) return byDay;
+
+    const moved = {
+      ...dragged,
+      dateISO: drag.dateISO,
+      startMinute: drag.startMinute,
+      endMinute: drag.endMinute,
+    };
+    const next = new Map(byDay);
+    const home = byDay.get(dragged.dateISO) ?? NO_BLOCKS;
+
+    if (dragged.dateISO === drag.dateISO) {
+      next.set(
+        drag.dateISO,
+        home.map((block) => (block.id === drag.id ? moved : block)),
+      );
+    } else {
+      next.set(
+        dragged.dateISO,
+        home.filter((block) => block.id !== drag.id),
+      );
+      next.set(drag.dateISO, [...(byDay.get(drag.dateISO) ?? NO_BLOCKS), moved]);
+    }
+    return next;
+  }, [byDay, shown, drag]);
+
+  // A block `/day` pointed at wears a ring just long enough to be found.
+  const [flashId, setFlashId] = useState(focusBlockId);
+  useEffect(() => {
+    if (flashId === null) return;
+    const timer = setTimeout(() => setFlashId(null), 2600);
+    return () => clearTimeout(timer);
+  }, [flashId]);
 
   // Open on the working day, not on midnight. Scrolling past eight empty hours
   // every time you open the calendar is a small tax you'd pay hundreds of times.
@@ -374,6 +450,16 @@ export function CalendarGrid({
     const container = scrollRef.current;
     if (!container) return;
     scrolledDayRef.current = selectedDay.dateISO;
+
+    // Arriving for one block beats every other rule: that block is why the
+    // page was opened.
+    const focused = focusBlockId
+      ? blocks.find((block) => block.id === focusBlockId)
+      : undefined;
+    if (focused) {
+      container.scrollTop = Math.max(0, (focused.startMinute - 60) * MINUTE_PX);
+      return;
+    }
 
     const desktopWeek = window.matchMedia("(min-width: 1024px)").matches && days.length > 1;
     if (selectedDay.dateISO === todayISO || (desktopWeek && days.some((day) => day.dateISO === todayISO))) {
@@ -390,29 +476,179 @@ export function CalendarGrid({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nowMinute, selectedDay.dateISO]);
 
-  const commit = (next: NonNullable<typeof drag>) => {
-    const span = clampSpan(next.startMinute, next.endMinute);
+  const commit = useCallback(
+    (next: DragState) => {
+      const span = clampSpan(next.startMinute, next.endMinute);
 
-    startTransition(async () => {
-      applyPatch({ kind: "move", id: next.id, dateISO: next.dateISO, ...span });
-      const formData = new FormData();
-      formData.set("id", next.id);
-      formData.set("date", next.dateISO);
-      formData.set("startMinute", String(span.startMinute));
-      formData.set("endMinute", String(span.endMinute));
-      await moveBlock(formData);
-    });
-  };
+      startTransition(async () => {
+        applyPatch({ kind: "move", id: next.id, dateISO: next.dateISO, ...span });
+        const formData = new FormData();
+        formData.set("id", next.id);
+        formData.set("date", next.dateISO);
+        formData.set("startMinute", String(span.startMinute));
+        formData.set("endMinute", String(span.endMinute));
+        await moveBlock(formData);
+      });
+    },
+    [applyPatch],
+  );
 
-  const toggleDone = (block: CalendarBlock) => {
-    startTransition(async () => {
-      applyPatch({ kind: "toggleBlock", id: block.id });
-      const formData = new FormData();
-      formData.set("id", block.id);
-      formData.set("done", String(block.completedAt === null));
-      await toggleBlockDone(formData);
-    });
-  };
+  /**
+   * Pick a block up.
+   *
+   * Lives here rather than in the column because a block can leave its column:
+   * carried sideways in week view it lands on another day, the way it does in
+   * Google's. The listeners sit on the window for the same reason — the chip
+   * that was pressed is unmounted the moment it changes columns, and would
+   * take its listeners with it.
+   *
+   * State only moves when the snapped position does. The pointer reports every
+   * frame; a block on a 15-minute grid has somewhere new to be far less often.
+   */
+  const beginDrag = useCallback<BeginDrag>(
+    (event, block, mode) => {
+      // A finger on a block is usually a scroll passing through. Touch gets the
+      // tap (the chip's own click) and the agenda below; dragging is a mouse's.
+      if (event.button !== 0 || event.pointerType === "touch") return;
+      const grid = gridRef.current;
+      const scroller = scrollRef.current;
+      if (!grid || !scroller) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      const minuteAt = (clientY: number) =>
+        snap((clientY - grid.getBoundingClientRect().top) / MINUTE_PX);
+
+      // Columns don't move sideways mid-drag, so their edges are read once.
+      // Hidden ones (the other six days on a phone) have no width and drop out.
+      const columns = Array.from(grid.querySelectorAll<HTMLElement>("[data-day]"))
+        .map((element) => ({
+          dateISO: element.dataset.day ?? "",
+          rect: element.getBoundingClientRect(),
+        }))
+        .filter((column) => column.rect.width > 0);
+      const dayAt = (clientX: number) =>
+        columns.find(
+          (column) => clientX >= column.rect.left && clientX < column.rect.right,
+        )?.dateISO;
+
+      const offset = minuteAt(event.clientY) - block.startMinute;
+      const length = spanMinutes(block);
+      const origin: DragState = {
+        id: block.id,
+        mode,
+        dateISO: block.dateISO,
+        startMinute: block.startMinute,
+        endMinute: block.endMinute,
+      };
+
+      let latest = origin;
+      let pointer = { x: event.clientX, y: event.clientY };
+      let frame = 0;
+      setDrag(origin);
+
+      const update = () => {
+        const minute = minuteAt(pointer.y);
+        let next: DragState;
+        if (mode === "move") {
+          const start = Math.max(
+            0,
+            Math.min(minute - offset, MINUTES_PER_DAY - length),
+          );
+          next = {
+            ...latest,
+            dateISO: dayAt(pointer.x) ?? latest.dateISO,
+            startMinute: start,
+            endMinute: start + length,
+          };
+        } else {
+          next = {
+            ...latest,
+            endMinute: Math.min(
+              MINUTES_PER_DAY,
+              Math.max(block.startMinute + SNAP_MINUTES, minute),
+            ),
+          };
+        }
+        if (
+          next.dateISO === latest.dateISO &&
+          next.startMinute === latest.startMinute &&
+          next.endMinute === latest.endMinute
+        ) {
+          return;
+        }
+        latest = next;
+        setDrag(next);
+      };
+
+      // Held near the top or bottom edge, the day scrolls under the block —
+      // otherwise 9am to 5pm is further than one screen can be dragged.
+      const autoscroll = () => {
+        const bounds = scroller.getBoundingClientRect();
+        const above = bounds.top + AUTOSCROLL_EDGE_PX - pointer.y;
+        const below = pointer.y - (bounds.bottom - AUTOSCROLL_EDGE_PX);
+        const push = above > 0 ? -above : below > 0 ? below : 0;
+        if (push !== 0) {
+          scroller.scrollTop += Math.max(
+            -AUTOSCROLL_MAX_PX,
+            Math.min(AUTOSCROLL_MAX_PX, push / 3),
+          );
+          update();
+        }
+        frame = requestAnimationFrame(autoscroll);
+      };
+
+      const finish = (keep: boolean) => {
+        cancelAnimationFrame(frame);
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        window.removeEventListener("pointercancel", onCancel);
+        window.removeEventListener("keydown", onKey);
+        setDrag(null);
+        if (!keep) return;
+
+        const moved =
+          latest.dateISO !== origin.dateISO ||
+          latest.startMinute !== origin.startMinute ||
+          latest.endMinute !== origin.endMinute;
+        // A click that never moved is a click, not a drag — don't write a no-op.
+        if (moved) commit(latest);
+        else if (mode === "move") onEdit(block);
+      };
+
+      const onMove = (moveEvent: PointerEvent) => {
+        pointer = { x: moveEvent.clientX, y: moveEvent.clientY };
+        update();
+        if (frame === 0) frame = requestAnimationFrame(autoscroll);
+      };
+      const onUp = () => finish(true);
+      const onCancel = () => finish(false);
+      // Escape puts it back, the way it does everywhere else you drag things.
+      const onKey = (keyEvent: KeyboardEvent) => {
+        if (keyEvent.key === "Escape") finish(false);
+      };
+
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointercancel", onCancel);
+      window.addEventListener("keydown", onKey);
+    },
+    [commit, onEdit],
+  );
+
+  const toggleDone = useCallback(
+    (block: CalendarBlock) => {
+      startTransition(async () => {
+        applyPatch({ kind: "toggleBlock", id: block.id });
+        const formData = new FormData();
+        formData.set("id", block.id);
+        formData.set("done", String(block.completedAt === null));
+        await toggleBlockDone(formData);
+      });
+    },
+    [applyPatch],
+  );
 
   /**
    * One line inside a block.
@@ -421,44 +657,53 @@ export function CalendarGrid({
    * itself is untouched. Same rule as the block's own tick: a plan is not the
    * thing, and `toggleBlockDone` would not have it any other way.
    */
-  const toggleTask = (block: CalendarBlock, taskId: string) => {
-    const done = block.tasks.find((task) => task.id === taskId)?.doneAt === null;
-    const beatIndex = liveBeatIndex(block, todayISO, nowMinute);
-    startTransition(async () => {
-      applyPatch({ kind: "toggleTask", blockId: block.id, taskId, beatIndex });
-      const formData = new FormData();
-      formData.set("blockId", block.id);
-      formData.set("taskId", taskId);
-      formData.set("done", String(done));
-      await toggleBlockTask(formData);
-    });
-  };
+  const toggleTask = useCallback(
+    (block: CalendarBlock, taskId: string) => {
+      const done = block.tasks.find((task) => task.id === taskId)?.doneAt === null;
+      const beatIndex = liveBeatIndex(block, todayISO, nowRef.current);
+      startTransition(async () => {
+        applyPatch({ kind: "toggleTask", blockId: block.id, taskId, beatIndex });
+        const formData = new FormData();
+        formData.set("blockId", block.id);
+        formData.set("taskId", taskId);
+        formData.set("done", String(done));
+        await toggleBlockTask(formData);
+      });
+    },
+    [applyPatch, todayISO],
+  );
 
   /** One interval of an interval block, tapped by hand. Either direction. */
-  const toggleBeat = (block: CalendarBlock, index: number) => {
-    const done = !block.beats.some((beat) => beat.index === index);
-    startTransition(async () => {
-      applyPatch({ kind: "toggleBeat", blockId: block.id, index });
-      const formData = new FormData();
-      formData.set("blockId", block.id);
-      formData.set("index", String(index));
-      formData.set("done", String(done));
-      await toggleBlockBeat(formData);
-    });
-  };
+  const toggleBeat = useCallback(
+    (block: CalendarBlock, index: number) => {
+      const done = !block.beats.some((beat) => beat.index === index);
+      startTransition(async () => {
+        applyPatch({ kind: "toggleBeat", blockId: block.id, index });
+        const formData = new FormData();
+        formData.set("blockId", block.id);
+        formData.set("index", String(index));
+        formData.set("done", String(done));
+        await toggleBlockBeat(formData);
+      });
+    },
+    [applyPatch],
+  );
 
   /**
    * "Not today." Drops the cue block for this one day only — the habit stays put
    * and its definition is untouched, so tomorrow's plan still brings the cue.
    */
-  const dropCue = (block: CalendarBlock) => {
-    startTransition(async () => {
-      applyPatch({ kind: "remove", id: block.id });
-      const formData = new FormData();
-      formData.set("id", block.id);
-      await deleteBlock(formData);
-    });
-  };
+  const dropCue = useCallback(
+    (block: CalendarBlock) => {
+      startTransition(async () => {
+        applyPatch({ kind: "remove", id: block.id });
+        const formData = new FormData();
+        formData.set("id", block.id);
+        await deleteBlock(formData);
+      });
+    },
+    [applyPatch],
+  );
 
   return (
     <div className="min-w-0 space-y-5">
@@ -496,62 +741,88 @@ export function CalendarGrid({
         className="border-border bg-card/80 grid grid-cols-[3.5rem_minmax(0,1fr)] border-b backdrop-blur lg:[grid-template-columns:var(--calendar-columns)]"
       >
         <div aria-hidden />
-        {days.map((day, index) => (
-          <div
-            key={day.dateISO}
-            className={cn(
-              "border-border/40 border-l px-2 pt-3 pb-2 text-center",
-              day.dateISO !== selectedDay.dateISO && "hidden lg:block",
-              day.isToday && "bg-accent/40",
-            )}
-          >
-            <p
-              className={cn(
-                "text-label font-medium",
-                day.isToday
-                  ? "text-accent-foreground"
-                  : isWeekend(day.dateISO)
-                    ? "text-muted-foreground/70"
-                    : "text-muted-foreground",
-              )}
-            >
-              {day.weekday}
-            </p>
-            <p className="mt-0.5 flex justify-center">
+        {days.map((day, index) => {
+          const heading = (
+            <>
               <span
                 className={cn(
-                  "tabular-nums",
+                  "block text-label font-medium",
                   day.isToday
-                    ? "bg-primary text-primary-foreground grid size-7 place-items-center rounded-full text-label font-medium"
-                    : cn(
-                        "text-title",
-                        isWeekend(day.dateISO) && "text-muted-foreground",
-                      ),
+                    ? "text-accent-foreground"
+                    : isWeekend(day.dateISO)
+                      ? "text-muted-foreground/70"
+                      : "text-muted-foreground",
                 )}
               >
-              {dayNumber(day.dateISO)}
+                {day.weekday}
               </span>
-            </p>
-            {day.isToday && <p className="mt-1 text-xs text-accent-foreground">Today</p>}
-            <DayStrip
-              blocks={blocksFor(day.dateISO)}
-              isToday={day.dateISO === todayISO}
-              index={index}
-            />
-            <PrayerTimes
-              bands={prayerBands[day.dateISO] ?? []}
-              isToday={day.dateISO === todayISO}
-              dayLabel={`${day.weekday}, ${day.label}`}
-            />
-          </div>
-        ))}
+              <span className="mt-0.5 flex justify-center">
+                <span
+                  className={cn(
+                    "tabular-nums",
+                    day.isToday
+                      ? "bg-primary text-primary-foreground grid size-7 place-items-center rounded-full text-label font-medium"
+                      : cn(
+                          "text-title",
+                          isWeekend(day.dateISO) && "text-muted-foreground",
+                        ),
+                  )}
+                >
+                  {dayNumber(day.dateISO)}
+                </span>
+              </span>
+            </>
+          );
+
+          return (
+            <div
+              key={day.dateISO}
+              className={cn(
+                "border-border/40 border-l px-2 pt-3 pb-2 text-center",
+                day.dateISO !== selectedDay.dateISO && "hidden lg:block",
+                day.isToday && "bg-accent/40",
+              )}
+            >
+              {days.length > 1 ? (
+                // In a week, a day's heading opens that day — Google's rule,
+                // and the shortest way from "which day?" to planning it.
+                <Link
+                  href={`/calendar?view=day&date=${day.dateISO}`}
+                  prefetch={false}
+                  aria-label={`Open ${day.weekday}, ${day.label}`}
+                  className="focus-visible:ring-ring hover:bg-accent/60 mx-auto block w-fit rounded-[10px] px-2 py-0.5 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                >
+                  {heading}
+                </Link>
+              ) : (
+                <div>{heading}</div>
+              )}
+              {day.isToday && <p className="mt-1 text-xs text-accent-foreground">Today</p>}
+              {/* Reads the arranged day, so a block in motion is a strip
+                  in motion. */}
+              <DayStrip
+                blocks={arranged.get(day.dateISO) ?? NO_BLOCKS}
+                isToday={day.dateISO === todayISO}
+                index={index}
+              />
+              <PrayerTimes
+                bands={prayerBands[day.dateISO] ?? NO_BANDS}
+                isToday={day.dateISO === todayISO}
+                dayLabel={`${day.weekday}, ${day.label}`}
+              />
+            </div>
+          );
+        })}
       </div>
 
+      {/* Tall enough to fill the screen under the page header, the way a
+          calendar should — the day is the page, not a window onto it. */}
       <div
         ref={scrollRef}
-        className="max-h-[min(68dvh,780px)] overflow-y-auto overscroll-contain"
+        className="max-h-[max(420px,calc(100dvh-18rem))] overflow-y-auto overscroll-contain"
       >
         <div
+          ref={gridRef}
           className="relative grid grid-cols-[3.5rem_minmax(0,1fr)] lg:[grid-template-columns:var(--calendar-columns)]"
           style={{
             height: MINUTES_PER_DAY * MINUTE_PX,
@@ -563,15 +834,15 @@ export function CalendarGrid({
             <DayColumn
               key={day.dateISO}
               day={day}
-              blocks={shown.filter((block) => block.dateISO === day.dateISO)}
-              prayerBands={prayerBands[day.dateISO] ?? []}
+              blocks={arranged.get(day.dateISO) ?? NO_BLOCKS}
+              prayerBands={prayerBands[day.dateISO] ?? NO_BANDS}
               isToday={day.dateISO === todayISO}
               relation={dayRelation(day.dateISO, todayISO)}
               dayView={days.length === 1}
               selected={day.dateISO === selectedDay.dateISO}
-              drag={drag}
-              setDrag={setDrag}
-              commit={commit}
+              draggingId={drag && drag.dateISO === day.dateISO ? drag.id : null}
+              flashId={flashId}
+              onBeginDrag={beginDrag}
               onCreate={onCreate}
               onEdit={onEdit}
               onToggleDone={toggleDone}
@@ -588,7 +859,7 @@ export function CalendarGrid({
 
       <SelectedDayAgenda
         day={selectedDay}
-        blocks={blocksFor(selectedDay.dateISO)}
+        blocks={byDay.get(selectedDay.dateISO) ?? NO_BLOCKS}
         relation={dayRelation(selectedDay.dateISO, todayISO)}
         onCreate={onCreate}
         onEdit={onEdit}
@@ -617,7 +888,7 @@ const KIND_LABELS: Record<CalendarBlock["kind"], string> = {
 };
 
 /** A readable, full-size alternative to manipulating small timed blocks. */
-function SelectedDayAgenda({
+const SelectedDayAgenda = memo(function SelectedDayAgenda({
   day,
   blocks,
   relation,
@@ -746,7 +1017,7 @@ function SelectedDayAgenda({
       )}
     </section>
   );
-}
+});
 
 type DayRelation = ReturnType<typeof dayRelation>;
 
@@ -865,7 +1136,7 @@ function BeatRail({
  * Decorative on purpose: the grid underneath carries the real data, so the
  * strips are aria-hidden.
  */
-function DayStrip({
+const DayStrip = memo(function DayStrip({
   blocks,
   isToday,
   index,
@@ -936,7 +1207,7 @@ function DayStrip({
       )}
     </div>
   );
-}
+});
 
 /**
  * The day's busy time as segments, overlaps merged, coloured by the kind of
@@ -989,270 +1260,15 @@ function HourGutter() {
   );
 }
 
-function DayColumn({
-  day,
-  blocks,
-  prayerBands,
-  isToday,
-  relation,
-  dayView,
-  selected,
-  drag,
-  setDrag,
-  commit,
-  onCreate,
-  onEdit,
-  onToggleDone,
-  onToggleTask,
-  onToggleBeat,
-  onDropCue,
-  onDropItem,
-  onDropOnBlock,
-}: {
-  day: GridDay;
-  blocks: CalendarBlock[];
-  prayerBands: PrayerBand[];
-  isToday: boolean;
-  relation: DayRelation;
-  onToggleBeat: (block: CalendarBlock, index: number) => void;
-  /** The grid is showing exactly one day — the invitation may speak. */
-  dayView: boolean;
-  selected: boolean;
-  drag: {
-    id: string;
-    mode: "move" | "resize";
-    dateISO: string;
-    startMinute: number;
-    endMinute: number;
-  } | null;
-  setDrag: (
-    next: {
-      id: string;
-      mode: "move" | "resize";
-      dateISO: string;
-      startMinute: number;
-      endMinute: number;
-    } | null,
-  ) => void;
-  commit: (next: {
-    id: string;
-    mode: "move" | "resize";
-    dateISO: string;
-    startMinute: number;
-    endMinute: number;
-  }) => void;
-  onCreate: (
-    dateISO: string,
-    span: { startMinute: number; endMinute: number },
-  ) => void;
-  onEdit: (block: CalendarBlock) => void;
-  onToggleDone: (block: CalendarBlock) => void;
-  onToggleTask: (block: CalendarBlock, taskId: string) => void;
-  onDropCue: (block: CalendarBlock) => void;
-  onDropItem: (item: PlanDragItem, dateISO: string, startMinute: number) => void;
-  onDropOnBlock: (item: PlanDragItem, block: CalendarBlock) => void;
-}) {
-  const columnRef = useRef<HTMLDivElement>(null);
-
-  // Where a dragged-in item would land, in minutes. Null when nothing of ours
-  // is over this column.
-  const [dropMinute, setDropMinute] = useState<number | null>(null);
-
-  // Press-and-drag to create: the live span while the pointer is down on an
-  // empty slot. Released without a drag, the slot just clicks.
-  const [creating, setCreating] = useState<{
-    startMinute: number;
-    endMinute: number;
-  } | null>(null);
-  /** The click that follows a real drag must not also create. */
-  const skipNextClickRef = useRef(false);
-
-  /** Where in the day a pointer is, in minutes. */
-  const minuteAt = (clientY: number): number => {
-    const rect = columnRef.current?.getBoundingClientRect();
-    if (!rect) return 0;
-    return snap((clientY - rect.top) / MINUTE_PX);
-  };
-
 /**
- * Google's gesture: press an empty slot and drag down to claim exactly the
- * stretch you dragged, rather than asking for a length afterwards. A plain
- * press that never moves is a click, and clicks still open the editor with
- * the default length — nothing is lost by dragging.
+ * Everything in a column that never changes: the hour lines and the dimmed
+ * hours outside the waking window. Memoised with no props, so a drag — which
+ * re-renders the column it passes through on every snapped step — never
+ * touches these fifty nodes again.
  */
-  const beginCreateDrag = (event: React.PointerEvent, minute: number) => {
-    const element = event.currentTarget as HTMLElement;
-    element.setPointerCapture(event.pointerId);
-
-    let latest: { startMinute: number; endMinute: number } | null = null;
-    setCreating({ startMinute: minute, endMinute: minute });
-
-    const onMove = (moveEvent: PointerEvent) => {
-      const current = minuteAt(moveEvent.clientY);
-      latest = {
-        startMinute: Math.min(minute, current),
-        endMinute: Math.max(minute, current),
-      };
-      setCreating(latest);
-    };
-
-    const onUp = () => {
-      element.releasePointerCapture(event.pointerId);
-      element.removeEventListener("pointermove", onMove);
-      element.removeEventListener("pointerup", onUp);
-      element.removeEventListener("pointercancel", onUp);
-      setCreating(null);
-      if (
-        latest &&
-        latest.endMinute - latest.startMinute >= MIN_BLOCK_MINUTES
-      ) {
-        // The trailing click would otherwise create a second, 1-hour block.
-        skipNextClickRef.current = true;
-        onCreate(day.dateISO, latest);
-      }
-    };
-
-    element.addEventListener("pointermove", onMove);
-    element.addEventListener("pointerup", onUp);
-    element.addEventListener("pointercancel", onUp);
-  };
-
-  const beginDrag = (
-    event: React.PointerEvent,
-    block: CalendarBlock,
-    mode: "move" | "resize",
-  ) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    const element = event.currentTarget as HTMLElement;
-    element.setPointerCapture(event.pointerId);
-
-    const grabbedAt = minuteAt(event.clientY);
-    const offset = grabbedAt - block.startMinute;
-    const length = spanMinutes(block);
-
-    let latest = {
-      id: block.id,
-      mode,
-      dateISO: day.dateISO,
-      startMinute: block.startMinute,
-      endMinute: block.endMinute,
-    };
-    setDrag(latest);
-
-    const onMove = (moveEvent: PointerEvent) => {
-      const minute = minuteAt(moveEvent.clientY);
-      latest =
-        mode === "move"
-          ? {
-              ...latest,
-              startMinute: Math.max(0, minute - offset),
-              endMinute: Math.max(0, minute - offset) + length,
-            }
-          : { ...latest, endMinute: Math.max(block.startMinute + SNAP_MINUTES, minute) };
-      setDrag(latest);
-    };
-
-    const onUp = () => {
-      element.releasePointerCapture(event.pointerId);
-      element.removeEventListener("pointermove", onMove);
-      element.removeEventListener("pointerup", onUp);
-      element.removeEventListener("pointercancel", onUp);
-      setDrag(null);
-      // A click that never moved is a click, not a drag — don't write a no-op.
-      if (
-        latest.startMinute !== block.startMinute ||
-        latest.endMinute !== block.endMinute
-      ) {
-        commit(latest);
-      } else if (mode === "move") {
-        onEdit(block);
-      }
-    };
-
-    element.addEventListener("pointermove", onMove);
-    element.addEventListener("pointerup", onUp);
-    element.addEventListener("pointercancel", onUp);
-  };
-
-  // The dragged block's live position, so everything downstream describes the
-  // day as it is being arranged rather than as it was a moment ago.
-  const positioned = blocks.map((block) =>
-    drag && drag.id === block.id
-      ? { ...block, startMinute: drag.startMinute, endMinute: drag.endMinute }
-      : block,
-  );
-
-  const laid = layoutColumns(positioned);
-
-  /**
-   * The block the pointer is currently over, if any.
-   *
-   * A drop on empty grid makes a new block; a drop *on* a block adds to it.
-   * Without this the two gestures are indistinguishable, and the only way to
-   * put a third task into a two-hour stretch would be to open the editor and
-   * hunt for it — which is exactly the friction the grouping is supposed to
-   * remove.
-   */
-  const dropBlock =
-    dropMinute === null
-      ? null
-      : (positioned.find(
-          (block) =>
-            dropMinute >= block.startMinute && dropMinute < block.endMinute,
-        ) ?? null);
-
-  // Recomputed mid-drag on purpose: watching the gap close as you drag is the
-  // point. Told after the fact, you have already made the plan that fails.
-  const transitions = transitionsForDay(
-    positioned.map((block) => ({
-      id: block.id,
-      title: block.title,
-      startMinute: block.startMinute,
-      endMinute: block.endMinute,
-      cueForId: block.cueForId,
-      hasCue: block.hasCue,
-    })),
-  );
-
+const ColumnBackdrop = memo(function ColumnBackdrop() {
   return (
-    <div
-      ref={columnRef}
-      className={cn(
-        "border-border/40 relative border-l",
-        !selected && "hidden lg:block",
-        day.isToday && "bg-accent/30 ring-primary/15 ring-1 ring-inset",
-      )}
-      onDragOver={(event) => {
-        if (!isPlanItemDrag(event.dataTransfer)) return;
-        // Without this the browser treats the column as a non-drop zone and
-        // shows the "no entry" cursor.
-        event.preventDefault();
-        event.dataTransfer.dropEffect = "copy";
-        setDropMinute(minuteAt(event.clientY));
-      }}
-      onDragLeave={(event) => {
-        // Fires when crossing onto a child too; ignore those, or the preview
-        // strobes as the pointer moves over each half-hour target.
-        if (event.currentTarget.contains(event.relatedTarget as Node | null)) {
-          return;
-        }
-        setDropMinute(null);
-      }}
-      onDrop={(event) => {
-        const item = readPlanItem(event.dataTransfer);
-        const target = dropBlock;
-        setDropMinute(null);
-        if (!item) return;
-        event.preventDefault();
-        if (target) {
-          onDropOnBlock(item, target);
-          return;
-        }
-        onDropItem(item, day.dateISO, minuteAt(event.clientY));
-      }}
-    >
+    <>
       {/* Hour lines. Half-hours are lighter, so the grid reads as hours first. */}
       {Array.from({ length: 48 }, (_, half) => (
         <div
@@ -1283,32 +1299,144 @@ function DayColumn({
           height: (MINUTES_PER_DAY - STRIP_TO) * MINUTE_PX,
         }}
       />
+    </>
+  );
+});
 
-      {/* Click targets, one per quarter hour. A div with an onClick would
-          swallow block clicks; these sit underneath, at z-0. The dashed inset
-          outline on hover is the affordance — a clickable slot announces
-          itself, so no instructions are needed. Pressing and dragging claims
-          the dragged stretch; pressing without moving opens the editor with
-          the default length. */}
+/**
+ * Click targets, one per quarter hour. The dashed inset outline on hover is
+ * the affordance — a clickable slot announces itself, so no instructions are
+ * needed.
+ *
+ * Ninety-six buttons a day, six hundred and seventy-two a week: static, and
+ * memoised so they render once. They carry no handlers of their own — the
+ * layer around them listens once and reads `data-slot`.
+ */
+const SlotButtons = memo(function SlotButtons({ dayLabel }: { dayLabel: string }) {
+  return (
+    <>
       {Array.from({ length: MINUTES_PER_DAY / SNAP_MINUTES }, (_, slot) => (
         <button
           key={slot}
           type="button"
-          aria-label={`Block out ${formatMinuteOfDay(slot * SNAP_MINUTES)} on ${day.label}`}
-          onPointerDown={(event) => beginCreateDrag(event, slot * SNAP_MINUTES)}
-          onClick={() => {
-            if (skipNextClickRef.current) {
-              skipNextClickRef.current = false;
-              return;
-            }
-            // Keyboard and plain mouse presses both land here: create with the
-            // default length at this slot.
-            onCreate(day.dateISO, spanOfLength(slot * SNAP_MINUTES, PLAN_DEFAULT_MINUTES));
-          }}
+          data-slot={slot}
+          aria-label={`Block out ${formatMinuteOfDay(slot * SNAP_MINUTES)} on ${dayLabel}`}
           className="hover:bg-primary/5 focus-visible:bg-primary/10 focus-visible:ring-ring after:border-primary/30 absolute inset-x-0 after:absolute after:inset-x-1 after:inset-y-0.5 after:rounded-md after:border after:border-dashed after:opacity-0 after:transition-opacity hover:after:opacity-100 focus-visible:after:opacity-100 focus-visible:ring-1 focus-visible:outline-none"
           style={{ top: slot * SNAP_MINUTES * MINUTE_PX, height: SNAP_MINUTES * MINUTE_PX }}
         />
       ))}
+    </>
+  );
+});
+
+/**
+ * The empty grid, as something you can press.
+ *
+ * Google's gesture: press an empty slot and drag down to claim exactly the
+ * stretch you dragged, rather than asking for a length afterwards. A plain
+ * press that never moves is a click, and clicks still open the editor with
+ * the default length — nothing is lost by dragging.
+ *
+ * Owns the live span itself, so dragging one out re-renders this layer's
+ * preview and nothing else: not the buttons, not the blocks, not the column.
+ */
+const SlotLayer = memo(function SlotLayer({
+  dateISO,
+  dayLabel,
+  onCreate,
+}: {
+  dateISO: string;
+  dayLabel: string;
+  onCreate: (dateISO: string, span: Span) => void;
+}) {
+  const layerRef = useRef<HTMLDivElement>(null);
+  const [creating, setCreating] = useState<Span | null>(null);
+  /** The click that follows a real drag must not also create. */
+  const skipNextClickRef = useRef(false);
+
+  const slotMinute = (target: EventTarget): number | null => {
+    const raw = (target as HTMLElement).dataset?.slot;
+    return raw === undefined ? null : Number(raw) * SNAP_MINUTES;
+  };
+
+  const beginCreateDrag = (event: React.PointerEvent) => {
+    skipNextClickRef.current = false;
+    const minute = slotMinute(event.target);
+    // A finger on the grid is scrolling it. Touch gets the tap — the click
+    // below — and never the drag, or every scroll would open the editor.
+    if (minute === null || event.button !== 0 || event.pointerType === "touch") {
+      return;
+    }
+
+    const element = event.target as HTMLElement;
+    const pointerId = event.pointerId;
+    element.setPointerCapture(pointerId);
+
+    let latest: Span = { startMinute: minute, endMinute: minute };
+    setCreating(latest);
+
+    const onMove = (moveEvent: PointerEvent) => {
+      const rect = layerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const current = Math.min(
+        MINUTES_PER_DAY,
+        Math.max(0, snap((moveEvent.clientY - rect.top) / MINUTE_PX)),
+      );
+      const next = {
+        startMinute: Math.min(minute, current),
+        endMinute: Math.max(minute, current),
+      };
+      // The pointer moves every frame; the span only moves every 15 minutes.
+      if (
+        next.startMinute === latest.startMinute &&
+        next.endMinute === latest.endMinute
+      ) {
+        return;
+      }
+      latest = next;
+      setCreating(next);
+    };
+
+    const finish = (create: boolean) => {
+      if (element.hasPointerCapture(pointerId)) {
+        element.releasePointerCapture(pointerId);
+      }
+      element.removeEventListener("pointermove", onMove);
+      element.removeEventListener("pointerup", onUp);
+      element.removeEventListener("pointercancel", onCancel);
+      setCreating(null);
+      if (create && latest.endMinute - latest.startMinute >= MIN_BLOCK_MINUTES) {
+        // The trailing click would otherwise create a second block.
+        skipNextClickRef.current = true;
+        onCreate(dateISO, latest);
+      }
+    };
+    const onUp = () => finish(true);
+    const onCancel = () => finish(false);
+
+    element.addEventListener("pointermove", onMove);
+    element.addEventListener("pointerup", onUp);
+    element.addEventListener("pointercancel", onCancel);
+  };
+
+  return (
+    <div
+      ref={layerRef}
+      className="absolute inset-0"
+      onPointerDown={beginCreateDrag}
+      onClick={(event) => {
+        const minute = slotMinute(event.target);
+        if (minute === null) return;
+        if (skipNextClickRef.current) {
+          skipNextClickRef.current = false;
+          return;
+        }
+        // Keyboard, touch and plain mouse presses all land here: create with
+        // the default length at this slot.
+        onCreate(dateISO, spanOfLength(minute, PLAN_DEFAULT_MINUTES));
+      }}
+    >
+      <SlotButtons dayLabel={dayLabel} />
 
       {/* The live span while pressing-and-dragging to create. */}
       {creating && (
@@ -1329,6 +1457,154 @@ function DayColumn({
           </p>
         </div>
       )}
+    </div>
+  );
+});
+
+/**
+ * One day of the grid.
+ *
+ * Memoised, and handed only what belongs to it: its own blocks (already
+ * carrying a drag in flight), and handlers that keep their identity. Dragging
+ * a block down Tuesday re-renders Tuesday; the other six columns sit still.
+ */
+const DayColumn = memo(function DayColumn({
+  day,
+  blocks,
+  prayerBands,
+  isToday,
+  relation,
+  dayView,
+  selected,
+  draggingId,
+  flashId,
+  onBeginDrag,
+  onCreate,
+  onEdit,
+  onToggleDone,
+  onToggleTask,
+  onToggleBeat,
+  onDropCue,
+  onDropItem,
+  onDropOnBlock,
+}: {
+  day: GridDay;
+  /** The day's blocks as they are being arranged — a drag already applied. */
+  blocks: CalendarBlock[];
+  prayerBands: PrayerBand[];
+  isToday: boolean;
+  relation: DayRelation;
+  /** The grid is showing exactly one day — the invitation may speak. */
+  dayView: boolean;
+  selected: boolean;
+  /** The block being dragged, when it is currently over this column. */
+  draggingId: string | null;
+  /** A block another page pointed at; it wears a ring for a moment. */
+  flashId: string | null;
+  onBeginDrag: BeginDrag;
+  onCreate: (dateISO: string, span: Span) => void;
+  onEdit: (block: CalendarBlock) => void;
+  onToggleDone: (block: CalendarBlock) => void;
+  onToggleTask: (block: CalendarBlock, taskId: string) => void;
+  onToggleBeat: (block: CalendarBlock, index: number) => void;
+  onDropCue: (block: CalendarBlock) => void;
+  onDropItem: (item: PlanDragItem, dateISO: string, startMinute: number) => void;
+  onDropOnBlock: (item: PlanDragItem, block: CalendarBlock) => void;
+}) {
+  const columnRef = useRef<HTMLDivElement>(null);
+
+  // Where a dragged-in item would land, in minutes. Null when nothing of ours
+  // is over this column.
+  const [dropMinute, setDropMinute] = useState<number | null>(null);
+
+  /** Where in the day a pointer is, in minutes. */
+  const minuteAt = (clientY: number): number => {
+    const rect = columnRef.current?.getBoundingClientRect();
+    if (!rect) return 0;
+    return snap((clientY - rect.top) / MINUTE_PX);
+  };
+
+  const laid = useMemo(() => layoutColumns(blocks), [blocks]);
+
+  /**
+   * The block the pointer is currently over, if any.
+   *
+   * A drop on empty grid makes a new block; a drop *on* a block adds to it.
+   * Without this the two gestures are indistinguishable, and the only way to
+   * put a third task into a two-hour stretch would be to open the editor and
+   * hunt for it — which is exactly the friction the grouping is supposed to
+   * remove.
+   */
+  const dropBlock =
+    dropMinute === null
+      ? null
+      : (blocks.find(
+          (block) =>
+            dropMinute >= block.startMinute && dropMinute < block.endMinute,
+        ) ?? null);
+
+  // Recomputed mid-drag on purpose: watching the gap close as you drag is the
+  // point. Told after the fact, you have already made the plan that fails.
+  const transitions = useMemo(
+    () =>
+      transitionsForDay(
+        blocks.map((block) => ({
+          id: block.id,
+          title: block.title,
+          startMinute: block.startMinute,
+          endMinute: block.endMinute,
+          cueForId: block.cueForId,
+          hasCue: block.hasCue,
+        })),
+      ),
+    [blocks],
+  );
+
+  return (
+    <div
+      ref={columnRef}
+      data-day={day.dateISO}
+      className={cn(
+        "border-border/40 relative border-l",
+        !selected && "hidden lg:block",
+        day.isToday && "bg-accent/30 ring-primary/15 ring-1 ring-inset",
+      )}
+      onDragOver={(event) => {
+        if (!isPlanItemDrag(event.dataTransfer)) return;
+        // Without this the browser treats the column as a non-drop zone and
+        // shows the "no entry" cursor.
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+        // `dragover` fires continuously; the preview only moves per snap.
+        const minute = minuteAt(event.clientY);
+        if (minute !== dropMinute) setDropMinute(minute);
+      }}
+      onDragLeave={(event) => {
+        // Fires when crossing onto a child too; ignore those, or the preview
+        // strobes as the pointer moves over each half-hour target.
+        if (event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          return;
+        }
+        setDropMinute(null);
+      }}
+      onDrop={(event) => {
+        const item = readPlanItem(event.dataTransfer);
+        const target = dropBlock;
+        setDropMinute(null);
+        if (!item) return;
+        event.preventDefault();
+        if (target) {
+          onDropOnBlock(item, target);
+          return;
+        }
+        onDropItem(item, day.dateISO, minuteAt(event.clientY));
+      }}
+    >
+      <ColumnBackdrop />
+
+      {/* Under everything else, at z-0: a div with an onClick over the whole
+          column would swallow block clicks. */}
+      <SlotLayer dateISO={day.dateISO} dayLabel={day.label} onCreate={onCreate} />
 
       {isToday && (
         <NowPosition>
@@ -1357,7 +1633,7 @@ function DayColumn({
           header sentence names the fact; this names the gesture. Drawn in the
           middle of the waking window and pointer-safe, so every slot under it
           stays clickable. */}
-      {dayView && positioned.length === 0 && (
+      {dayView && blocks.length === 0 && (
         <div
           aria-hidden
           className="border-border pointer-events-none absolute inset-x-4 rounded-xl border border-dashed px-6 py-5 text-center"
@@ -1391,7 +1667,7 @@ function DayColumn({
               // stop trusting.
               crowded={abutsNeighbour(
                 { startMinute: dropMinute, endMinute: dropMinute + minutes },
-                positioned,
+                blocks,
               )}
             />
           );
@@ -1417,21 +1693,22 @@ function DayColumn({
           block={block}
           column={column}
           columns={columns}
-          dragging={drag?.id === block.id}
+          dragging={draggingId === block.id}
           /** The drop would land *in* this block rather than beside it. */
           receiving={dropBlock?.id === block.id}
-          onPointerDown={(event, mode) => beginDrag(event, block, mode)}
-          onToggleDone={() => onToggleDone(block)}
-          onToggleTask={(taskId) => onToggleTask(block, taskId)}
+          flash={flashId === block.id}
           relation={relation}
-          onToggleBeat={(index) => onToggleBeat(block, index)}
-          onDropCue={() => onDropCue(block)}
-          onEdit={() => onEdit(block)}
+          onBeginDrag={onBeginDrag}
+          onToggleDone={onToggleDone}
+          onToggleTask={onToggleTask}
+          onToggleBeat={onToggleBeat}
+          onDropCue={onDropCue}
+          onEdit={onEdit}
         />
       ))}
     </div>
   );
-}
+});
 
 function DropPreview({
   startMinute,
@@ -1635,34 +1912,52 @@ function BlockTaskRow({
   );
 }
 
-function BlockChip({
+/**
+ * Memoised, and handed the block itself plus handlers that take it — so a
+ * column re-rendering around a drag redraws the one chip that is moving and
+ * leaves its neighbours alone.
+ */
+const BlockChip = memo(function BlockChip({
   block,
   column,
   columns,
   dragging,
   receiving,
-  onPointerDown,
-  onToggleDone,
-  onToggleTask,
+  flash,
+  onBeginDrag,
+  onToggleDone: toggleDone,
+  onToggleTask: toggleTask,
   relation,
-  onToggleBeat,
-  onDropCue,
-  onEdit,
+  onToggleBeat: toggleBeat,
+  onDropCue: dropCue,
+  onEdit: edit,
 }: {
   block: CalendarBlock;
   relation: DayRelation;
-  onToggleBeat: (index: number) => void;
+  onToggleBeat: (block: CalendarBlock, index: number) => void;
   column: number;
   columns: number;
   dragging: boolean;
   /** A dragged task is hovering this block: dropping adds it here. */
   receiving: boolean;
-  onPointerDown: (event: React.PointerEvent, mode: "move" | "resize") => void;
-  onToggleDone: () => void;
-  onToggleTask: (taskId: string) => void;
-  onDropCue: () => void;
-  onEdit: () => void;
+  /** Another page linked straight here: ringed until it has been seen. */
+  flash: boolean;
+  onBeginDrag: BeginDrag;
+  onToggleDone: (block: CalendarBlock) => void;
+  onToggleTask: (block: CalendarBlock, taskId: string) => void;
+  onDropCue: (block: CalendarBlock) => void;
+  onEdit: (block: CalendarBlock) => void;
 }) {
+  const onPointerDown = (event: React.PointerEvent, mode: "move" | "resize") =>
+    onBeginDrag(event, block, mode);
+  const onToggleDone = () => toggleDone(block);
+  const onToggleTask = (taskId: string) => toggleTask(block, taskId);
+  const onToggleBeat = (index: number) => toggleBeat(block, index);
+  const onDropCue = () => dropCue(block);
+  const onEdit = () => edit(block);
+  /** A finger never drags a block (see `beginDrag`), so its tap has to open it. */
+  const touchRef = useRef(false);
+
   const minutes = spanMinutes(block);
   const compact = minutes < COMPACT_MINUTES;
   /** Shorter than a heading plus its own padding: air is the first thing to go. */
@@ -1763,6 +2058,7 @@ function BlockChip({
         dragging && "z-30 cursor-grabbing shadow-md",
         !dragging && "cursor-grab",
         receiving && "ring-primary/70 z-20 ring-2",
+        flash && "ring-primary z-20 ring-2 ring-offset-2 ring-offset-card",
       )}
       style={{
         top: block.startMinute * MINUTE_PX,
@@ -1781,7 +2077,16 @@ function BlockChip({
           onEdit();
         }
       }}
-      onPointerDown={(event) => onPointerDown(event, "move")}
+      onPointerDown={(event) => {
+        touchRef.current = event.pointerType === "touch";
+        onPointerDown(event, "move");
+      }}
+      onClick={(event) => {
+        if (!touchRef.current) return;
+        // The chip's own controls answer for themselves.
+        if ((event.target as HTMLElement).closest("a, button")) return;
+        onEdit();
+      }}
     >
       {isCue ? (
         <div className="flex min-w-0 items-center gap-1.5">
@@ -1995,4 +2300,4 @@ function BlockChip({
       )}
     </div>
   );
-}
+});

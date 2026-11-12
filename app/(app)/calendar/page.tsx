@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, ListChecks } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { InfoTip } from "@/components/info-tip";
@@ -32,6 +32,7 @@ import { cn } from "@/lib/utils";
 
 import { CalendarView } from "./_components/calendar-view";
 import type { GridDay } from "./_components/calendar-grid";
+import { CalendarShortcuts, IntentLink } from "./_components/calendar-nav";
 import { MonthStrip } from "./_components/month-strip";
 import { SchedulePanel } from "./_components/schedule-panel";
 import { WeekInsights } from "./_components/week-insights";
@@ -71,9 +72,10 @@ export default async function CalendarPage({
   // The week the anchor sits in, for "Where the week goes". In week view it is
   // the same read as the grid's, so it is only fetched separately for a day.
   const weekStart = startOfWeek(anchor, user.weekStart);
-  const [blocks, weekBlocks, identities, schedulable, blockedDays, prayerBands] = await Promise.all([
-    getBlocks(user, start, length),
-    view === "week" ? null : getBlocks(user, weekStart, 7),
+  // One read of blocks for both views: the anchor's week always contains the
+  // anchor, so a day is that week filtered rather than a second query.
+  const [weekBlocks, identities, schedulable, blockedDays, prayerBands] = await Promise.all([
+    getBlocks(user, weekStart, 7),
     prisma.identity.findMany({
       where: { userId: user.id },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
@@ -94,6 +96,20 @@ export default async function CalendarPage({
     user.prayerRemindersEnabled ? getPrayerBands(user, start, length) : {},
   ]);
 
+  const anchorISO = toISODate(anchor);
+  const blocks =
+    view === "week"
+      ? weekBlocks
+      : weekBlocks.filter((block) => block.dateISO === anchorISO);
+
+  // `?block=` — `/day` links a quest straight to its block. Only honoured when
+  // that block is actually on screen; anything else is just a stale URL.
+  const blockParam = first("block");
+  const focusBlockId =
+    blockParam && blocks.some((block) => block.id === blockParam)
+      ? blockParam
+      : null;
+
   const days: GridDay[] = Array.from({ length }, (_, offset) => {
     const date = addDays(start, offset);
     return {
@@ -111,7 +127,6 @@ export default async function CalendarPage({
   // "How much of the day is spoken for" is measured against waking hours, not
   // 24 — three hours blocked out of a 24-hour day sounds like nothing and is
   // actually most of an evening.
-  const anchorISO = toISODate(anchor);
   const anchorBlocks = blocks.filter((block) => block.dateISO === anchorISO);
   // A daydream is imaginary time — it claims nothing, so every number below
   // reads the day without it. The grid still renders it (see `blocks`).
@@ -143,6 +158,7 @@ export default async function CalendarPage({
   // minutes open before it" does the arithmetic they'd otherwise have to.
   const nowMinute = minuteOfDayLocal(user.timezone);
   const anchorIsToday = anchor.getTime() === today.getTime();
+  const todayOnScreen = days.some((day) => day.isToday);
   const nextUp = anchorIsToday
     ? committed
         // `>=`: a block starting at the exact current minute is next up, not
@@ -224,11 +240,24 @@ export default async function CalendarPage({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          {/* The way back. `/day` is where today's plan gets *done*; this page
+              is where it gets made, and the two should be one step apart in
+              both directions. */}
+          {todayOnScreen && (
+            <Button asChild variant="ghost" size="sm" className="min-h-11 rounded-[10px] px-3">
+              <Link href="/day">
+                <ListChecks className="size-4" aria-hidden />
+                Today&apos;s quests
+              </Link>
+            </Button>
+          )}
+
           <nav aria-label="View" className="bg-secondary/50 flex gap-1 rounded-[13px] p-1">
             {(["day", "week"] as const).map((option) => (
-              <Link
+              <IntentLink
                 key={option}
                 href={`/calendar?view=${option}&date=${anchorISO}`}
+                aria-keyshortcuts={option === "day" ? "d" : "w"}
                 aria-current={view === option ? "true" : undefined}
                 className={cn(
                   "focus-visible:ring-ring inline-flex min-h-11 min-w-14 items-center justify-center rounded-[10px] px-3 py-2 text-label capitalize transition-colors focus-visible:ring-2 focus-visible:outline-none",
@@ -238,21 +267,35 @@ export default async function CalendarPage({
                 )}
               >
                 {option}
-              </Link>
+              </IntentLink>
             ))}
           </nav>
 
           <div className="border-border flex items-center rounded-[13px] border p-1">
             <Button asChild variant="ghost" size="icon" className="size-11 rounded-[10px]">
-              <Link href={hrefFor(addDays(anchor, -step))} aria-label={`Previous ${view}`}>
+              {/* Fully prefetched: stepping a day at a time is the most common
+                  move on this page, and it should not wait on a round trip. */}
+              <Link
+                href={hrefFor(addDays(anchor, -step))}
+                prefetch
+                aria-label={`Previous ${view}`}
+                aria-keyshortcuts="k"
+              >
                 <ChevronLeft className="size-4" aria-hidden />
               </Link>
             </Button>
             <Button asChild variant="ghost" size="sm" className="min-h-11 rounded-[10px] px-3">
-              <Link href={hrefFor(today)}>Today</Link>
+              <IntentLink href={hrefFor(today)} aria-keyshortcuts="t">
+                Today
+              </IntentLink>
             </Button>
             <Button asChild variant="ghost" size="icon" className="size-11 rounded-[10px]">
-              <Link href={hrefFor(addDays(anchor, step))} aria-label={`Next ${view}`}>
+              <Link
+                href={hrefFor(addDays(anchor, step))}
+                prefetch
+                aria-label={`Next ${view}`}
+                aria-keyshortcuts="j"
+              >
                 <ChevronRight className="size-4" aria-hidden />
               </Link>
             </Button>
@@ -267,6 +310,7 @@ export default async function CalendarPage({
           prayerBands={prayerBands}
           todayISO={toISODate(today)}
           anchorISO={anchorISO}
+          focusBlockId={focusBlockId}
           timeZone={user.timezone}
           tasks={schedulable.map((task) => ({
             id: task.id,
@@ -309,7 +353,7 @@ export default async function CalendarPage({
       </div>
 
       <WeekInsights
-        blocks={weekBlocks ?? blocks}
+        blocks={weekBlocks}
         identities={identities}
         rangeLabel={`${formatDate(weekStart)} - ${formatDate(addDays(weekStart, 6))}`}
       />
@@ -321,6 +365,23 @@ export default async function CalendarPage({
         </Link>{" "}
         can tell you the difference.
       </p>
+
+      <p className="text-muted-foreground mt-2 hidden text-micro lg:block">
+        Keys: <kbd className="font-mono">T</kbd> today ·{" "}
+        <kbd className="font-mono">J</kbd> / <kbd className="font-mono">K</kbd>{" "}
+        next and previous · <kbd className="font-mono">D</kbd> day ·{" "}
+        <kbd className="font-mono">W</kbd> week. Drag a block to move it — across
+        days in week view — and press <kbd className="font-mono">Esc</kbd> to put
+        it back.
+      </p>
+
+      <CalendarShortcuts
+        todayHref={hrefFor(today)}
+        prevHref={hrefFor(addDays(anchor, -step))}
+        nextHref={hrefFor(addDays(anchor, step))}
+        dayHref={`/calendar?view=day&date=${anchorISO}`}
+        weekHref={`/calendar?view=week&date=${anchorISO}`}
+      />
     </div>
   );
 }

@@ -32,6 +32,14 @@ export const habitHref = (item: TodayItem) =>
   });
 
 /**
+ * The calendar, opened *on this quest's block* — scrolled to it and ringed —
+ * rather than at the top of the day with the block left to be found. A habit
+ * quest has no block behind it, so it gets the plain day.
+ */
+export const questCalendarHref = (quest: Quest, calendarHref: string): string =>
+  quest.kind === "HABIT" ? calendarHref : `${calendarHref}&block=${quest.id}`;
+
+/**
  * Where a quest row leads. A task-bearing quest opens the timer on its next
  * line; recovery opens the recovery timer; a named claim on time ("gym")
  * opens the calendar, since there is nothing to put a clock against.
@@ -47,5 +55,5 @@ export function questHref(quest: Quest, calendarHref: string): string {
     return objectiveHref(target);
   }
 
-  return calendarHref;
+  return questCalendarHref(quest, calendarHref);
 }

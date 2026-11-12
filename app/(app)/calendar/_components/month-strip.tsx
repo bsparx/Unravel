@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import {
@@ -13,6 +12,8 @@ import {
   WEEKDAYS,
 } from "@/lib/dates";
 import { cn } from "@/lib/utils";
+
+import { IntentLink } from "./calendar-nav";
 
 /** Six rows of seven, so the month's cells never shift when the 1st moves. */
 const CELLS = 42;
@@ -52,21 +53,21 @@ export function MonthStrip({
   return (
     <section className="border-border bg-card rounded-[20px] border">
       <header className="flex items-center justify-between gap-2 px-3 pt-3">
-        <Link
+        <IntentLink
           href={`/calendar?view=day&date=${toISODate(addMonths(month, -1))}`}
           aria-label="Previous month"
           className="focus-visible:ring-ring text-muted-foreground hover:text-foreground grid size-11 place-items-center rounded-[10px] transition-colors focus-visible:ring-2 focus-visible:outline-none"
         >
           <ChevronLeft className="size-4" aria-hidden />
-        </Link>
+        </IntentLink>
         <h2 className="text-title">{formatMonthLabel(month)}</h2>
-        <Link
+        <IntentLink
           href={`/calendar?view=day&date=${toISODate(addMonths(month, 1))}`}
           aria-label="Next month"
           className="focus-visible:ring-ring text-muted-foreground hover:text-foreground grid size-11 place-items-center rounded-[10px] transition-colors focus-visible:ring-2 focus-visible:outline-none"
         >
           <ChevronRight className="size-4" aria-hidden />
-        </Link>
+        </IntentLink>
       </header>
 
       <div
@@ -88,7 +89,7 @@ export function MonthStrip({
           const isAnchor = iso === anchorISO;
           const hasBlocks = blockedDays.has(iso);
           return (
-            <Link
+            <IntentLink
               key={iso}
               href={`/calendar?view=day&date=${iso}`}
               aria-label={`${toISODate(date)}${isToday ? ", today" : ""}${hasBlocks ? ", has planned time" : ""}`}
@@ -114,7 +115,7 @@ export function MonthStrip({
                   aria-hidden
                 />
               )}
-            </Link>
+            </IntentLink>
           );
         })}
       </div>

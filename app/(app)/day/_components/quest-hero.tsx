@@ -31,6 +31,8 @@ import { cn } from "@/lib/utils";
 
 import type { CalendarBlock } from "@/lib/time-blocks";
 
+import { questCalendarHref } from "./quest-links";
+
 /**
  * The hero of the day, read as a quest.
  *
@@ -541,7 +543,7 @@ function FreeRoamCard({
 }) {
   return (
     <Link
-      href={calendarHref}
+      href={next ? questCalendarHref(next, calendarHref) : calendarHref}
       className={cn(
         cardShell,
         "focus-visible:ring-ring border-dashed border-border hover:border-primary/50 focus-visible:ring-2 focus-visible:outline-none",
@@ -614,7 +616,7 @@ function NextQuestCard({
           )
         : null;
 
-  const href = handle ?? calendarHref;
+  const href = handle ?? questCalendarHref(quest, calendarHref);
   const cta = handle ? "Set a timer" : "Open the calendar";
 
   const metaParts: string[] = [];
