@@ -120,6 +120,14 @@ enum HabitSlot {
   ALWAYS
 }
 
+/// Where a wish stands. ACHIEVED and RELEASED are both endings, and both are
+/// kept: letting a wish go on purpose is information, not failure.
+enum WishStatus {
+  ACTIVE
+  ACHIEVED
+  RELEASED
+}
+
 enum JournalKind {
   WORRY
   GRATITUDE
@@ -354,20 +362,6 @@ model User {
   /// off too.
   returnAlertsEnabled Boolean @default(true)
 
-  // Water. The goal is glasses per day, and the defaults follow the classic
-  // 8×8: 8 glasses × 250ml, one every two hours across a waking window. The
-  // science (NASEM) is a range, not a number — 8 is the baseline, the
-  // settings let it move to where the person actually is.
-  waterGoal                Int     @default(8)
-  waterRemindersEnabled    Boolean @default(false)
-  /// Minutes from local midnight when the reminder window opens. 480 = 08:00.
-  waterReminderStartMin    Int     @default(480)
-  /// 1320 = 22:00. Past this the day is a closed session: no more reminders.
-  waterReminderEndMin      Int     @default(1320)
-  /// Minimum gap between reminders, minutes. Defaults to 120 (one glass per
-  /// two hours fills the day's quota inside the window).
-  waterReminderIntervalMin Int     @default(120)
-
   // Prayer reminders. Timings are fetched from the Aladhan API once per
   // (city, date) and cached in PrayerDayTimes; `prayerCity` defaults to
   // "Karachi" in code when null.
@@ -382,7 +376,6 @@ model User {
   occurrences      TaskOccurrence[]
   sessions         FocusSession[]
   captures         Capture[]
-  waterLog         WaterGlass[]
   dayLogs          DayLog[]
   journal          JournalEntry[]
   steps            TaskStep[]
@@ -398,9 +391,9 @@ model User {
   prayerChecks     PrayerCheck[]
   shadowPatterns   ShadowPattern[]
   shadowLogs       ShadowLog[]
-  treats           Treat[]
-  chapters         Chapter[]
   weeklyReviews    WeeklyReview[]
+  wishes           Wish[]
+  disputations     Disputation[]
 }
 
 // ---------------------------------------------------------------- lists
@@ -503,9 +496,6 @@ model Task {
   /// one self is served by several habits. Habits only — a todo is a one-off
   /// and casts no standing vote.
   identities HabitIdentity[]
-
-  /// Chapter objectives that count this habit's done days.
-  chapterObjectives ChapterObjective[]
 
   @@index([userId, type, completedAt, archivedAt, dueDate])
   @@index([userId, projectId, sortOrder])
@@ -675,8 +665,6 @@ model Identity {
   habits   HabitIdentity[]
   blocks   TimeBlock[]
   shadows  ShadowPattern[]
-  treats   Treat[]
-  chapters Chapter[]
   ledDays  DayLog[]        @relation("DayLogLead")
   ledWeeks WeeklyReview[]
 
@@ -955,40 +943,9 @@ model Tag {
   @@index([userId])
 }
 
-// ---------------------------------------------------------------- hydration
-
-/// One row per glass of water actually logged — SPARSE, exactly like
-/// TaskOccurrence. Absence means "not drunk", the count for a day is a
-/// groupBy rather than a stored total, and nothing is ever pre-generated.
-///
-/// `timeMinute` is what makes the two most useful messages a query instead of
-/// a guess: "last glass was 3h ago" (the reminder) and "you're behind the
-/// pace line" (the vessel marker). A backdated glass keeps its claimed time —
-/// this is a log of when things happened, not a stream of button presses.
-model WaterGlass {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  /// Local calendar day in User.timezone, stored as UTC-midnight DATE — the
-  /// same pre-bucketing every other day in this schema uses.
-  date DateTime @db.Date
-
-  /// Minutes from local midnight, clamped to "now" on write.
-  timeMinute Int
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // No @@unique anywhere, deliberately: two glasses at the same minute are
-  // two glasses, and a constraint violation is the one failure mode that
-  // would make logging cost something.
-  @@index([userId, date])
-}
-
 // ---------------------------------------------------------------- prayer
 
-/// One row per prayer actually checked — SPARSE, exactly like WaterGlass and
+/// One row per prayer actually checked — SPARSE, exactly like
 /// TaskOccurrence. Absence means "not prayed". The daily cron wipes every row
 /// older than the current day at 04:00 Asia/Karachi, so a cycle lives roughly
 /// fajr-to-fajr and there is no history.
@@ -1224,6 +1181,68 @@ model JournalEntry {
   /// drop this and switch the actions from upsert to create.
   @@unique([userId, date, kind])
   @@index([userId, date])
+}
+
+// ---------------------------------------------------------------- mind
+
+/// One WOOP — Wish, Outcome, Obstacle, Plan (Gabriele Oettingen).
+///
+/// Mental contrasting: name the wish, picture the best of having it, then
+/// picture the obstacle *in you* and bind it to an if-then plan. A wish is a
+/// standing card, not a daily entry, and deliberately not tied to any task:
+/// it is about what you want, not about what's on today's list.
+model Wish {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  wish     String
+  outcome  String
+  obstacle String
+  plan     String
+
+  status    WishStatus @default(ACTIVE)
+  /// When it was achieved or let go. Null while active.
+  settledAt DateTime?
+  sortOrder Float      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status, sortOrder])
+}
+
+/// One ABCDE disputation (Martin Seligman, *Learned Optimism*).
+///
+/// Adversity, the Belief it set off, the Consequences of holding it, the
+/// Disputation, and the Energization that follows. The disputation is argued
+/// through up to four lenses — evidence, alternatives, implications,
+/// usefulness — and at least one has to be used, which the schema can't say
+/// and validation does.
+model Disputation {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  adversity    String
+  belief       String
+  /// 0..10: how strongly the belief was held when written. Optional.
+  beliefBefore Int?
+  consequences String
+
+  evidence     String?
+  alternatives String?
+  implications String?
+  usefulness   String?
+
+  energization String
+  /// 0..10: how strongly it's held after disputing. Optional.
+  beliefAfter  Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt])
 }
 
 // ---------------------------------------------------------------- money
@@ -1641,71 +1660,6 @@ model ShadowLog {
 
   @@unique([patternId, date])
   @@index([userId, date])
-}
-
-/// A reward that unlocks with votes. Nothing is spent: a treat reads the vote
-/// count, it never subtracts from it, so enjoying one costs no progress.
-model Treat {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  name        String
-  /// For one identity: unlocks at that identity's all-time votes. Null is the
-  /// whole cast: unlocks at this week's votes and resets every week.
-  identityId  String?
-  identity    Identity? @relation(fields: [identityId], references: [id], onDelete: SetNull)
-  votesNeeded Int
-  /// For a weekly treat only the current week's stamp counts as enjoyed.
-  enjoyedAt   DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-}
-
-/// A short story arc for one identity: a few objectives over a few days.
-/// Habitica's quest without the boss. A missed day simply waits.
-model Chapter {
-  id         String   @id @default(cuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  identityId String
-  identity   Identity @relation(fields: [identityId], references: [id], onDelete: Cascade)
-
-  title      String
-  intro      String?
-  /// Local calendar date the chapter began, as a UTC-midnight DATE.
-  startDate  DateTime @db.Date
-  lengthDays Int      @default(10)
-  /// Optional treat named in the story; display only.
-  reward     String?
-
-  completedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  objectives ChapterObjective[]
-
-  @@index([userId, completedAt])
-}
-
-/// One objective. Linked to a habit, it counts that habit's done days inside
-/// the chapter (derived, never stored). Unlinked, it counts manual logs.
-model ChapterObjective {
-  id        String  @id @default(cuid())
-  chapterId String
-  chapter   Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
-
-  text     String
-  target   Int     @default(1)
-  habitId  String?
-  habit    Task?   @relation(fields: [habitId], references: [id], onDelete: SetNull)
-  logged   Int     @default(0)
-  position Int     @default(0)
-
-  @@index([chapterId])
 }
 
 /// The weekly council: one per week planned. `weekStart` is the first day of

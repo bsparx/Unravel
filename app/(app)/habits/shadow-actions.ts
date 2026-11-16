@@ -14,7 +14,6 @@ function revalidateShadowViews() {
   revalidatePath("/habits");
   revalidatePath("/identities");
   revalidatePath("/day");
-  revalidatePath("/treats");
   revalidatePath("/review");
 }
 

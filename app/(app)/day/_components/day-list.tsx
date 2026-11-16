@@ -19,22 +19,16 @@ import {
 } from "@/lib/dates";
 import type { GlossaryTerm } from "@/lib/glossary";
 import type { TodayItem, TodayView } from "@/lib/tasks";
-import type { WaterToday } from "@/lib/water-data";
 
 import { LogTimeDialog } from "./log-time-dialog";
 import { TaskRow } from "./task-row";
-import { WaterRow } from "./water-row";
 
 export function DayList({
   view,
   todayISO,
-  water,
-  timezone,
 }: {
   view: TodayView;
   todayISO: string;
-  water: WaterToday;
-  timezone: string;
 }) {
   const [logTarget, setLogTarget] = useState<{
     item: TodayItem;
@@ -154,37 +148,16 @@ export function DayList({
 
   if (!hasAnything && view.completedToday.length === 0) {
     return (
-      <div className="space-y-8">
-        <section>
-          <h2 className="text-micro text-muted-foreground mb-1 font-sans font-medium tracking-wider uppercase">
-            Water
-          </h2>
-          <ul>
-            <WaterRow today={water} timezone={timezone} />
-          </ul>
-        </section>
-        <EmptyState
-          icon={Sun}
-          title="No quests yet"
-          description="Add the first thing on your mind above, or claim time for it on the calendar. One line is enough."
-        />
-      </div>
+      <EmptyState
+        icon={Sun}
+        title="No quests yet"
+        description="Add the first thing on your mind above, or claim time for it on the calendar. One line is enough."
+      />
     );
   }
 
   return (
     <div className="space-y-8">
-      {/* Water is a daily act whether or not anything else is on today, so it
-          sits above the empty state as well as above every section. */}
-      <section>
-        <h2 className="text-micro text-muted-foreground mb-1 font-sans font-medium tracking-wider uppercase">
-          Water
-        </h2>
-        <ul>
-          <WaterRow today={water} timezone={timezone} />
-        </ul>
-      </section>
-
       {sections
         .filter((section) => section.items.length > 0)
         .map((section) => (

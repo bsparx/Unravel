@@ -1,12 +1,9 @@
 import { DumpBox } from "@/components/dump-box";
 import { MiniTimerBadge } from "@/components/mini-timer-badge";
 import { TimezoneSync } from "@/components/timezone-sync";
-import { WaterReminder } from "@/components/water-reminder";
 import { TimerProvider } from "@/app/(app)/timer/_hooks/timer-provider";
 import { getActiveSession } from "@/app/(app)/timer/_lib/session-hydrate";
-import { todayLocal } from "@/lib/dates";
 import type { User } from "@/lib/generated/prisma/client";
-import { getWaterToday } from "@/lib/water-data";
 
 /**
  * Everything a signed-in person carries with them, regardless of which layout
@@ -23,8 +20,8 @@ import { getWaterToday } from "@/lib/water-data";
  * `getActiveSession`. The only thing lost is an un-started config, which
  * `/timer` re-derives from its searchParams on arrival anyway.
  *
- * Its two reads are independent, so they share one round trip, and both are
- * request-cached for the pages (/day, /timer) that ask for the same thing.
+ * The session read is request-cached, so /timer asking for the same thing
+ * costs nothing extra.
  */
 export async function AuthedProviders({
   user,
@@ -33,10 +30,7 @@ export async function AuthedProviders({
   user: User;
   children: React.ReactNode;
 }) {
-  const [active, water] = await Promise.all([
-    getActiveSession(user),
-    getWaterToday(user, todayLocal(user.timezone)),
-  ]);
+  const active = await getActiveSession(user);
 
   return (
     <TimerProvider
@@ -57,7 +51,6 @@ export async function AuthedProviders({
       <MiniTimerBadge />
       <DumpBox />
       <TimezoneSync currentTimezone={user.timezone} />
-      <WaterReminder today={water} timezone={user.timezone} />
     </TimerProvider>
   );
 }

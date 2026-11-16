@@ -41,7 +41,6 @@ function revalidateIdentityViews() {
   revalidatePath("/day");
   revalidatePath("/calendar");
   revalidatePath("/timer");
-  revalidatePath("/treats");
   revalidatePath("/review");
   revalidatePath("/");
 }

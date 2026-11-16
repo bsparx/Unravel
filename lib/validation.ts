@@ -29,12 +29,8 @@ import {
   MAX_TARGET_SECONDS,
 } from "@/lib/timer-math";
 import { MAX_REMIND_DAYS } from "@/lib/subscriptions";
-import {
-  MAX_GOAL,
-  MAX_INTERVAL_MIN,
-  MIN_GOAL,
-  MIN_INTERVAL_MIN,
-} from "@/lib/water";
+import { DISPUTATION_MAX } from "@/lib/disputation";
+import { WOOP_MAX } from "@/lib/woop";
 
 export const cuid = z.string().min(1).max(64);
 
@@ -288,36 +284,6 @@ export const updateShadowPatternSchema = shadowPatternSchema.extend({ id: cuid }
 export const markShadowSchema = z.object({
   patternId: cuid,
   mark: z.enum(["NOTICED", "CHOSE"]).nullable(),
-});
-
-export const treatSchema = z.object({
-  name: z.string().trim().min(1, "Name the treat.").max(80),
-  identityId: cuid.nullish(),
-  votesNeeded: z.coerce.number().int().min(1).max(1000),
-});
-
-export const MAX_OBJECTIVES = 5;
-export const chapterSchema = z.object({
-  identityId: cuid,
-  title: z.string().trim().min(1, "Give the chapter a title.").max(80),
-  intro: emptyToUndefined(z.string().trim().max(300)),
-  lengthDays: z.coerce.number().int().min(3).max(60),
-  reward: emptyToUndefined(z.string().trim().max(80)),
-  objectives: z
-    .array(
-      z.object({
-        text: z.string().trim().min(1).max(120),
-        target: z.coerce.number().int().min(1).max(60),
-        habitId: cuid.nullish(),
-      }),
-    )
-    .min(1, "Add at least one objective.")
-    .max(MAX_OBJECTIVES),
-});
-
-export const logObjectiveSchema = z.object({
-  objectiveId: cuid,
-  delta: z.union([z.literal(1), z.literal(-1)]),
 });
 
 export const weeklyReviewSchema = z.object({
@@ -637,46 +603,6 @@ export const settingsSchema = z.object({
   prayerCity: emptyToUndefined(z.string().trim().min(1).max(80)),
 });
 
-// ---------------------------------------------------------------- water
-
-/**
- * Logging a glass. `timeMinute` is optional — omitted means "right now", and
- * the action clamps it to now on the way in so a backdated glass can never be
- * logged "later today than it is".
- */
-export const logGlassSchema = z.object({
-  date: isoDate,
-  timeMinute: emptyToUndefined(
-    z.coerce.number().int().min(0).max(MINUTES_PER_DAY),
-  ),
-});
-
-export const removeGlassSchema = z.object({
-  glassId: cuid,
-});
-
-/**
- * The water settings form. `endMin > startMin` is refused rather than
- * clamped: a window that runs backwards means "no reminders at all", and that
- * decision should be made with the checkbox, not by accident.
- */
-export const waterSettingsSchema = z
-  .object({
-    goal: z.coerce.number().int().min(MIN_GOAL).max(MAX_GOAL),
-    remindersEnabled: z.coerce.boolean().default(false),
-    startMin: minuteOfDay,
-    endMin: minuteOfDay,
-    intervalMin: z.coerce
-      .number()
-      .int()
-      .min(MIN_INTERVAL_MIN)
-      .max(MAX_INTERVAL_MIN),
-  })
-  .refine((value) => value.endMin > value.startMin, {
-    message: "The reminder window has to run forwards.",
-    path: ["endMin"],
-  });
-
 // ---------------------------------------------------------------- budget
 
 /**
@@ -873,6 +799,57 @@ export const subscriptionSchema = z.object({
 export const subscriptionIdSchema = z.object({ id: cuid });
 
 // ---------------------------------------------------------------- action result
+
+// ---------------------------------------------------------------- mind
+
+const required = (max: number, message: string) =>
+  z.string().trim().min(1, message).max(max, "Keep it shorter than that.");
+
+/** One WOOP. Every part is required: a wish with no obstacle is just a wish. */
+export const wishSchema = z.object({
+  id: emptyToUndefined(cuid),
+  wish: required(WOOP_MAX.wish, "Name the wish."),
+  outcome: required(WOOP_MAX.outcome, "Picture the best outcome."),
+  obstacle: required(WOOP_MAX.obstacle, "Name the obstacle in you."),
+  plan: required(WOOP_MAX.plan, "Say what you'll do when it shows up."),
+});
+
+export const wishStatusSchema = z.object({
+  id: cuid,
+  status: z.enum(["ACTIVE", "ACHIEVED", "RELEASED"]),
+});
+
+/** 0..10, or absent. An empty string from the form is "not rated". */
+const conviction = emptyToUndefined(z.coerce.number().int().min(0).max(10));
+
+const lens = emptyToUndefined(
+  z.string().trim().max(DISPUTATION_MAX.lens, "Keep it shorter than that."),
+);
+
+/**
+ * One ABCDE. A, B, C and E are required; D is argued through up to four
+ * lenses and needs at least one — a disputation with nothing in D is just a
+ * record of the belief winning.
+ */
+export const disputationSchema = z
+  .object({
+    id: emptyToUndefined(cuid),
+    adversity: required(DISPUTATION_MAX.adversity, "Say what happened."),
+    belief: required(DISPUTATION_MAX.belief, "Write the belief down."),
+    beliefBefore: conviction,
+    consequences: required(DISPUTATION_MAX.consequences, "Say what it made you feel or do."),
+    evidence: lens,
+    alternatives: lens,
+    implications: lens,
+    usefulness: lens,
+    energization: required(DISPUTATION_MAX.energization, "Say what shifted."),
+    beliefAfter: conviction,
+  })
+  .refine(
+    (value) =>
+      Boolean(value.evidence || value.alternatives || value.implications || value.usefulness),
+    { message: "Argue back through at least one lens.", path: ["evidence"] },
+  );
 
 export type ActionState =
   | { status: "idle" }

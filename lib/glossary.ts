@@ -72,16 +72,6 @@ export const GLOSSARY = {
     what: "Habits you're trying to break, like scrolling in bed. Each one names the identity it pulls against and a plan that makes it harder.",
     why: "Tap Noticed when you catch it. That's useful information, not a failure. Tap Chose otherwise when you resist, and that identity gets a vote.",
   },
-  treats: {
-    title: "Treats",
-    what: "Rewards you set for yourself that unlock with votes, like new running shoes at 30 votes for the self who trains.",
-    why: "Nothing is spent, so enjoying a treat never costs progress. A treat for the whole cast unlocks from this week's votes and resets every week.",
-  },
-  chapters: {
-    title: "Chapters",
-    what: "A short story for one identity: a few objectives over a few days, like seven rough drawings in ten days.",
-    why: "It gives your habits a goal to aim at. Objectives linked to a habit fill in by themselves, and a missed day simply waits.",
-  },
   council: {
     title: "The weekly council",
     what: "A ten-minute review once a week. You look back at each identity's votes, make one struggling habit smaller or easier, and choose who leads next week.",
@@ -111,6 +101,21 @@ export const GLOSSARY = {
     title: "Closing the day",
     what: "Three short steps at night: pick tomorrow's frog, empty what's still on your mind, and note one good thing.",
     why: "Tomorrow starts already decided, and the day ends instead of trailing off.",
+  },
+  mind: {
+    title: "Mind",
+    what: "Two practices on one page. WOOP turns a wish into a plan for the obstacle in you. ABCDE takes a gloomy thought after a setback and argues back.",
+    why: "Wanting something and thinking clearly about setbacks are both skills, and both get easier written down.",
+  },
+  woop: {
+    title: "WOOP",
+    what: "Wish, Outcome, Obstacle, Plan, from Gabriele Oettingen. Picture what you want, then the thing in you most likely to get in the way, then decide what you'll do when it does.",
+    why: "Picturing the obstacle next to the outcome works better than positive thinking alone. The plan becomes an if-then you can act on.",
+  },
+  disputation: {
+    title: "Disputation",
+    what: "Adversity, Belief, Consequences, Disputation, Energization, from Martin Seligman's Learned Optimism. Write what happened and what you told yourself, then argue back as if someone else had said it.",
+    why: "The thought after a setback is often the harshest available one. Checking it against evidence, alternatives, implications and usefulness loosens its grip.",
   },
 } as const satisfies Record<string, { title: string; what: string; why: string }>;
 

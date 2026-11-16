@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
  * the past tense with the optional log beside it ("Did the warmup · 25m
  * extra") and the identity vote lands at the end — the reinforcement loop,
  * said once and without ceremony. Nothing animates here beyond the checkbox's
- * pop: a met day settles rather than celebrates, the rule /water settled on.
+ * pop: a met day settles rather than celebrates.
  */
 export function HabitDayLine({
   bar,

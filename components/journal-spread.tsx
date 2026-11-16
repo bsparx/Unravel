@@ -87,8 +87,13 @@ export function JournalSpreadDialog({
       open
       onOpenChange={(open) => !open && !confirmPending && onCancel()}
     >
-      <DialogContent className="border-paper-edge bg-paper text-paper-ink ring-paper-edge/60 gap-0 overflow-hidden p-0 sm:max-w-4xl lg:max-w-5xl">
-        <div className="flex flex-col-reverse sm:flex-row">
+      {/* A column with the pages scrolling and the footer pinned. The dialog
+          clips its rounded corners with overflow-hidden, which also cancels
+          its own scrolling, so on a phone (pages stacked, keyboard up) the
+          confirm button used to sit below the cut with no way to reach it.
+          Now only the pages scroll; the buttons never leave the screen. */}
+      <DialogContent className="border-paper-edge bg-paper text-paper-ink ring-paper-edge/60 flex flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl lg:max-w-5xl">
+        <div className="flex min-h-0 flex-1 flex-col-reverse overflow-y-auto overscroll-contain sm:flex-row">
           {/* ── Left page: the day ─────────────────────────────────────── */}
           <aside className="border-paper-edge bg-paper-edge/15 relative w-full shrink-0 border-b px-5 pt-8 pb-5 sm:w-[38%] sm:border-r sm:border-b-0 sm:shadow-[inset_-14px_0_18px_-16px_rgba(42,36,28,0.35)]">
             <WashiTape className="absolute top-2 left-4" rotate="-3deg" />
@@ -195,8 +200,8 @@ export function JournalSpreadDialog({
                     placeholder={placeholder}
                     className={cn(
                       "text-paper-ink placeholder:text-paper-ink-muted/70",
-                      "font-hand min-h-32 rounded-md border-0 bg-transparent px-1 py-0  leading-[1.9rem] shadow-none sm:min-h-44 sm:text-3xl md:text-2xl sm:leading-[2.75rem]",
-                      "dark:bg-transparent focus-visible:ring-primary/40 focus-visible:ring-2 text-5xl",
+                      "font-hand min-h-24 rounded-md border-0 bg-transparent px-1 py-0  leading-[1.9rem] shadow-none sm:min-h-44 sm:text-3xl md:text-2xl sm:leading-[2.75rem]",
+                      "dark:bg-transparent focus-visible:ring-primary/40 focus-visible:ring-2 text-[1.75rem]",
                     )}
                   />
                 </div>
@@ -218,7 +223,7 @@ export function JournalSpreadDialog({
           </div>
         </div>
 
-        <DialogFooter className="border-paper-edge bg-paper-edge/15 sm:justify-between m-0 gap-2 rounded-none border-t p-3">
+        <DialogFooter className="border-paper-edge bg-paper-edge/15 m-0 shrink-0 flex-row justify-between gap-2 rounded-none border-t p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:justify-between">
           <Button
             type="button"
             variant="ghost"

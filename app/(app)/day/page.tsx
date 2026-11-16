@@ -16,7 +16,6 @@ import { getPrayerCycle } from "@/lib/prayers";
 import { getRenewingSoon } from "@/lib/subscriptions-data";
 import { getTodayView } from "@/lib/tasks";
 import { getBlocks } from "@/lib/time-blocks";
-import { getWaterToday } from "@/lib/water-data";
 
 import { DayList } from "./_components/day-list";
 import { LeadPanel } from "./_components/lead-panel";
@@ -32,10 +31,9 @@ export default async function TodayPage() {
   // Every section only needs today's date, so the whole page loads in one
   // parallel round rather than one waterfall step per section.
   const today = todayLocal(user.timezone);
-  const [view, blocks, water, prayers, votes, leadId, renewals] = await Promise.all([
+  const [view, blocks, prayers, votes, leadId, renewals] = await Promise.all([
     getTodayView(user),
     getBlocks(user, today, 1),
-    getWaterToday(user, today),
     user.prayerRemindersEnabled ? getPrayerCycle(user) : null,
     getIdentityVotes(user),
     getLeadIdentityId(user),
@@ -114,8 +112,6 @@ export default async function TodayPage() {
       <DayList
         view={view}
         todayISO={todayISO}
-        water={water}
-        timezone={user.timezone}
       />
 
       <div className="border-border mt-10 flex flex-wrap justify-center gap-2 border-t pt-6">

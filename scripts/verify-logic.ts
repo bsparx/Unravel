@@ -182,7 +182,9 @@ import {
   buildTimerHref,
   parseTimerParams,
 } from "@/lib/timer-url";
-import { BODY_PARTS } from "@/lib/validation";
+import { BODY_PARTS, disputationSchema, wishSchema } from "@/lib/validation";
+import { beliefShift, hasDispute } from "@/lib/disputation";
+import { formatIfThen, woopClause } from "@/lib/woop";
 import { bodyPartLabel } from "@/lib/exercise-labels";
 import {
   BACK_ANCHORS,
@@ -3430,6 +3432,51 @@ check("subscription form: email optional, but real when given", () => {
     subscriptionSchema.safeParse({ ...base, remindDaysBefore: "200" }).success,
     false,
   );
+});
+
+// ---------------------------------------------------------------- mind
+
+check("a wish needs all four WOOP parts, within their limits", () => {
+  const full = { wish: "Finish the draft", outcome: "A free weekend", obstacle: "My phone", plan: "Leave it in the hall" };
+  assert.equal(wishSchema.safeParse(full).success, true);
+  assert.equal(wishSchema.safeParse({ ...full, obstacle: "   " }).success, false);
+  assert.equal(wishSchema.safeParse({ ...full, wish: "x".repeat(121) }).success, false);
+  // An empty id is a new wish, not a malformed one.
+  assert.equal(wishSchema.safeParse({ ...full, id: "" }).success, true);
+});
+
+check("the if-then reads as one sentence", () => {
+  assert.equal(
+    formatIfThen({ obstacle: "Reaching for my phone.", plan: "Put it in the hall" }),
+    "If reaching for my phone, then I will put it in the hall.",
+  );
+  assert.equal(woopClause("I get tired"), "I get tired");
+});
+
+check("a disputation has to argue back through at least one lens", () => {
+  const base = {
+    adversity: "No replies",
+    belief: "They think it's stupid",
+    consequences: "Stopped working",
+    energization: "Calmer",
+  };
+  assert.equal(disputationSchema.safeParse(base).success, false);
+  assert.equal(disputationSchema.safeParse({ ...base, evidence: "  " }).success, false);
+  assert.equal(disputationSchema.safeParse({ ...base, alternatives: "They're busy" }).success, true);
+  assert.equal(hasDispute({ evidence: "", alternatives: "", implications: " ", usefulness: "No" }), true);
+});
+
+check("belief ratings are 0-10 or not given at all", () => {
+  const base = {
+    adversity: "a", belief: "b", consequences: "c", energization: "e", usefulness: "no",
+  };
+  const parse = (extra: Record<string, string>) => disputationSchema.safeParse({ ...base, ...extra });
+  assert.equal(parse({ beliefBefore: "", beliefAfter: "" }).success, true);
+  assert.equal(parse({ beliefBefore: "8", beliefAfter: "0" }).success, true);
+  assert.equal(parse({ beliefBefore: "11" }).success, false);
+  assert.equal(parse({ beliefAfter: "-1" }).success, false);
+  assert.equal(beliefShift({ beliefBefore: 8, beliefAfter: 3 }), -5);
+  assert.equal(beliefShift({ beliefBefore: 8, beliefAfter: null }), null);
 });
 
 console.log(`\n${passed} checks passed.\n`);

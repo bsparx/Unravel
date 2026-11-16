@@ -9,8 +9,7 @@ import { useEffect, useState } from "react";
  * client can agree with to the minute, and rendering a moving marker at a
  * server-computed minute would be a guaranteed hydration mismatch. Consumers
  * treat null as "not yet" and render nothing that moves. The same contract as
- * the calendar's NowProvider and the water row's pace tick — this is the
- * shared hook behind all of them.
+ * the calendar's NowProvider; this is the shared hook behind all of them.
  */
 export function useNowMinute(timeZone: string): number | null {
   const [minute, setMinute] = useState<number | null>(null);
