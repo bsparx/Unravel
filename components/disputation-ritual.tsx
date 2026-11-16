@@ -270,16 +270,16 @@ export function DisputationRitual({
               const open = openLens === lens.key;
               const filled = fields[lens.key].trim().length > 0;
               return (
-                <RitualGlass key={lens.key} className={cn("p-0 sm:p-0", !open && "bg-white/5")}>
+                <RitualGlass key={lens.key} className={cn("p-0 sm:p-0", !open && "bg-[var(--woop-hover)]")}>
                   <button
                     type="button"
                     onClick={() => setOpenLens(lens.key)}
                     aria-expanded={open}
-                    className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none sm:px-4"
+                    className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left focus-visible:ring-2 focus-visible:ring-[var(--woop-focus)] focus-visible:outline-none sm:px-4"
                   >
                     <span
                       className={cn(
-                        "grid size-5 shrink-0 place-items-center rounded-full border text-[#1b1f45]",
+                        "grid size-5 shrink-0 place-items-center rounded-full border text-[var(--abcde-on-disputation)]",
                         filled
                           ? "border-transparent bg-[var(--abcde-disputation)]"
                           : "border-[var(--woop-glass-edge)]",
@@ -365,12 +365,12 @@ function Conviction({
               aria-label={`${n} out of 10${wasBefore ? ", your earlier rating" : ""}`}
               onClick={() => onChange(selected ? null : n)}
               className={cn(
-                "grid size-8 place-items-center rounded-full font-mono text-xs tabular-nums transition-colors focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:outline-none sm:size-9",
+                "grid size-8 place-items-center rounded-full font-mono text-xs tabular-nums transition-colors focus-visible:ring-2 focus-visible:ring-[var(--woop-focus)] focus-visible:outline-none sm:size-9",
                 selected
-                  ? "bg-[var(--woop-ink)] text-[#161a3d] shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]"
+                  ? "bg-[var(--woop-ink)] text-[var(--woop-on-ink)] shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]"
                   : wasBefore
                     ? "border border-dashed border-[var(--woop-ink)]/70 text-[var(--woop-ink)]"
-                    : "bg-white/8 text-[var(--woop-ink)]/80 hover:bg-white/15",
+                    : "bg-[var(--woop-glass)] text-[var(--woop-ink)]/80 hover:bg-[var(--woop-hover)]",
               )}
             >
               {n}

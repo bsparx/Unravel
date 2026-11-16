@@ -1088,13 +1088,13 @@ check("every scheduled block starts at 15 minutes, whatever the estimate", () =>
   assert.equal(PLAN_CUE_MINUTES, 15);
 });
 
-check("eggplant is a third theme that resolves to dark", () => {
-  // LOAD-BEARING. The `.dark` class is the switch every dark: variant, sonner
-  // and chart keys off — eggplant must resolve to dark or it renders as the
-  // light theme with a dead data attribute.
-  assert.equal(resolveTheme("eggplant"), "dark");
+check("there are exactly two palettes, plus following the device", () => {
+  // The `.dark` class is the switch every dark: variant, sonner and chart
+  // keys off, so dark must resolve to dark and light to light.
+  assert.deepEqual([...THEMES].sort(), ["dark", "light", "system"]);
+  assert.equal(resolveTheme("dark"), "dark");
+  assert.equal(resolveTheme("light"), "light");
   assert.equal(resolveTheme("system"), systemTheme());
-  assert.ok(THEMES.includes("eggplant"));
 });
 
 check("a malformed time is rejected rather than coerced to midnight", () => {
@@ -3281,9 +3281,10 @@ check("the evening shift wraps past midnight and ends at five", () => {
   assert.equal(isEveningHour(2, 21), true);
   assert.equal(isEveningHour(5, 21), false);
   assert.equal(isEveningHour(20, 21), false);
-  assert.equal(activePalette("sage", { on: true, from: 21 }, 22), "hearth");
-  assert.equal(activePalette("sage", { on: false, from: 21 }, 22), "sage");
-  assert.equal(activePalette("clear", { on: true, from: 21 }, 9), "clear");
+  // The shift turns the night on in the evening and leaves the day alone.
+  assert.equal(activePalette("light", { on: true, from: 21 }, 22), "dark");
+  assert.equal(activePalette("light", { on: false, from: 21 }, 22), "light");
+  assert.equal(activePalette("light", { on: true, from: 21 }, 9), "light");
 });
 
 check("every starter character passes the identity form's own rules", () => {

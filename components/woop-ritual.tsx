@@ -47,7 +47,7 @@ const SKIES: readonly RitualSky[] = [
     key: "wish",
     className: "woop-sky-wish",
     scenery: (
-      <Sparkle className="absolute top-[12%] right-[14%] size-4 fill-current text-white/85" />
+      <Sparkle className="absolute top-[12%] right-[14%] size-4 fill-current text-[var(--woop-star)]" />
     ),
   },
   { key: "outcome", className: "woop-sky-outcome" },
@@ -213,7 +213,7 @@ export function WoopRitual({
               loading={sealing}
               disabled={sealing}
               onClick={() => void seal()}
-              className="rounded-full bg-[var(--woop-plan)] px-6 font-medium text-[#3a2208] shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_6px_18px_-8px_rgba(60,30,5,0.6)] transition-transform hover:brightness-105 active:scale-[0.98]"
+              className="rounded-full bg-[var(--woop-plan)] px-6 font-medium text-[var(--woop-plan-ink)] shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_6px_18px_-8px_rgba(60,30,5,0.6)] transition-transform hover:brightness-105 active:scale-[0.98]"
             >
               {sealing ? "Sealing…" : initial ? "Seal it again" : "Seal it"}
             </Button>

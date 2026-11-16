@@ -194,53 +194,55 @@
 :root {
   --radius: 0.625rem;
 
-  /* The atmosphere: a fixed field of lilac, blush, and peach washes under
-     every surface. Translucent surfaces blur it; opaque ones hide it. */
+  /* Cotton candy. A fixed field of spun-sugar washes, pink from one side and
+     baby blue from the other, meeting in lavender. Translucent surfaces blur
+     it; opaque ones hide it. The ink stays a deep grape so text never goes
+     pastel along with the field. */
   --atmosphere:
-    linear-gradient(32deg, rgba(164, 117, 230, 0.1) 0 20%, transparent 20%),
-    linear-gradient(145deg, transparent 0 82%, rgba(255, 166, 193, 0.09) 82%),
-    radial-gradient(ellipse at 2% 7%, rgba(190, 153, 247, 0.69), transparent 38%),
-    radial-gradient(ellipse at 96% 11%, rgba(255, 196, 211, 0.68), transparent 39%),
-    radial-gradient(ellipse at 84% 82%, rgba(255, 212, 180, 0.62), transparent 42%),
-    radial-gradient(ellipse at 24% 91%, rgba(230, 193, 255, 0.55), transparent 44%),
-    linear-gradient(125deg, #f6f3ff, #faf4fe 48%, #fff9f3);
+    radial-gradient(ellipse at 3% 6%, rgba(255, 176, 216, 0.74), transparent 40%),
+    radial-gradient(ellipse at 96% 9%, rgba(170, 216, 255, 0.78), transparent 40%),
+    radial-gradient(ellipse at 84% 86%, rgba(255, 196, 228, 0.66), transparent 44%),
+    radial-gradient(ellipse at 18% 92%, rgba(186, 208, 255, 0.62), transparent 44%),
+    radial-gradient(ellipse at 52% 46%, rgba(236, 220, 255, 0.5), transparent 56%),
+    linear-gradient(125deg, #fff2f9, #fbf4ff 48%, #f0f7ff);
 
-  --background: #f7f2fb;
-  --foreground: #302637;
+  --background: #fdf4fb;
+  --foreground: #33284a;
 
-  --card: rgba(255, 255, 255, 0.68);
-  --card-foreground: #302637;
-  --popover: rgba(255, 255, 255, 0.88);
-  --popover-foreground: #302637;
+  --card: rgba(255, 255, 255, 0.66);
+  --card-foreground: #33284a;
+  --popover: rgba(255, 255, 255, 0.9);
+  --popover-foreground: #33284a;
 
-  --primary: #654263;
+  /* Candy pink, deep enough to carry white text (4.8:1). */
+  --primary: #c23d82;
   --primary-foreground: #ffffff;
-  --secondary: rgba(255, 255, 255, 0.51);
-  --secondary-foreground: #302637;
-  --muted: rgba(255, 255, 255, 0.51);
-  --muted-foreground: #564a60;
-  --accent: rgba(238, 221, 250, 0.68);
-  --accent-foreground: #603b64;
-  --destructive: #b34462;
+  --secondary: rgba(255, 255, 255, 0.55);
+  --secondary-foreground: #33284a;
+  --muted: rgba(255, 255, 255, 0.52);
+  --muted-foreground: #5d5074;
+  --accent: rgba(255, 216, 236, 0.74);
+  --accent-foreground: #a12d6a;
+  --destructive: #b8344d;
 
-  --border: rgba(105, 74, 128, 0.23);
-  --input: rgba(105, 74, 128, 0.32);
-  --input-surface: #fdf9ff;
-  --ring: #654263;
+  --border: rgba(150, 88, 160, 0.22);
+  --input: rgba(150, 88, 160, 0.34);
+  --input-surface: #fffbfe;
+  --ring: #c23d82;
 
-  /* Panel edge and elevation, from the reference's frosted panels. */
-  --card-edge: rgba(255, 255, 255, 0.78);
+  /* Panel edge and elevation: frosted sugar, with pink-tinted shadow. */
+  --card-edge: rgba(255, 255, 255, 0.82);
   --card-shadow:
-    0 20px 54px rgba(118, 75, 146, 0.11), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    0 20px 54px rgba(214, 104, 168, 0.13), inset 0 1px 0 rgba(255, 255, 255, 0.92);
   --pop-shadow:
-    0 22px 58px rgba(111, 68, 130, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.75);
+    0 22px 58px rgba(160, 88, 170, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.78);
 
   /* A settled indigo, not a bright one. It has to hold a large ring for
      twenty-five minutes without becoming something you want to look away
      from, so the chroma stays well under the plum's. */
-  --running: #3d5fb2;
+  --running: #4366c4;
   --running-foreground: #f7f9ff;
-  --running-muted: #dde4f8;
+  --running-muted: #dee7fb;
 
   /* Cool and low-chroma, so recovery reads as a different kind of time at a
      glance rather than as "the timer, but a bit different". */
@@ -249,10 +251,10 @@
   --rest-muted: #e2e7f0;
   --rest-track: #e7eaf3;
 
-  --arc-track: #e8e2f2;
-  --arc-tick: #c9c0dc;
+  --arc-track: #f4e2ef;
+  --arc-tick: #dcc3d8;
 
-  --chart-1: #654263;
+  --chart-1: #c23d82;
   --chart-2: #4a5fc4;
   --chart-3: #227a65;
   --chart-4: #b98a3f;
@@ -292,14 +294,14 @@
   --id-5: #088cb9;
   --id-6: #a27900;
 
-  --sidebar: rgba(255, 255, 255, 0.62);
-  --sidebar-foreground: #3b3044;
-  --sidebar-primary: #654263;
+  --sidebar: rgba(255, 255, 255, 0.6);
+  --sidebar-foreground: #3a2f52;
+  --sidebar-primary: #c23d82;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: rgba(238, 221, 250, 0.68);
-  --sidebar-accent-foreground: #603b64;
-  --sidebar-border: rgba(105, 74, 128, 0.23);
-  --sidebar-ring: #654263;
+  --sidebar-accent: rgba(255, 216, 236, 0.74);
+  --sidebar-accent-foreground: #a12d6a;
+  --sidebar-border: rgba(150, 88, 160, 0.22);
+  --sidebar-ring: #c23d82;
 
   --paper: #f4ecdc;
   --paper-edge: #e2d5bc;
@@ -311,22 +313,24 @@
 }
 
 .dark {
-  /* Deep navy with blue and violet light wells. */
+  /* The night. Midnight that deepens toward the top of the sky, a moon's
+     halo in the upper corner, and an indigo glow low on the horizon where the
+     town still is. The stars are a fixed layer of their own (see `body`
+     below), so they don't scroll and don't sit under the glass twice. */
   --atmosphere:
-    linear-gradient(32deg, rgba(27, 76, 153, 0.11) 0 19%, transparent 19%),
-    linear-gradient(145deg, transparent 0 85%, rgba(87, 42, 155, 0.1) 85%),
-    radial-gradient(ellipse at 4% 5%, rgba(39, 72, 151, 0.52), transparent 39%),
-    radial-gradient(ellipse at 93% 14%, rgba(91, 45, 145, 0.31), transparent 41%),
-    radial-gradient(ellipse at 83% 85%, rgba(13, 87, 133, 0.28), transparent 45%),
-    linear-gradient(135deg, #060a19, #080d21 46%, #05091b);
+    radial-gradient(circle at 88% 8%, rgba(232, 236, 255, 0.2) 0 1.6%, rgba(190, 202, 255, 0.09) 5%, rgba(140, 156, 255, 0.04) 14%, transparent 30%),
+    radial-gradient(ellipse at 4% 5%, rgba(30, 50, 128, 0.46), transparent 40%),
+    radial-gradient(ellipse at 62% 34%, rgba(64, 40, 138, 0.16), transparent 46%),
+    radial-gradient(ellipse 120% 40% at 50% 112%, rgba(46, 58, 150, 0.34), transparent 70%),
+    linear-gradient(180deg, #03050e 0%, #050918 45%, #0a1030 100%);
 
-  --background: #060a19;
-  --foreground: #f1f5ff;
+  --background: #04070f;
+  --foreground: #eef1ff;
 
-  --card: rgba(12, 25, 55, 0.69);
-  --card-foreground: #f1f5ff;
-  --popover: rgba(11, 21, 46, 0.92);
-  --popover-foreground: #f1f5ff;
+  --card: rgba(10, 20, 48, 0.68);
+  --card-foreground: #eef1ff;
+  --popover: rgba(9, 17, 40, 0.93);
+  --popover-foreground: #eef1ff;
 
   --primary: #3652e9;
   --primary-foreground: #ffffff;
@@ -338,14 +342,15 @@
   --accent-foreground: #a7b8ff;
   --destructive: #ff7c91;
 
-  --border: rgba(139, 163, 229, 0.27);
-  --input: rgba(139, 163, 229, 0.34);
-  --input-surface: #0e1b37;
-  --ring: #8fa3ff;
+  --border: rgba(139, 160, 235, 0.25);
+  --input: rgba(139, 160, 235, 0.34);
+  --input-surface: #0b1631;
+  --ring: #9aabff;
 
-  --card-edge: rgba(149, 174, 247, 0.25);
+  /* Moonlit rims: the top edge of every panel catches a little silver. */
+  --card-edge: rgba(170, 186, 255, 0.24);
   --card-shadow:
-    0 26px 64px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(228, 239, 255, 0.11);
+    0 26px 64px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(222, 230, 255, 0.13);
   --pop-shadow:
     0 28px 68px rgba(0, 0, 0, 0.39), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 
@@ -398,8 +403,8 @@
   --id-5: #0a9cce;
   --id-6: #b48701;
 
-  --sidebar: rgba(12, 25, 55, 0.62);
-  --sidebar-foreground: #dfe7f8;
+  --sidebar: rgba(8, 16, 40, 0.64);
+  --sidebar-foreground: #dfe5fa;
   --sidebar-primary: #3652e9;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: rgba(57, 82, 165, 0.3);
@@ -415,258 +420,6 @@
   --paper-ink-muted: #7a705f;
   --washi: #a8bbaa;
   --washi-2: #c2b096;
-}
-
-/* ---------------------------------------------------------------------------
-   Eggplant — the violet night theme. Same dark base as `.dark`, re-tinted:
-   surfaces carry a subtle aubergine cast and the accent becomes a lifted
-   mauve (the same lift dark mode gives the teal). The reserved colours stay
-   untouched: running is still the clock's blue, rest the recovery slate, and
-   the charts and money palettes keep their own identities.
-
-   Selected as `.dark[data-theme="eggplant"]` — the extra attribute (set by
-   lib/theme.ts and the before-paint script) outranks plain `.dark` at equal
-   specificity-plus-one, so every token here wins without touching the base.
---------------------------------------------------------------------------- */
-
-.dark[data-theme="eggplant"] {
-  --background: #0b0811;
-  --foreground: #ece6dc;
-
-  --card: #120e1a;
-  --card-foreground: #ece6dc;
-  --popover: #120e1a;
-  --popover-foreground: #ece6dc;
-
-  --primary: #b089b2;
-  --primary-foreground: #1f141f;
-  --secondary: #1a1524;
-  --secondary-foreground: #d8cede;
-  --muted: #171122;
-  --muted-foreground: #a494a8;
-  --accent: #201832;
-  --accent-foreground: #c5a8c8;
-  --destructive: #d4796a;
-
-  --border: #221b30;
-  --input: #2a2138;
-  --input-surface: #171122;
-  --ring: #b089b2;
-
-  /* The violet night gets its own atmosphere — otherwise it would inherit
-     the navy one from `.dark` and glow the wrong colour behind its glass. */
-  --atmosphere:
-    radial-gradient(ellipse at 4% 5%, rgba(74, 37, 120, 0.55), transparent 40%),
-    radial-gradient(ellipse at 93% 14%, rgba(120, 46, 104, 0.3), transparent 42%),
-    radial-gradient(ellipse at 83% 85%, rgba(44, 28, 88, 0.4), transparent 45%),
-    linear-gradient(135deg, #0b0811, #0e0a18 46%, #090510);
-
-  --card-edge: rgba(176, 137, 178, 0.28);
-  --card-shadow:
-    0 26px 64px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(236, 230, 220, 0.08);
-  --pop-shadow:
-    0 28px 68px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-
-  --arc-track: #1c1626;
-  --arc-tick: #3a3148;
-
-  --sidebar: #0e0a16;
-  --sidebar-foreground: #d8cede;
-  --sidebar-primary: #b089b2;
-  --sidebar-primary-foreground: #1f141f;
-  --sidebar-accent: #201832;
-  --sidebar-accent-foreground: #c5a8c8;
-  --sidebar-border: #221b30;
-  --sidebar-ring: #b089b2;
-
-  /* Cream with a violet cast — the same paper, seen by lamplight. */
-  --paper: #e8dfce;
-  --paper-edge: #cfc0a6;
-  --paper-rule: #a9a0c2;
-  --paper-ink: #241e28;
-  --paper-ink-muted: #7c7288;
-  --washi: #b3a4c4;
-  --washi-2: #c9b89e;
-}
-
-
-/* ---------------------------------------------------------------------------
-   Sage, Grove, Hearth and Clear. Same mechanism as eggplant: light themes
-   add `data-theme` to the root, dark ones add it alongside `.dark`, and only
-   the tokens that differ are restated. Reserved colours (running, rest),
-   charts, money and paper stay as their base theme defines them.
---------------------------------------------------------------------------- */
-
-/* Sage — mist and sage washes with the app's original teal. */
-:root[data-theme="sage"] {
-  --atmosphere:
-    linear-gradient(32deg, rgba(104, 164, 140, 0.1) 0 20%, transparent 20%),
-    linear-gradient(145deg, transparent 0 82%, rgba(140, 186, 206, 0.1) 82%),
-    radial-gradient(ellipse at 2% 7%, rgba(158, 204, 180, 0.62), transparent 38%),
-    radial-gradient(ellipse at 96% 11%, rgba(176, 211, 228, 0.6), transparent 39%),
-    radial-gradient(ellipse at 84% 82%, rgba(212, 226, 176, 0.56), transparent 42%),
-    radial-gradient(ellipse at 24% 91%, rgba(186, 220, 206, 0.5), transparent 44%),
-    linear-gradient(125deg, #ecf4ef, #f1f6f3 48%, #f4f7ee);
-  --background: #eff5f1;
-  --foreground: #1c2a24;
-  --card: rgba(255, 255, 255, 0.66);
-  --card-foreground: #1c2a24;
-  --popover: rgba(255, 255, 255, 0.9);
-  --popover-foreground: #1c2a24;
-  --primary: #2f6f6a;
-  --primary-foreground: #f8fbfa;
-  --secondary: rgba(255, 255, 255, 0.52);
-  --secondary-foreground: #1c2a24;
-  --muted: rgba(255, 255, 255, 0.5);
-  --muted-foreground: #45574f;
-  --accent: rgba(204, 230, 218, 0.72);
-  --accent-foreground: #205a55;
-  --destructive: #ac3f3a;
-  --border: rgba(46, 94, 80, 0.21);
-  --input: rgba(46, 94, 80, 0.34);
-  --input-surface: #fafdfb;
-  --ring: #2f6f6a;
-  --card-edge: rgba(255, 255, 255, 0.8);
-  --card-shadow:
-    0 20px 54px rgba(52, 104, 88, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  --pop-shadow:
-    0 22px 58px rgba(44, 90, 76, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.75);
-  --arc-track: #dde9e3;
-  --arc-tick: #b6cac0;
-  --sidebar: rgba(255, 255, 255, 0.6);
-  --sidebar-foreground: #26352e;
-  --sidebar-primary: #2f6f6a;
-  --sidebar-primary-foreground: #f8fbfa;
-  --sidebar-accent: rgba(204, 230, 218, 0.72);
-  --sidebar-accent-foreground: #205a55;
-  --sidebar-border: rgba(46, 94, 80, 0.21);
-  --sidebar-ring: #2f6f6a;
-}
-
-/* Grove — a forest at night, moss actions and pale green ink. */
-.dark[data-theme="grove"] {
-  --atmosphere:
-    linear-gradient(32deg, rgba(40, 110, 80, 0.1) 0 19%, transparent 19%),
-    linear-gradient(145deg, transparent 0 85%, rgba(30, 92, 104, 0.1) 85%),
-    radial-gradient(ellipse at 4% 5%, rgba(38, 104, 74, 0.5), transparent 39%),
-    radial-gradient(ellipse at 93% 14%, rgba(24, 82, 96, 0.32), transparent 41%),
-    radial-gradient(ellipse at 83% 85%, rgba(72, 98, 38, 0.28), transparent 45%),
-    linear-gradient(135deg, #07110e, #091612 46%, #060f0c);
-  --background: #07110e;
-  --foreground: #e8f1ea;
-  --card: rgba(13, 34, 27, 0.7);
-  --card-foreground: #e8f1ea;
-  --popover: rgba(11, 29, 23, 0.93);
-  --popover-foreground: #e8f1ea;
-  --primary: #86c9a1;
-  --primary-foreground: #0b1d14;
-  --secondary: rgba(24, 56, 44, 0.6);
-  --secondary-foreground: #e2eee6;
-  --muted: rgba(24, 56, 44, 0.5);
-  --muted-foreground: #a8bfb2;
-  --accent: rgba(60, 130, 96, 0.28);
-  --accent-foreground: #a3dcbb;
-  --destructive: #f2877a;
-  --border: rgba(140, 200, 168, 0.24);
-  --input: rgba(140, 200, 168, 0.32);
-  --input-surface: #0b1a15;
-  --ring: #a3dcbb;
-  --card-edge: rgba(150, 214, 180, 0.2);
-  --card-shadow:
-    0 26px 64px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(226, 255, 238, 0.08);
-  --pop-shadow:
-    0 28px 68px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  --arc-track: #15281f;
-  --arc-tick: #2f4a3c;
-  --sidebar: rgba(10, 28, 22, 0.64);
-  --sidebar-foreground: #d9e8de;
-  --sidebar-primary: #86c9a1;
-  --sidebar-primary-foreground: #0b1d14;
-  --sidebar-accent: rgba(60, 130, 96, 0.28);
-  --sidebar-accent-foreground: #a3dcbb;
-  --sidebar-border: rgba(140, 200, 168, 0.22);
-  --sidebar-ring: #a3dcbb;
-}
-
-/* Hearth — ember on a warm dark, for the evening close. */
-.dark[data-theme="hearth"] {
-  --atmosphere:
-    radial-gradient(ellipse at 4% 5%, rgba(122, 54, 30, 0.42), transparent 40%),
-    radial-gradient(ellipse at 93% 14%, rgba(112, 38, 56, 0.28), transparent 42%),
-    radial-gradient(ellipse at 80% 88%, rgba(150, 84, 30, 0.3), transparent 46%),
-    linear-gradient(135deg, #110c0a, #140e0b 46%, #0e0a08);
-  --background: #110c0a;
-  --foreground: #f2e8de;
-  --card: rgba(30, 21, 17, 0.8);
-  --card-foreground: #f2e8de;
-  --popover: rgba(28, 20, 17, 0.95);
-  --popover-foreground: #f2e8de;
-  --primary: #e29b62;
-  --primary-foreground: #24140a;
-  --secondary: rgba(46, 32, 25, 0.66);
-  --secondary-foreground: #ecdfd2;
-  --muted: rgba(46, 32, 25, 0.5);
-  --muted-foreground: #c2b0a1;
-  --accent: rgba(150, 84, 44, 0.26);
-  --accent-foreground: #f1bc8f;
-  --destructive: #f28c82;
-  --border: rgba(226, 178, 140, 0.2);
-  --input: rgba(226, 178, 140, 0.3);
-  --input-surface: #18110e;
-  --ring: #f1bc8f;
-  --card-edge: rgba(240, 190, 150, 0.18);
-  --card-shadow:
-    0 26px 64px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 236, 220, 0.06);
-  --pop-shadow:
-    0 28px 68px rgba(0, 0, 0, 0.46), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  --arc-track: #261c16;
-  --arc-tick: #4b392d;
-  --sidebar: rgba(20, 14, 11, 0.72);
-  --sidebar-foreground: #e9ddd1;
-  --sidebar-primary: #e29b62;
-  --sidebar-primary-foreground: #24140a;
-  --sidebar-accent: rgba(150, 84, 44, 0.26);
-  --sidebar-accent-foreground: #f1bc8f;
-  --sidebar-border: rgba(226, 178, 140, 0.18);
-  --sidebar-ring: #f1bc8f;
-}
-
-/* Clear — flat, monochrome, high contrast. No atmosphere and no glass, so
-   colour is left for identities and live time. Also the cheapest to paint. */
-:root[data-theme="clear"] {
-  --atmosphere: none;
-  --background: #f3f3f1;
-  --foreground: #141416;
-  --card: #fcfcfb;
-  --card-foreground: #141416;
-  --popover: #fcfcfb;
-  --popover-foreground: #141416;
-  --primary: #1b1b1f;
-  --primary-foreground: #fafaf8;
-  --secondary: #ebebe8;
-  --secondary-foreground: #141416;
-  --muted: #efefec;
-  --muted-foreground: #48484e;
-  --accent: #e3e3df;
-  --accent-foreground: #141416;
-  --destructive: #b42318;
-  --border: #d2d2cc;
-  --input: #85857f;
-  --input-surface: #fdfdfc;
-  --ring: #141416;
-  --card-edge: #d2d2cc;
-  --card-shadow: none;
-  --pop-shadow: 0 18px 48px rgba(20, 20, 22, 0.14);
-  --arc-track: #e2e2de;
-  --arc-tick: #b5b5ae;
-  --sidebar: #fafaf9;
-  --sidebar-foreground: #26262a;
-  --sidebar-primary: #1b1b1f;
-  --sidebar-primary-foreground: #fafaf8;
-  --sidebar-accent: #e3e3df;
-  --sidebar-accent-foreground: #141416;
-  --sidebar-border: #d2d2cc;
-  --sidebar-ring: #141416;
 }
 
 @layer base {
@@ -689,6 +442,35 @@
     font-size: var(--text-body);
     line-height: var(--text-body--line-height);
     -webkit-font-smoothing: antialiased;
+  }
+
+  /* The night's stars. A fixed layer under everything, dark mode only: two
+     tiles of pinpricks at sizes that don't divide each other (271px, 419px),
+     so the field never visibly repeats. Still, on purpose: the sky is
+     there to be felt at the edge of the eye, not watched. The canvas paints
+     below it (the body's background propagates to the root), the content
+     above it. */
+  .dark body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+      radial-gradient(1px 1px at 23px 41px, rgba(236, 240, 255, 0.85), transparent 100%),
+      radial-gradient(1px 1px at 97px 163px, rgba(236, 240, 255, 0.55), transparent 100%),
+      radial-gradient(1.5px 1.5px at 181px 77px, rgba(236, 240, 255, 0.75), transparent 100%),
+      radial-gradient(1px 1px at 233px 219px, rgba(236, 240, 255, 0.45), transparent 100%),
+      radial-gradient(1px 1px at 141px 251px, rgba(200, 212, 255, 0.5), transparent 100%),
+      radial-gradient(1px 1px at 61px 311px, rgba(236, 240, 255, 0.4), transparent 100%),
+      radial-gradient(1.5px 1.5px at 307px 37px, rgba(255, 244, 222, 0.7), transparent 100%),
+      radial-gradient(1px 1px at 389px 193px, rgba(236, 240, 255, 0.5), transparent 100%),
+      radial-gradient(1px 1px at 263px 359px, rgba(200, 212, 255, 0.45), transparent 100%);
+    background-size:
+      271px 271px, 271px 271px, 271px 271px, 271px 271px, 271px 271px,
+      419px 419px, 419px 419px, 419px 419px, 419px 419px;
+    /* Fewer stars low in the sky, where the horizon glow washes them out. */
+    mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%);
   }
 
   ::selection {
@@ -802,13 +584,6 @@
   -webkit-backdrop-filter: blur(22px) saturate(1.3);
 }
 
-/* Clear is opaque by design, so there is nothing to blur. Dropping the filter
-   there also saves the most expensive paint the app does. */
-:root[data-theme="clear"] :is([data-slot="card"], [data-slot="dialog-content"], [data-slot="popover-content"], [data-slot="dropdown-menu-content"], [data-slot="dropdown-menu-sub-content"], [data-slot="select-content"], [data-slot="sheet-content"], [data-slot="sidebar-inner"], .bg-card, .bg-popover, .bg-sidebar) {
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-
 /* Frosted edge and soft elevation, replacing the flat hairline ring. */
 [data-slot="card"] {
   border: 1px solid var(--card-edge);
@@ -819,20 +594,26 @@
   box-shadow: var(--pop-shadow);
 }
 
-/* Primary action: a plum fill in light, the reference's blue-to-violet
-   gradient in dark. Scoped to `.bg-primary` so buttons that swapped their
-   fill for a reserved colour (`bg-running` and friends) keep it. */
+/* Primary action: spun sugar in light (candy pink drifting to orchid), and
+   midnight-to-violet in the dark. Scoped to `.bg-primary` so buttons that
+   swapped their fill for a reserved colour (`bg-running` and friends) keep
+   it. Both ends of each gradient hold white text above 4.5:1. */
 [data-slot="button"].bg-primary {
-  box-shadow: 0 4px 12px rgba(89, 50, 89, 0.2);
+  background-image: linear-gradient(100deg, #c23d82, #a1449f);
+  box-shadow: 0 4px 12px rgba(194, 61, 130, 0.24);
 }
 
-.dark:not([data-theme]) [data-slot="button"].bg-primary {
+[data-slot="button"].bg-primary:hover {
+  background-image: linear-gradient(100deg, #b33477, #933b92);
+}
+
+.dark [data-slot="button"].bg-primary {
   background-image: linear-gradient(100deg, #284be3, #5e31d3);
   border-color: #4c54e6;
   box-shadow: 0 3px 0 #1b2374;
 }
 
-.dark:not([data-theme]) [data-slot="button"].bg-primary:hover {
+.dark [data-slot="button"].bg-primary:hover {
   background-image: linear-gradient(100deg, #345bff, #7040ea);
   border-color: #6674ff;
 }
@@ -904,95 +685,47 @@
  */
 @supports not (backdrop-filter: blur(1px)) {
   :root {
-    --card: #fdf9ff;
+    --card: #fffafd;
     --popover: #fffdfe;
-    --secondary: #f7f1fc;
-    --muted: #f5effc;
-    --accent: #f0e4fa;
-    --sidebar: #fdf9ff;
+    --secondary: #fdf2f9;
+    --muted: #fbf1f8;
+    --accent: #fde3f0;
+    --sidebar: #fffafd;
   }
 
   .dark {
-    --card: #0e1b37;
-    --popover: #0c1830;
-    --secondary: #172a50;
-    --muted: #152648;
-    --accent: #1d3164;
-    --sidebar: #0e1b37;
-  }
-  :root[data-theme="sage"] {
-    --card: #fafdfb;
-    --popover: #fcfefd;
-    --secondary: #eef5f1;
-    --muted: #ecf3ef;
-    --accent: #dcece4;
-    --sidebar: #fafdfb;
+    --card: #0b1631;
+    --popover: #09132b;
+    --secondary: #14254a;
+    --muted: #122142;
+    --accent: #1a2d5e;
+    --sidebar: #0b1631;
   }
 
-  .dark[data-theme="grove"] {
-    --card: #0d1d17;
-    --popover: #0b1a15;
-    --secondary: #14291f;
-    --muted: #12251d;
-    --accent: #183527;
-    --sidebar: #0d1d17;
-  }
 
-  .dark[data-theme="hearth"] {
-    --card: #1a1310;
-    --popover: #18110e;
-    --secondary: #241a15;
-    --muted: #211813;
-    --accent: #2e1f16;
-    --sidebar: #1a1310;
-  }
 }
 
 @media (prefers-reduced-transparency: reduce) {
   :root {
-    --card: #fdf9ff;
+    --card: #fffafd;
     --popover: #fffdfe;
-    --secondary: #f7f1fc;
-    --muted: #f5effc;
-    --accent: #f0e4fa;
-    --sidebar: #fdf9ff;
+    --secondary: #fdf2f9;
+    --muted: #fbf1f8;
+    --accent: #fde3f0;
+    --sidebar: #fffafd;
   }
 
   .dark {
-    --card: #0e1b37;
-    --popover: #0c1830;
-    --secondary: #172a50;
-    --muted: #152648;
-    --accent: #1d3164;
-    --sidebar: #0e1b37;
+    --card: #0b1631;
+    --popover: #09132b;
+    --secondary: #14254a;
+    --muted: #122142;
+    --accent: #1a2d5e;
+    --sidebar: #0b1631;
   }
 
-  :root[data-theme="sage"] {
-    --card: #fafdfb;
-    --popover: #fcfefd;
-    --secondary: #eef5f1;
-    --muted: #ecf3ef;
-    --accent: #dcece4;
-    --sidebar: #fafdfb;
-  }
 
-  .dark[data-theme="grove"] {
-    --card: #0d1d17;
-    --popover: #0b1a15;
-    --secondary: #14291f;
-    --muted: #12251d;
-    --accent: #183527;
-    --sidebar: #0d1d17;
-  }
 
-  .dark[data-theme="hearth"] {
-    --card: #1a1310;
-    --popover: #18110e;
-    --secondary: #241a15;
-    --muted: #211813;
-    --accent: #2e1f16;
-    --sidebar: #1a1310;
-  }
 
   [data-slot="card"],
   [data-slot="dialog-content"],
@@ -1035,27 +768,91 @@
 /* ---------------------------------------------------------------------------
    WOOP — the ritual's sky.
 
-   Like the journal paper, the sky is its own scene and does not follow the
-   app theme: the four steps tell one dusk-to-dawn story — night for the wish,
-   pre-dawn for the outcome, cloud for the obstacle, sunrise for the plan —
-   and that story reads the same in every theme. Gradients can't transition,
-   so each step is its own stacked layer and the component cross-fades their
-   opacity.
+   The four steps tell one story: the wish at the quiet end of the day, the
+   outcome as the light comes back, cloud for the obstacle, and the sun for
+   the plan. It follows the theme. In the night theme it is literal (stars,
+   then dawn); in cotton candy it is the same walk by daylight, lavender
+   dusk to a peach morning, with the ink turning dark so it reads on the
+   pastel. Gradients can't transition, so each step is its own stacked layer
+   and the component cross-fades their opacity.
 --------------------------------------------------------------------------- */
 
 :root {
+  /* Cotton candy: dark grape ink on spun-sugar skies. */
+  --woop-base: #f6e8f6;
+  --woop-ink: #35264c;
+  --woop-ink-muted: rgba(53, 38, 76, 0.74);
+  --woop-on-ink: #fff7fc;
+  --woop-glass: rgba(255, 255, 255, 0.52);
+  --woop-glass-edge: rgba(255, 255, 255, 0.9);
+  --woop-line: rgba(84, 52, 116, 0.16);
+  --woop-hover: rgba(84, 52, 116, 0.08);
+  --woop-focus: rgba(84, 52, 116, 0.45);
+  --woop-scrim: rgba(255, 250, 253, 0.58);
+  --woop-solid: #fff4fa;
+  --woop-star: #ffffff;
+  --woop-cloud-rgb: 140 132 178;
+  /* Step accents, deep enough to read on a pale sky. */
+  --woop-wish: #5a4ccf;
+  --woop-outcome: #bd3a7a;
+  --woop-obstacle: #52657f;
+  --woop-plan: #a35206;
+  --woop-plan-ink: #fff8ef;
+  --woop-seal: #b8443f;
+}
+
+.dark {
+  /* The night: cream ink on dark skies. */
+  --woop-base: #0b0f2a;
   --woop-ink: #f7f1e6;
   --woop-ink-muted: rgba(247, 241, 230, 0.68);
+  --woop-on-ink: #161a3d;
   --woop-glass: rgba(255, 255, 255, 0.09);
   --woop-glass-edge: rgba(255, 255, 255, 0.2);
+  --woop-line: rgba(255, 255, 255, 0.1);
+  --woop-hover: rgba(255, 255, 255, 0.1);
+  --woop-focus: rgba(255, 255, 255, 0.5);
+  --woop-scrim: rgba(11, 15, 42, 0.45);
+  --woop-solid: #1a2050;
+  --woop-star: rgba(255, 255, 255, 0.85);
+  --woop-cloud-rgb: 200 210 225;
   --woop-wish: #b9c4ff;
   --woop-outcome: #f3a6c8;
   --woop-obstacle: #a9b6c6;
   --woop-plan: #ffc66b;
-  --woop-seal: #b8443f;
+  --woop-plan-ink: #3a2208;
 }
 
+/* Daylight skies (cotton candy). */
 .woop-sky-wish {
+  background:
+    radial-gradient(ellipse at 80% 0%, rgba(196, 180, 255, 0.55), transparent 55%),
+    radial-gradient(ellipse at 10% 100%, rgba(255, 196, 226, 0.6), transparent 60%),
+    linear-gradient(180deg, #e6dcff 0%, #f1dcf6 55%, #fde2ef 100%);
+}
+
+.woop-sky-outcome {
+  background:
+    radial-gradient(ellipse 90% 60% at 50% 115%, rgba(255, 168, 206, 0.7), transparent 70%),
+    radial-gradient(ellipse at 15% 100%, rgba(214, 186, 255, 0.55), transparent 60%),
+    linear-gradient(180deg, #efe0ff 0%, #ffdcec 55%, #ffd2e4 100%);
+}
+
+.woop-sky-obstacle {
+  background:
+    radial-gradient(ellipse at 50% 120%, rgba(170, 176, 210, 0.4), transparent 65%),
+    linear-gradient(180deg, #ecebf4 0%, #e1e2ee 50%, #d6d9e8 100%);
+}
+
+.woop-sky-plan {
+  background:
+    radial-gradient(circle at 50% 108%, rgba(255, 220, 150, 0.95) 0 9%, rgba(255, 186, 120, 0.5) 18%, transparent 52%),
+    radial-gradient(ellipse 120% 70% at 50% 110%, rgba(255, 170, 150, 0.45), transparent 70%),
+    linear-gradient(180deg, #fde6f1 0%, #ffe6d6 50%, #ffdcb8 100%);
+}
+
+/* Night skies. */
+.dark .woop-sky-wish {
   background:
     radial-gradient(1.5px 1.5px at 12% 18%, rgba(255, 255, 255, 0.9), transparent 60%),
     radial-gradient(1px 1px at 27% 62%, rgba(255, 255, 255, 0.7), transparent 60%),
@@ -1069,7 +866,7 @@
     linear-gradient(180deg, #070b22 0%, #121a45 55%, #1f2560 100%);
 }
 
-.woop-sky-outcome {
+.dark .woop-sky-outcome {
   background:
     radial-gradient(1px 1px at 18% 14%, rgba(255, 255, 255, 0.7), transparent 60%),
     radial-gradient(1px 1px at 71% 19%, rgba(255, 255, 255, 0.6), transparent 60%),
@@ -1079,13 +876,13 @@
     linear-gradient(180deg, #10123a 0%, #35296b 50%, #7a4a8f 100%);
 }
 
-.woop-sky-obstacle {
+.dark .woop-sky-obstacle {
   background:
     radial-gradient(ellipse at 50% 120%, rgba(140, 160, 190, 0.35), transparent 65%),
     linear-gradient(180deg, #151a24 0%, #252d3c 50%, #3a4456 100%);
 }
 
-.woop-sky-plan {
+.dark .woop-sky-plan {
   background:
     radial-gradient(circle at 50% 108%, rgba(255, 214, 140, 0.95) 0 9%, rgba(255, 170, 90, 0.55) 18%, transparent 52%),
     radial-gradient(ellipse 120% 70% at 50% 110%, rgba(255, 140, 90, 0.55), transparent 70%),
@@ -1095,10 +892,10 @@
 /* Cloud banks for the obstacle step — soft, slow, a little in the way. */
 .woop-clouds {
   background:
-    radial-gradient(ellipse 30% 14% at 20% 30%, rgba(200, 210, 225, 0.16), transparent 70%),
-    radial-gradient(ellipse 36% 16% at 70% 42%, rgba(200, 210, 225, 0.13), transparent 70%),
-    radial-gradient(ellipse 28% 12% at 45% 64%, rgba(200, 210, 225, 0.11), transparent 70%),
-    radial-gradient(ellipse 34% 14% at 90% 80%, rgba(200, 210, 225, 0.1), transparent 70%);
+    radial-gradient(ellipse 30% 14% at 20% 30%, rgb(var(--woop-cloud-rgb) / 0.2), transparent 70%),
+    radial-gradient(ellipse 36% 16% at 70% 42%, rgb(var(--woop-cloud-rgb) / 0.16), transparent 70%),
+    radial-gradient(ellipse 28% 12% at 45% 64%, rgb(var(--woop-cloud-rgb) / 0.14), transparent 70%),
+    radial-gradient(ellipse 34% 14% at 90% 80%, rgb(var(--woop-cloud-rgb) / 0.12), transparent 70%);
   background-size: 200% 100%;
 }
 
@@ -1152,7 +949,7 @@
    blur it can't read through. */
 @media (prefers-reduced-transparency: reduce) {
   .woop-glass {
-    background-color: #1a2050 !important;
+    background-color: var(--woop-solid) !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
   }
@@ -1161,29 +958,78 @@
 /* ---------------------------------------------------------------------------
    ABCDE — the disputation's weather.
 
-   WOOP walks from night to sunrise; a disputation walks through a storm and
+   WOOP walks from dusk to sunrise; a disputation walks through a storm and
    out the other side. Adversity is a grey dusk, the Belief is cloud pressing
    low, the Consequences are the rain, the Disputation is wind tearing the
-   cloud open, and Energization is the washed sky after. Like WOOP's sky (and
-   the journal paper) it is its own scene and ignores the app theme. Every
-   layer stays dark enough for the cream ink to read on it.
+   cloud open, and Energization is the washed sky after. It follows the theme
+   the same way WOOP's sky does: an overcast pastel afternoon in cotton
+   candy, a real storm at night.
 --------------------------------------------------------------------------- */
 
 :root {
+  --abcde-adversity: #8e5f36;
+  --abcde-belief: #5e568a;
+  --abcde-consequences: #426486;
+  --abcde-disputation: #946507;
+  --abcde-on-disputation: #fffaf0;
+  --abcde-energization: #11658c;
+  --abcde-rain: rgba(78, 100, 140, 0.16);
+  --abcde-wind-rgb: 255 255 255;
+}
+
+.dark {
   --abcde-adversity: #e2cdb0;
   --abcde-belief: #c3bfd8;
   --abcde-consequences: #a9c0d6;
   --abcde-disputation: #f4d68e;
+  --abcde-on-disputation: #1b1f45;
   --abcde-energization: #a7e3f2;
+  --abcde-rain: rgba(190, 210, 235, 0.09);
+  --abcde-wind-rgb: 200 210 230;
 }
 
+/* Daylight weather (cotton candy). */
 .abcde-sky-adversity {
+  background:
+    radial-gradient(ellipse 80% 40% at 50% 100%, rgba(255, 196, 170, 0.45), transparent 70%),
+    linear-gradient(180deg, #ece6ee 0%, #efe3e3 55%, #f6e0d8 100%);
+}
+
+.abcde-sky-belief {
+  background:
+    radial-gradient(ellipse 60% 22% at 25% 18%, rgba(190, 184, 214, 0.4), transparent 70%),
+    radial-gradient(ellipse 70% 26% at 75% 32%, rgba(176, 170, 206, 0.35), transparent 70%),
+    linear-gradient(180deg, #e3dfee 0%, #e7e2f0 50%, #ece6f2 100%);
+}
+
+.abcde-sky-consequences {
+  background:
+    radial-gradient(ellipse 100% 40% at 50% 0%, rgba(160, 176, 204, 0.4), transparent 70%),
+    linear-gradient(180deg, #dbe2ec 0%, #e1e7f0 55%, #e8ecf3 100%);
+}
+
+.abcde-sky-disputation {
+  background:
+    radial-gradient(ellipse 35% 70% at 68% -10%, rgba(255, 232, 170, 0.6), transparent 70%),
+    radial-gradient(ellipse 22% 60% at 38% -10%, rgba(255, 232, 170, 0.45), transparent 70%),
+    linear-gradient(180deg, #e8ecf6 0%, #eef0f8 50%, #f6f0f4 100%);
+}
+
+.abcde-sky-energization {
+  background:
+    radial-gradient(circle at 82% 12%, rgba(255, 246, 214, 0.95) 0 4%, rgba(255, 236, 190, 0.4) 12%, transparent 34%),
+    radial-gradient(ellipse 90% 40% at 50% 110%, rgba(255, 206, 232, 0.5), transparent 70%),
+    linear-gradient(180deg, #cfeaff 0%, #def1ff 55%, #f0f6ff 100%);
+}
+
+/* Night weather. */
+.dark .abcde-sky-adversity {
   background:
     radial-gradient(ellipse 80% 40% at 50% 100%, rgba(214, 160, 120, 0.35), transparent 70%),
     linear-gradient(180deg, #1d1c26 0%, #36323f 55%, #5a4c4a 100%);
 }
 
-.abcde-sky-belief {
+.dark .abcde-sky-belief {
   background:
     radial-gradient(ellipse 60% 22% at 25% 18%, rgba(160, 160, 185, 0.22), transparent 70%),
     radial-gradient(ellipse 70% 26% at 75% 32%, rgba(140, 140, 170, 0.2), transparent 70%),
@@ -1191,7 +1037,7 @@
     linear-gradient(180deg, #24222f 0%, #2e2c3b 50%, #3a3747 100%);
 }
 
-.abcde-sky-consequences {
+.dark .abcde-sky-consequences {
   background:
     radial-gradient(ellipse 100% 40% at 50% 0%, rgba(90, 105, 125, 0.45), transparent 70%),
     linear-gradient(180deg, #161b24 0%, #1f2632 55%, #2b3442 100%);
@@ -1202,13 +1048,13 @@
   background-image: repeating-linear-gradient(
     104deg,
     transparent 0 22px,
-    rgba(190, 210, 235, 0.09) 22px 23px,
+    var(--abcde-rain) 22px 23px,
     transparent 23px 47px
   );
   background-size: 100% 140px;
 }
 
-.abcde-sky-disputation {
+.dark .abcde-sky-disputation {
   background:
     radial-gradient(ellipse 35% 70% at 68% -10%, rgba(255, 226, 150, 0.32), transparent 70%),
     radial-gradient(ellipse 22% 60% at 38% -10%, rgba(255, 226, 150, 0.2), transparent 70%),
@@ -1220,13 +1066,13 @@
 /* Torn cloud carried across: the wind in "argue back". */
 .abcde-wind {
   background:
-    radial-gradient(ellipse 26% 9% at 15% 30%, rgba(200, 210, 230, 0.13), transparent 70%),
-    radial-gradient(ellipse 30% 10% at 60% 52%, rgba(200, 210, 230, 0.11), transparent 70%),
-    radial-gradient(ellipse 22% 8% at 88% 22%, rgba(200, 210, 230, 0.1), transparent 70%);
+    radial-gradient(ellipse 26% 9% at 15% 30%, rgb(var(--abcde-wind-rgb) / 0.3), transparent 70%),
+    radial-gradient(ellipse 30% 10% at 60% 52%, rgb(var(--abcde-wind-rgb) / 0.24), transparent 70%),
+    radial-gradient(ellipse 22% 8% at 88% 22%, rgb(var(--abcde-wind-rgb) / 0.2), transparent 70%);
   background-size: 200% 100%;
 }
 
-.abcde-sky-energization {
+.dark .abcde-sky-energization {
   background:
     radial-gradient(circle at 82% 12%, rgba(255, 244, 214, 0.55) 0 4%, rgba(255, 236, 190, 0.18) 12%, transparent 34%),
     radial-gradient(ellipse 90% 40% at 50% 110%, rgba(150, 210, 230, 0.35), transparent 70%),

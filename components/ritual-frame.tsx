@@ -80,7 +80,7 @@ export function RitualFrame({
     <Dialog open onOpenChange={(open) => !open && !locked && onDismiss()}>
       <DialogContent
         showCloseButton={false}
-        className="isolate flex h-[min(680px,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden border-0 bg-[#0b0f2a] p-0 text-[var(--woop-ink)] ring-white/10 sm:max-w-3xl"
+        className="isolate flex h-[min(680px,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden border-0 bg-[var(--woop-base)] p-0 text-[var(--woop-ink)] ring-[var(--woop-line)] sm:max-w-3xl"
       >
         {/* The sky: one layer per step, cross-faded. */}
         <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
@@ -96,7 +96,7 @@ export function RitualFrame({
               {skyKey === sky.key && sky.scenery}
             </div>
           ))}
-          <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[var(--woop-line)] to-transparent" />
         </div>
 
         {/* Fixed height, and only the step body scrolls: the dialog clips
@@ -106,7 +106,7 @@ export function RitualFrame({
         <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
           <nav
             aria-label={label}
-            className="flex shrink-0 justify-center gap-4 border-b border-white/10 px-4 pt-5 pb-3 sm:w-28 sm:flex-col sm:justify-center sm:gap-5 sm:border-r sm:border-b-0 sm:px-0 sm:py-8"
+            className="flex shrink-0 justify-center gap-4 border-b border-[var(--woop-line)] px-4 pt-5 pb-3 sm:w-28 sm:flex-col sm:justify-center sm:gap-5 sm:border-r sm:border-b-0 sm:px-0 sm:py-8"
           >
             {steps.map((step, index) => (
               <button
@@ -117,7 +117,7 @@ export function RitualFrame({
                 aria-current={step.current ? "step" : undefined}
                 aria-label={`${step.name}${step.done ? ", written" : ""}`}
                 className={cn(
-                  "relative flex flex-col items-center gap-0.5 rounded-2xl px-1.5 py-1 transition-colors duration-500 focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:outline-none disabled:cursor-default",
+                  "relative flex flex-col items-center gap-0.5 rounded-2xl px-1.5 py-1 transition-colors duration-500 focus-visible:ring-2 focus-visible:ring-[var(--woop-focus)] focus-visible:outline-none disabled:cursor-default",
                   step.current
                     ? cn(
                         step.accent,
@@ -135,7 +135,7 @@ export function RitualFrame({
                   {step.name}
                 </span>
                 {step.done && (
-                  <span className="absolute -top-1 -right-1 grid size-4 place-items-center rounded-full bg-[var(--woop-ink)] text-[#1b1f45]">
+                  <span className="absolute -top-1 -right-1 grid size-4 place-items-center rounded-full bg-[var(--woop-ink)] text-[var(--woop-on-ink)]">
                     <Check className="size-2.5" strokeWidth={3} aria-hidden />
                   </span>
                 )}
@@ -166,7 +166,7 @@ export function RitualFrame({
               <div className="my-auto py-6">{children}</div>
             </div>
 
-            <div className="woop-glass -mx-5 flex shrink-0 items-center justify-between gap-2 border-t border-white/10 bg-[#0b0f2a]/45 px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md sm:-mx-8 sm:px-8">
+            <div className="woop-glass -mx-5 flex shrink-0 items-center justify-between gap-2 border-t border-[var(--woop-line)] bg-[var(--woop-scrim)] px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md sm:-mx-8 sm:px-8">
               {footer}
             </div>
           </div>
@@ -245,7 +245,7 @@ export const ritualTextareaClass =
 
 /** Primary: a cream pill with an inner highlight. No glow. */
 export const ritualPrimaryClass =
-  "rounded-full bg-[var(--woop-ink)] px-5 text-[#161a3d] shadow-[inset_0_1px_0_rgba(255,255,255,0.6),0_6px_18px_-8px_rgba(5,8,30,0.6)] transition-transform hover:bg-white active:scale-[0.98] disabled:bg-white/25 disabled:text-[var(--woop-ink)]/70 disabled:shadow-none";
+  "rounded-full bg-[var(--woop-ink)] px-5 text-[var(--woop-on-ink)] shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_6px_18px_-8px_rgba(5,8,30,0.5)] transition-[transform,filter] hover:bg-[var(--woop-ink)] hover:brightness-110 active:scale-[0.98] disabled:bg-[var(--woop-glass)] disabled:text-[var(--woop-ink-muted)] disabled:shadow-none";
 
 export const ritualGhostClass =
-  "text-[var(--woop-ink-muted)] hover:bg-white/10 hover:text-[var(--woop-ink)]";
+  "text-[var(--woop-ink-muted)] hover:bg-[var(--woop-hover)] hover:text-[var(--woop-ink)]";

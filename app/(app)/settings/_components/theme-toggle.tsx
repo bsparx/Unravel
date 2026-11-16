@@ -18,14 +18,9 @@ import { cn } from "@/lib/utils";
  * active one.
  */
 const OPTIONS: { value: Theme; label: string; note: string; swatch: [string, string] }[] = [
-  { value: "system", label: "System", note: "Follows your device", swatch: ["#f7f2fb", "#060a19"] },
-  { value: "light", label: "Light", note: "Lilac and plum", swatch: ["#f7f2fb", "#654263"] },
-  { value: "dark", label: "Dark", note: "Navy and blue-violet", swatch: ["#060a19", "#3652e9"] },
-  { value: "eggplant", label: "Eggplant", note: "Aubergine and mauve", swatch: ["#0b0811", "#b089b2"] },
-  { value: "sage", label: "Sage", note: "Mist and teal", swatch: ["#eff5f1", "#2f6f6a"] },
-  { value: "grove", label: "Grove", note: "Forest and moss", swatch: ["#07110e", "#86c9a1"] },
-  { value: "hearth", label: "Hearth", note: "Ember, for evenings", swatch: ["#110c0a", "#e29b62"] },
-  { value: "clear", label: "Clear", note: "Flat, high contrast", swatch: ["#f3f3f1", "#1b1b1f"] },
+  { value: "system", label: "System", note: "Follows your device", swatch: ["#fdf5fb", "#04070f"] },
+  { value: "light", label: "Light", note: "Cotton candy", swatch: ["#ffd3ea", "#bfe2ff"] },
+  { value: "dark", label: "Dark", note: "Midnight and moonlight", swatch: ["#04070f", "#6f82ff"] },
 ];
 
 const EVENING_HOURS = [19, 20, 21, 22];
@@ -46,7 +41,7 @@ export function ThemeToggle() {
         <div
           role="group"
           aria-labelledby="appearance-label"
-          className="grid grid-cols-1 gap-1.5 sm:grid-cols-2"
+          className="grid grid-cols-1 gap-1.5 sm:grid-cols-3"
         >
           {OPTIONS.map(({ value, label, note, swatch }) => {
             const active = hydrated && theme === value;
@@ -92,8 +87,8 @@ export function ThemeToggle() {
               Evening shift
             </p>
             <p className="text-muted-foreground text-micro">
-              Switch to Hearth in the evening, until 05:00. A warmer room makes
-              the close easier.
+              Switch to the night theme in the evening, until 05:00. A darker
+              room makes the close easier.
             </p>
           </div>
           <button

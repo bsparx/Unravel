@@ -5,7 +5,7 @@
  * lilypad, waiting to be eaten. Drawn in the house stroke style (one stroke,
  * round caps, like BrandMark): the body is ink in stroke-foreground and the
  * lilypad is the only filled surface, in the primary token at low opacity, so
- * the frog wears whatever theme it sits in — paper, dark, or eggplant — with
+ * the frog wears whatever theme it sits in — cotton candy or the night — with
  * no new colours.
  *
  * Two moods: "eaten" is false while the frog waits (open eyes, small smile)

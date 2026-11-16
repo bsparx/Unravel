@@ -13,36 +13,20 @@
  * change here; everything below is the same behaviour next-themes provided.
  */
 
-export type Theme =
-  | "light"
-  | "dark"
-  | "eggplant"
-  | "sage"
-  | "grove"
-  | "hearth"
-  | "clear"
-  | "system";
+/**
+ * Two palettes and "follow the device". Light is cotton candy, dark is the
+ * night. A stored value from the retired palettes (eggplant, sage, grove,
+ * hearth, clear) fails `isTheme` and falls back to "system".
+ */
+export type Theme = "light" | "dark" | "system";
 export type ResolvedTheme = "light" | "dark";
 /** A concrete palette: every theme except "system". */
 export type Palette = Exclude<Theme, "system">;
 
-export const THEMES: Theme[] = [
-  "light",
-  "dark",
-  "eggplant",
-  "sage",
-  "grove",
-  "hearth",
-  "clear",
-  "system",
-];
+export const THEMES: Theme[] = ["light", "dark", "system"];
 
-/**
- * The palettes that ride on `.dark`. Every `dark:` variant, sonner, the charts
- * and the timer faces key off that class, so a dark palette inherits all of it
- * and only swaps tokens on top — the eggplant trick, generalised.
- */
-export const DARK_PALETTES: readonly Palette[] = ["dark", "eggplant", "grove", "hearth"];
+/** The palettes that ride on `.dark`: every `dark:` variant keys off it. */
+export const DARK_PALETTES: readonly Palette[] = ["dark"];
 
 /** Shared with the inline script in `theme-script.tsx`. Keep them in step. */
 export const THEME_STORAGE_KEY = "theme";
@@ -50,14 +34,16 @@ export const THEME_STORAGE_KEY = "theme";
 export const EVENING_STORAGE_KEY = "theme-evening";
 
 /**
- * The marker every palette except plain light and dark puts on `<html>` — see
- * globals.css. Light and dark are the bases, so they carry no marker.
+ * The attribute the retired palettes used to set on `<html>`. Nothing sets it
+ * now, but `applyTheme` still clears it so a page left over from before the
+ * change can't keep a stale palette on top.
  */
 export const THEME_ATTR = "data-theme";
 
 /** The evening shift ends at 05:00, whatever hour it started. */
 export const EVENING_ENDS_AT = 5;
-export const EVENING_PALETTE: Palette = "hearth";
+/** The evening shift switches to the night. */
+export const EVENING_PALETTE: Palette = "dark";
 
 export type EveningShift = { on: boolean; from: number };
 const EVENING_OFF: EveningShift = { on: false, from: 21 };
@@ -133,7 +119,7 @@ export function setEvening(next: EveningShift): void {
 
 /**
  * The palette actually on screen: the preference, unless the evening shift is
- * on and it is evening, in which case Hearth.
+ * on and it is evening, in which case the night.
  */
 export function activePalette(
   theme: Theme = getTheme(),
@@ -160,12 +146,7 @@ export function systemTheme(): ResolvedTheme {
     : "light";
 }
 
-/**
- * A concrete light/dark answer to any preference. Eggplant resolves to dark:
- * it IS the dark theme with a violet palette — the `.dark` class is what every
- * `dark:` variant, sonner, chart and timer face already keys off, so eggplant
- * inherits all of that for free and only swaps tokens on top.
- */
+/** A concrete light/dark answer to any preference. */
 export const resolveTheme = (theme: Theme): ResolvedTheme => {
   const palette = theme === "system" ? systemTheme() : theme;
   return DARK_PALETTES.includes(palette) ? "dark" : "light";
@@ -298,11 +279,7 @@ export function applyTheme(
   const restore = animate ? null : suppressTransitions();
 
   root.classList.toggle("dark", resolved === "dark");
-  if (palette === "light" || palette === "dark") {
-    root.removeAttribute(THEME_ATTR);
-  } else {
-    root.setAttribute(THEME_ATTR, palette);
-  }
+  root.removeAttribute(THEME_ATTR);
   root.style.colorScheme = resolved;
 
   restore?.();

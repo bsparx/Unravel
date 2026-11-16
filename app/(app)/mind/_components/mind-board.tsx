@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DisputationIndexCard } from "@/components/disputation-card";
 import { DisputationRitual } from "@/components/disputation-ritual";
+import { ritualPrimaryClass } from "@/components/ritual-frame";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -511,7 +512,7 @@ function SkyEmpty({
       )}
     >
       <div className="mx-auto flex max-w-sm flex-col items-center gap-4">
-        <span className="grid size-10 place-items-center rounded-full border border-white/20 bg-white/10">
+        <span className="grid size-10 place-items-center rounded-full border border-[var(--woop-glass-edge)] bg-[var(--woop-glass)]">
           {icon}
         </span>
         <div className="space-y-1.5">
@@ -521,7 +522,7 @@ function SkyEmpty({
         <Button
           type="button"
           onClick={onAction}
-          className="mt-2 rounded-full bg-[var(--woop-ink)] px-5 text-[#161a3d] shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] hover:bg-white active:scale-[0.98]"
+          className={cn("mt-2", ritualPrimaryClass)}
         >
           {action}
         </Button>

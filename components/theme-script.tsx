@@ -41,11 +41,7 @@ try {
   var dark = darkPalettes.indexOf(palette) >= 0;
   var root = document.documentElement;
   root.classList.toggle("dark", dark);
-  if (palette === "light" || palette === "dark") {
-    root.removeAttribute(${JSON.stringify(THEME_ATTR)});
-  } else {
-    root.setAttribute(${JSON.stringify(THEME_ATTR)}, palette);
-  }
+  root.removeAttribute(${JSON.stringify(THEME_ATTR)});
   root.style.colorScheme = dark ? "dark" : "light";
 } catch (error) {}
 `.trim();
