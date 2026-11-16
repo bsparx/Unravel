@@ -9,7 +9,6 @@
 export const CLOSE_STEPS = [
   "one-thing",
   "worry",
-  "gratitude",
   "handoff",
 ] as const;
 
@@ -32,28 +31,4 @@ export function nextCloseStep(step: CloseStep): CloseStep | null {
 
 export function closeStepHref(step: CloseStep): string {
   return `/close?step=${step}`;
-}
-
-/**
- * Rotating placeholder for the gratitude line.
- *
- * Seeded by the date rather than random, so it's stable across a refresh —
- * a prompt that changes under you mid-thought is its own small friction.
- */
-const GRATITUDE_PROMPTS = [
-  "Something that went better than you expected…",
-  "Someone who made today easier…",
-  "A small thing you'd miss if it were gone…",
-  "Something you did today that took effort…",
-  "A moment you'd keep from today…",
-  "Something that worked, however small…",
-  "Anything at all. It doesn't have to be profound.",
-];
-
-export function gratitudePrompt(date: Date): string {
-  const dayNumber = Math.floor(date.getTime() / 86_400_000);
-  return GRATITUDE_PROMPTS[
-    ((dayNumber % GRATITUDE_PROMPTS.length) + GRATITUDE_PROMPTS.length) %
-      GRATITUDE_PROMPTS.length
-  ];
 }

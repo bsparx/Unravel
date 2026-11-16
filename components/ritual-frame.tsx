@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Check } from "lucide-react";
 
 import {
@@ -9,6 +9,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 /**
@@ -55,6 +56,8 @@ export function RitualFrame({
   aside,
   footer,
   onDismiss,
+  backdrop,
+  renderGlyph,
   children,
 }: {
   /** What the rail is, for screen readers ("WOOP steps"). */
@@ -74,8 +77,27 @@ export function RitualFrame({
   aside?: ReactNode;
   footer: ReactNode;
   onDismiss: () => void;
+  /** Scenery that stays up across every sky (a rising moon). */
+  backdrop?: ReactNode;
+  /** Draw a rail glyph yourself (a lantern) instead of the letter. */
+  renderGlyph?: (step: RitualRailStep, index: number) => ReactNode;
   children: ReactNode;
 }) {
+  // Up to ten steps (n good things) don't fit the roomy rail: glyphs shrink,
+  // names move into tooltips, and the phone row scrolls instead of clipping.
+  const dense = steps.length > 6;
+
+  // On a phone the dense rail scrolls; keep the current step in view as you
+  // advance, or step 9 is written somewhere you can't see.
+  const railRef = useRef<HTMLElement>(null);
+  const currentIndex = steps.findIndex((step) => step.current);
+  useEffect(() => {
+    if (!dense || currentIndex < 0) return;
+    railRef.current
+      ?.querySelector('[aria-current="step"]')
+      ?.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
+  }, [dense, currentIndex]);
+
   return (
     <Dialog open onOpenChange={(open) => !open && !locked && onDismiss()}>
       <DialogContent
@@ -96,6 +118,7 @@ export function RitualFrame({
               {skyKey === sky.key && sky.scenery}
             </div>
           ))}
+          {backdrop}
           <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[var(--woop-line)] to-transparent" />
         </div>
 
@@ -105,41 +128,67 @@ export function RitualFrame({
             of reach. The footer is pinned instead. */}
         <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
           <nav
+            ref={railRef}
             aria-label={label}
-            className="flex shrink-0 justify-center gap-4 border-b border-[var(--woop-line)] px-4 pt-5 pb-3 sm:w-28 sm:flex-col sm:justify-center sm:gap-5 sm:border-r sm:border-b-0 sm:px-0 sm:py-8"
+            className={cn(
+              "flex shrink-0 border-b border-[var(--woop-line)] px-4 pt-5 pb-3 sm:w-28 sm:flex-col sm:items-center sm:border-r sm:border-b-0 sm:px-0 sm:py-8",
+              dense
+                ? "snap-x gap-3 overflow-x-auto [scrollbar-width:none] *:snap-center sm:gap-2.5 sm:overflow-x-visible sm:overflow-y-auto [&>*:first-child]:ml-auto [&>*:last-child]:mr-auto sm:[&>*:first-child]:mt-auto sm:[&>*:first-child]:ml-0 sm:[&>*:last-child]:mb-auto sm:[&>*:last-child]:mr-0"
+                : "justify-center gap-4 sm:justify-center sm:gap-5",
+            )}
           >
             {steps.map((step, index) => (
-              <button
-                key={step.key}
-                type="button"
-                disabled={locked || !step.reachable}
-                onClick={() => onJump(index)}
-                aria-current={step.current ? "step" : undefined}
-                aria-label={`${step.name}${step.done ? ", written" : ""}`}
-                className={cn(
-                  "relative flex flex-col items-center gap-0.5 rounded-2xl px-1.5 py-1 transition-colors duration-500 focus-visible:ring-2 focus-visible:ring-[var(--woop-focus)] focus-visible:outline-none disabled:cursor-default",
-                  step.current
-                    ? cn(
-                        step.accent,
-                        "after:absolute after:-bottom-1 after:h-0.5 after:w-5 after:rounded-full after:bg-current sm:after:top-1/2 sm:after:bottom-auto sm:after:-left-3 sm:after:h-5 sm:after:w-0.5 sm:after:-translate-y-1/2",
-                      )
-                    : step.done
-                      ? "text-[var(--woop-ink)]/85 hover:text-[var(--woop-ink)]"
-                      : "text-[var(--woop-ink)]/30",
-                )}
-              >
-                <span className="font-display text-3xl leading-none font-medium sm:text-[2.75rem]">
-                  {step.letter}
-                </span>
-                <span className="hidden text-[0.625rem] font-medium tracking-[0.16em] uppercase opacity-80 sm:block">
+              <Tooltip key={step.key}>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    disabled={locked || !step.reachable}
+                    onClick={() => onJump(index)}
+                    aria-current={step.current ? "step" : undefined}
+                    aria-label={`${step.name}${step.done ? ", written" : ""}`}
+                    className={cn(
+                      "relative flex shrink-0 flex-col items-center gap-0.5 rounded-2xl px-1.5 py-1 transition-colors duration-500 focus-visible:ring-2 focus-visible:ring-[var(--woop-focus)] focus-visible:outline-none disabled:cursor-default",
+                      step.current
+                        ? cn(
+                            step.accent,
+                            "after:absolute after:-bottom-1 after:h-0.5 after:w-5 after:rounded-full after:bg-current sm:after:top-1/2 sm:after:bottom-auto sm:after:-left-3 sm:after:h-5 sm:after:w-0.5 sm:after:-translate-y-1/2",
+                          )
+                        : step.done
+                          ? "text-[var(--woop-ink)]/85 hover:text-[var(--woop-ink)]"
+                          : "text-[var(--woop-ink)]/30",
+                    )}
+                  >
+                    {renderGlyph ? (
+                      renderGlyph(step, index)
+                    ) : (
+                      <span
+                        className={cn(
+                          "font-display leading-none font-medium",
+                          dense ? "text-xl sm:text-2xl" : "text-3xl sm:text-[2.75rem]",
+                        )}
+                      >
+                        {step.letter}
+                      </span>
+                    )}
+                    {/* "Good thing 3" under a 3 says nothing new; a real name
+                        (Yourself, Hamd) does. */}
+                    {!dense && !/\d+$/.test(step.name) && (
+                      <span className="hidden text-[0.625rem] font-medium tracking-[0.16em] uppercase opacity-80 sm:block">
+                        {step.name}
+                      </span>
+                    )}
+                    {step.done && !renderGlyph && (
+                      <span className="absolute -top-1 -right-1 grid size-4 place-items-center rounded-full bg-[var(--woop-ink)] text-[var(--woop-on-ink)]">
+                        <Check className="size-2.5" strokeWidth={3} aria-hidden />
+                      </span>
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="hidden sm:inline-flex">
                   {step.name}
-                </span>
-                {step.done && (
-                  <span className="absolute -top-1 -right-1 grid size-4 place-items-center rounded-full bg-[var(--woop-ink)] text-[var(--woop-on-ink)]">
-                    <Check className="size-2.5" strokeWidth={3} aria-hidden />
-                  </span>
-                )}
-              </button>
+                  {step.done ? " · written" : step.reachable ? "" : " · write the earlier steps first"}
+                </TooltipContent>
+              </Tooltip>
             ))}
           </nav>
 
@@ -149,7 +198,7 @@ export function RitualFrame({
                 <p className="text-[0.6875rem] font-medium tracking-[0.2em] text-[var(--woop-ink-muted)] uppercase">
                   {eyebrow}
                 </p>
-                <DialogTitle className="font-display mt-1 truncate text-lg font-normal text-[var(--woop-ink)] sm:text-xl">
+                <DialogTitle className="font-display mt-1 text-lg leading-snug font-normal text-balance text-[var(--woop-ink)] sm:truncate sm:text-xl">
                   {title}
                 </DialogTitle>
               </div>
@@ -186,12 +235,14 @@ export function RitualPrompt({
 }) {
   return (
     <div className="space-y-1.5">
-      <DialogDescription asChild>
-        <h3 className="font-display pb-1 text-2xl leading-[1.15] text-balance text-[var(--woop-ink)] italic sm:text-[2rem]">
-          {question}
-        </h3>
-      </DialogDescription>
-      <p className="text-sm text-[var(--woop-ink-muted)]">{guide}</p>
+      {/* The question is a plain heading: as the dialog's description it
+          inherited `text-label`, which beat `text-2xl` below the sm
+          breakpoint and shrank every question on a phone. The guide is the
+          description instead. */}
+      <h3 className="font-display pb-1 text-2xl leading-[1.15] text-balance text-[var(--woop-ink)] italic sm:text-[2rem]">
+        {question}
+      </h3>
+      <DialogDescription className="text-[var(--woop-ink-muted)]">{guide}</DialogDescription>
     </div>
   );
 }

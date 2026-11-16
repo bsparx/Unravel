@@ -131,6 +131,7 @@ enum WishStatus {
 enum JournalKind {
   WORRY
   GRATITUDE
+  DUA
 }
 
 /// What a block of time on the calendar is *for*. Deliberately short:
@@ -367,6 +368,20 @@ model User {
   // "Karachi" in code when null.
   prayerRemindersEnabled Boolean @default(false)
   prayerCity             String?
+
+  // Mind. Each practice can be switched off on its own; with all four off the
+  // page leaves the sidebar. Template ids live in lib/practices.ts and are
+  // checked there, not as an enum, so adding a template needs no migration.
+  mindWoopEnabled        Boolean @default(true)
+  mindDisputationEnabled Boolean @default(true)
+  mindGratitudeEnabled   Boolean @default(true)
+  mindDuaEnabled         Boolean @default(true)
+  gratitudeTemplate      String  @default("good-things")
+  /// n for the "n things" gratitude template, 1-10.
+  gratitudeCount         Int     @default(3)
+  duaTemplate            String  @default("adab")
+  /// n for the "n du'as" template, 1-10.
+  duaCount               Int     @default(3)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1170,14 +1185,21 @@ model JournalEntry {
 
   date DateTime    @db.Date
   kind JournalKind
+  /// Plain text of the page, whatever its shape.
   body String
+
+  /// Gratitude and du'a pages: the template written with and a snapshot of
+  /// its prompts and answers, `[{ key, label, text }]`. A snapshot rather
+  /// than a reference, so switching templates never breaks an old page.
+  template String?
+  items    Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   /// Lets each close step be a blind upsert — this constraint is exactly what
   /// makes "walk back a step and edit it" overwrite rather than append.
-  /// Caps you at one worry and one gratitude per day; to allow a running log,
+  /// Caps you at one worry, one gratitude and one du'a per day; to allow a running log,
   /// drop this and switch the actions from upsert to create.
   @@unique([userId, date, kind])
   @@index([userId, date])

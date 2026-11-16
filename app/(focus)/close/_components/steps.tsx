@@ -13,15 +13,14 @@ import { cn } from "@/lib/utils";
 import {
   bailOut,
   handOff,
-  saveGratitude,
   saveWorry,
   setTomorrowOneThing,
 } from "../actions";
 
 /**
- * Four screens, one input each.
+ * Three screens, one input each.
  *
- * Ritual, not form-filling: no progress bar, no "step 2 of 4", no back-and-next
+ * Ritual, not form-filling: no progress bar, no "step 2 of 3", no back-and-next
  * chrome. The only escape is a quiet "leave it for tonight", and it doesn't
  * lose anything because each step has already written.
  */
@@ -148,35 +147,6 @@ export function StepWorry({ initial }: { initial: string }) {
           autoFocus
           placeholder="Anything at all. Or nothing — that's a fine answer too."
           className="resize-none text-body"
-        />
-        <Button type="submit">Next</Button>
-      </form>
-    </Shell>
-  );
-}
-
-export function StepGratitude({
-  initial,
-  prompt,
-}: {
-  initial: string;
-  prompt: string;
-}) {
-  return (
-    <Shell eyebrow="Closing the day" title="One good thing.">
-      <form action={saveGratitude} className="space-y-4">
-        <label htmlFor="gratitude" className="sr-only">
-          One good thing about today
-        </label>
-        <Input
-          id="gratitude"
-          name="body"
-          maxLength={300}
-          defaultValue={initial}
-          autoFocus
-          autoComplete="off"
-          placeholder={prompt}
-          className="h-12 text-body"
         />
         <Button type="submit">Next</Button>
       </form>

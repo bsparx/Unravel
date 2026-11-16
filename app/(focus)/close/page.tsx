@@ -1,13 +1,12 @@
 import type { PassOption } from "@/app/(focus)/_components/morning-pass";
 import { requireUser } from "@/lib/auth";
 import { getRawCaptures } from "@/lib/captures";
-import { gratitudePrompt, parseCloseStep } from "@/lib/close-ritual";
+import { parseCloseStep } from "@/lib/close-ritual";
 import { addDays, formatMinutes, toISODate, todayLocal } from "@/lib/dates";
 import { getDayLog } from "@/lib/day-log";
 import { prisma } from "@/lib/db";
 
 import {
-  StepGratitude,
   StepHandoff,
   StepOneThing,
   StepWorry,
@@ -50,21 +49,6 @@ export default async function ClosePage({
       select: { body: true },
     });
     return <StepWorry initial={existing?.body ?? ""} />;
-  }
-
-  if (step === "gratitude") {
-    const existing = await prisma.journalEntry.findUnique({
-      where: {
-        userId_date_kind: { userId: user.id, date: today, kind: "GRATITUDE" },
-      },
-      select: { body: true },
-    });
-    return (
-      <StepGratitude
-        initial={existing?.body ?? ""}
-        prompt={gratitudePrompt(today)}
-      />
-    );
   }
 
   const tomorrowLog = await getDayLog(user, tomorrow);

@@ -31,6 +31,13 @@ import {
 import { MAX_REMIND_DAYS } from "@/lib/subscriptions";
 import { DISPUTATION_MAX } from "@/lib/disputation";
 import { WOOP_MAX } from "@/lib/woop";
+import {
+  PRACTICE_MAX_COUNT,
+  PRACTICE_MIN_COUNT,
+  buildPracticeItems,
+  findTemplate,
+  type PracticeKind,
+} from "@/lib/practices";
 
 export const cuid = z.string().min(1).max(64);
 
@@ -586,6 +593,9 @@ export const projectSchema = z.object({
   color: z.enum(["teal", "clay", "sage", "sand", "ink"]).default("teal"),
 });
 
+/** n for the counted gratitude and du'a templates. */
+const practiceCount = z.coerce.number().int().min(PRACTICE_MIN_COUNT).max(PRACTICE_MAX_COUNT);
+
 export const settingsSchema = z.object({
   timezone: z.string().min(1).max(64),
   weekStart: z.coerce.number().int().min(0).max(6),
@@ -601,6 +611,20 @@ export const settingsSchema = z.object({
   prayerRemindersEnabled: z.coerce.boolean().default(false),
   /** Empty means "leave the app default" — the action stores null. */
   prayerCity: emptyToUndefined(z.string().trim().min(1).max(80)),
+  mindWoopEnabled: z.coerce.boolean().default(true),
+  mindDisputationEnabled: z.coerce.boolean().default(true),
+  mindGratitudeEnabled: z.coerce.boolean().default(true),
+  mindDuaEnabled: z.coerce.boolean().default(true),
+  gratitudeTemplate: z
+    .string()
+    .refine((id) => findTemplate("gratitude", id) !== null, "Pick a gratitude template.")
+    .default("good-things"),
+  gratitudeCount: practiceCount.default(3),
+  duaTemplate: z
+    .string()
+    .refine((id) => findTemplate("dua", id) !== null, "Pick a du'a template.")
+    .default("adab"),
+  duaCount: practiceCount.default(3),
 });
 
 // ---------------------------------------------------------------- budget
@@ -850,6 +874,55 @@ export const disputationSchema = z
       Boolean(value.evidence || value.alternatives || value.implications || value.usefulness),
     { message: "Argue back through at least one lens.", path: ["evidence"] },
   );
+
+// ---------------------------------------------------------------- practices
+
+export const practiceKindSchema = z.enum(["gratitude", "dua"]);
+
+/** Which template a practice uses. The id must be one lib/practices.ts knows. */
+export const practiceTemplateSchema = z
+  .object({
+    kind: practiceKindSchema,
+    template: z.string().min(1).max(40),
+    count: practiceCount,
+  })
+  .refine((value) => findTemplate(value.kind, value.template) !== null, {
+    message: "That template doesn't exist.",
+    path: ["template"],
+  });
+
+/**
+ * One day's gratitude or du'a page. `answers` arrives as JSON keyed by
+ * `step:field`; the transform checks it against the template and returns the
+ * snapshot that gets stored, labels and all.
+ */
+export const practiceEntrySchema = z
+  .object({
+    kind: practiceKindSchema,
+    template: z.string().min(1).max(40),
+    count: practiceCount,
+    answers: z.preprocess((raw) => {
+      if (typeof raw !== "string") return raw;
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    }, z.record(z.string(), z.string().max(5000))),
+  })
+  .transform((value, ctx) => {
+    const template = findTemplate(value.kind as PracticeKind, value.template);
+    if (!template) {
+      ctx.addIssue({ code: "custom", message: "That template doesn't exist.", path: ["template"] });
+      return z.NEVER;
+    }
+    const built = buildPracticeItems(template, value.count, value.answers);
+    if (!built.ok) {
+      ctx.addIssue({ code: "custom", message: built.message, path: ["answers"] });
+      return z.NEVER;
+    }
+    return { kind: value.kind, template: template.id, count: value.count, items: built.items };
+  });
 
 export type ActionState =
   | { status: "idle" }

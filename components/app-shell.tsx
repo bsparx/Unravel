@@ -92,9 +92,12 @@ export function AppShell({
   children,
   banner,
   defaultOpen = true,
+  mindEnabled = true,
 }: {
   children: React.ReactNode;
   banner?: React.ReactNode;
+  /** With every Mind practice switched off, the page leaves the rail. */
+  mindEnabled?: boolean;
   /** Read from the sidebar_state cookie so the choice survives reloads. */
   defaultOpen?: boolean;
 }) {
@@ -162,7 +165,7 @@ export function AppShell({
 
           <SidebarGroup>
             <SidebarMenu>
-              {RAIL_EXTRA.map(({ href, label, icon: Icon }) => (
+              {RAIL_EXTRA.filter(({ href }) => mindEnabled || href !== "/mind").map(({ href, label, icon: Icon }) => (
                 <SidebarMenuItem key={href}>
                   <SidebarMenuButton
                     asChild

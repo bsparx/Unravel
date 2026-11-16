@@ -1088,3 +1088,233 @@
   .abcde-rain { animation: abcde-rain-fall 1.6s linear infinite; }
   .abcde-wind { animation: woop-drift 26s linear infinite; }
 }
+
+/* ---------------------------------------------------------------------------
+   Gratitude — lanterns.
+
+   The page is written in the hour after golden hour, and every good thing
+   lights one lantern on the string. Light is the progress: by the review the
+   whole garland is lit and the sky has gone to a warm dusk. Cotton candy
+   gets a peach-to-lavender evening; the night theme a real dusk with the
+   lanterns doing the lighting.
+--------------------------------------------------------------------------- */
+
+:root {
+  --thanks-lantern: #ef8f2f;
+  --thanks-lantern-glow: rgba(255, 160, 70, 0.55);
+  --thanks-unlit: rgba(255, 255, 255, 0.7);
+  --thanks-unlit-edge: rgba(84, 52, 116, 0.28);
+  --thanks-cord: rgba(84, 52, 116, 0.3);
+  --thanks-accent: #9a4a0a;
+  --thanks-on-accent: #fff8ef;
+}
+
+.dark {
+  --thanks-lantern: #ffb75e;
+  --thanks-lantern-glow: rgba(255, 170, 80, 0.6);
+  --thanks-unlit: rgba(255, 255, 255, 0.07);
+  --thanks-unlit-edge: rgba(255, 255, 255, 0.28);
+  --thanks-cord: rgba(255, 255, 255, 0.22);
+  --thanks-accent: #ffc98a;
+  --thanks-on-accent: #3a2208;
+}
+
+.thanks-sky-early {
+  background:
+    radial-gradient(circle at 85% 8%, rgba(255, 214, 160, 0.75) 0 6%, rgba(255, 196, 150, 0.3) 18%, transparent 42%),
+    linear-gradient(180deg, #fff0de 0%, #ffe5da 55%, #fde0ec 100%);
+}
+
+.thanks-sky-mid {
+  background:
+    radial-gradient(ellipse 120% 50% at 50% 112%, rgba(255, 176, 150, 0.55), transparent 70%),
+    linear-gradient(180deg, #ffe3cf 0%, #ffd9d6 50%, #f6d6ec 100%);
+}
+
+.thanks-sky-late {
+  background:
+    radial-gradient(ellipse 120% 45% at 50% 115%, rgba(255, 180, 170, 0.45), transparent 70%),
+    linear-gradient(180deg, #f3dcf2 0%, #ead7f6 55%, #e0d8fb 100%);
+}
+
+.thanks-sky-lit {
+  background:
+    radial-gradient(ellipse 90% 30% at 50% 0%, rgba(255, 190, 110, 0.45), transparent 75%),
+    radial-gradient(ellipse 120% 45% at 50% 115%, rgba(255, 196, 160, 0.4), transparent 70%),
+    linear-gradient(180deg, #f9e2ea 0%, #eedaf4 55%, #e3dbfa 100%);
+}
+
+.dark .thanks-sky-early {
+  background:
+    radial-gradient(circle at 85% 92%, rgba(255, 170, 100, 0.55) 0 5%, rgba(255, 140, 90, 0.2) 18%, transparent 42%),
+    linear-gradient(180deg, #1c1834 0%, #3d2a4c 55%, #6c3f50 100%);
+}
+
+.dark .thanks-sky-mid {
+  background:
+    radial-gradient(ellipse 120% 40% at 50% 115%, rgba(200, 100, 110, 0.4), transparent 70%),
+    linear-gradient(180deg, #141532 0%, #2c2347 55%, #523350 100%);
+}
+
+.dark .thanks-sky-late {
+  background:
+    radial-gradient(1px 1px at 14% 20%, rgba(255, 255, 255, 0.6), transparent 60%),
+    radial-gradient(1px 1px at 67% 12%, rgba(255, 255, 255, 0.5), transparent 60%),
+    radial-gradient(1.5px 1.5px at 82% 34%, rgba(255, 255, 255, 0.6), transparent 60%),
+    radial-gradient(ellipse 120% 35% at 50% 118%, rgba(160, 90, 120, 0.35), transparent 70%),
+    linear-gradient(180deg, #0c0f28 0%, #1b1c40 55%, #31284d 100%);
+}
+
+.dark .thanks-sky-lit {
+  background:
+    radial-gradient(1px 1px at 14% 20%, rgba(255, 255, 255, 0.5), transparent 60%),
+    radial-gradient(1.5px 1.5px at 82% 34%, rgba(255, 255, 255, 0.5), transparent 60%),
+    radial-gradient(ellipse 90% 34% at 50% 0%, rgba(255, 170, 80, 0.3), transparent 75%),
+    linear-gradient(180deg, #14122e 0%, #1d1b3e 55%, #2b2246 100%);
+}
+
+/* A lantern: a paper body with a cap. Unlit it's a pale shell; lit it fills
+   with warm light that spills a little. The glow is the light itself, the
+   only glow in the app that's allowed to be one. In the components layer so
+   a utility like `absolute` on a particular lantern still wins. */
+@layer components {
+  .thanks-lantern {
+    position: relative;
+    border-radius: 42% 42% 38% 38% / 50% 50% 34% 34%;
+    background: var(--thanks-unlit);
+    box-shadow: inset 0 0 0 1px var(--thanks-unlit-edge);
+    transition: background-color 700ms ease-out, box-shadow 700ms ease-out;
+  }
+
+  .thanks-lantern::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: -3px;
+    width: 45%;
+    height: 3px;
+    transform: translateX(-50%);
+    border-radius: 1px;
+    background: var(--thanks-cord);
+  }
+
+  .thanks-lantern[data-lit="true"] {
+    background: radial-gradient(circle at 50% 55%, #fff1c9 0%, var(--thanks-lantern) 70%);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.35),
+      0 0 14px 2px var(--thanks-lantern-glow);
+  }
+}
+
+@keyframes thanks-flicker {
+  0%, 100% { opacity: 1; }
+  45% { opacity: 0.86; }
+  55% { opacity: 0.95; }
+}
+
+@keyframes thanks-kindle {
+  0% { transform: scale(0.85); filter: brightness(1.6); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .thanks-lantern[data-lit="true"] { animation: thanks-kindle 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both, thanks-flicker 5s ease-in-out 700ms infinite; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thanks-lantern { transition: none; }
+}
+
+/* ---------------------------------------------------------------------------
+   Du'a — the crescent.
+
+   The page walks from maghrib into the night: dusk at Hamd, the first stars,
+   the deep still hours of the night (the time du'a is most loved), and a pale
+   fajr on the review. A crescent rises as you write. A faint eight-point star
+   lattice sits under the deepest hour, as on the ceiling of a masjid.
+--------------------------------------------------------------------------- */
+
+:root {
+  --dua-moon: #d99a2b;
+  --dua-accent: #4b3fa6;
+  --dua-on-accent: #fbf8ff;
+}
+
+.dark {
+  --dua-moon: #f6dc9c;
+  --dua-accent: #d6ccff;
+  --dua-on-accent: #17143a;
+}
+
+.dua-sky-maghrib {
+  background:
+    radial-gradient(ellipse 120% 45% at 50% 115%, rgba(255, 176, 170, 0.6), transparent 70%),
+    linear-gradient(180deg, #e8def8 0%, #f3dbef 55%, #ffe1e2 100%);
+}
+
+.dua-sky-isha {
+  background:
+    radial-gradient(ellipse 120% 40% at 50% 118%, rgba(230, 180, 214, 0.45), transparent 70%),
+    linear-gradient(180deg, #dcd8f6 0%, #e0d8f4 55%, #ead9f0 100%);
+}
+
+.dua-sky-night {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56' viewBox='0 0 56 56'%3E%3Cg fill='none' stroke='%23543474' stroke-opacity='0.09' stroke-width='0.8'%3E%3Crect x='16' y='16' width='24' height='24'/%3E%3Crect x='16' y='16' width='24' height='24' transform='rotate(45 28 28)'/%3E%3C/g%3E%3C/svg%3E"),
+    linear-gradient(180deg, #d4d1f2 0%, #d8d4f3 55%, #e0d6f2 100%);
+}
+
+.dua-sky-fajr {
+  background:
+    radial-gradient(ellipse 120% 40% at 50% 112%, rgba(255, 200, 190, 0.55), transparent 70%),
+    linear-gradient(180deg, #e6ecff 0%, #eeeafb 55%, #fde4ec 100%);
+}
+
+.dark .dua-sky-maghrib {
+  background:
+    radial-gradient(ellipse 120% 40% at 50% 115%, rgba(220, 110, 110, 0.5), transparent 70%),
+    linear-gradient(180deg, #17163a 0%, #3e2c58 55%, #8d4d63 100%);
+}
+
+.dark .dua-sky-isha {
+  background:
+    radial-gradient(1px 1px at 18% 16%, rgba(255, 255, 255, 0.7), transparent 60%),
+    radial-gradient(1.5px 1.5px at 72% 26%, rgba(255, 255, 255, 0.75), transparent 60%),
+    radial-gradient(1px 1px at 46% 10%, rgba(255, 255, 255, 0.55), transparent 60%),
+    radial-gradient(ellipse 120% 35% at 50% 118%, rgba(120, 80, 140, 0.4), transparent 70%),
+    linear-gradient(180deg, #0c0e2c 0%, #191c48 55%, #2b2556 100%);
+}
+
+.dark .dua-sky-night {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56' viewBox='0 0 56 56'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='0.06' stroke-width='0.8'%3E%3Crect x='16' y='16' width='24' height='24'/%3E%3Crect x='16' y='16' width='24' height='24' transform='rotate(45 28 28)'/%3E%3C/g%3E%3C/svg%3E"),
+    radial-gradient(1px 1px at 12% 22%, rgba(255, 255, 255, 0.75), transparent 60%),
+    radial-gradient(1.5px 1.5px at 31% 8%, rgba(255, 255, 255, 0.8), transparent 60%),
+    radial-gradient(1px 1px at 58% 30%, rgba(255, 255, 255, 0.6), transparent 60%),
+    radial-gradient(1.5px 1.5px at 84% 14%, rgba(255, 255, 255, 0.8), transparent 60%),
+    radial-gradient(1px 1px at 92% 58%, rgba(255, 255, 255, 0.5), transparent 60%),
+    radial-gradient(1px 1px at 6% 66%, rgba(255, 255, 255, 0.5), transparent 60%),
+    linear-gradient(180deg, #05071a 0%, #0c1036 55%, #161a46 100%);
+}
+
+.dark .dua-sky-fajr {
+  background:
+    radial-gradient(ellipse 120% 40% at 50% 112%, rgba(235, 160, 170, 0.5), transparent 70%),
+    linear-gradient(180deg, #172050 0%, #2f3f78 55%, #7d6c98 100%);
+}
+
+/* A crescent: a transparent disc whose inset shadow is the lit sliver. */
+.dua-crescent {
+  border-radius: 9999px;
+  box-shadow: inset 0.42em -0.18em 0 0 var(--dua-moon);
+  transform: rotate(-18deg);
+  transition: bottom 1400ms cubic-bezier(0.3, 0.7, 0.2, 1), opacity 900ms ease-out;
+}
+
+.dark .dua-crescent {
+  filter: drop-shadow(0 0 10px rgba(246, 220, 156, 0.35));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dua-crescent { transition: opacity 300ms linear; }
+}

@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { AppShell } from "@/components/app-shell";
 import { AuthedProviders } from "@/app/_components/authed-providers";
 import { requireUser } from "@/lib/auth";
+import { mindEnabled } from "@/lib/mind-data";
 
 export default async function AppLayout({
   children,
@@ -17,7 +18,12 @@ export default async function AppLayout({
 
   return (
     <AuthedProviders user={user}>
-      <AppShell defaultOpen={sidebarOpen}>{children}</AppShell>
+      <AppShell
+        defaultOpen={sidebarOpen}
+        mindEnabled={Object.values(mindEnabled(user)).some(Boolean)}
+      >
+        {children}
+      </AppShell>
     </AuthedProviders>
   );
 }

@@ -12,17 +12,19 @@ export default function Loading() {
         <Skeleton className="h-10 w-32" />
         <Skeleton className="h-5 w-full max-w-sm" />
       </header>
-      <div className="mb-8 flex items-center justify-between gap-4">
-        <Skeleton className="h-10 w-64 rounded-full" />
-        <Skeleton className="h-10 w-32 rounded-full" />
-      </div>
-      <div className="grid gap-8 md:grid-cols-2">
-        {[0, 1, 2, 3].map((index) => (
-          <Skeleton
-            key={index}
-            className={index % 2 ? "h-64 rounded-md" : "h-72 rounded-md"}
-          />
-        ))}
+      <Skeleton className="mb-8 h-10 w-full max-w-md rounded-full" />
+      {/* Shaped like the first tab most days: today's page, then the dots. */}
+      <div className="mx-auto max-w-2xl space-y-10">
+        <div className="flex items-center justify-between gap-3">
+          <Skeleton className="h-7 w-24" />
+          <Skeleton className="h-8 w-48 rounded-full" />
+        </div>
+        <Skeleton className="h-64 rounded-2xl" />
+        <div className="flex gap-1.5">
+          {Array.from({ length: 14 }, (_, index) => (
+            <Skeleton key={index} className="size-4 rounded-full" />
+          ))}
+        </div>
       </div>
     </div>
   );

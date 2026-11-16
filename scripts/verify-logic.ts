@@ -95,7 +95,6 @@ import {
   prayerWindows,
 } from "@/lib/prayer-math";
 import {
-  gratitudePrompt,
   nextCloseStep,
   parseCloseStep,
 } from "@/lib/close-ritual";
@@ -182,7 +181,26 @@ import {
   buildTimerHref,
   parseTimerParams,
 } from "@/lib/timer-url";
-import { BODY_PARTS, disputationSchema, wishSchema } from "@/lib/validation";
+import {
+  BODY_PARTS,
+  disputationSchema,
+  practiceEntrySchema,
+  practiceTemplateSchema,
+  settingsSchema,
+  wishSchema,
+} from "@/lib/validation";
+import {
+  DUA_TEMPLATES,
+  GRATITUDE_TEMPLATES,
+  buildPracticeItems,
+  clampCount,
+  fieldId,
+  findTemplate,
+  groupItems,
+  readItems,
+  stepComplete,
+  templateOrDefault,
+} from "@/lib/practices";
 import { beliefShift, hasDispute } from "@/lib/disputation";
 import { formatIfThen, woopClause } from "@/lib/woop";
 import { bodyPartLabel } from "@/lib/exercise-labels";
@@ -935,27 +953,14 @@ check("an unknown step falls back to the first, never throws", () => {
 
 check("a real step is preserved, so refresh doesn't restart the ritual", () => {
   assert.equal(parseCloseStep("worry"), "worry");
-  assert.equal(parseCloseStep("gratitude"), "gratitude");
+  // Gratitude moved to /mind; an old deep link starts the ritual over.
+  assert.equal(parseCloseStep("gratitude"), "one-thing");
 });
 
-check("the four steps advance in order and the last has no next", () => {
+check("the three steps advance in order and the last has no next", () => {
   assert.equal(nextCloseStep("one-thing"), "worry");
-  assert.equal(nextCloseStep("worry"), "gratitude");
-  assert.equal(nextCloseStep("gratitude"), "handoff");
+  assert.equal(nextCloseStep("worry"), "handoff");
   assert.equal(nextCloseStep("handoff"), null);
-});
-
-check("the gratitude prompt is stable for a given day", () => {
-  const date = parseLocalDate("2026-07-28")!;
-  assert.equal(gratitudePrompt(date), gratitudePrompt(date));
-  assert.ok(gratitudePrompt(date).length > 0);
-  // And it does actually rotate.
-  const prompts = new Set(
-    Array.from({ length: 14 }, (_, i) =>
-      gratitudePrompt(addDays(date, i)),
-    ),
-  );
-  assert.ok(prompts.size > 1);
 });
 
 console.log("\ntime blocking — minute arithmetic");
@@ -3478,6 +3483,108 @@ check("belief ratings are 0-10 or not given at all", () => {
   assert.equal(parse({ beliefAfter: "-1" }).success, false);
   assert.equal(beliefShift({ beliefBefore: 8, beliefAfter: 3 }), -5);
   assert.equal(beliefShift({ beliefBefore: 8, beliefAfter: null }), null);
+});
+
+console.log("\nmind — gratitude and du'a templates");
+
+check("every template has unique step keys and unique field keys per step", () => {
+  for (const template of [...GRATITUDE_TEMPLATES, ...DUA_TEMPLATES]) {
+    for (const n of [1, 3, 10]) {
+      const steps = template.steps(n);
+      assert.ok(steps.length > 0, template.id);
+      assert.equal(new Set(steps.map((step) => step.key)).size, steps.length, template.id);
+      for (const step of steps) {
+        assert.equal(new Set(step.fields.map((field) => field.key)).size, step.fields.length, `${template.id}/${step.key}`);
+        assert.ok(step.glyph.length >= 1 && step.glyph.length <= 2, `${template.id}/${step.key} glyph`);
+      }
+    }
+  }
+});
+
+check("each practice has exactly one counted template, and it clamps n to 1-10", () => {
+  for (const list of [GRATITUDE_TEMPLATES, DUA_TEMPLATES]) {
+    const counted = list.filter((template) => template.counted);
+    assert.equal(counted.length, 1);
+    assert.equal(counted[0].steps(5).length, 5);
+    assert.equal(counted[0].steps(0).length, 1);
+    assert.equal(counted[0].steps(99).length, 10);
+  }
+  assert.equal(clampCount("abc"), 3);
+  assert.equal(clampCount(4.4), 4);
+});
+
+check("templates have unique ids and the defaults exist", () => {
+  for (const list of [GRATITUDE_TEMPLATES, DUA_TEMPLATES]) {
+    assert.equal(new Set(list.map((template) => template.id)).size, list.length);
+  }
+  assert.equal(findTemplate("gratitude", "good-things")?.counted, true);
+  assert.equal(findTemplate("dua", "adab")?.id, "adab");
+  assert.equal(findTemplate("dua", "good-things"), null);
+  assert.equal(templateOrDefault("dua", "gone").id, "adab");
+});
+
+check("placeholders rotate with the day seed but keys never do", () => {
+  const template = findTemplate("gratitude", "good-things")!;
+  const a = template.steps(3, 0);
+  const b = template.steps(3, 1);
+  assert.deepEqual(a.map((step) => step.key), b.map((step) => step.key));
+  assert.notEqual(a[0].fields[0].placeholder, b[0].fields[0].placeholder);
+});
+
+check("a page is checked against its template before it's stored", () => {
+  const template = findTemplate("gratitude", "what-went-well")!;
+  const answers = { "well-1:what": "Talk went well", "well-2:what": "Gym", "well-3:what": "Slept" };
+  const built = buildPracticeItems(template, 3, answers);
+  assert.equal(built.ok, true);
+  if (built.ok) {
+    assert.equal(built.items.length, 6); // the optional whys are kept, blank
+    assert.equal(built.items[0].label, "What went well");
+    assert.equal(groupItems(built.items).length, 3);
+  }
+  assert.equal(buildPracticeItems(template, 3, { ...answers, "well-2:what": " " }).ok, false);
+  assert.equal(buildPracticeItems(template, 3, { ...answers, "evil:key": "x" }).ok, false);
+  assert.equal(buildPracticeItems(template, 3, { ...answers, "well-1:why": "x".repeat(241) }).ok, false);
+});
+
+check("a step is complete once its required fields are written", () => {
+  const step = findTemplate("dua", "adab")!.steps(1).find((s) => s.key === "istighfar")!;
+  assert.equal(stepComplete(step, {}), true); // all optional
+  const ask = findTemplate("dua", "adab")!.steps(1).find((s) => s.key === "ask")!;
+  assert.equal(stepComplete(ask, {}), false);
+  assert.equal(stepComplete(ask, { [fieldId(ask, ask.fields[0])]: "Ease" }), true);
+});
+
+check("the practice schemas take JSON answers and bounded counts", () => {
+  const ok = practiceEntrySchema.safeParse({
+    kind: "dua",
+    template: "n-duas",
+    count: "2",
+    answers: JSON.stringify({ "dua-1:text": "Health", "dua-2:text": "Ease" }),
+  });
+  assert.equal(ok.success, true);
+  if (ok.success) assert.equal(ok.data.items.length, 2);
+  assert.equal(practiceEntrySchema.safeParse({ kind: "dua", template: "n-duas", count: "2", answers: "{not json" }).success, false);
+  assert.equal(practiceEntrySchema.safeParse({ kind: "dua", template: "letter", count: "1", answers: "{}" }).success, false);
+  assert.equal(practiceTemplateSchema.safeParse({ kind: "gratitude", template: "savour", count: "3" }).success, true);
+  assert.equal(practiceTemplateSchema.safeParse({ kind: "gratitude", template: "savour", count: "11" }).success, false);
+  assert.equal(practiceTemplateSchema.safeParse({ kind: "gratitude", template: "adab", count: "3" }).success, false);
+});
+
+check("settings default the Mind practices on and reject unknown templates", () => {
+  const base = {
+    timezone: "UTC", weekStart: "1", pomodoroMinutes: "25", shortBreakMinutes: "5",
+    longBreakMinutes: "15", longBreakEvery: "4",
+  };
+  const parsed = settingsSchema.parse(base);
+  assert.equal(parsed.gratitudeTemplate, "good-things");
+  assert.equal(parsed.duaTemplate, "adab");
+  assert.equal(settingsSchema.safeParse({ ...base, duaTemplate: "savour" }).success, false);
+  assert.equal(settingsSchema.safeParse({ ...base, gratitudeCount: "0" }).success, false);
+});
+
+check("a malformed stored page reads as no items, never throws", () => {
+  assert.deepEqual(readItems(null), []);
+  assert.deepEqual(readItems([{ key: 1 }, "x", { key: "a", text: "b" }]), [{ key: "a", step: "", label: "", text: "b" }]);
 });
 
 console.log(`\n${passed} checks passed.\n`);

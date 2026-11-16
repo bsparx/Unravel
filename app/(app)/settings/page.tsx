@@ -1,5 +1,6 @@
 import { requireUser } from "@/lib/auth";
 import { supportedTimeZones } from "@/lib/dates";
+import { clampCount, templateOrDefault } from "@/lib/practices";
 
 import { SettingsForm } from "./_components/settings-form";
 import { ThemeToggle } from "./_components/theme-toggle";
@@ -42,6 +43,14 @@ export default async function SettingsPage() {
           hapticsEnabled: user.hapticsEnabled,
           prayerRemindersEnabled: user.prayerRemindersEnabled,
           prayerCity: user.prayerCity ?? "Karachi",
+          mindWoopEnabled: user.mindWoopEnabled,
+          mindDisputationEnabled: user.mindDisputationEnabled,
+          mindGratitudeEnabled: user.mindGratitudeEnabled,
+          mindDuaEnabled: user.mindDuaEnabled,
+          gratitudeTemplate: templateOrDefault("gratitude", user.gratitudeTemplate).id,
+          gratitudeCount: clampCount(user.gratitudeCount),
+          duaTemplate: templateOrDefault("dua", user.duaTemplate).id,
+          duaCount: clampCount(user.duaCount),
         }}
       />
     </div>

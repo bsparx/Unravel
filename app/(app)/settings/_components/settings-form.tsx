@@ -1,9 +1,14 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { InfoTip } from "@/components/info-tip";
+import {
+  PracticeTemplatePicker,
+  type TemplateChoice,
+} from "@/components/practice-template-picker";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,6 +39,14 @@ export type SettingsValues = {
   hapticsEnabled: boolean;
   prayerRemindersEnabled: boolean;
   prayerCity: string;
+  mindWoopEnabled: boolean;
+  mindDisputationEnabled: boolean;
+  mindGratitudeEnabled: boolean;
+  mindDuaEnabled: boolean;
+  gratitudeTemplate: string;
+  gratitudeCount: number;
+  duaTemplate: string;
+  duaCount: number;
 };
 
 export function SettingsForm({
@@ -52,6 +65,19 @@ export function SettingsForm({
     if (state.status === "success") toast.success(state.message ?? "Saved.");
     if (state.status === "error") toast.error(state.message);
   }, [state]);
+
+  // The pickers only show under a practice that's on, so the boxes are
+  // controlled; everything else on the form stays uncontrolled.
+  const [gratitudeOn, setGratitudeOn] = useState(values.mindGratitudeEnabled);
+  const [duaOn, setDuaOn] = useState(values.mindDuaEnabled);
+  const [gratitude, setGratitude] = useState<TemplateChoice>({
+    template: values.gratitudeTemplate,
+    count: values.gratitudeCount,
+  });
+  const [dua, setDua] = useState<TemplateChoice>({
+    template: values.duaTemplate,
+    count: values.duaCount,
+  });
 
   const error = (field: string) =>
     state.status === "error" ? state.fieldErrors?.[field] : undefined;
@@ -227,6 +253,74 @@ export function SettingsForm({
           </div>
         </section>
 
+        <section id="mind" className="scroll-mt-8 space-y-4">
+          <div>
+            <h2 className="font-display text-title flex items-center gap-1">
+              Mind <InfoTip term="mind" />
+            </h2>
+            <p className="text-muted-foreground text-label">
+              Choose which practices appear on the Mind page: all of them, some,
+              or none. With all four off, Mind leaves the sidebar. Nothing you
+              have written is deleted when a practice is switched off.
+            </p>
+          </div>
+
+          <div className="space-y-5">
+            <div className="space-y-3">
+              <CheckboxField
+                id="mindGratitudeEnabled"
+                label="Gratitude"
+                hint="A page a day of what was good. Light a lantern for each one."
+                checked={gratitudeOn}
+                onCheckedChange={setGratitudeOn}
+              />
+              {gratitudeOn && (
+                <div className="space-y-2 sm:pl-7">
+                  <p className="text-label flex items-center gap-1 font-medium">
+                    Gratitude template <InfoTip term="template" />
+                  </p>
+                  <PracticeTemplatePicker kind="gratitude" value={gratitude} onChange={setGratitude} />
+                </div>
+              )}
+              <input type="hidden" name="gratitudeTemplate" value={gratitude.template} />
+              <input type="hidden" name="gratitudeCount" value={gratitude.count} />
+            </div>
+
+            <div className="space-y-3">
+              <CheckboxField
+                id="mindDuaEnabled"
+                label="Du'a"
+                hint="A page a day of what you ask Allah for, in English prompts. Once a day; today's page stays editable."
+                checked={duaOn}
+                onCheckedChange={setDuaOn}
+              />
+              {duaOn && (
+                <div className="space-y-2 sm:pl-7">
+                  <p className="text-label flex items-center gap-1 font-medium">
+                    Du&apos;a template <InfoTip term="template" />
+                  </p>
+                  <PracticeTemplatePicker kind="dua" value={dua} onChange={setDua} />
+                </div>
+              )}
+              <input type="hidden" name="duaTemplate" value={dua.template} />
+              <input type="hidden" name="duaCount" value={dua.count} />
+            </div>
+
+            <CheckboxField
+              id="mindWoopEnabled"
+              label="Wishes (WOOP)"
+              hint="Wish, Outcome, Obstacle, Plan. For something you want and the thing in you that gets in the way."
+              defaultChecked={values.mindWoopEnabled}
+            />
+            <CheckboxField
+              id="mindDisputationEnabled"
+              label="Disputations (ABCDE)"
+              hint="For a gloomy thought after a setback: write it down and argue back."
+              defaultChecked={values.mindDisputationEnabled}
+            />
+          </div>
+        </section>
+
         <div className="border-border border-t pt-6">
           <Button type="submit" disabled={pending}>
             {pending ? "Saving…" : "Save settings"}
@@ -295,15 +389,26 @@ function CheckboxField({
   label,
   hint,
   defaultChecked,
+  checked,
+  onCheckedChange,
 }: {
   id: string;
   label: string;
   hint: string;
-  defaultChecked: boolean;
+  defaultChecked?: boolean;
+  /** Controlled, when something else on the form depends on the box. */
+  checked?: boolean;
+  onCheckedChange?: (checked: boolean) => void;
 }) {
   return (
     <div className="flex items-start gap-3">
-      <Checkbox id={id} name={id} defaultChecked={defaultChecked} />
+      <Checkbox
+        id={id}
+        name={id}
+        {...(checked === undefined
+          ? { defaultChecked }
+          : { checked, onCheckedChange: (next) => onCheckedChange?.(next === true) })}
+      />
       <div className="grid gap-0.5">
         <Label htmlFor={id} className="font-normal">
           {label}

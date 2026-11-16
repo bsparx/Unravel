@@ -18,7 +18,7 @@ import type { JournalKind } from "@/lib/generated/prisma/client";
  *
  * Every step writes on advance rather than at the end. Bailing out halfway
  * keeps everything you already entered — there is no final submit holding the
- * four hostage, because a ritual you can only complete perfectly is a ritual
+ * three hostage, because a ritual you can only complete perfectly is a ritual
  * you stop doing.
  */
 
@@ -49,14 +49,8 @@ export async function saveWorry(formData: FormData): Promise<void> {
   advance("worry");
 }
 
-/** Step 3 — the gratitude line. */
-export async function saveGratitude(formData: FormData): Promise<void> {
-  await saveJournal(formData, "GRATITUDE");
-  advance("gratitude");
-}
-
 /**
- * Step 4 — the hand-off.
+ * Step 3 — the hand-off.
  *
  * Marks the day closed and starts recovery *server-side*, so the last thing
  * that happens is the timer already running rather than another button.

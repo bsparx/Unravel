@@ -27,6 +27,10 @@ export async function updateSettings(
     "hapticsEnabled",
     "returnAlertsEnabled",
     "prayerRemindersEnabled",
+    "mindWoopEnabled",
+    "mindDisputationEnabled",
+    "mindGratitudeEnabled",
+    "mindDuaEnabled",
   ]) {
     values[key] = values[key] === "on" || values[key] === "true";
   }
@@ -75,6 +79,14 @@ export async function updateSettings(
       returnAlertsEnabled: input.returnAlertsEnabled,
       prayerRemindersEnabled: input.prayerRemindersEnabled,
       prayerCity: input.prayerCity ?? null,
+      mindWoopEnabled: input.mindWoopEnabled,
+      mindDisputationEnabled: input.mindDisputationEnabled,
+      mindGratitudeEnabled: input.mindGratitudeEnabled,
+      mindDuaEnabled: input.mindDuaEnabled,
+      gratitudeTemplate: input.gratitudeTemplate,
+      gratitudeCount: input.gratitudeCount,
+      duaTemplate: input.duaTemplate,
+      duaCount: input.duaCount,
     },
   });
 

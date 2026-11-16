@@ -99,13 +99,13 @@ export const GLOSSARY = {
   },
   close: {
     title: "Closing the day",
-    what: "Three short steps at night: pick tomorrow's frog, empty what's still on your mind, and note one good thing.",
+    what: "Two short steps at night: pick tomorrow's frog and empty what's still on your mind. Then the day hands off to rest. Gratitude lives on the Mind page.",
     why: "Tomorrow starts already decided, and the day ends instead of trailing off.",
   },
   mind: {
     title: "Mind",
-    what: "Two practices on one page. WOOP turns a wish into a plan for the obstacle in you. ABCDE takes a gloomy thought after a setback and argues back.",
-    why: "Wanting something and thinking clearly about setbacks are both skills, and both get easier written down.",
+    what: "Up to four practices on one page, each switchable in Settings. Gratitude and du'a are a page a day. WOOP turns a wish into a plan for the obstacle in you. ABCDE takes a gloomy thought after a setback and argues back.",
+    why: "Noticing the good, asking for what you need, wanting well and thinking clearly about setbacks are all skills, and all get easier written down.",
   },
   woop: {
     title: "WOOP",
@@ -116,6 +116,21 @@ export const GLOSSARY = {
     title: "Disputation",
     what: "Adversity, Belief, Consequences, Disputation, Energization, from Martin Seligman's Learned Optimism. Write what happened and what you told yourself, then argue back as if someone else had said it.",
     why: "The thought after a setback is often the harshest available one. Checking it against evidence, alternatives, implications and usefulness loosens its grip.",
+  },
+  gratitude: {
+    title: "Gratitude",
+    what: "One page a day of what was good. Pick a template: a quick list of good things (you choose how many, up to 10), or a deeper one like What went well and why, or a letter of thanks.",
+    why: "Writing down good things trains attention to find them. In Seligman's studies, a week of it lifted mood for months.",
+  },
+  dua: {
+    title: "Du'a",
+    what: "One page a day of what you ask Allah for. Pick a template: a short list of du'as (up to 10), widening circles from yourself to the ummah, or the full adab from praise to ameen.",
+    why: "Writing it slows you down enough to mean it, and the pages become a record of what you were carrying and asking for.",
+  },
+  template: {
+    title: "Templates",
+    what: "The shape of each day's page. Light templates take a minute; deep ones take ten. Change it any time from the chip at the top; pages you've already written keep their own shape.",
+    why: "Some days want a quick list, some want slow writing. Neither is the better habit; the one you'll actually do is.",
   },
 } as const satisfies Record<string, { title: string; what: string; why: string }>;
 
