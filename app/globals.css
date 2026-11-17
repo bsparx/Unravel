@@ -1318,3 +1318,102 @@
 @media (prefers-reduced-motion: reduce) {
   .dua-crescent { transition: opacity 300ms linear; }
 }
+
+/* ---------------------------------------------------------------------------
+   Fasting — from the last meal to the first light.
+
+   A fast is drawn as a night: it begins at dusk when the window closes,
+   deepens while you go, and turns to dawn as the goal comes near. The ring
+   is the clock; the sky only says roughly where in the night you are.
+   Cotton candy walks the same night by daylight, lilac to a peach morning.
+   It shares the ritual ink tokens (--woop-ink and friends) so text and the
+   primary button read on it the same way they do on the Mind skies.
+--------------------------------------------------------------------------- */
+
+:root {
+  --fast-track: rgba(84, 52, 116, 0.13);
+  --fast-ring: #5a4ccf;
+  --fast-ring-end: #bd3a7a;
+  --fast-reached: #a35206;
+  --fast-eat: rgba(239, 143, 47, 0.42);
+  --fast-eat-edge: rgba(163, 82, 6, 0.55);
+  --fast-now: #35264c;
+}
+
+.dark {
+  --fast-track: rgba(255, 255, 255, 0.11);
+  --fast-ring: #b9c4ff;
+  --fast-ring-end: #f3a6c8;
+  --fast-reached: #ffc66b;
+  --fast-eat: rgba(255, 183, 94, 0.34);
+  --fast-eat-edge: rgba(255, 198, 107, 0.6);
+  --fast-now: #f7f1e6;
+}
+
+.fast-sky-day {
+  background:
+    radial-gradient(circle at 88% 10%, rgba(255, 214, 160, 0.7) 0 5%, rgba(255, 196, 150, 0.25) 16%, transparent 40%),
+    linear-gradient(180deg, #fff1e2 0%, #fde6e4 55%, #f6e2f2 100%);
+}
+
+.fast-sky-dusk {
+  background:
+    radial-gradient(ellipse 120% 50% at 50% 115%, rgba(255, 170, 160, 0.5), transparent 70%),
+    linear-gradient(180deg, #efe0f6 0%, #f3dcec 55%, #fbdcdc 100%);
+}
+
+.fast-sky-night {
+  background:
+    radial-gradient(ellipse 80% 40% at 20% 0%, rgba(180, 170, 255, 0.4), transparent 70%),
+    linear-gradient(180deg, #e4dcfb 0%, #e6dcf6 55%, #efdcf0 100%);
+}
+
+.fast-sky-dawn {
+  background:
+    radial-gradient(ellipse 120% 55% at 50% 118%, rgba(255, 196, 140, 0.65), transparent 70%),
+    linear-gradient(180deg, #e8e0fa 0%, #f6e0ec 50%, #ffe6d4 100%);
+}
+
+.dark .fast-sky-day {
+  background:
+    radial-gradient(circle at 88% 12%, rgba(255, 200, 130, 0.35) 0 4%, rgba(255, 170, 110, 0.12) 16%, transparent 40%),
+    linear-gradient(180deg, #1d2148 0%, #2c2c55 55%, #43355a 100%);
+}
+
+.dark .fast-sky-dusk {
+  background:
+    radial-gradient(ellipse 120% 45% at 50% 115%, rgba(200, 100, 110, 0.42), transparent 70%),
+    linear-gradient(180deg, #151633 0%, #2b2347 55%, #523350 100%);
+}
+
+.dark .fast-sky-night {
+  background:
+    radial-gradient(1px 1px at 12% 22%, rgba(255, 255, 255, 0.65), transparent 60%),
+    radial-gradient(1px 1px at 38% 10%, rgba(255, 255, 255, 0.45), transparent 60%),
+    radial-gradient(1.5px 1.5px at 71% 18%, rgba(255, 255, 255, 0.6), transparent 60%),
+    radial-gradient(1px 1px at 88% 40%, rgba(255, 255, 255, 0.5), transparent 60%),
+    radial-gradient(1px 1px at 55% 33%, rgba(255, 255, 255, 0.35), transparent 60%),
+    linear-gradient(180deg, #080b22 0%, #11163a 55%, #1d1f48 100%);
+}
+
+.dark .fast-sky-dawn {
+  background:
+    radial-gradient(1px 1px at 18% 14%, rgba(255, 255, 255, 0.4), transparent 60%),
+    radial-gradient(1px 1px at 76% 10%, rgba(255, 255, 255, 0.35), transparent 60%),
+    radial-gradient(ellipse 120% 50% at 50% 120%, rgba(255, 170, 110, 0.5), transparent 70%),
+    linear-gradient(180deg, #0f1336 0%, #2a2650 50%, #5b3d56 100%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fast-ring-arc {
+    transition: stroke-dashoffset 900ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .fast-pulse {
+    animation: fast-pulse 2.4s ease-in-out infinite;
+  }
+}
+
+@keyframes fast-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}

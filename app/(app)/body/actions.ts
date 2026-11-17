@@ -16,7 +16,7 @@ import {
 import { autoDayTypes, generateRoutine } from "@/lib/exercise-routine";
 
 function revalidateExercises() {
-  revalidatePath("/exercises");
+  revalidatePath("/body");
 }
 
 /** Name the exact days, then generate and persist the routine. */

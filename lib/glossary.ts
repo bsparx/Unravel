@@ -132,6 +132,26 @@ export const GLOSSARY = {
     what: "The shape of each day's page. Light templates take a minute; deep ones take ten. Change it any time from the chip at the top; pages you've already written keep their own shape.",
     why: "Some days want a quick list, some want slow writing. Neither is the better habit; the one you'll actually do is.",
   },
+  body: {
+    title: "Body",
+    what: "Exercises and intermittent fasting on one page, each switchable in Settings. Exercises is your corrective week and the body-map catalog; Fasting is your eating window and a log of real fasts.",
+    why: "Moving and eating are the two daily things the body asks for. Keeping them together makes the day's plan for the body one glance.",
+  },
+  fasting: {
+    title: "Fasting",
+    what: "Two kinds. Intermittent: one eating window a day by the clock, like 16:8. Islamic: from Fajr to Maghrib, with the times from your prayer city. Start a fast with a tap and break it with another; the ring shows how far you've come against the goal, and any time can be fixed afterwards.",
+    why: "The plan and the log sit side by side, so you can see what you meant to do and what you did. There are no streaks: a shorter fast is still a fast.",
+  },
+  "islamic-fast": {
+    title: "Kind of fast",
+    what: "Intermittent follows the clock: you choose the hours you eat in. Islamic (sawm) follows the sun: no food or drink from Fajr to Maghrib, using the prayer times for the city in Settings, so it's longer in summer and shorter in winter.",
+    why: "Logged before Fajr, an Islamic fast waits for Fajr to begin; broken after Maghrib, it's logged as ending at Maghrib, so tapping iftar late doesn't stretch it.",
+  },
+  "fast-window": {
+    title: "Eating window",
+    what: "The hours you eat in each day. Pick a protocol like 16:8 (fast 16 hours, eat in 8) and when the window opens, or set both ends yourself. A window can run past midnight.",
+    why: "A fixed window turns a daily decision into a default. Changing it only affects fasts you start from then on; past fasts keep their own goal.",
+  },
 } as const satisfies Record<string, { title: string; what: string; why: string }>;
 
 export type GlossaryTerm = keyof typeof GLOSSARY;

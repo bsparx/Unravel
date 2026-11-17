@@ -1,8 +1,10 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { startTransition, useActionState, useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { FastKindPicker } from "@/components/fasting/kind-picker";
+import { FastWindowPicker } from "@/components/fasting/window-picker";
 import { Button } from "@/components/ui/button";
 import { InfoTip } from "@/components/info-tip";
 import {
@@ -20,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { WEEKDAYS } from "@/lib/dates";
+import type { FastKindId, FastWindow } from "@/lib/fasting";
 import { idleState } from "@/lib/validation";
 
 import { updateSettings } from "../actions";
@@ -47,6 +50,11 @@ export type SettingsValues = {
   gratitudeCount: number;
   duaTemplate: string;
   duaCount: number;
+  bodyExercisesEnabled: boolean;
+  bodyFastingEnabled: boolean;
+  fastKind: FastKindId;
+  fastEatStart: number;
+  fastEatEnd: number;
 };
 
 export function SettingsForm({
@@ -79,12 +87,30 @@ export function SettingsForm({
     count: values.duaCount,
   });
 
+  const [fastingOn, setFastingOn] = useState(values.bodyFastingEnabled);
+  const [fastKind, setFastKind] = useState<FastKindId>(values.fastKind);
+  const [fastWindow, setFastWindow] = useState<FastWindow>({
+    eatStart: values.fastEatStart,
+    eatEnd: values.fastEatEnd,
+  });
+
   const error = (field: string) =>
     state.status === "error" ? state.fieldErrors?.[field] : undefined;
 
   return (
     <>
-      <form action={formAction} className="space-y-10">
+      {/* Submitted through onSubmit, not `action`: a form action resets the
+          form afterwards, and Radix answers a reset by setting each
+          controlled checkbox back to its first value. A practice you had just
+          switched off showed as on again, and the next save turned it on. */}
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          const formData = new FormData(event.currentTarget);
+          startTransition(() => formAction(formData));
+        }}
+        className="space-y-10"
+      >
         <section className="space-y-4">
           <div>
             <h2 className="font-display text-title">Your day</h2>
@@ -217,7 +243,7 @@ export function SettingsForm({
           </div>
         </section>
 
-        <section className="space-y-4">
+        <section id="prayers" className="scroll-mt-8 space-y-4">
           <div>
             <h2 className="font-display text-title">Prayer reminders</h2>
             <p className="text-muted-foreground text-label">
@@ -318,6 +344,64 @@ export function SettingsForm({
               hint="For a gloomy thought after a setback: write it down and argue back."
               defaultChecked={values.mindDisputationEnabled}
             />
+          </div>
+        </section>
+
+        <section id="body" className="scroll-mt-8 space-y-4">
+          <div>
+            <h2 className="font-display text-title flex items-center gap-1">
+              Body <InfoTip term="body" />
+            </h2>
+            <p className="text-muted-foreground text-label">
+              Choose what appears on the Body page. With both off, Body leaves
+              the sidebar and the bottom bar. Your routine and your fasts are
+              kept when a section is switched off.
+            </p>
+          </div>
+
+          <div className="space-y-5">
+            <CheckboxField
+              id="bodyExercisesEnabled"
+              label="Exercises"
+              hint="Your corrective week of yoga and dumbbells, and the body-map catalog."
+              defaultChecked={values.bodyExercisesEnabled}
+            />
+
+            <div className="space-y-3">
+              <CheckboxField
+                id="bodyFastingEnabled"
+                label="Fasting"
+                hint="Intermittent (one eating window a day, by the clock) or Islamic (Fajr to Maghrib). A ring for the fast in progress and a log of real start and end times."
+                checked={fastingOn}
+                onCheckedChange={setFastingOn}
+              />
+              {fastingOn && (
+                <div className="space-y-4 sm:pl-7">
+                  <FastKindPicker value={fastKind} onChange={setFastKind} />
+                  {fastKind === "INTERMITTENT" ? (
+                    <div className="space-y-2">
+                      <p className="text-label flex items-center gap-1 font-medium">
+                        Eating window <InfoTip term="fast-window" />
+                      </p>
+                      <FastWindowPicker value={fastWindow} onChange={setFastWindow} />
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground text-label">
+                      Fajr and Maghrib come from the city under Prayer reminders above, so
+                      the fast follows the sun through the year.
+                    </p>
+                  )}
+                  {error("fastEatEnd") && (
+                    <p role="alert" className="text-destructive text-label">
+                      {error("fastEatEnd")}
+                    </p>
+                  )}
+                </div>
+              )}
+              <input type="hidden" name="fastKind" value={fastKind} />
+              <input type="hidden" name="fastEatStart" value={fastWindow.eatStart} />
+              <input type="hidden" name="fastEatEnd" value={fastWindow.eatEnd} />
+            </div>
           </div>
         </section>
 

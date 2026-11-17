@@ -31,6 +31,8 @@ export async function updateSettings(
     "mindDisputationEnabled",
     "mindGratitudeEnabled",
     "mindDuaEnabled",
+    "bodyExercisesEnabled",
+    "bodyFastingEnabled",
   ]) {
     values[key] = values[key] === "on" || values[key] === "true";
   }
@@ -52,6 +54,14 @@ export async function updateSettings(
       status: "error",
       message: "That timezone isn't one this browser knows about.",
       fieldErrors: { timezone: "Pick one from the list." },
+    };
+  }
+
+  if (input.fastEatStart === input.fastEatEnd) {
+    return {
+      status: "error",
+      message: "The eating window needs to open and close at different times.",
+      fieldErrors: { fastEatEnd: "Pick a different closing time." },
     };
   }
 
@@ -87,6 +97,11 @@ export async function updateSettings(
       gratitudeCount: input.gratitudeCount,
       duaTemplate: input.duaTemplate,
       duaCount: input.duaCount,
+      bodyExercisesEnabled: input.bodyExercisesEnabled,
+      bodyFastingEnabled: input.bodyFastingEnabled,
+      fastKind: input.fastKind,
+      fastEatStart: input.fastEatStart,
+      fastEatEnd: input.fastEatEnd,
     },
   });
 

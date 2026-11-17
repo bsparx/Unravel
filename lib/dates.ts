@@ -113,6 +113,53 @@ export function startOfLocalDay(
   return new Date(secondPass);
 }
 
+/**
+ * The instant a wall-clock time happens in `timeZone`: "2026-11-17", 20:30 in
+ * Karachi is 15:30Z. Same two-pass offset trick as `startOfLocalDay`, so a
+ * DST day resolves to a real instant (a skipped 02:30 lands an hour later;
+ * a repeated 01:30 takes its first occurrence).
+ */
+export function localToInstant(
+  dateISO: string,
+  minuteOfDay: number,
+  timeZone: string,
+): Date | null {
+  const day = parseLocalDate(dateISO);
+  if (!day || !Number.isInteger(minuteOfDay) || minuteOfDay < 0 || minuteOfDay > 1439) {
+    return null;
+  }
+  const wall = day.getTime() + minuteOfDay * 60_000;
+  const firstPass = wall - offsetMinutes(timeZone, new Date(wall)) * 60_000;
+  const secondPass = wall - offsetMinutes(timeZone, new Date(firstPass)) * 60_000;
+  return new Date(secondPass);
+}
+
+/** A `datetime-local` value ("2026-11-17T20:30") read in `timeZone`. */
+export function localInputToInstant(value: string, timeZone: string): Date | null {
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return null;
+  const hours = Number(match[2]);
+  const minutes = Number(match[3]);
+  if (hours > 23 || minutes > 59) return null;
+  return localToInstant(match[1], hours * 60 + minutes, timeZone);
+}
+
+/** The inverse: an instant as a `datetime-local` value in `timeZone`. */
+export function instantToLocalInput(instant: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(instant);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "00";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
+}
+
 /** Today's calendar day in `timeZone`, as a UTC-midnight Date. */
 export function todayLocal(timeZone: string, now: Date = new Date()): Date {
   return toLocalDate(now, timeZone);

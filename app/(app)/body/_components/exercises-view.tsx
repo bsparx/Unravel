@@ -70,23 +70,23 @@ export function ExercisesView({
     .join(" · ");
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-5 py-8 md:px-8 md:py-12">
+    <div>
       <div className="space-y-12">
         <header className="space-y-2">
           <p className="text-micro text-muted-foreground font-medium tracking-wider uppercase">
             Undoing the desk
           </p>
-          <h1 className="font-display text-display">Exercises</h1>
+          <h2 className="font-display text-title">Exercises</h2>
           <p className="text-muted-foreground max-w-prose text-body">
             A corrective week for the postural patterns a desk builds:
             anterior pelvic tilt, rounded shoulders and forward head. Yoga and
-            light dumbbells, up to five exercises a day — your call per day.
+            light dumbbells, up to five exercises a day, your call per day.
           </p>
           {hasRoutine && (
             <p className="text-label text-muted-foreground">
               {daysOfWeek.length} days a week · {daysLabel} ·{" "}
               {ROUTINE_EQUIPMENT_LABELS[equipment]} ·{" "}
-              {difficulty === "EASY" ? "gentle — easy exercises" : "challenging"} ·{" "}
+              {difficulty === "EASY" ? "gentle, easy exercises" : "challenging"} ·{" "}
               {EQUIPMENT_LABELS.YOGA.toLowerCase()} {week.yoga} /{" "}
               {EQUIPMENT_LABELS.DUMBBELL.toLowerCase()} {week.dumbbell}
             </p>

@@ -594,6 +594,9 @@ export const projectSchema = z.object({
 });
 
 /** n for the counted gratitude and du'a templates. */
+/** A minute of the local day, 0-1439: the eating window's ends. */
+const windowMinute = z.coerce.number().int().min(0).max(1439);
+
 const practiceCount = z.coerce.number().int().min(PRACTICE_MIN_COUNT).max(PRACTICE_MAX_COUNT);
 
 export const settingsSchema = z.object({
@@ -625,6 +628,11 @@ export const settingsSchema = z.object({
     .refine((id) => findTemplate("dua", id) !== null, "Pick a du'a template.")
     .default("adab"),
   duaCount: practiceCount.default(3),
+  bodyExercisesEnabled: z.coerce.boolean().default(true),
+  bodyFastingEnabled: z.coerce.boolean().default(true),
+  fastKind: z.enum(["INTERMITTENT", "ISLAMIC"]).default("INTERMITTENT"),
+  fastEatStart: windowMinute.default(720),
+  fastEatEnd: windowMinute.default(1200),
 });
 
 // ---------------------------------------------------------------- budget
@@ -956,6 +964,42 @@ export function formValues(formData: FormData): Record<string, unknown> {
 
   return values;
 }
+
+// ---------------------------------------------------------------- fasting
+
+/** A `datetime-local` value, read in the user's timezone by the action. */
+const localDateTime = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, "Pick a date and a time.");
+
+const fastKind = z.enum(["INTERMITTENT", "ISLAMIC"]);
+
+export const fastStartSchema = z.object({
+  /** Omitted means now (intermittent) or the coming Fajr (Islamic). */
+  startedAt: emptyToUndefined(localDateTime),
+  /** Sent by the panel so a just-switched kind is the one used. */
+  kind: emptyToUndefined(fastKind),
+});
+
+export const fastEndSchema = z.object({
+  id: cuid,
+  /** Omitted means now. */
+  endedAt: emptyToUndefined(localDateTime),
+});
+
+export const fastUpdateSchema = z.object({
+  id: cuid,
+  startedAt: localDateTime,
+  /** Omitted for the fast that's still running. */
+  endedAt: emptyToUndefined(localDateTime),
+});
+
+export const fastPlanSchema = z
+  .object({ kind: fastKind.default("INTERMITTENT"), eatStart: windowMinute, eatEnd: windowMinute })
+  .refine((value) => value.eatStart !== value.eatEnd, {
+    message: "The window needs to open and close at different times.",
+    path: ["eatEnd"],
+  });
 
 // ---------------------------------------------------------------- exercises
 

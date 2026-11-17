@@ -265,6 +265,26 @@ export async function getTimingsForDates(
   return result;
 }
 
+/**
+ * The user's prayer city's timings for each date, shifted into the user's
+ * timezone (minutes from local midnight). Dates whose timings couldn't be
+ * fetched or recovered from the cache are simply absent.
+ */
+export async function getUserTimings(
+  user: Pick<User, "timezone" | "prayerCity">,
+  dates: Date[],
+): Promise<{ city: string; timings: Map<string, PrayerTimings> }> {
+  const city = (user.prayerCity ?? "").trim() || DEFAULT_CITY;
+  const raw = await getTimingsForDates(city, dates);
+  const timings = new Map<string, PrayerTimings>();
+  for (const date of dates) {
+    const iso = toISODate(date);
+    const found = raw.get(iso);
+    if (found) timings.set(iso, toZoneTimings(found, date, user.timezone));
+  }
+  return { city, timings };
+}
+
 export type PrayerCycleView = {
   city: string;
   /** The local day the cycle belongs to (yesterday when Isha is still open). */

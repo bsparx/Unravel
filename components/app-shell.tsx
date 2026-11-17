@@ -9,7 +9,7 @@ import {
   CalendarClock,
   CalendarDays,
   Drama,
-  Dumbbell,
+  HeartPulse,
   Inbox,
   ListChecks,
   ListTodo,
@@ -44,7 +44,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * The desktop rail's primary group, in the order the day runs. Five is the
- * ceiling for the mobile bar; the desktop rail has room, so Exercises lives
+ * ceiling for the mobile bar; the desktop rail has room, so Body lives
  * here and Statistics moves to the rail's second group.
  */
 const NAV = [
@@ -52,12 +52,12 @@ const NAV = [
   { href: "/day", label: "Day", icon: ListChecks },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/timer", label: "Timer", icon: Timer },
-  { href: "/exercises", label: "Exercises", icon: Dumbbell },
+  { href: "/body", label: "Body", icon: HeartPulse },
 ] as const;
 
 /**
  * The mobile bottom bar: the surfaces you touch on an ordinary day, in the
- * order the day runs. The desktop rail can hold both Exercises and Statistics;
+ * order the day runs. The desktop rail can hold both Body and Statistics;
  * the bar can't, and training is the daily act.
  */
 const MOBILE_NAV = [
@@ -65,7 +65,7 @@ const MOBILE_NAV = [
   { href: "/day", label: "Day", icon: ListChecks },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/timer", label: "Timer", icon: Timer },
-  { href: "/exercises", label: "Exercises", icon: Dumbbell },
+  { href: "/body", label: "Body", icon: HeartPulse },
 ] as const;
 
 /** There's room on the desktop rail, and losing these from it would be a loss. */
@@ -93,11 +93,14 @@ export function AppShell({
   banner,
   defaultOpen = true,
   mindEnabled = true,
+  bodyEnabled = true,
 }: {
   children: React.ReactNode;
   banner?: React.ReactNode;
   /** With every Mind practice switched off, the page leaves the rail. */
   mindEnabled?: boolean;
+  /** Likewise Body, with both exercises and fasting off. */
+  bodyEnabled?: boolean;
   /** Read from the sidebar_state cookie so the choice survives reloads. */
   defaultOpen?: boolean;
 }) {
@@ -141,7 +144,7 @@ export function AppShell({
         <SidebarContent>
           <SidebarGroup>
             <SidebarMenu>
-        {NAV.map(({ href, label, icon: Icon }) => (
+        {NAV.filter(({ href }) => bodyEnabled || href !== "/body").map(({ href, label, icon: Icon }) => (
                 <SidebarMenuItem key={href}>
                   <SidebarMenuButton
                     asChild
@@ -224,7 +227,7 @@ export function AppShell({
         aria-label="Main"
         className="bg-background/95 border-border fixed inset-x-0 bottom-0 z-40 flex border-t pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
       >
-        {MOBILE_NAV.map(({ href, label, icon: Icon }) => (
+        {MOBILE_NAV.filter(({ href }) => bodyEnabled || href !== "/body").map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}

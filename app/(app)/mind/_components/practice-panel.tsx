@@ -104,19 +104,33 @@ export function PracticePanel({
     });
   };
 
-  useEffect(
-    () => () => {
+  // Saved when the popover closes, too, and sent on the way out if the
+  // panel goes (another tab or page) or the browser tab does (a reload).
+  const flush = () => {
+    const waiting = queued.current;
+    if (!waiting) return;
+    clearTimeout(waiting.timer);
+    save(waiting.next);
+  };
+
+  useEffect(() => {
+    const leave = () => {
       const waiting = queued.current;
       if (!waiting) return;
       clearTimeout(waiting.timer);
+      queued.current = null;
       const formData = new FormData();
       formData.set("kind", kind);
       formData.set("template", waiting.next.template);
       formData.set("count", String(waiting.next.count));
       void setPracticeTemplate(formData);
-    },
-    [kind],
-  );
+    };
+    globalThis.addEventListener("pagehide", leave);
+    return () => {
+      globalThis.removeEventListener("pagehide", leave);
+      leave();
+    };
+  }, [kind]);
 
   const chooseTemplate = (next: TemplateChoice) => {
     setChoice(next);
@@ -134,7 +148,7 @@ export function PracticePanel({
         </div>
 
         <div className="flex items-center gap-1">
-          <Popover>
+          <Popover onOpenChange={(open) => !open && flush()}>
             <PopoverTrigger asChild>
               <Button type="button" variant="outline" size="sm" className="rounded-full">
                 <Settings2 className="size-3.5" aria-hidden />

@@ -383,6 +383,18 @@ model User {
   /// n for the "n du'as" template, 1-10.
   duaCount               Int     @default(3)
 
+  // Body. Exercises and intermittent fasting, each switchable; with both off
+  // the page leaves the sidebar and the mobile bar.
+  bodyExercisesEnabled Boolean @default(true)
+  bodyFastingEnabled   Boolean @default(true)
+  /// Which fast the plan is: an eating window by the clock, or Islamic
+  /// (sawm), Fajr to Maghrib from the prayer city's timings.
+  fastKind             FastKind @default(INTERMITTENT)
+  /// The eating window, as minutes of the local day (0-1439). End may be
+  /// earlier than start: a window that runs past midnight. 12:00-20:00 is 16:8.
+  fastEatStart         Int     @default(720)
+  fastEatEnd           Int     @default(1200)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -393,6 +405,7 @@ model User {
   captures         Capture[]
   dayLogs          DayLog[]
   journal          JournalEntry[]
+  fasts            Fast[]
   steps            TaskStep[]
   blocks           TimeBlock[]
   moneyCategories  MoneyCategory[]
@@ -1703,4 +1716,33 @@ model WeeklyReview {
   updatedAt DateTime @updatedAt
 
   @@unique([userId, weekStart])
+}
+
+/// One fast, from the last bite to the first. Instants in UTC; shown and
+/// edited in the user's timezone. At most one is open (endedAt null) at a
+/// time, enforced in the action rather than by a partial index Prisma can't
+/// describe.
+model Fast {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  kind      FastKind  @default(INTERMITTENT)
+  startedAt DateTime
+  endedAt   DateTime?
+  /// The goal when it started, in minutes. A snapshot: changing the eating
+  /// window later never rewrites how an old fast is judged.
+  targetMinutes Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, startedAt])
+}
+
+enum FastKind {
+  /// An eating window by the clock (16:8 and friends).
+  INTERMITTENT
+  /// Sawm: from Fajr to Maghrib, timings from the prayer city.
+  ISLAMIC
 }

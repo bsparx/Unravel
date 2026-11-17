@@ -1,5 +1,6 @@
 import { requireUser } from "@/lib/auth";
 import { supportedTimeZones } from "@/lib/dates";
+import { normalizeWindow } from "@/lib/fasting";
 import { clampCount, templateOrDefault } from "@/lib/practices";
 
 import { SettingsForm } from "./_components/settings-form";
@@ -10,6 +11,7 @@ export const metadata = { title: "Settings" };
 export default async function SettingsPage() {
   const user = await requireUser();
 
+  const window = normalizeWindow(user.fastEatStart, user.fastEatEnd);
   const zones = supportedTimeZones();
   // Make sure the user's current zone is selectable even on a runtime whose
   // Intl data doesn't list it.
@@ -51,6 +53,11 @@ export default async function SettingsPage() {
           gratitudeCount: clampCount(user.gratitudeCount),
           duaTemplate: templateOrDefault("dua", user.duaTemplate).id,
           duaCount: clampCount(user.duaCount),
+          bodyExercisesEnabled: user.bodyExercisesEnabled,
+          bodyFastingEnabled: user.bodyFastingEnabled,
+          fastKind: user.fastKind,
+          fastEatStart: window.eatStart,
+          fastEatEnd: window.eatEnd,
         }}
       />
     </div>

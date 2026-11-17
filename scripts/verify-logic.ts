@@ -9,6 +9,28 @@
 
 import assert from "node:assert/strict";
 
+import { BODY_TABS, enabledBodyTabs } from "@/lib/body-tabs";
+import { instantToLocalInput, localInputToInstant, localToInstant } from "@/lib/dates";
+import {
+  FAST_PROTOCOLS,
+  dailyTotals,
+  eatMinutes,
+  fastMinutes,
+  fastProgress,
+  formatHM,
+  islamicDayFor,
+  islamicEnd,
+  islamicMinutes,
+  islamicStripWindow,
+  normalizeWindow,
+  phaseAt,
+  protocolOf,
+  validateFastTimes,
+  windowFor,
+  windowRatio,
+} from "@/lib/fasting";
+import { fastUpdateSchema, fastPlanSchema } from "@/lib/validation";
+
 import { nextFreeSlot, stageFor } from "@/lib/identity-look";
 import { reviewWeekStart } from "@/lib/review-week";
 import { activePalette, isEveningHour } from "@/lib/theme";
@@ -211,7 +233,7 @@ import {
   FRONT_REGIONS,
   MAPPED_PARTS,
   type MuscleRegion,
-} from "@/app/(app)/exercises/_components/body-map-paths";
+} from "@/app/(app)/body/_components/body-map-paths";
 
 let passed = 0;
 const check = (name: string, fn: () => void) => {
@@ -3585,6 +3607,159 @@ check("settings default the Mind practices on and reject unknown templates", () 
 check("a malformed stored page reads as no items, never throws", () => {
   assert.deepEqual(readItems(null), []);
   assert.deepEqual(readItems([{ key: 1 }, "x", { key: "a", text: "b" }]), [{ key: "a", step: "", label: "", text: "b" }]);
+});
+
+// ---------------------------------------------------------------- body / fasting
+
+check("every fasting protocol adds up to a day, opening at noon", () => {
+  for (const protocol of FAST_PROTOCOLS) {
+    const window = windowFor(protocol, 720);
+    assert.equal(eatMinutes(window), protocol.eatHours * 60);
+    assert.equal(fastMinutes(window) + eatMinutes(window), 1440);
+    assert.equal(protocolOf(window), protocol.id);
+  }
+  assert.equal(windowRatio({ eatStart: 720, eatEnd: 1200 }), "16:8");
+  assert.equal(windowRatio({ eatStart: 720, eatEnd: 780 }), "OMAD");
+  assert.equal(protocolOf({ eatStart: 600, eatEnd: 1140 }), "custom");
+  assert.equal(windowRatio({ eatStart: 600, eatEnd: 1140 }), "15:9");
+});
+
+check("an eating window can run past midnight", () => {
+  const late = { eatStart: 18 * 60, eatEnd: 2 * 60 };
+  assert.equal(eatMinutes(late), 480);
+  assert.equal(fastMinutes(late), 960);
+  assert.deepEqual(windowFor(FAST_PROTOCOLS.find((p) => p.id === "16-8")!, 20 * 60), { eatStart: 1200, eatEnd: 240 });
+  assert.equal(phaseAt(23 * 60, late).phase, "eating");
+  assert.equal(phaseAt(60, late).phase, "eating");
+  assert.equal(phaseAt(3 * 60, late).phase, "fasting");
+  assert.equal(phaseAt(3 * 60, late).minutesLeft, 15 * 60);
+});
+
+check("a broken stored window falls back to 16:8 at noon", () => {
+  assert.deepEqual(normalizeWindow(600, 600), { eatStart: 720, eatEnd: 1200 });
+  assert.deepEqual(normalizeWindow(-1, 1200), { eatStart: 720, eatEnd: 1200 });
+  assert.deepEqual(normalizeWindow(600, 1000), { eatStart: 600, eatEnd: 1000 });
+});
+
+check("the plan's phase flips exactly at the window's edges", () => {
+  const window = { eatStart: 720, eatEnd: 1200 };
+  assert.deepEqual(phaseAt(719, window), { phase: "fasting", changesAt: 720, minutesLeft: 1 });
+  assert.deepEqual(phaseAt(720, window), { phase: "eating", changesAt: 1200, minutesLeft: 480 });
+  assert.deepEqual(phaseAt(1199, window), { phase: "eating", changesAt: 1200, minutesLeft: 1 });
+  assert.deepEqual(phaseAt(1200, window), { phase: "fasting", changesAt: 720, minutesLeft: 960 });
+});
+
+check("fast progress before, at and past the goal", () => {
+  const start = new Date("2026-11-16T15:00:00Z");
+  const at = (h: number) => new Date(start.getTime() + h * 3_600_000);
+  assert.equal(fastProgress(start, at(8), 960).reached, false);
+  assert.equal(fastProgress(start, at(8), 960).ratio, 0.5);
+  assert.equal(fastProgress(start, at(16), 960).reached, true);
+  assert.equal(fastProgress(start, at(20), 960).ratio, 1.25);
+  assert.equal(fastProgress(start, new Date(start.getTime() - 60_000), 960).elapsedMinutes, 0);
+  assert.equal(fastProgress(start, at(1), 960).goalAt.toISOString(), "2026-11-17T07:00:00.000Z");
+  assert.equal(formatHM(552), "9h 12m");
+  assert.equal(formatHM(960), "16h");
+  assert.equal(formatHM(45), "45m");
+});
+
+check("fast times: order, the future, 72 hours and overlaps", () => {
+  const now = new Date("2026-11-17T12:00:00Z");
+  const h = (n: number) => new Date(now.getTime() + n * 3_600_000);
+  assert.equal(validateFastTimes(h(-16), h(-1), now, []), null);
+  assert.match(validateFastTimes(h(-1), h(-2), now, []) ?? "", /after the start/);
+  assert.match(validateFastTimes(h(1), null, now, []) ?? "", /future/);
+  assert.match(validateFastTimes(h(-2), h(1), now, []) ?? "", /future/);
+  assert.equal(validateFastTimes(h(-2), new Date(now.getTime() + 60_000), now, []), null);
+  assert.match(validateFastTimes(h(-80), h(-1), now, []) ?? "", /72 hours/);
+  const other = { id: "a", startedAt: h(-30), endedAt: h(-20) };
+  assert.match(validateFastTimes(h(-25), h(-10), now, [other]) ?? "", /overlaps/);
+  assert.equal(validateFastTimes(h(-20), h(-10), now, [other]), null);
+  const running = { id: "b", startedAt: h(-5), endedAt: null };
+  assert.match(validateFastTimes(h(-8), h(-4), now, [running]) ?? "", /overlaps/);
+  assert.equal(validateFastTimes(h(-8), h(-6), now, [running]), null);
+});
+
+check("a fast counts toward the local day it ended on", () => {
+  const tz = "Asia/Karachi"; // UTC+5
+  const now = new Date("2026-11-17T09:00:00Z"); // 14:00 on the 17th in Karachi
+  const today = new Date("2026-11-17T00:00:00Z");
+  const fasts = [
+    // 20:00 on the 15th → 12:00 on the 16th, Karachi.
+    { id: "a", startedAt: new Date("2026-11-15T15:00:00Z"), endedAt: new Date("2026-11-16T07:00:00Z"), targetMinutes: 960 },
+    // Running since 21:00 on the 16th.
+    { id: "b", startedAt: new Date("2026-11-16T16:00:00Z"), endedAt: null, targetMinutes: 960 },
+  ];
+  const days = dailyTotals(fasts, today, 3, tz, now);
+  assert.deepEqual(days.map((d) => d.dateISO), ["2026-11-15", "2026-11-16", "2026-11-17"]);
+  assert.equal(days[0].minutes, 0);
+  assert.equal(days[0].targetMinutes, null);
+  assert.equal(days[1].minutes, 960);
+  assert.equal(days[1].reached, true);
+  assert.equal(days[2].minutes, 17 * 60);
+});
+
+check("local wall-clock times round-trip, across a DST change", () => {
+  assert.equal(localToInstant("2026-11-17", 20 * 60 + 30, "Asia/Karachi")?.toISOString(), "2026-11-17T15:30:00.000Z");
+  // New York leaves DST on 1 Nov 2026: 09:00 is EDT on the 31st, EST on the 2nd.
+  assert.equal(localToInstant("2026-10-31", 540, "America/New_York")?.toISOString(), "2026-10-31T13:00:00.000Z");
+  assert.equal(localToInstant("2026-11-02", 540, "America/New_York")?.toISOString(), "2026-11-02T14:00:00.000Z");
+  const instant = localInputToInstant("2026-11-17T07:05", "America/New_York")!;
+  assert.equal(instantToLocalInput(instant, "America/New_York"), "2026-11-17T07:05");
+  assert.equal(localInputToInstant("2026-11-17T24:00", "UTC"), null);
+  assert.equal(localInputToInstant("nope", "UTC"), null);
+  assert.equal(localToInstant("2026-11-17", 1440, "UTC"), null);
+});
+
+check("fasting schemas and Body settings", () => {
+  assert.equal(fastPlanSchema.safeParse({ eatStart: "720", eatEnd: "1200" }).success, true);
+  assert.equal(fastPlanSchema.safeParse({ eatStart: "720", eatEnd: "720" }).success, false);
+  assert.equal(fastPlanSchema.safeParse({ eatStart: "720", eatEnd: "1440" }).success, false);
+  assert.equal(fastUpdateSchema.safeParse({ id: "x", startedAt: "2026-11-17T20:00", endedAt: "" }).success, true);
+  assert.equal(fastUpdateSchema.safeParse({ id: "x", startedAt: "2026-11-17 20:00" }).success, false);
+  const parsed = settingsSchema.parse({
+    timezone: "UTC", weekStart: "1", pomodoroMinutes: "25", shortBreakMinutes: "5",
+    longBreakMinutes: "15", longBreakEvery: "4",
+  });
+  assert.equal(parsed.bodyExercisesEnabled, true);
+  assert.equal(parsed.fastEatStart, 720);
+  assert.equal(parsed.fastEatEnd, 1200);
+  assert.deepEqual(enabledBodyTabs({ exercises: true, fasting: true }), [...BODY_TABS]);
+  assert.deepEqual(enabledBodyTabs({ exercises: false, fasting: true }), ["fasting"]);
+  assert.deepEqual(enabledBodyTabs({ exercises: false, fasting: false }), []);
+});
+
+check("an Islamic fast belongs to the day whose Maghrib is still ahead", () => {
+  // Karachi, UTC+5: Fajr 05:20, Maghrib 17:30 local.
+  const day = (iso: string) => ({
+    dateISO: iso,
+    fajr: new Date(`${iso}T00:20:00Z`),
+    maghrib: new Date(`${iso}T12:30:00Z`),
+  });
+  const days = [day("2026-11-16"), day("2026-11-17"), day("2026-11-18")];
+  assert.equal(islamicDayFor(new Date("2026-11-17T00:00:00Z"), days)?.dateISO, "2026-11-17"); // suhoor
+  assert.equal(islamicDayFor(new Date("2026-11-17T08:00:00Z"), days)?.dateISO, "2026-11-17"); // midday
+  assert.equal(islamicDayFor(new Date("2026-11-17T13:00:00Z"), days)?.dateISO, "2026-11-18"); // after Maghrib
+  assert.equal(islamicDayFor(new Date("2026-11-19T00:00:00Z"), days), null);
+  assert.equal(islamicMinutes(days[1]), 12 * 60 + 10);
+  // Break fast: now before Maghrib, Maghrib once it has passed.
+  const maghrib = days[1].maghrib;
+  assert.equal(islamicEnd(new Date("2026-11-17T10:00:00Z"), maghrib).toISOString(), "2026-11-17T10:00:00.000Z");
+  assert.equal(islamicEnd(new Date("2026-11-17T15:00:00Z"), maghrib).toISOString(), maghrib.toISOString());
+  // The strip: eat from Maghrib to Fajr, local minutes.
+  assert.deepEqual(islamicStripWindow(days[1].fajr, days[1].maghrib, "Asia/Karachi"), { eatStart: 1050, eatEnd: 320 });
+});
+
+check("the fast plan and settings accept a kind", () => {
+  assert.equal(fastPlanSchema.parse({ kind: "ISLAMIC", eatStart: "720", eatEnd: "1200" }).kind, "ISLAMIC");
+  assert.equal(fastPlanSchema.parse({ eatStart: "720", eatEnd: "1200" }).kind, "INTERMITTENT");
+  assert.equal(fastPlanSchema.safeParse({ kind: "RAMADAN", eatStart: "720", eatEnd: "1200" }).success, false);
+  const base = {
+    timezone: "UTC", weekStart: "1", pomodoroMinutes: "25", shortBreakMinutes: "5",
+    longBreakMinutes: "15", longBreakEvery: "4",
+  };
+  assert.equal(settingsSchema.parse(base).fastKind, "INTERMITTENT");
+  assert.equal(settingsSchema.parse({ ...base, fastKind: "ISLAMIC" }).fastKind, "ISLAMIC");
 });
 
 console.log(`\n${passed} checks passed.\n`);
