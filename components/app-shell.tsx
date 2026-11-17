@@ -51,7 +51,7 @@ const NAV = [
   { href: "/", label: "Today", icon: Sun },
   { href: "/day", label: "Day", icon: ListChecks },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/timer", label: "Timer", icon: Timer },
+  { href: "/mind", label: "Mind", icon: Brain },
   { href: "/body", label: "Body", icon: HeartPulse },
 ] as const;
 
@@ -64,7 +64,7 @@ const MOBILE_NAV = [
   { href: "/", label: "Today", icon: Sun },
   { href: "/day", label: "Day", icon: ListChecks },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/timer", label: "Timer", icon: Timer },
+  { href: "/mind", label: "Mind", icon: Brain },
   { href: "/body", label: "Body", icon: HeartPulse },
 ] as const;
 
@@ -74,7 +74,7 @@ const RAIL_EXTRA = [
   { href: "/tasks", label: "Tasks", icon: ListTodo },
   { href: "/habits", label: "Habits", icon: Repeat },
   { href: "/identities", label: "Identities", icon: Drama },
-  { href: "/mind", label: "Mind", icon: Brain },
+  { href: "/timer", label: "Timer", icon: Timer },
   { href: "/review", label: "Weekly review", icon: MessagesSquare },
   { href: "/stats", label: "Statistics", icon: BarChart3 },
   { href: "/budget", label: "Budget", icon: Wallet },
@@ -108,6 +108,9 @@ export function AppShell({
   // `"/"` works here without a special case: the equality catches it, and
   // `startsWith("//")` is never true. Don't "fix" this into `startsWith(href)`
   // — that would light up Today on every single route.
+  // Mind and Body leave the nav when every one of their practices is off.
+  const shown = ({ href }: { href: string }) =>
+    (mindEnabled || href !== "/mind") && (bodyEnabled || href !== "/body");
   const isActive = (href: string) =>
     pathname === href ||
     pathname.startsWith(`${href}/`) ||
@@ -144,7 +147,7 @@ export function AppShell({
         <SidebarContent>
           <SidebarGroup>
             <SidebarMenu>
-        {NAV.filter(({ href }) => bodyEnabled || href !== "/body").map(({ href, label, icon: Icon }) => (
+        {NAV.filter(shown).map(({ href, label, icon: Icon }) => (
                 <SidebarMenuItem key={href}>
                   <SidebarMenuButton
                     asChild
@@ -168,7 +171,7 @@ export function AppShell({
 
           <SidebarGroup>
             <SidebarMenu>
-              {RAIL_EXTRA.filter(({ href }) => mindEnabled || href !== "/mind").map(({ href, label, icon: Icon }) => (
+              {RAIL_EXTRA.filter(shown).map(({ href, label, icon: Icon }) => (
                 <SidebarMenuItem key={href}>
                   <SidebarMenuButton
                     asChild
@@ -227,7 +230,7 @@ export function AppShell({
         aria-label="Main"
         className="bg-background/95 border-border fixed inset-x-0 bottom-0 z-40 flex border-t pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
       >
-        {MOBILE_NAV.filter(({ href }) => bodyEnabled || href !== "/body").map(({ href, label, icon: Icon }) => (
+        {MOBILE_NAV.filter(shown).map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}
