@@ -376,6 +376,7 @@ model User {
   mindDisputationEnabled Boolean @default(true)
   mindGratitudeEnabled   Boolean @default(true)
   mindDuaEnabled         Boolean @default(true)
+  mindMeditationEnabled  Boolean @default(true)
   gratitudeTemplate      String  @default("good-things")
   /// n for the "n things" gratitude template, 1-10.
   gratitudeCount         Int     @default(3)
@@ -406,6 +407,7 @@ model User {
   dayLogs          DayLog[]
   journal          JournalEntry[]
   fasts            Fast[]
+  meditations      MeditationSession[]
   steps            TaskStep[]
   blocks           TimeBlock[]
   moneyCategories  MoneyCategory[]
@@ -1745,4 +1747,29 @@ enum FastKind {
   INTERMITTENT
   /// Sawm: from Fajr to Maghrib, timings from the prayer city.
   ISLAMIC
+}
+
+/// One sitting. The garden on /mind is drawn from the sum of `seconds`, so
+/// there is no stored progress to drift: minutes only add, and a session
+/// ended early still counts what was sat.
+model MeditationSession {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// A meditation id from lib/meditations.ts. Checked there, not by an enum,
+  /// so adding a kind needs no migration.
+  kind           String
+  /// The choices it ran with, e.g. {"n":6} or {"set":"tasbih"}.
+  options        Json?
+  plannedSeconds Int
+  seconds        Int
+  /// Dhikr taps, or the breath count reached.
+  count          Int?
+  completed      Boolean
+  startedAt      DateTime
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, startedAt])
 }

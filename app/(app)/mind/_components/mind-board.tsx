@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { DisputationRitual } from "@/components/disputation-ritual";
+import type { MeditationChoice } from "@/components/meditation/meditation-picker";
+import { MeditationSession, type SessionResult } from "@/components/meditation/meditation-session";
+import { primeAudio } from "@/components/meditation/sound";
 import { PracticeRitual } from "@/components/practice-ritual";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -20,9 +23,11 @@ import {
   type PracticeKind,
 } from "@/lib/practices";
 import type { WishCard, WoopFields } from "@/lib/woop";
+import { findMeditation } from "@/lib/meditations";
 
-import { saveDisputation, savePractice, saveWish } from "../actions";
+import { saveDisputation, saveMeditation, savePractice, saveWish } from "../actions";
 import { DisputationsPanel } from "./disputations-panel";
+import { MeditatePanel } from "./meditate-panel";
 import { PracticePanel, type PracticeWriteMode } from "./practice-panel";
 import { WishesPanel } from "./wishes-panel";
 
@@ -31,11 +36,13 @@ type Editing =
   | { kind: "wish"; card: WishCard | null }
   | { kind: "disputation"; card: DisputationCard | null }
   | { kind: "practice"; practice: PracticeKind; mode: PracticeWriteMode }
+  | { kind: "meditation"; choice: MeditationChoice; before: number }
   | null;
 
 const LABELS: Record<MindTab, string> = {
   gratitude: "Gratitude",
   dua: "Du'a",
+  meditate: "Meditate",
   wishes: "Wishes",
   disputations: "Disputations",
 };
@@ -56,6 +63,13 @@ export function MindBoard({
   const tabs = MIND_TABS.filter((tab) => enabled[tab]);
   const [tab, setTab] = useState<MindTab>(initialTab);
   const [editing, setEditing] = useState<Editing>(null);
+  const selectedTab = useRef<HTMLButtonElement>(null);
+
+  // On a phone the tab row scrolls; keep the open tab in view (a link to
+  // ?tab=wishes otherwise lands with Wishes hidden off the right edge).
+  useEffect(() => {
+    selectedTab.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [tab]);
 
   // The tab lives in the URL so a reload lands where you were. Native
   // history keeps it a URL change, not a server round trip.
@@ -141,6 +155,24 @@ export function MindBoard({
     }
   };
 
+  const onSaveMeditation = async (choice: MeditationChoice, result: SessionResult) => {
+    const formData = new FormData();
+    formData.set("kind", choice.kind);
+    formData.set("options", JSON.stringify(choice.options));
+    formData.set("seconds", String(result.seconds));
+    if (result.count !== null) formData.set("count", String(result.count));
+    formData.set("completed", String(result.completed));
+    formData.set("startedAt", result.startedAt.toISOString());
+    try {
+      const state = await saveMeditation(formData);
+      return state.status !== "error";
+    } catch {
+      return false;
+    }
+  };
+
+  const satToday = (view.meditation.days.at(-1)?.minutes ?? 0) > 0;
+
   const showNew =
     (tab === "wishes" && active.length > 0) || (tab === "disputations" && disputations.length > 0);
 
@@ -156,11 +188,13 @@ export function MindBoard({
           >
             {tabs.map((value) => {
               const selected = tab === value;
-              const daily = value === "gratitude" || value === "dua";
-              const writtenToday = daily && view[value].today !== null;
+              const daily = value === "gratitude" || value === "dua" || value === "meditate";
+              const writtenToday =
+                value === "meditate" ? satToday : daily && view[value as "gratitude" | "dua"].today !== null;
               return (
                 <button
                   key={value}
+                  ref={selected ? selectedTab : undefined}
                   type="button"
                   role="tab"
                   aria-selected={selected}
@@ -183,15 +217,31 @@ export function MindBoard({
                             writtenToday
                               ? value === "gratitude"
                                 ? "bg-[var(--thanks-lantern)]"
-                                : "bg-[var(--dua-accent)]"
+                                : value === "meditate"
+                                  ? "bg-[var(--garden-light)]"
+                                  : "bg-[var(--dua-accent)]"
                               : "border-muted-foreground/50 border",
                           )}
                         >
-                          <span className="sr-only">{writtenToday ? "(written today)" : "(not written today)"}</span>
+                          <span className="sr-only">
+                            {value === "meditate"
+                              ? writtenToday
+                                ? "(sat today)"
+                                : "(not yet today)"
+                              : writtenToday
+                                ? "(written today)"
+                                : "(not written today)"}
+                          </span>
                         </span>
                       </TooltipTrigger>
                       <TooltipContent side="bottom">
-                        {writtenToday ? "Today's page is written" : "Not written yet today"}
+                        {value === "meditate"
+                          ? writtenToday
+                            ? "You've sat today"
+                            : "No sitting yet today"
+                          : writtenToday
+                            ? "Today's page is written"
+                            : "Not written yet today"}
                       </TooltipContent>
                     </Tooltip>
                   ) : (
@@ -237,6 +287,16 @@ export function MindBoard({
             onOpen={(card) => setEditing({ kind: "disputation", card })}
           />
         )}
+        {tab === "meditate" && (
+          <MeditatePanel
+            view={view.meditation}
+            onBegin={(choice) => {
+              // The tap that begins is the gesture browsers want before sound.
+              primeAudio();
+              setEditing({ kind: "meditation", choice, before: view.meditation.totalMinutes });
+            }}
+          />
+        )}
         {(tab === "gratitude" || tab === "dua") && (
           <PracticePanel
             // Keyed by tab only: keying by template remounted the panel on
@@ -265,6 +325,20 @@ export function MindBoard({
           onCancel={() => setEditing(null)}
         />
       )}
+      {editing?.kind === "meditation" && (() => {
+        const meditation = findMeditation(editing.choice.kind);
+        if (!meditation) return null;
+        return (
+          <MeditationSession
+            key={`${editing.choice.kind}-${JSON.stringify(editing.choice.options)}`}
+            meditation={meditation}
+            options={editing.choice.options}
+            totalMinutesBefore={editing.before}
+            onSave={(result) => onSaveMeditation(editing.choice, result)}
+            onClose={() => setEditing(null)}
+          />
+        );
+      })()}
       {editing?.kind === "practice" && (() => {
         const practice = view[editing.practice];
         const page = editing.mode === "edit" ? practice.today : null;

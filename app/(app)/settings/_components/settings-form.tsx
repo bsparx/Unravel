@@ -46,6 +46,7 @@ export type SettingsValues = {
   mindDisputationEnabled: boolean;
   mindGratitudeEnabled: boolean;
   mindDuaEnabled: boolean;
+  mindMeditationEnabled: boolean;
   gratitudeTemplate: string;
   gratitudeCount: number;
   duaTemplate: string;
@@ -286,7 +287,7 @@ export function SettingsForm({
             </h2>
             <p className="text-muted-foreground text-label">
               Choose which practices appear on the Mind page: all of them, some,
-              or none. With all four off, Mind leaves the sidebar. Nothing you
+              or none. With all five off, Mind leaves the sidebar. Nothing you
               have written is deleted when a practice is switched off.
             </p>
           </div>
@@ -332,6 +333,12 @@ export function SettingsForm({
               <input type="hidden" name="duaCount" value={dua.count} />
             </div>
 
+            <CheckboxField
+              id="mindMeditationEnabled"
+              label="Meditation"
+              hint="Breathing (box, 4-7-8 and more), dhikr, body scan and stillness, from easy to hard, on a full-screen timer. Your minutes grow a moonlit garden."
+              defaultChecked={values.mindMeditationEnabled}
+            />
             <CheckboxField
               id="mindWoopEnabled"
               label="Wishes (WOOP)"
@@ -412,7 +419,7 @@ export function SettingsForm({
         </div>
       </form>
 
-      <section className="space-y-4">
+      <section className="mt-16 space-y-4">
         <div>
           <h2 className="font-display text-title">Danger zone</h2>
           <p className="text-muted-foreground text-label">

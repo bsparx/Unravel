@@ -12,8 +12,8 @@ import { MindBoard } from "./_components/mind-board";
 export const metadata = { title: "Mind" };
 
 /**
- * Up to four practices for the inside of the day, each one switchable in
- * Settings.
+ * Up to five practices for the inside of the day, each one switchable in
+ * Settings. Meditation is a full-screen timer that grows a garden.
  *
  * Gratitude and du'a are a page a day, written with a template you choose.
  * Wishes are WOOPs (Oettingen): something you want, the best of having it,
@@ -49,7 +49,7 @@ export default async function MindPage({ searchParams }: PageProps<"/mind">) {
         <div className="border-border mx-auto max-w-md rounded-2xl border border-dashed px-6 py-14 text-center">
           <p className="font-display text-2xl">Mind is switched off</p>
           <p className="text-muted-foreground mt-2 text-body">
-            Gratitude, du&apos;a, wishes and disputations can each be turned on in Settings, in any mix.
+            Gratitude, du&apos;a, meditation, wishes and disputations can each be turned on in Settings, in any mix.
           </p>
           <Button asChild className="mt-6 rounded-full">
             <Link href="/settings#mind">
@@ -69,6 +69,7 @@ function intro(enabled: MindEnabled): string {
     enabled.gratitude && "what was good",
     enabled.dua && "what you're asking for",
   ].filter(Boolean);
+  const sit = enabled.meditate ? "Time to sit and breathe, and a garden that grows with it." : "";
   const other = [
     enabled.wishes && "wishes you plan for",
     enabled.disputations && "the thoughts you argue back",
@@ -78,5 +79,5 @@ function intro(enabled: MindEnabled): string {
   const second = other.length
     ? `${other.join(", and ")}.`.replace(/^./, (c) => c.toUpperCase())
     : "";
-  return [first, second].filter(Boolean).join(" ");
+  return [first, sit, second].filter(Boolean).join(" ");
 }

@@ -104,7 +104,7 @@ export const GLOSSARY = {
   },
   mind: {
     title: "Mind",
-    what: "Up to four practices on one page, each switchable in Settings. Gratitude and du'a are a page a day. WOOP turns a wish into a plan for the obstacle in you. ABCDE takes a gloomy thought after a setback and argues back.",
+    what: "Up to five practices on one page, each switchable in Settings. Gratitude and du'a are a page a day. Meditation is a timer for breathing, dhikr and stillness that grows a garden. WOOP turns a wish into a plan for the obstacle in you. ABCDE takes a gloomy thought after a setback and argues back.",
     why: "Noticing the good, asking for what you need, wanting well and thinking clearly about setbacks are all skills, and all get easier written down.",
   },
   woop: {
@@ -151,6 +151,16 @@ export const GLOSSARY = {
     title: "Eating window",
     what: "The hours you eat in each day. Pick a protocol like 16:8 (fast 16 hours, eat in 8) and when the window opens, or set both ends yourself. A window can run past midnight.",
     why: "A fixed window turns a daily decision into a default. Changing it only affects fasts you start from then on; past fasts keep their own goal.",
+  },
+  meditation: {
+    title: "Meditation",
+    what: "Pick a practice and sit with it, full screen. Breathing ones show an orb that fills and empties with each breath, with the count inside; box and triangle trace their shape as you go. Dhikr counts on a ring of beads as you tap. Each is marked easy, medium or hard, and some change level with their setting.",
+    why: "A few minutes of slow breathing or quiet attention settles the body and trains you to notice where your mind has gone. The levels are there so you can start where it's easy and stretch when you want to.",
+  },
+  garden: {
+    title: "The garden",
+    what: "A moonlit garden that fills in as your minutes add up: wildflowers at 5, a pond at 15, a lantern at 60, and on to a full moon at 2,000. Every minute you sit counts, even in a session you end early.",
+    why: "Something you can watch grow makes the practice feel like it's going somewhere. It never wilts: a week away takes nothing from it.",
   },
 } as const satisfies Record<string, { title: string; what: string; why: string }>;
 

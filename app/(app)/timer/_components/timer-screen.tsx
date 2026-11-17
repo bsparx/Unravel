@@ -33,7 +33,7 @@ import { adjustLoggedTime } from "../actions";
 import type { TodayLog as TodayLogData } from "../_lib/today-log";
 import { useTimer, type TimerTask } from "../_hooks/timer-provider";
 import { useThresholdHaptics } from "../_hooks/use-threshold-haptics";
-import { useWakeLock } from "../_hooks/use-wake-lock";
+import { useWakeLock } from "@/components/use-wake-lock";
 import { IntervalDotTrack } from "./interval-dot-track";
 import { DurationDial, ModePills } from "./mode-switcher";
 import { OverrunPanel } from "./overrun-panel";

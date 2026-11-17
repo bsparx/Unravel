@@ -226,7 +226,7 @@ export function PracticePanel({
           is just a day. */}
       <section aria-label="The last two weeks" className="space-y-2">
         <div className="flex items-center gap-1">
-          <p className="text-muted-foreground text-micro font-medium tracking-wider uppercase">Last two weeks</p>
+          <h3 className="text-body font-medium">Last two weeks</h3>
         </div>
         <ol className="flex flex-wrap gap-1.5">
           {view.days.map((day) => {
@@ -258,7 +258,7 @@ export function PracticePanel({
       {/* The journal. */}
       {view.past.length > 0 && (
         <section aria-label={copy.earlier} className="space-y-5">
-          <p className="text-muted-foreground text-micro font-medium tracking-wider uppercase">{copy.earlier}</p>
+          <h3 className="text-body font-medium">{copy.earlier}</h3>
           <ol className="space-y-6">
             {view.past.slice(0, shown).map((page) => (
               <PastPage

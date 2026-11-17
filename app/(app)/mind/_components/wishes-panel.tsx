@@ -66,13 +66,17 @@ export function WishesPanel({
           onAction={onNew}
         />
       ) : (
-        <ul className="columns-1 gap-8 md:columns-2">
+        // One wish gets the same centred column as a gratitude or du'a page;
+        // two or more sit side by side and fill the width between them.
+        <ul className={cn(active.length === 1 ? "mx-auto max-w-2xl" : "columns-1 gap-8 md:columns-2")}>
           {active.map((card, index) => (
             <li key={card.id} className="group relative mb-10 break-inside-avoid pt-2">
               <WoopIndexCard
                 woop={card}
                 className={cn(
-                  "transition-transform duration-300 group-hover:rotate-0",
+                  // A header band for the card's tools, beside the tape, so
+                  // they never sit on the wish itself.
+                  "pt-14 transition-transform duration-300 group-hover:rotate-0",
                   index % 2 ? "rotate-[0.5deg]" : "rotate-[-0.6deg]",
                   stamping === card.id && "rotate-0",
                 )}

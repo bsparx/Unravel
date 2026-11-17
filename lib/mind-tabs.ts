@@ -6,5 +6,5 @@
  * a "use client" file reaches the server as a client reference, not as the
  * array, so `MIND_TABS.filter` would not exist there.
  */
-export const MIND_TABS = ["gratitude", "dua", "wishes", "disputations"] as const;
+export const MIND_TABS = ["gratitude", "dua", "meditate", "wishes", "disputations"] as const;
 export type MindTab = (typeof MIND_TABS)[number];

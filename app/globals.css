@@ -425,6 +425,11 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    /* Thin, theme-coloured scrollbars everywhere: the platform default (grey
+       track, arrow buttons) looked dropped in on the night skies and inside
+       dialogs. Anything that hides its bar on purpose still overrides this. */
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--muted-foreground) 45%, transparent) transparent;
   }
 
   html {
@@ -1416,4 +1421,157 @@
 @keyframes fast-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
+}
+
+/* ---------------------------------------------------------------------------
+   Meditation — the moonlit garden.
+
+   A garden at night that fills in as minutes are sat: a pond, trees,
+   lanterns, fireflies. Cotton candy sees it at lavender twilight with peach
+   lantern light; the night theme at true midnight with a white moon. During
+   a session the whole scene takes a --breath value (0 to 1) and the pond's
+   ripples and the lanterns' glow swell and settle with it.
+--------------------------------------------------------------------------- */
+
+:root {
+  --garden-sky-1: #6f63b8;
+  --garden-sky-2: #ad93d6;
+  --garden-sky-3: #f0bdd4;
+  --garden-star: #ffffff;
+  --garden-moon: #fff7ea;
+  --garden-moon-shade: #e2d2ee;
+  --garden-hill-far: #9783c6;
+  --garden-hill: #8170b6;
+  --garden-ground: #6a59a1;
+  --garden-leaf: #b5dcc4;
+  --garden-leaf-tree: #5b8e86;
+  --garden-bark: #4a3a64;
+  --garden-water-1: #93a8ea;
+  --garden-water-2: #5d6db9;
+  --garden-water-rim: #cdbcf0;
+  --garden-ripple: #ffffff;
+  --garden-light: #ffb36b;
+  --garden-flower: #ffd1e6;
+  --garden-flower-2: #fff0a8;
+  --garden-stone: #d3c7e8;
+  --garden-stone-dark: #66579a;
+  --garden-wood: #8b5d6e;
+  --garden-koi: #ff8a5c;
+  --garden-lily: #86c4a0;
+  --garden-blossom: #ffc4dd;
+  --garden-heron: #f1ebfa;
+  /* The session's veil over the garden, so white type reads on it. */
+  --garden-veil: rgba(48, 32, 96, 0.42);
+}
+
+.dark {
+  --garden-sky-1: #050820;
+  --garden-sky-2: #0e1440;
+  --garden-sky-3: #262b60;
+  --garden-star: #ffffff;
+  --garden-moon: #f4efe0;
+  --garden-moon-shade: #c9c3b0;
+  --garden-hill-far: #131b46;
+  --garden-hill: #0e1539;
+  --garden-ground: #0a102e;
+  --garden-leaf: #4a8577;
+  --garden-leaf-tree: #1f4a47;
+  --garden-bark: #2b2441;
+  --garden-water-1: #1e2f69;
+  --garden-water-2: #101a45;
+  --garden-water-rim: #2d3c7c;
+  --garden-ripple: #b9c4ff;
+  --garden-light: #ffc46b;
+  --garden-flower: #f3a6c8;
+  --garden-flower-2: #ffe08a;
+  --garden-stone: #3b406d;
+  --garden-stone-dark: #262a53;
+  --garden-wood: #5c4046;
+  --garden-koi: #ff9a6b;
+  --garden-lily: #2f6b56;
+  --garden-blossom: #f3a6c8;
+  --garden-heron: #cfd6ea;
+  --garden-veil: rgba(4, 6, 24, 0.5);
+}
+
+.garden-scene [data-fx] {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* The breath: ripples widen and lanterns brighten on the in-breath. Driven
+   by --breath, which the session writes each frame; outside a session it's
+   unset and everything rests. */
+.garden-scene [data-fx="ripple"] {
+  transform: scale(calc(0.85 + var(--breath, 0.3) * 0.35));
+  opacity: calc(0.25 + var(--breath, 0.3) * 0.45);
+}
+.garden-scene [data-fx="glow"] {
+  opacity: calc(0.4 + var(--breath, 0.3) * 0.6);
+}
+.garden-scene [data-fx="halo"] {
+  transform: scale(calc(0.92 + var(--breath, 0.3) * 0.16));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .garden-scene [data-fx="twinkle"] {
+    animation: garden-twinkle 4s ease-in-out infinite;
+  }
+  .garden-scene [data-fx="firefly"] {
+    animation: garden-firefly 7s ease-in-out infinite;
+  }
+  .garden-scene [data-fx="sway"] {
+    transform-origin: bottom center;
+    animation: garden-sway 9s ease-in-out infinite;
+  }
+  .garden-scene [data-fx="swim"] {
+    animation: garden-swim 14s ease-in-out infinite;
+  }
+  .garden-scene [data-fx="meteor"] {
+    animation: garden-meteor 9s ease-in infinite;
+  }
+  .garden-scene [data-grow] {
+    transform-box: fill-box;
+    transform-origin: bottom center;
+    animation: garden-grow 1.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+@keyframes garden-twinkle {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 0.35; }
+}
+@keyframes garden-firefly {
+  0%, 100% { transform: translate(0, 0); opacity: 0.9; }
+  25% { transform: translate(8px, -10px); opacity: 0.3; }
+  50% { transform: translate(-6px, -18px); opacity: 1; }
+  75% { transform: translate(-10px, -6px); opacity: 0.4; }
+}
+@keyframes garden-sway {
+  0%, 100% { transform: rotate(-0.8deg); }
+  50% { transform: rotate(0.8deg); }
+}
+@keyframes garden-swim {
+  0%, 100% { transform: translateX(-40px) scaleX(1); }
+  48% { transform: translateX(40px) scaleX(1); }
+  52% { transform: translateX(40px) scaleX(-1); }
+  98% { transform: translateX(-40px) scaleX(-1); }
+}
+@keyframes garden-meteor {
+  0%, 80% { transform: translate(0, 0); opacity: 0; }
+  83% { opacity: 1; }
+  92%, 100% { transform: translate(-180px, 90px); opacity: 0; }
+}
+@keyframes garden-grow {
+  from { transform: scale(0.4); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* The breath orb, sized by --level (0 empty to 1 full). */
+.meditation-orb {
+  transform: scale(calc(0.42 + var(--level, 0.5) * 0.58));
+  background:
+    radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.55) 32%, transparent 70%),
+    radial-gradient(circle, color-mix(in oklab, var(--garden-light) 70%, white) 0%, color-mix(in oklab, var(--garden-light) 35%, transparent) 55%, transparent 72%);
+  box-shadow: 0 0 calc(30px + var(--level, 0.5) * 70px) color-mix(in oklab, var(--garden-light) 45%, transparent);
 }

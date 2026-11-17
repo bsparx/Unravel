@@ -211,7 +211,7 @@ export function RitualFrame({
 
             {/* my-auto centres a short step and lets a long one scroll from
                 its top, which justify-center would clip. */}
-            <div className="-mx-5 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-5 sm:-mx-8 sm:px-8">
+            <div className="-mx-5 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-5 [scrollbar-color:var(--woop-line)_transparent] [scrollbar-width:thin] sm:-mx-8 sm:px-8">
               <div className="my-auto py-6">{children}</div>
             </div>
 

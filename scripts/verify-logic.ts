@@ -10,6 +10,22 @@
 import assert from "node:assert/strict";
 
 import { BODY_TABS, enabledBodyTabs } from "@/lib/body-tabs";
+import { GARDEN_STAGES, nextStage, stagesAt, towardNext, unlockedBetween } from "@/lib/garden";
+import {
+  MEDITATIONS,
+  breathAt,
+  dhikrAt,
+  dhikrSteps,
+  dhikrTotal,
+  findMeditation,
+  normalizeOptions,
+  optionsValid,
+  plannedSeconds,
+  promptAt,
+  sessionLength,
+} from "@/lib/meditations";
+import { MIND_TABS } from "@/lib/mind-tabs";
+import { meditationSessionSchema } from "@/lib/validation";
 import { instantToLocalInput, localInputToInstant, localToInstant } from "@/lib/dates";
 import {
   FAST_PROTOCOLS,
@@ -3760,6 +3776,110 @@ check("the fast plan and settings accept a kind", () => {
   };
   assert.equal(settingsSchema.parse(base).fastKind, "INTERMITTENT");
   assert.equal(settingsSchema.parse({ ...base, fastKind: "ISLAMIC" }).fastKind, "ISLAMIC");
+});
+
+// ---------------------------------------------------------------- meditation
+
+check("box n-n-n-n is four phases of n, n held to 4-8, and its level follows n", () => {
+  const box = findMeditation("box")!;
+  for (let n = 4; n <= 8; n += 1) {
+    const pattern = box.pattern!({ n });
+    assert.deepEqual(pattern.map((p) => p.seconds), [n, n, n, n]);
+    assert.deepEqual(pattern.map((p) => p.cue), ["in", "hold-in", "out", "hold-out"]);
+  }
+  assert.deepEqual(box.pattern!({ n: 2 }).map((p) => p.seconds), [4, 4, 4, 4]);
+  assert.deepEqual(box.pattern!({ n: 12 }).map((p) => p.seconds), [8, 8, 8, 8]);
+  assert.equal(box.level({ n: 4 }), "easy");
+  assert.equal(box.level({ n: 6 }), "medium");
+  assert.equal(box.level({ n: 8 }), "hard");
+  assert.equal(findMeditation("triangle")!.level({ n: 7 }), "hard");
+});
+
+check("the named patterns breathe the way they say", () => {
+  assert.deepEqual(findMeditation("4-7-8")!.pattern!({}).map((p) => p.seconds), [4, 7, 8]);
+  const sigh = findMeditation("sigh")!.pattern!({});
+  assert.deepEqual(sigh.map((p) => p.cue), ["in", "in", "out"]);
+  assert.ok(sigh[0].to < sigh[1].to, "the second sip tops the breath up");
+  assert.deepEqual(findMeditation("longer-exhale")!.pattern!({ out: 8 }).map((p) => p.seconds), [4, 8]);
+  // Every meditation has a level at its defaults, and ids are unique.
+  assert.equal(new Set(MEDITATIONS.map((m) => m.id)).size, MEDITATIONS.length);
+  for (const m of MEDITATIONS) assert.ok(["easy", "medium", "hard"].includes(m.level(m.defaults)));
+  const levels = new Set(MEDITATIONS.map((m) => m.level(m.defaults)));
+  assert.ok(levels.has("easy") && levels.has("hard"), "there are easy ones and hard ones");
+});
+
+check("breathAt lands on the right phase at the boundaries and across cycles", () => {
+  const pattern = findMeditation("box")!.pattern!({ n: 4 });
+  assert.equal(breathAt(0, pattern).index, 0);
+  assert.equal(breathAt(0, pattern).countdown, 4);
+  assert.equal(breathAt(3999, pattern).index, 0);
+  assert.equal(breathAt(3999, pattern).countdown, 1);
+  assert.equal(breathAt(4000, pattern).index, 1);
+  assert.equal(breathAt(12_000, pattern).index, 3);
+  const next = breathAt(16_500, pattern);
+  assert.equal(next.cycle, 1);
+  assert.equal(next.index, 0);
+  // The orb is empty at the start of an in-breath, full by the end of it, and stays full through the hold.
+  assert.equal(breathAt(0, pattern).level, 0);
+  assert.ok(Math.abs(breathAt(3999, pattern).level - 1) < 0.01);
+  assert.equal(breathAt(6000, pattern).level, 1);
+  assert.ok(Math.abs(breathAt(16_000, pattern).around) < 1e-9);
+});
+
+check("sessions round to whole breaths, and dhikr runs to its count", () => {
+  const box = findMeditation("box")!;
+  assert.equal(sessionLength(1, box.pattern!({ n: 4 })), 64); // 60s -> 3.75 cycles of 16 -> 4
+  assert.equal(sessionLength(1, box.pattern!({ n: 8 })), 64); // 60s -> 1.9 cycles of 32 -> 2
+  assert.equal(sessionLength(1, findMeditation("4-7-8")!.pattern!({})), 57); // 3 cycles of 19
+  assert.equal(plannedSeconds(findMeditation("dhikr")!, { set: "tasbih" }), 0);
+  assert.equal(plannedSeconds(findMeditation("body-scan")!, { minutes: 10 }), 600);
+  const tasbih = dhikrSteps({ set: "tasbih" });
+  assert.equal(dhikrTotal(tasbih), 100);
+  assert.deepEqual(dhikrAt(0, tasbih), { step: 0, inStep: 0, done: false });
+  assert.deepEqual(dhikrAt(33, tasbih), { step: 1, inStep: 0, done: false });
+  assert.deepEqual(dhikrAt(99, tasbih), { step: 2, inStep: 33, done: false });
+  assert.equal(dhikrAt(100, tasbih).done, true);
+  assert.equal(dhikrSteps({ set: "custom", phrase: "  Ya Latif ", target: 99 })[0].phrase, "Ya Latif");
+  assert.equal(promptAt(0, ["a", "b", "c", "d"], 400), 0);
+  assert.equal(promptAt(100_000, ["a", "b", "c", "d"], 400), 1);
+  assert.equal(promptAt(999_000, ["a", "b", "c", "d"], 400), 3);
+});
+
+check("options are normalised, and only exact ones are accepted", () => {
+  const box = findMeditation("box")!;
+  assert.deepEqual(normalizeOptions(box, {}), { n: 4, minutes: 5 });
+  assert.deepEqual(normalizeOptions(box, { n: 9, minutes: 7 }), { n: 8, minutes: 5 });
+  assert.equal(optionsValid(box, { n: 6, minutes: 10 }), true);
+  assert.equal(optionsValid(box, { n: 3, minutes: 10 }), false);
+  assert.equal(optionsValid(box, { n: 9 }), false);
+  const base = { kind: "box", options: JSON.stringify({ n: 4, minutes: 1 }), completed: "true", startedAt: new Date(Date.now() - 70_000).toISOString() };
+  assert.equal(meditationSessionSchema.safeParse({ ...base, seconds: "64" }).success, true);
+  assert.equal(meditationSessionSchema.safeParse({ ...base, seconds: "400" }).success, false, "longer than the plan");
+  assert.equal(meditationSessionSchema.safeParse({ ...base, seconds: "64", kind: "levitation" }).success, false);
+  assert.equal(meditationSessionSchema.safeParse({ ...base, seconds: "64", options: JSON.stringify({ n: 3, minutes: 1 }) }).success, false);
+  assert.equal(meditationSessionSchema.safeParse({ ...base, seconds: "64", startedAt: new Date(Date.now() + 3_600_000).toISOString() }).success, false);
+  // Dhikr has no planned length, so any honest length is fine.
+  assert.equal(
+    meditationSessionSchema.safeParse({ kind: "dhikr", options: JSON.stringify({ set: "tasbih" }), seconds: "900", count: "100", completed: "true", startedAt: base.startedAt }).success,
+    true,
+  );
+});
+
+check("the garden only grows, and says what a sitting brought", () => {
+  for (let i = 1; i < GARDEN_STAGES.length; i += 1) {
+    assert.ok(GARDEN_STAGES[i].minutes > GARDEN_STAGES[i - 1].minutes, "thresholds strictly increase");
+  }
+  assert.equal(new Set(GARDEN_STAGES.map((s) => s.id)).size, GARDEN_STAGES.length);
+  assert.deepEqual(stagesAt(0).map((s) => s.id), ["meadow"]);
+  assert.deepEqual(stagesAt(15).map((s) => s.id), ["meadow", "flowers", "pond"]);
+  assert.equal(nextStage(14.9)?.id, "pond");
+  assert.equal(nextStage(1e6), null);
+  assert.deepEqual(unlockedBetween(0, 4.9).map((s) => s.id), []);
+  assert.deepEqual(unlockedBetween(4, 16).map((s) => s.id), ["flowers", "pond"]);
+  assert.deepEqual(unlockedBetween(5, 5).map((s) => s.id), []);
+  assert.equal(towardNext(10), 0.5);
+  assert.equal(towardNext(1e6), 1);
+  assert.ok(MIND_TABS.includes("meditate"));
 });
 
 console.log(`\n${passed} checks passed.\n`);

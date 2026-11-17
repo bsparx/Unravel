@@ -115,7 +115,8 @@ export function SkyEmpty({
   return (
     <div
       className={cn(
-        "relative isolate overflow-hidden rounded-2xl px-6 py-14 text-center text-[var(--woop-ink)] sm:py-20",
+        // The same centred column as the pages and cards it stands in for.
+        "relative isolate mx-auto w-full max-w-2xl overflow-hidden rounded-2xl px-6 py-14 text-center text-[var(--woop-ink)] sm:py-20",
         sky,
       )}
     >

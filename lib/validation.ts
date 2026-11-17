@@ -38,6 +38,13 @@ import {
   findTemplate,
   type PracticeKind,
 } from "@/lib/practices";
+import {
+  MAX_SESSION_SECONDS,
+  findMeditation,
+  optionsValid,
+  plannedSeconds,
+  type MeditationOptions,
+} from "@/lib/meditations";
 
 export const cuid = z.string().min(1).max(64);
 
@@ -618,6 +625,7 @@ export const settingsSchema = z.object({
   mindDisputationEnabled: z.coerce.boolean().default(true),
   mindGratitudeEnabled: z.coerce.boolean().default(true),
   mindDuaEnabled: z.coerce.boolean().default(true),
+  mindMeditationEnabled: z.coerce.boolean().default(true),
   gratitudeTemplate: z
     .string()
     .refine((id) => findTemplate("gratitude", id) !== null, "Pick a gratitude template.")
@@ -964,6 +972,52 @@ export function formValues(formData: FormData): Record<string, unknown> {
 
   return values;
 }
+
+// ---------------------------------------------------------------- meditation
+
+/**
+ * One sitting, as the session sends it. The kind must exist, its options
+ * must be exactly what the catalog would run (so a hand-made request can't
+ * file a 3-3-3-3 box), the planned length must match the options, and the
+ * time sat can't run past the plan by more than a minute. Dhikr has no
+ * planned length and runs until the count is done.
+ */
+export const meditationSessionSchema = z
+  .object({
+    kind: z.string().min(1).max(40),
+    options: z.string().max(400).transform((raw, ctx) => {
+      try {
+        const value = JSON.parse(raw) as unknown;
+        if (value && typeof value === "object" && !Array.isArray(value)) return value as MeditationOptions;
+      } catch {
+        // fall through
+      }
+      ctx.addIssue({ code: "custom", message: "Those options didn't arrive." });
+      return z.NEVER;
+    }),
+    seconds: z.coerce.number().int().min(1).max(MAX_SESSION_SECONDS),
+    count: emptyToUndefined(z.coerce.number().int().min(0).max(100_000)),
+    completed: z.enum(["true", "false"]).transform((value) => value === "true"),
+    startedAt: z.coerce.date(),
+  })
+  .superRefine((value, ctx) => {
+    const meditation = findMeditation(value.kind);
+    if (!meditation) {
+      ctx.addIssue({ code: "custom", path: ["kind"], message: "That meditation doesn't exist." });
+      return;
+    }
+    if (!optionsValid(meditation, value.options)) {
+      ctx.addIssue({ code: "custom", path: ["options"], message: "Those options are out of range." });
+      return;
+    }
+    const planned = plannedSeconds(meditation, value.options);
+    if (planned > 0 && value.seconds > planned + 60) {
+      ctx.addIssue({ code: "custom", path: ["seconds"], message: "That's longer than the session." });
+    }
+    if (value.startedAt.getTime() > Date.now() + 60_000) {
+      ctx.addIssue({ code: "custom", path: ["startedAt"], message: "A session can't start in the future." });
+    }
+  });
 
 // ---------------------------------------------------------------- fasting
 

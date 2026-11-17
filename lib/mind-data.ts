@@ -11,6 +11,12 @@ import {
   type PracticePage,
 } from "@/lib/practices";
 import type { WishCard } from "@/lib/woop";
+import {
+  findMeditation,
+  meditationTitle,
+  normalizeOptions,
+  type MeditationOptions,
+} from "@/lib/meditations";
 
 /** How far back the journal on each daily tab reaches. */
 const HISTORY_DAYS = 90;
@@ -32,7 +38,32 @@ export type PracticeView = {
   seed: number;
 };
 
+export type MeditationRow = {
+  id: string;
+  kind: string;
+  title: string;
+  seconds: number;
+  completed: boolean;
+  count: number | null;
+  /** "Tue 17 Nov, 08:40" in the user's zone. */
+  label: string;
+};
+
+export type MeditationView = {
+  /** Every minute ever sat, fractions included; the garden is drawn from it. */
+  totalMinutes: number;
+  sessions: number;
+  /** Newest first. */
+  recent: MeditationRow[];
+  /** Oldest first, ending today. */
+  days: { dateISO: string; label: string; minutes: number }[];
+  todayISO: string;
+  /** What the picker opens on: the last sitting's choice. */
+  last: { kind: string; options: MeditationOptions } | null;
+};
+
 export type MindEnabled = {
+  meditate: boolean;
   wishes: boolean;
   disputations: boolean;
   gratitude: boolean;
@@ -46,6 +77,7 @@ export type MindView = {
   disputations: DisputationCard[];
   gratitude: PracticeView;
   dua: PracticeView;
+  meditation: MeditationView;
 };
 
 export function mindEnabled(user: User): MindEnabled {
@@ -54,6 +86,7 @@ export function mindEnabled(user: User): MindEnabled {
     disputations: user.mindDisputationEnabled,
     gratitude: user.mindGratitudeEnabled,
     dua: user.mindDuaEnabled,
+    meditate: user.mindMeditationEnabled,
   };
 }
 
@@ -74,7 +107,7 @@ export async function getMind(user: User): Promise<MindView> {
   const today = todayLocal(user.timezone);
   const since = addDays(today, -HISTORY_DAYS);
 
-  const [wishes, disputations, pages] = await Promise.all([
+  const [wishes, disputations, pages, sitTotal, sittings] = await Promise.all([
     prisma.wish.findMany({
       where: { userId: user.id },
       orderBy: [{ sortOrder: "desc" }, { createdAt: "desc" }],
@@ -87,6 +120,16 @@ export async function getMind(user: User): Promise<MindView> {
       where: { userId: user.id, kind: { in: ["GRATITUDE", "DUA"] }, date: { gte: since } },
       orderBy: { date: "desc" },
       select: { id: true, date: true, kind: true, template: true, items: true, body: true },
+    }),
+    prisma.meditationSession.aggregate({
+      where: { userId: user.id },
+      _sum: { seconds: true },
+      _count: true,
+    }),
+    prisma.meditationSession.findMany({
+      where: { userId: user.id, startedAt: { gte: addDays(today, -HISTORY_DAYS) } },
+      orderBy: { startedAt: "desc" },
+      take: 200,
     }),
   ]);
 
@@ -146,8 +189,60 @@ export async function getMind(user: User): Promise<MindView> {
     settledLabel: row.settledAt ? day.format(row.settledAt) : null,
   }));
 
+  // Sittings are instants, so they're bucketed into days in the user's zone.
+  const localISO = new Intl.DateTimeFormat("en-CA", {
+    timeZone: user.timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const sitLabel = new Intl.DateTimeFormat("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: user.timezone,
+  });
+  const minutesByDay = new Map<string, number>();
+  for (const row of sittings) {
+    const iso = localISO.format(row.startedAt);
+    minutesByDay.set(iso, (minutesByDay.get(iso) ?? 0) + row.seconds / 60);
+  }
+  const lastRow = sittings[0];
+  const lastMeditation = lastRow ? findMeditation(lastRow.kind) : null;
+  const meditation: MeditationView = {
+    totalMinutes: (sitTotal._sum.seconds ?? 0) / 60,
+    sessions: sitTotal._count,
+    recent: sittings.slice(0, 30).map((row) => {
+      const found = findMeditation(row.kind);
+      const options = (row.options ?? {}) as MeditationOptions;
+      return {
+        id: row.id,
+        kind: row.kind,
+        title: found ? meditationTitle(found, options) : "A sitting",
+        seconds: row.seconds,
+        completed: row.completed,
+        count: row.count,
+        label: sitLabel.format(row.startedAt).replace(/ at /, ", "),
+      };
+    }),
+    days: Array.from({ length: WEEK_DOTS }, (_, i) => {
+      const date = addDays(today, i - WEEK_DOTS + 1);
+      const iso = toISODate(date);
+      return { dateISO: iso, label: dayLabel.format(date), minutes: minutesByDay.get(iso) ?? 0 };
+    }),
+    todayISO,
+    last:
+      lastRow && lastMeditation
+        ? { kind: lastRow.kind, options: normalizeOptions(lastMeditation, (lastRow.options ?? {}) as MeditationOptions) }
+        : null,
+  };
+
   return {
     enabled: mindEnabled(user),
+    meditation,
     gratitude: practice("gratitude", user.gratitudeTemplate, user.gratitudeCount),
     dua: practice("dua", user.duaTemplate, user.duaCount),
     active: cards.filter((card) => card.status === "ACTIVE"),

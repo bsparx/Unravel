@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { todayLocal } from "@/lib/dates";
 import { prisma } from "@/lib/db";
+import { findMeditation, normalizeOptions, plannedSeconds } from "@/lib/meditations";
 import { itemsToBody } from "@/lib/practices";
 import {
   type ActionState,
@@ -12,6 +13,7 @@ import {
   disputationSchema,
   fieldErrorsFrom,
   formValues,
+  meditationSessionSchema,
   practiceEntrySchema,
   practiceTemplateSchema,
   wishSchema,
@@ -190,4 +192,41 @@ export async function setPracticeTemplate(formData: FormData): Promise<ActionSta
   revalidatePath("/mind");
   revalidatePath("/settings");
   return { status: "success" };
+}
+
+/**
+ * Keep a sitting. Called when a session finishes or is ended early; either
+ * way the minutes sat are what's kept, and the garden grows by them.
+ */
+export async function saveMeditation(formData: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  const parsed = meditationSessionSchema.safeParse(formValues(formData));
+  if (!parsed.success) return invalid(parsed.error);
+
+  const { kind, options, seconds, count, completed, startedAt } = parsed.data;
+  const meditation = findMeditation(kind)!;
+
+  await prisma.meditationSession.create({
+    data: {
+      userId: user.id,
+      kind,
+      options: normalizeOptions(meditation, options) as object,
+      plannedSeconds: plannedSeconds(meditation, options),
+      seconds,
+      count: count ?? null,
+      completed,
+      startedAt,
+    },
+  });
+
+  revalidatePath("/mind");
+  return { status: "success" };
+}
+
+export async function deleteMeditation(id: string): Promise<void> {
+  const user = await requireUser();
+  const parsed = cuid.safeParse(id);
+  if (!parsed.success) return;
+  await prisma.meditationSession.deleteMany({ where: { id: parsed.data, userId: user.id } });
+  revalidatePath("/mind");
 }

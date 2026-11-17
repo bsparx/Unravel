@@ -129,12 +129,25 @@ export function FastingPanel({ view }: { view: FastingView }) {
   const [shown, setShown] = useState(PAGE_SIZE);
 
   const today = view.islamic.today;
+  // The chip names the plan; the prayer and meal names add width a phone
+  // doesn't have, so they show from sm up.
   const planLabel =
-    plan.kind === "ISLAMIC"
-      ? today
-        ? `Islamic · Fajr ${today.fajrLabel} to Maghrib ${today.maghribLabel}`
-        : "Islamic · Fajr to Maghrib"
-      : `${windowRatio(plan.window)} · eat ${formatMinuteOfDay(plan.window.eatStart)} to ${formatMinuteOfDay(plan.window.eatEnd)}`;
+    plan.kind === "ISLAMIC" ? (
+      today ? (
+        <>
+          Islamic · <span className="hidden sm:inline">Fajr </span>
+          {today.fajrLabel} to <span className="hidden sm:inline">Maghrib </span>
+          {today.maghribLabel}
+        </>
+      ) : (
+        "Islamic · Fajr to Maghrib"
+      )
+    ) : (
+      <>
+        {windowRatio(plan.window)} · <span className="hidden sm:inline">eat </span>
+        {formatMinuteOfDay(plan.window.eatStart)} to {formatMinuteOfDay(plan.window.eatEnd)}
+      </>
+    );
   const target = plan.kind === "ISLAMIC" ? (today?.minutes ?? view.targetMinutes) : fastMinutes(plan.window);
 
   return (
@@ -149,7 +162,7 @@ export function FastingPanel({ view }: { view: FastingView }) {
           <PopoverTrigger asChild>
             <Button type="button" variant="outline" size="sm" className="max-w-full rounded-full">
               <Settings2 className="size-3.5" aria-hidden />
-              <span className="text-muted-foreground">Plan:</span>
+              <span className="text-muted-foreground hidden sm:inline">Plan:</span>
               <span className="truncate tabular-nums">{planLabel}</span>
               <ChevronDown className="size-3.5 opacity-60" aria-hidden />
             </Button>

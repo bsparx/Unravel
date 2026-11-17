@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, Sparkle } from "lucide-react";
+import { ArrowLeft, ArrowRight, EyeClosed, Sparkle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -213,7 +213,7 @@ export function WoopRitual({
               loading={sealing}
               disabled={sealing}
               onClick={() => void seal()}
-              className="rounded-full bg-[var(--woop-plan)] px-6 font-medium text-[var(--woop-plan-ink)] shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_6px_18px_-8px_rgba(60,30,5,0.6)] transition-transform hover:brightness-105 active:scale-[0.98]"
+              className="rounded-full bg-[var(--woop-plan)] px-6 font-medium text-[var(--woop-plan-ink)] shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_6px_18px_-8px_rgba(60,30,5,0.6)] transition-transform hover:bg-[var(--woop-plan)] hover:brightness-105 active:scale-[0.98]"
             >
               {sealing ? "Sealing…" : initial ? "Seal it again" : "Seal it"}
             </Button>
@@ -268,9 +268,13 @@ export function WoopRitual({
             <span className={cn("woop-breathe absolute inset-0 rounded-full border-2 opacity-70", RING[step.key])} />
             <span className={cn("woop-breathe absolute inset-5 rounded-full border opacity-40 [animation-delay:-2s]", RING[step.key])} />
             <span className={cn("absolute inset-12 rounded-full bg-current opacity-15 blur-xl", ACCENT[step.key])} />
-            <p className="font-hand relative max-w-[8.5rem] text-xl leading-tight text-[var(--woop-ink)] sm:text-2xl">
-              {trimmed}
-            </p>
+            {/* No echo of what was just written: it's fresh in mind, and a long
+                outcome never fit the ring. Back shows it if needed. */}
+            <EyeClosed
+              aria-hidden
+              strokeWidth={1.5}
+              className={cn("woop-breathe relative size-12 sm:size-14", ACCENT[step.key])}
+            />
           </div>
           <div className="space-y-1">
             <p className="font-display text-xl text-[var(--woop-ink)] italic sm:text-2xl">{step.picture}</p>
