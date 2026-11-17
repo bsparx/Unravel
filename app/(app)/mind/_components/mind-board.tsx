@@ -9,12 +9,15 @@ import type { MeditationChoice } from "@/components/meditation/meditation-picker
 import { MeditationSession, type SessionResult } from "@/components/meditation/meditation-session";
 import { primeAudio } from "@/components/meditation/sound";
 import { PracticeRitual } from "@/components/practice-ritual";
+import { BookDialog } from "@/components/reading/book-dialog";
+import { LogReadingDialog } from "@/components/reading/log-reading-dialog";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { WoopRitual } from "@/components/woop-ritual";
 import { cn } from "@/lib/utils";
 import type { DisputationCard, DisputationFields } from "@/lib/disputation";
 import type { MindView } from "@/lib/mind-data";
+import type { ShelfBook } from "@/lib/reading-data";
 import { MIND_TABS, type MindTab } from "@/lib/mind-tabs";
 import {
   itemsToAnswers,
@@ -29,6 +32,7 @@ import { saveDisputation, saveMeditation, savePractice, saveWish } from "../acti
 import { DisputationsPanel } from "./disputations-panel";
 import { MeditatePanel } from "./meditate-panel";
 import { PracticePanel, type PracticeWriteMode } from "./practice-panel";
+import { ReadingPanel } from "./reading-panel";
 import { WishesPanel } from "./wishes-panel";
 
 
@@ -37,18 +41,29 @@ type Editing =
   | { kind: "disputation"; card: DisputationCard | null }
   | { kind: "practice"; practice: PracticeKind; mode: PracticeWriteMode }
   | { kind: "meditation"; choice: MeditationChoice; before: number }
+  | { kind: "book" }
+  | { kind: "log"; book: ShelfBook }
   | null;
 
 const LABELS: Record<MindTab, string> = {
   gratitude: "Gratitude",
   dua: "Du'a",
   meditate: "Meditate",
+  reading: "Reading",
   wishes: "Wishes",
   disputations: "Disputations",
 };
 
+// What each daily tab's dot says, done or not yet.
+const DOT: Record<"gratitude" | "dua" | "meditate" | "reading", { colour: string; done: string; not: string; srDone: string; srNot: string }> = {
+  gratitude: { colour: "bg-[var(--thanks-lantern)]", done: "Today's page is written", not: "Not written yet today", srDone: "(written today)", srNot: "(not written today)" },
+  dua: { colour: "bg-[var(--dua-accent)]", done: "Today's page is written", not: "Not written yet today", srDone: "(written today)", srNot: "(not written today)" },
+  meditate: { colour: "bg-[var(--garden-light)]", done: "You've sat today", not: "No sitting yet today", srDone: "(sat today)", srNot: "(not yet today)" },
+  reading: { colour: "bg-[var(--reading-dot)]", done: "You've read today", not: "No reading yet today", srDone: "(read today)", srNot: "(not yet today)" },
+};
+
 /**
- * /mind: up to four practices behind one switch. The two daily pages come
+ * /mind: up to six practices behind one switch. The two daily pages come
  * first, because they're the ones you open every day; wishes and
  * disputations are there for when you need them.
  */
@@ -172,6 +187,8 @@ export function MindBoard({
   };
 
   const satToday = (view.meditation.days.at(-1)?.minutes ?? 0) > 0;
+  const readToday = view.reading.days.at(-1)?.read ?? false;
+
 
   const showNew =
     (tab === "wishes" && active.length > 0) || (tab === "disputations" && disputations.length > 0);
@@ -188,9 +205,14 @@ export function MindBoard({
           >
             {tabs.map((value) => {
               const selected = tab === value;
-              const daily = value === "gratitude" || value === "dua" || value === "meditate";
+              const daily = value === "gratitude" || value === "dua" || value === "meditate" || value === "reading";
               const writtenToday =
-                value === "meditate" ? satToday : daily && view[value as "gratitude" | "dua"].today !== null;
+                value === "meditate"
+                  ? satToday
+                  : value === "reading"
+                    ? readToday
+                    : daily && view[value as "gratitude" | "dua"].today !== null;
+              const dot = daily ? DOT[value] : null;
               return (
                 <button
                   key={value}
@@ -208,41 +230,19 @@ export function MindBoard({
                   )}
                 >
                   {LABELS[value]}
-                  {daily ? (
+                  {dot ? (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span
                           className={cn(
                             "size-1.5 rounded-full",
-                            writtenToday
-                              ? value === "gratitude"
-                                ? "bg-[var(--thanks-lantern)]"
-                                : value === "meditate"
-                                  ? "bg-[var(--garden-light)]"
-                                  : "bg-[var(--dua-accent)]"
-                              : "border-muted-foreground/50 border",
+                            writtenToday ? dot.colour : "border-muted-foreground/50 border",
                           )}
                         >
-                          <span className="sr-only">
-                            {value === "meditate"
-                              ? writtenToday
-                                ? "(sat today)"
-                                : "(not yet today)"
-                              : writtenToday
-                                ? "(written today)"
-                                : "(not written today)"}
-                          </span>
+                          <span className="sr-only">{writtenToday ? dot.srDone : dot.srNot}</span>
                         </span>
                       </TooltipTrigger>
-                      <TooltipContent side="bottom">
-                        {value === "meditate"
-                          ? writtenToday
-                            ? "You've sat today"
-                            : "No sitting yet today"
-                          : writtenToday
-                            ? "Today's page is written"
-                            : "Not written yet today"}
-                      </TooltipContent>
+                      <TooltipContent side="bottom">{writtenToday ? dot.done : dot.not}</TooltipContent>
                     </Tooltip>
                   ) : (
                     <span className="font-mono text-micro tabular-nums opacity-60">
@@ -297,6 +297,13 @@ export function MindBoard({
             }}
           />
         )}
+        {tab === "reading" && (
+          <ReadingPanel
+            view={view.reading}
+            onAdd={() => setEditing({ kind: "book" })}
+            onLog={(book) => setEditing({ kind: "log", book })}
+          />
+        )}
         {(tab === "gratitude" || tab === "dua") && (
           <PracticePanel
             // Keyed by tab only: keying by template remounted the panel on
@@ -339,6 +346,15 @@ export function MindBoard({
           />
         );
       })()}
+      {editing?.kind === "book" && <BookDialog initial={null} onClose={() => setEditing(null)} />}
+      {editing?.kind === "log" && (
+        <LogReadingDialog
+          key={editing.book.id}
+          book={editing.book}
+          todayISO={view.reading.todayISO}
+          onClose={() => setEditing(null)}
+        />
+      )}
       {editing?.kind === "practice" && (() => {
         const practice = view[editing.practice];
         const page = editing.mode === "edit" ? practice.today : null;

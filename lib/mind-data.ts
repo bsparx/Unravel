@@ -17,6 +17,7 @@ import {
   normalizeOptions,
   type MeditationOptions,
 } from "@/lib/meditations";
+import { getReading, type ReadingView } from "@/lib/reading-data";
 
 /** How far back the journal on each daily tab reaches. */
 const HISTORY_DAYS = 90;
@@ -64,6 +65,7 @@ export type MeditationView = {
 
 export type MindEnabled = {
   meditate: boolean;
+  reading: boolean;
   wishes: boolean;
   disputations: boolean;
   gratitude: boolean;
@@ -78,6 +80,7 @@ export type MindView = {
   gratitude: PracticeView;
   dua: PracticeView;
   meditation: MeditationView;
+  reading: ReadingView;
 };
 
 export function mindEnabled(user: User): MindEnabled {
@@ -87,6 +90,7 @@ export function mindEnabled(user: User): MindEnabled {
     gratitude: user.mindGratitudeEnabled,
     dua: user.mindDuaEnabled,
     meditate: user.mindMeditationEnabled,
+    reading: user.mindReadingEnabled,
   };
 }
 
@@ -107,7 +111,7 @@ export async function getMind(user: User): Promise<MindView> {
   const today = todayLocal(user.timezone);
   const since = addDays(today, -HISTORY_DAYS);
 
-  const [wishes, disputations, pages, sitTotal, sittings] = await Promise.all([
+  const [wishes, disputations, pages, sitTotal, sittings, reading] = await Promise.all([
     prisma.wish.findMany({
       where: { userId: user.id },
       orderBy: [{ sortOrder: "desc" }, { createdAt: "desc" }],
@@ -131,6 +135,7 @@ export async function getMind(user: User): Promise<MindView> {
       orderBy: { startedAt: "desc" },
       take: 200,
     }),
+    getReading(user),
   ]);
 
   // `date` is a calendar day stored at UTC midnight, so it's labelled in UTC.
@@ -243,6 +248,7 @@ export async function getMind(user: User): Promise<MindView> {
   return {
     enabled: mindEnabled(user),
     meditation,
+    reading,
     gratitude: practice("gratitude", user.gratitudeTemplate, user.gratitudeCount),
     dua: practice("dua", user.duaTemplate, user.duaCount),
     active: cards.filter((card) => card.status === "ACTIVE"),

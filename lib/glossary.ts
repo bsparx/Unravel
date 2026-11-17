@@ -104,7 +104,7 @@ export const GLOSSARY = {
   },
   mind: {
     title: "Mind",
-    what: "Up to five practices on one page, each switchable in Settings. Gratitude and du'a are a page a day. Meditation is a timer for breathing, dhikr and stillness that grows a garden. WOOP turns a wish into a plan for the obstacle in you. ABCDE takes a gloomy thought after a setback and argues back.",
+    what: "Up to six practices on one page, each switchable in Settings. Gratitude and du'a are a page a day. Meditation is a timer for breathing, dhikr and stillness that grows a garden. Reading keeps the books you're reading and the notes each one gathers. WOOP turns a wish into a plan for the obstacle in you. ABCDE takes a gloomy thought after a setback and argues back.",
     why: "Noticing the good, asking for what you need, wanting well and thinking clearly about setbacks are all skills, and all get easier written down.",
   },
   woop: {
@@ -161,6 +161,16 @@ export const GLOSSARY = {
     title: "The garden",
     what: "A moonlit garden that fills in as your minutes add up: wildflowers at 5, a pond at 15, a lantern at 60, and on to a full moon at 2,000. Every minute you sit counts, even in a session you end early.",
     why: "Something you can watch grow makes the practice feel like it's going somewhere. It never wilts: a week away takes nothing from it.",
+  },
+  reading: {
+    title: "Reading",
+    what: "The books you're reading, on a shelf. Each time you read, log the page you started on and the page you stopped at, and a line about what stayed with you; keep a quote if one stood out. Each book gathers those notes in page order, and when you're ready you write the book in your own words.",
+    why: "Writing a little after each sitting is how a book stays with you. A few lines a day add up to notes you'd never sit down and write in one go.",
+  },
+  "book-notes": {
+    title: "Notes",
+    what: "Every reading's note and quote, laid out in page order so they read like the book does. Switch to by-date to see them as a diary instead. Copy them as Markdown to keep them anywhere.",
+    why: "Notes in page order turn into a summary almost on their own: read them through and the shape of the book is there.",
   },
 } as const satisfies Record<string, { title: string; what: string; why: string }>;
 

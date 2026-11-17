@@ -50,6 +50,7 @@ export default async function SettingsPage() {
           mindGratitudeEnabled: user.mindGratitudeEnabled,
           mindDuaEnabled: user.mindDuaEnabled,
           mindMeditationEnabled: user.mindMeditationEnabled,
+          mindReadingEnabled: user.mindReadingEnabled,
           gratitudeTemplate: templateOrDefault("gratitude", user.gratitudeTemplate).id,
           gratitudeCount: clampCount(user.gratitudeCount),
           duaTemplate: templateOrDefault("dua", user.duaTemplate).id,

@@ -45,6 +45,15 @@ import {
   plannedSeconds,
   type MeditationOptions,
 } from "@/lib/meditations";
+import {
+  BOOK_AUTHOR_MAX,
+  BOOK_PAGES_MAX,
+  BOOK_SUMMARY_MAX,
+  BOOK_TITLE_MAX,
+  READING_NOTE_MAX,
+  READING_QUOTE_MAX,
+  isBookCover,
+} from "@/lib/reading";
 
 export const cuid = z.string().min(1).max(64);
 
@@ -626,6 +635,7 @@ export const settingsSchema = z.object({
   mindGratitudeEnabled: z.coerce.boolean().default(true),
   mindDuaEnabled: z.coerce.boolean().default(true),
   mindMeditationEnabled: z.coerce.boolean().default(true),
+  mindReadingEnabled: z.coerce.boolean().default(true),
   gratitudeTemplate: z
     .string()
     .refine((id) => findTemplate("gratitude", id) !== null, "Pick a gratitude template.")
@@ -1018,6 +1028,75 @@ export const meditationSessionSchema = z
       ctx.addIssue({ code: "custom", path: ["startedAt"], message: "A session can't start in the future." });
     }
   });
+
+// ---------------------------------------------------------------- reading
+
+const page = z.coerce.number().int().min(0, "Pages start at 0.").max(BOOK_PAGES_MAX, "That's past any book.");
+const bookStatus = z.enum(["READING", "UP_NEXT", "FINISHED", "SET_ASIDE"]);
+
+/**
+ * A book, added or edited. A percent book runs 0..100 and needs no length;
+ * a paged one may leave its length blank. Where you already are has to be
+ * inside the book.
+ */
+export const bookSchema = z
+  .object({
+    id: emptyToUndefined(cuid),
+    title: z
+      .string()
+      .trim()
+      .min(1, "What's it called?")
+      .max(BOOK_TITLE_MAX, `Keep the title under ${BOOK_TITLE_MAX} characters.`),
+    author: z.string().trim().max(BOOK_AUTHOR_MAX, `Keep the author under ${BOOK_AUTHOR_MAX} characters.`).optional().or(z.literal("")),
+    unit: z.enum(["PAGE", "PERCENT"]),
+    totalPages: emptyToUndefined(z.coerce.number().int().min(1, "A book has at least a page.").max(BOOK_PAGES_MAX, "That's past any book.")),
+    startPage: emptyToUndefined(page),
+    cover: z.string().refine(isBookCover, "Pick a cover."),
+    status: bookStatus.optional(),
+  })
+  .superRefine((value, ctx) => {
+    const start = value.startPage ?? 0;
+    if (value.unit === "PERCENT" && start > 100) {
+      ctx.addIssue({ code: "custom", path: ["startPage"], message: "Somewhere from 0 to 100%." });
+    }
+    if (value.unit === "PAGE" && value.totalPages !== undefined && start >= value.totalPages) {
+      ctx.addIssue({ code: "custom", path: ["startPage"], message: `The book has ${value.totalPages} pages.` });
+    }
+  });
+
+/**
+ * One reading. Its pages are checked against the book, and its day against
+ * the user's today, in the action (lib/reading.ts), since neither is known
+ * here. A reading needs pages moved or something written: a note on its
+ * own ("still thinking about chapter 3") is a reading too.
+ */
+export const readingLogSchema = z
+  .object({
+    id: emptyToUndefined(cuid),
+    bookId: cuid,
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a day."),
+    fromPage: page,
+    toPage: page,
+    note: z.string().trim().max(READING_NOTE_MAX, `Keep the note under ${READING_NOTE_MAX} characters.`).optional().or(z.literal("")),
+    quote: z.string().trim().max(READING_QUOTE_MAX, `Keep the line under ${READING_QUOTE_MAX} characters.`).optional().or(z.literal("")),
+    quotePage: emptyToUndefined(page),
+    finished: z.enum(["true", "false"]).optional().transform((value) => value === "true"),
+  })
+  .superRefine((value, ctx) => {
+    if (value.toPage < value.fromPage) {
+      ctx.addIssue({ code: "custom", path: ["toPage"], message: "Where you stopped comes after where you started." });
+    }
+    if (value.toPage === value.fromPage && !value.note && !value.quote) {
+      ctx.addIssue({ code: "custom", path: ["toPage"], message: "Move the page on, or write a note." });
+    }
+  });
+
+export const bookStatusSchema = z.object({ id: cuid, status: bookStatus });
+
+export const bookSummarySchema = z.object({
+  id: cuid,
+  summary: z.string().trim().max(BOOK_SUMMARY_MAX, "That's longer than this can hold.").optional().or(z.literal("")),
+});
 
 // ---------------------------------------------------------------- fasting
 

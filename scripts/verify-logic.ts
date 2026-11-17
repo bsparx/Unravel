@@ -25,7 +25,21 @@ import {
   sessionLength,
 } from "@/lib/meditations";
 import { MIND_TABS } from "@/lib/mind-tabs";
-import { meditationSessionSchema } from "@/lib/validation";
+import { bookSchema, meditationSessionSchema, readingLogSchema } from "@/lib/validation";
+import {
+  BOOK_COVER_KEYS,
+  checkLogDate,
+  checkLogRange,
+  coverFor,
+  isBookCover,
+  notesByDate,
+  notesInOrder,
+  positionLabel,
+  positionOf,
+  progressOf,
+  rangeLabel,
+  toMarkdown,
+} from "@/lib/reading";
 import { instantToLocalInput, localInputToInstant, localToInstant } from "@/lib/dates";
 import {
   FAST_PROTOCOLS,
@@ -3880,6 +3894,101 @@ check("the garden only grows, and says what a sitting brought", () => {
   assert.equal(towardNext(10), 0.5);
   assert.equal(towardNext(1e6), 1);
   assert.ok(MIND_TABS.includes("meditate"));
+});
+
+console.log("\nreading — the shelf and the notebook");
+
+check("where you are is the furthest reading, or where you started", () => {
+  const book = { unit: "PAGE" as const, totalPages: 300, startPage: 40 };
+  assert.equal(positionOf(book, []), 40);
+  assert.equal(positionOf(book, [{ fromPage: 40, toPage: 90 }, { fromPage: 10, toPage: 20 }]), 90, "an old reading can't move you back");
+  assert.equal(positionOf({ ...book, startPage: 0 }, [{ fromPage: 0, toPage: 12 }]), 12);
+});
+
+check("progress needs a length, and never passes the end", () => {
+  assert.equal(progressOf({ unit: "PAGE", totalPages: null, startPage: 0 }, 50), null);
+  assert.equal(progressOf({ unit: "PAGE", totalPages: 200, startPage: 0 }, 50), 0.25);
+  assert.equal(progressOf({ unit: "PAGE", totalPages: 200, startPage: 0 }, 260), 1);
+  assert.equal(progressOf({ unit: "PERCENT", totalPages: null, startPage: 0 }, 40), 0.4);
+});
+
+check("ranges and positions read naturally in pages and percent", () => {
+  assert.equal(rangeLabel("PAGE", 34, 58), "pp. 34–58");
+  assert.equal(rangeLabel("PAGE", 34, 34), "p. 34");
+  assert.equal(rangeLabel("PERCENT", 12, 20), "12–20%");
+  assert.equal(positionLabel({ unit: "PAGE", totalPages: 499, startPage: 0 }, 142), "p. 142 of 499");
+  assert.equal(positionLabel({ unit: "PAGE", totalPages: null, startPage: 0 }, 142), "p. 142");
+  assert.equal(positionLabel({ unit: "PAGE", totalPages: 499, startPage: 0 }, 0), "499 pages");
+  assert.equal(positionLabel({ unit: "PERCENT", totalPages: null, startPage: 0 }, 28), "28%");
+});
+
+check("the notebook reads front to back; by date reads newest first", () => {
+  const logs = [
+    { id: "c", fromPage: 60, toPage: 80, dateISO: "2026-11-10", createdAt: "a" },
+    { id: "a", fromPage: 0, toPage: 30, dateISO: "2026-11-12", createdAt: "b" },
+    { id: "b", fromPage: 30, toPage: 60, dateISO: "2026-11-11", createdAt: "c" },
+    { id: "d", fromPage: 0, toPage: 30, dateISO: "2026-11-01", createdAt: "d" },
+  ];
+  assert.deepEqual(notesInOrder(logs).map((l) => l.id), ["d", "a", "b", "c"]);
+  assert.deepEqual(notesByDate(logs).map((l) => l.id), ["a", "b", "c", "d"]);
+});
+
+check("a reading has to fit its book, and its day can't be ahead", () => {
+  const book = { unit: "PAGE" as const, totalPages: 100 };
+  assert.equal(checkLogRange(book, { fromPage: 10, toPage: 40 }), null);
+  assert.ok(checkLogRange(book, { fromPage: 40, toPage: 10 }));
+  assert.ok(checkLogRange(book, { fromPage: 90, toPage: 120 }));
+  assert.ok(checkLogRange(book, { fromPage: 10, toPage: 40, quotePage: 140 }));
+  assert.equal(checkLogRange({ unit: "PAGE", totalPages: null }, { fromPage: 900, toPage: 950 }), null, "no length, no ceiling");
+  assert.ok(checkLogRange({ unit: "PERCENT", totalPages: null }, { fromPage: 90, toPage: 101 }));
+  assert.equal(checkLogDate("2026-11-17", "2026-11-17", "2025-11-16"), null);
+  assert.ok(checkLogDate("2026-11-18", "2026-11-17", "2025-11-16"));
+  assert.ok(checkLogDate("2025-01-01", "2026-11-17", "2025-11-16"));
+});
+
+check("a reading needs pages moved or something written", () => {
+  const base = { bookId: "book1", date: "2026-11-17", fromPage: "10", toPage: "24", note: "", quote: "", quotePage: "" };
+  assert.equal(readingLogSchema.safeParse(base).success, true);
+  assert.equal(readingLogSchema.safeParse({ ...base, toPage: "5" }).success, false, "backwards");
+  assert.equal(readingLogSchema.safeParse({ ...base, toPage: "10" }).success, false, "nothing moved, nothing written");
+  assert.equal(readingLogSchema.safeParse({ ...base, toPage: "10", note: "Still thinking about chapter 3." }).success, true);
+  assert.equal(readingLogSchema.safeParse({ ...base, date: "17/11/2026" }).success, false);
+  assert.equal(readingLogSchema.parse({ ...base, finished: "true" }).finished, true);
+});
+
+check("a book needs a title, and where you start has to be inside it", () => {
+  const base = { title: "Muqaddimah", author: "", unit: "PAGE", totalPages: "460", startPage: "", cover: "forest" };
+  assert.equal(bookSchema.safeParse(base).success, true);
+  assert.equal(bookSchema.safeParse({ ...base, title: "  " }).success, false);
+  assert.equal(bookSchema.safeParse({ ...base, startPage: "460" }).success, false);
+  assert.equal(bookSchema.safeParse({ ...base, cover: "gold-leaf" }).success, false);
+  assert.equal(bookSchema.safeParse({ ...base, unit: "PERCENT", totalPages: "", startPage: "101" }).success, false);
+  assert.equal(bookSchema.safeParse({ ...base, totalPages: "", startPage: "900" }).success, true, "no length, any start");
+});
+
+check("a new book's cover is stable for its title and always exists", () => {
+  assert.equal(coverFor("Thinking, Fast and Slow"), coverFor("  thinking, fast and slow "));
+  for (const title of ["", "A", "Muqaddimah", "The Brothers Karamazov", "x".repeat(300)]) {
+    assert.ok(isBookCover(coverFor(title)));
+  }
+  assert.equal(new Set(BOOK_COVER_KEYS).size, BOOK_COVER_KEYS.length);
+});
+
+check("notes copy out as Markdown in page order, with quotes", () => {
+  const md = toMarkdown(
+    { title: "Walden", author: "Thoreau", unit: "PAGE", summary: "Simplify." },
+    [
+      { fromPage: 20, toPage: 40, dateISO: "2026-11-02", createdAt: "b", note: "Second.", quote: null, quotePage: null },
+      { fromPage: 0, toPage: 20, dateISO: "2026-11-01", createdAt: "a", note: "First.", quote: "I went to the woods", quotePage: 12 },
+      { fromPage: 40, toPage: 60, dateISO: "2026-11-03", createdAt: "c", note: null, quote: null, quotePage: null },
+    ],
+  );
+  assert.ok(md.startsWith("# Walden\n*Thoreau*"));
+  assert.ok(md.includes("## In my own words\n\nSimplify."));
+  assert.ok(md.indexOf("pp. 0–20") < md.indexOf("pp. 20–40"));
+  assert.ok(md.includes("> I went to the woods\n> — p. 12"));
+  assert.ok(!md.includes("pp. 40–60"), "a reading with nothing written isn't a note");
+  assert.ok(MIND_TABS.includes("reading"));
 });
 
 console.log(`\n${passed} checks passed.\n`);

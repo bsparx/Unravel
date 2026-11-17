@@ -47,6 +47,7 @@ export type SettingsValues = {
   mindGratitudeEnabled: boolean;
   mindDuaEnabled: boolean;
   mindMeditationEnabled: boolean;
+  mindReadingEnabled: boolean;
   gratitudeTemplate: string;
   gratitudeCount: number;
   duaTemplate: string;
@@ -287,7 +288,7 @@ export function SettingsForm({
             </h2>
             <p className="text-muted-foreground text-label">
               Choose which practices appear on the Mind page: all of them, some,
-              or none. With all five off, Mind leaves the sidebar. Nothing you
+              or none. With all six off, Mind leaves the sidebar. Nothing you
               have written is deleted when a practice is switched off.
             </p>
           </div>
@@ -338,6 +339,12 @@ export function SettingsForm({
               label="Meditation"
               hint="Breathing (box, 4-7-8 and more), dhikr, body scan and stillness, from easy to hard, on a full-screen timer. Your minutes grow a moonlit garden."
               defaultChecked={values.mindMeditationEnabled}
+            />
+            <CheckboxField
+              id="mindReadingEnabled"
+              label="Reading"
+              hint="The books you're reading on a shelf. Log where you started and stopped, and what stayed with you; each book gathers its own notes."
+              defaultChecked={values.mindReadingEnabled}
             />
             <CheckboxField
               id="mindWoopEnabled"

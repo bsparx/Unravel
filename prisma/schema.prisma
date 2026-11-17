@@ -377,6 +377,7 @@ model User {
   mindGratitudeEnabled   Boolean @default(true)
   mindDuaEnabled         Boolean @default(true)
   mindMeditationEnabled  Boolean @default(true)
+  mindReadingEnabled     Boolean @default(true)
   gratitudeTemplate      String  @default("good-things")
   /// n for the "n things" gratitude template, 1-10.
   gratitudeCount         Int     @default(3)
@@ -408,6 +409,8 @@ model User {
   journal          JournalEntry[]
   fasts            Fast[]
   meditations      MeditationSession[]
+  books            Book[]
+  readingLogs      ReadingLog[]
   steps            TaskStep[]
   blocks           TimeBlock[]
   moneyCategories  MoneyCategory[]
@@ -1772,4 +1775,76 @@ model MeditationSession {
   createdAt DateTime @default(now())
 
   @@index([userId, startedAt])
+}
+
+/// A book on the shelf in /mind. Where you are in it is never stored: it's
+/// the furthest any reading reached (or `startPage`, where you already were
+/// when you added it), so deleting a reading can't leave a stale number.
+model Book {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title      String
+  author     String?
+  unit       ReadingUnit @default(PAGE)
+  /// Null when unknown. A PERCENT book always runs to 100.
+  totalPages Int?
+  /// Already this far in when it was added.
+  startPage  Int         @default(0)
+  /// A cover key from lib/reading.ts. Checked there, not by an enum.
+  cover      String
+  status     BookStatus  @default(READING)
+  /// "In your own words": the summary you write, slowly, from your notes.
+  summary    String?
+
+  startedAt  DateTime?
+  finishedAt DateTime?
+  sortOrder  Float       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  logs ReadingLog[]
+
+  @@index([userId, status, sortOrder])
+}
+
+/// One sitting with a book: where you started, where you stopped, and what
+/// stayed with you. A book's notes are these, read in page order.
+model ReadingLog {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookId String
+  book   Book   @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  /// The user's own calendar day, stored at UTC midnight.
+  date      DateTime @db.Date
+  fromPage  Int
+  toPage    Int
+  note      String?
+  /// A line worth keeping, and the page it's on.
+  quote     String?
+  quotePage Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, date])
+  @@index([bookId, fromPage])
+}
+
+enum BookStatus {
+  READING
+  UP_NEXT
+  FINISHED
+  SET_ASIDE
+}
+
+enum ReadingUnit {
+  /// Pages of a printed book.
+  PAGE
+  /// Percent, for e-books.
+  PERCENT
 }
