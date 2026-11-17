@@ -19,7 +19,7 @@ export default function Loading() {
           </div>
         </header>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
           {/* The grid — day view is the default, so one wide column. */}
           <div className="bg-card overflow-hidden rounded-[20px] border">
             <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] border-b">

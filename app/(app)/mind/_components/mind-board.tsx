@@ -197,7 +197,7 @@ export function MindBoard({
     <div>
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
         {/* Scrolls rather than wraps on a phone: four pills don't fit 375px. */}
-        <div className="-mx-5 max-w-[calc(100%+2.5rem)] overflow-x-auto px-5 [scrollbar-width:none] sm:mx-0 sm:max-w-full sm:px-0">
+        <div className="relative -mx-5 max-w-[calc(100%+2.5rem)] overflow-x-auto px-5 [scrollbar-width:none] sm:mx-0 sm:max-w-full sm:px-0">
           <div
             role="tablist"
             aria-label="Mind sections"
