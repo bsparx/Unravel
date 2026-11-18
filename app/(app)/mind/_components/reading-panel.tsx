@@ -7,9 +7,9 @@ import { toast } from "sonner";
 
 import { InfoTip } from "@/components/info-tip";
 import { BookCover } from "@/components/reading/book-cover";
+import { SceneCard } from "@/components/scenes/scene-card";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { ReadingDay, ReadingView, ShelfBook } from "@/lib/reading-data";
+import type { ReadingView, ShelfBook } from "@/lib/reading-data";
 import { cn } from "@/lib/utils";
 
 import { setBookStatus } from "../reading-actions";
@@ -46,8 +46,24 @@ export function ReadingPanel({
     );
   }
 
+  const readOn = new Map(view.days.map((day) => [day.dateISO, day]));
+
   return (
     <div className="space-y-14">
+      <SceneCard
+        tab="reading"
+        tending={view.tending}
+        note={(day) => {
+          const read = readOn.get(day.dateISO);
+          if (!read) return null;
+          const parts = [
+            read.pages > 0 && `${read.pages} ${read.pages === 1 ? "page" : "pages"}`,
+            read.percent > 0 && `${read.percent}%`,
+          ].filter(Boolean);
+          return parts.length ? parts.join(" and ") : null;
+        }}
+      />
+
       <section aria-label="Reading now" className="space-y-2">
         <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
           <div className="flex items-center gap-1">
@@ -80,8 +96,6 @@ export function ReadingPanel({
           )}
         />
       </section>
-
-      <Dots days={view.days} todayISO={view.todayISO} />
 
       {view.upNext.length > 0 && (
         <section aria-label="Up next" className="space-y-1">
@@ -287,46 +301,4 @@ function WeekLine({ week }: { week: ReadingView["week"] }) {
   ].filter(Boolean);
   if (!parts.length) return null;
   return <p className="text-muted-foreground text-label tabular-nums">{parts.join(" and ")} in the last 7 days</p>;
-}
-
-function dayText(day: ReadingDay, today: boolean): string {
-  const when = today ? "Today" : day.label;
-  if (!day.read) return `${when} · no reading`;
-  const parts = [
-    day.pages > 0 && `${day.pages} ${day.pages === 1 ? "page" : "pages"}`,
-    day.percent > 0 && `${day.percent}%`,
-  ].filter(Boolean);
-  return `${when} · ${parts.length ? parts.join(" and ") : "a note"}`;
-}
-
-function Dots({ days, todayISO }: { days: ReadingDay[]; todayISO: string }) {
-  return (
-    <section aria-label="The last two weeks" className="space-y-2">
-      <h3 className="text-body font-medium">Last two weeks</h3>
-      <ol className="flex flex-wrap gap-1.5">
-        {days.map((day) => {
-          const today = day.dateISO === todayISO;
-          const text = dayText(day, today);
-          return (
-            <li key={day.dateISO}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span
-                    tabIndex={0}
-                    aria-label={text}
-                    className={cn(
-                      "focus-visible:ring-ring block size-4 rounded-full transition-colors focus-visible:ring-2 focus-visible:outline-none",
-                      day.read ? "bg-[var(--reading-dot)]" : "border-border border bg-transparent",
-                      today && "ring-foreground/30 ring-2 ring-offset-2 ring-offset-[var(--background)]",
-                    )}
-                  />
-                </TooltipTrigger>
-                <TooltipContent side="top">{text}</TooltipContent>
-              </Tooltip>
-            </li>
-          );
-        })}
-      </ol>
-    </section>
-  );
 }

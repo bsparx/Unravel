@@ -18,10 +18,11 @@ import {
   type MeditationOptions,
 } from "@/lib/meditations";
 import { getReading, type ReadingView } from "@/lib/reading-data";
+import { TEND_DAYS, historyFrom, tend, type Tending } from "@/lib/tending";
 
 /** How far back the journal on each daily tab reaches. */
 const HISTORY_DAYS = 90;
-/** The quiet row of dots: written or not, no streak counted. */
+/** Two weeks of sitting minutes, for the garden's day notes. */
 const WEEK_DOTS = 14;
 
 export type PracticeView = {
@@ -31,12 +32,12 @@ export type PracticeView = {
   today: PracticePage | null;
   /** Newest first, today excluded. */
   past: PracticePage[];
-  /** Oldest first, ending today. */
-  days: { dateISO: string; label: string; written: boolean }[];
   /** Today, so the client never has to work out the user's day itself. */
   todayISO: string;
   /** Rotates placeholders, stable for the day. */
   seed: number;
+  /** The scene: kept by the pages written in the last two weeks. */
+  tending: Tending;
 };
 
 export type MeditationRow = {
@@ -51,9 +52,6 @@ export type MeditationRow = {
 };
 
 export type MeditationView = {
-  /** Every minute ever sat, fractions included; the garden is drawn from it. */
-  totalMinutes: number;
-  sessions: number;
   /** Newest first. */
   recent: MeditationRow[];
   /** Oldest first, ending today. */
@@ -61,6 +59,8 @@ export type MeditationView = {
   todayISO: string;
   /** What the picker opens on: the last sitting's choice. */
   last: { kind: string; options: MeditationOptions } | null;
+  /** The garden: kept by the days sat in the last two weeks. */
+  tending: Tending;
 };
 
 export type MindEnabled = {
@@ -81,6 +81,12 @@ export type MindView = {
   dua: PracticeView;
   meditation: MeditationView;
   reading: ReadingView;
+  /** The summit: kept by the days a wish was rehearsed. */
+  wishTending: Tending;
+  /** Wishes rehearsed today. */
+  rehearsedToday: string[];
+  /** The harbour: kept by the days one was written or revisited. */
+  disputationTending: Tending;
 };
 
 export function mindEnabled(user: User): MindEnabled {
@@ -111,7 +117,10 @@ export async function getMind(user: User): Promise<MindView> {
   const today = todayLocal(user.timezone);
   const since = addDays(today, -HISTORY_DAYS);
 
-  const [wishes, disputations, pages, sitTotal, sittings, reading] = await Promise.all([
+  // Fifteen days back: two weeks, and the day before them, for the scenes.
+  const tendSince = addDays(today, -TEND_DAYS);
+
+  const [wishes, disputations, pages, sittings, reading, rehearsals, recentRevisits, lastRevisits] = await Promise.all([
     prisma.wish.findMany({
       where: { userId: user.id },
       orderBy: [{ sortOrder: "desc" }, { createdAt: "desc" }],
@@ -125,17 +134,27 @@ export async function getMind(user: User): Promise<MindView> {
       orderBy: { date: "desc" },
       select: { id: true, date: true, kind: true, template: true, items: true, body: true },
     }),
-    prisma.meditationSession.aggregate({
-      where: { userId: user.id },
-      _sum: { seconds: true },
-      _count: true,
-    }),
     prisma.meditationSession.findMany({
       where: { userId: user.id, startedAt: { gte: addDays(today, -HISTORY_DAYS) } },
       orderBy: { startedAt: "desc" },
       take: 200,
     }),
     getReading(user),
+    prisma.wishRehearsal.findMany({
+      where: { userId: user.id, date: { gte: tendSince } },
+      select: { wishId: true, date: true },
+    }),
+    prisma.disputationRevisit.findMany({
+      where: { userId: user.id, date: { gte: tendSince } },
+      select: { date: true },
+    }),
+    // The latest revisit of each disputation, for its card.
+    prisma.disputationRevisit.findMany({
+      where: { userId: user.id },
+      orderBy: { date: "desc" },
+      distinct: ["disputationId"],
+      select: { disputationId: true, date: true, belief: true },
+    }),
   ]);
 
   // `date` is a calendar day stored at UTC midnight, so it's labelled in UTC.
@@ -167,15 +186,11 @@ export async function getMind(user: User): Promise<MindView> {
       });
     const written = new Set(rows.map((row) => row.dateISO));
     return {
+      tending: tend(historyFrom(todayISO, (iso) => written.has(iso), (date) => dayLabel.format(date))),
       template: templateOrDefault(kind, templateId).id,
       count: clampCount(count),
       today: rows.find((row) => row.dateISO === todayISO) ?? null,
       past: rows.filter((row) => row.dateISO !== todayISO),
-      days: Array.from({ length: WEEK_DOTS }, (_, i) => {
-        const date = addDays(today, i - WEEK_DOTS + 1);
-        const iso = toISODate(date);
-        return { dateISO: iso, label: dayLabel.format(date), written: written.has(iso) };
-      }),
       todayISO,
       seed: Math.floor(today.getTime() / 86_400_000),
     };
@@ -218,8 +233,9 @@ export async function getMind(user: User): Promise<MindView> {
   const lastRow = sittings[0];
   const lastMeditation = lastRow ? findMeditation(lastRow.kind) : null;
   const meditation: MeditationView = {
-    totalMinutes: (sitTotal._sum.seconds ?? 0) / 60,
-    sessions: sitTotal._count,
+    tending: tend(
+      historyFrom(todayISO, (iso) => (minutesByDay.get(iso) ?? 0) > 0, (date) => dayLabel.format(date)),
+    ),
     recent: sittings.slice(0, 30).map((row) => {
       const found = findMeditation(row.kind);
       const options = (row.options ?? {}) as MeditationOptions;
@@ -245,8 +261,22 @@ export async function getMind(user: User): Promise<MindView> {
         : null,
   };
 
+  // Disputations are instants, bucketed into the user's day like sittings;
+  // revisits are already calendar days.
+  const disputedDays = new Set([
+    ...disputations.map((row) => localISO.format(row.createdAt)),
+    ...recentRevisits.map((row) => toISODate(row.date)),
+  ]);
+  const rehearsedDays = new Set(rehearsals.map((row) => toISODate(row.date)));
+  const revisitOf = new Map(lastRevisits.map((row) => [row.disputationId, row]));
+
   return {
     enabled: mindEnabled(user),
+    wishTending: tend(historyFrom(todayISO, (iso) => rehearsedDays.has(iso), (date) => dayLabel.format(date))),
+    rehearsedToday: rehearsals.filter((row) => toISODate(row.date) === todayISO).map((row) => row.wishId),
+    disputationTending: tend(
+      historyFrom(todayISO, (iso) => disputedDays.has(iso), (date) => dayLabel.format(date)),
+    ),
     meditation,
     reading,
     gratitude: practice("gratitude", user.gratitudeTemplate, user.gratitudeCount),
@@ -271,6 +301,15 @@ export async function getMind(user: User): Promise<MindView> {
       beliefAfter: row.beliefAfter,
       createdAt: row.createdAt.toISOString(),
       createdLabel: day.format(row.createdAt),
+      revisit: (() => {
+        const last = revisitOf.get(row.id);
+        if (!last) return null;
+        return {
+          belief: last.belief,
+          label: dayLabel.format(last.date),
+          today: toISODate(last.date) === todayISO,
+        };
+      })(),
     })),
   };
 }

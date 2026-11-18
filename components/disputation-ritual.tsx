@@ -335,15 +335,18 @@ export function DisputationRitual({
  * 0 to 10, as eleven tappable numerals. Nothing selected means "not rated",
  * which is a fine answer. `ghost` marks an earlier rating for comparison.
  */
-function Conviction({
+export function Conviction({
   label,
   value,
   ghost = null,
+  ghostLabel = "where you started",
   onChange,
 }: {
   label: string;
   value: number | null;
   ghost?: number | null;
+  /** What the dashed ring stands for, in "The dashed ring is …". */
+  ghostLabel?: string;
   onChange: (value: number | null) => void;
 }) {
   return (
@@ -380,7 +383,7 @@ function Conviction({
       </div>
       {ghost !== null && (
         <p className="text-xs text-[var(--woop-ink-muted)]">
-          The dashed ring is where you started: {ghost}.
+          The dashed ring is {ghostLabel}: {ghost}.
         </p>
       )}
     </fieldset>

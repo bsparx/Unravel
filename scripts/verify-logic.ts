@@ -10,7 +10,6 @@
 import assert from "node:assert/strict";
 
 import { BODY_TABS, enabledBodyTabs } from "@/lib/body-tabs";
-import { GARDEN_STAGES, nextStage, stagesAt, towardNext, unlockedBetween } from "@/lib/garden";
 import {
   MEDITATIONS,
   breathAt,
@@ -25,6 +24,8 @@ import {
   sessionLength,
 } from "@/lib/meditations";
 import { MIND_TABS } from "@/lib/mind-tabs";
+import { SCENES, sceneCaption, stageIdsAt } from "@/lib/scenes";
+import { TEND_DAYS, tend, type TendDay } from "@/lib/tending";
 import { bookSchema, meditationSessionSchema, readingLogSchema } from "@/lib/validation";
 import {
   BOOK_COVER_KEYS,
@@ -3879,20 +3880,64 @@ check("options are normalised, and only exact ones are accepted", () => {
   );
 });
 
-check("the garden only grows, and says what a sitting brought", () => {
-  for (let i = 1; i < GARDEN_STAGES.length; i += 1) {
-    assert.ok(GARDEN_STAGES[i].minutes > GARDEN_STAGES[i - 1].minutes, "thresholds strictly increase");
+// Fifteen days, oldest first, ending today: "x" done, "." missed.
+const days = (pattern: string): TendDay[] =>
+  [...pattern].map((c, i) => ({ dateISO: `d${i}`, label: `day ${i}`, done: c === "x" }));
+
+check("a scene is kept by the last two weeks, and nothing else", () => {
+  // Fourteen days straight and today: whole.
+  assert.equal(tend(days("xxxxxxxxxxxxxxx")).level, TEND_DAYS);
+  // Today still open isn't held against you: the window ends yesterday.
+  const open = tend(days("xxxxxxxxxxxxxx."));
+  assert.equal(open.level, 14);
+  assert.equal(open.today, false);
+  assert.equal(open.ifDone, 14, "doing today keeps it whole");
+  assert.equal(open.ifSkipped, 13, "skipping today costs the newest stage");
+  // Nothing at all: the base.
+  assert.equal(tend(days("...............")).level, 0);
+  assert.equal(tend(days("..............x")).level, 1, "today counts the moment it's done");
+});
+
+check("one missed day costs one stage, for exactly two weeks", () => {
+  // A miss five days ago, every other day kept, today done.
+  assert.equal(tend(days("xxxxxxxxx.xxxxx")).level, 13);
+  // The miss is the oldest day in the window ending yesterday: still 13 until today is done...
+  const leaving = tend(days(".xxxxxxxxxxxxx."));
+  assert.equal(leaving.level, 13);
+  // ...and doing today lets the miss go: whole again.
+  assert.equal(leaving.ifDone, 14);
+  assert.equal(tend(days(".xxxxxxxxxxxxxx")).level, 14);
+});
+
+check("each day kept is progress or maintenance, never a loss", () => {
+  for (let mask = 0; mask < 1 << 14; mask += 97) {
+    const past = Array.from({ length: 14 }, (_, i) => ((mask >> i) & 1 ? "x" : ".")).join("");
+    const t = tend(days(`${past}.`));
+    assert.ok(t.ifDone === t.level || t.ifDone === t.level + 1, "doing today adds one or keeps it");
+    assert.ok(t.ifSkipped === t.level || t.ifSkipped === t.level - 1, "skipping costs at most one");
   }
-  assert.equal(new Set(GARDEN_STAGES.map((s) => s.id)).size, GARDEN_STAGES.length);
-  assert.deepEqual(stagesAt(0).map((s) => s.id), ["meadow"]);
-  assert.deepEqual(stagesAt(15).map((s) => s.id), ["meadow", "flowers", "pond"]);
-  assert.equal(nextStage(14.9)?.id, "pond");
-  assert.equal(nextStage(1e6), null);
-  assert.deepEqual(unlockedBetween(0, 4.9).map((s) => s.id), []);
-  assert.deepEqual(unlockedBetween(4, 16).map((s) => s.id), ["flowers", "pond"]);
-  assert.deepEqual(unlockedBetween(5, 5).map((s) => s.id), []);
-  assert.equal(towardNext(10), 0.5);
-  assert.equal(towardNext(1e6), 1);
+});
+
+check("short histories start from nothing, and the window is fourteen days", () => {
+  const t = tend(days("xx"));
+  assert.equal(t.level, 2);
+  assert.equal(t.window.length, TEND_DAYS);
+});
+
+check("every scene has fourteen named stages, and says what today brings", () => {
+  for (const tab of MIND_TABS) {
+    const scene = SCENES[tab];
+    assert.equal(scene.stages.length, TEND_DAYS, `${tab} has fourteen stages`);
+    assert.equal(new Set(scene.stages.map((s) => s.id)).size, TEND_DAYS, `${tab} stage ids are unique`);
+  }
+  const garden = SCENES.meditate;
+  assert.deepEqual(stageIdsAt(garden, 2), ["flowers", "pond"]);
+  assert.deepEqual(stageIdsAt(garden, 0), []);
+  assert.equal(sceneCaption(garden, tend(days("..............x"))).line, "Today brought wildflowers in the grass.");
+  assert.equal(sceneCaption(garden, tend(days("..............."))).line, "Sit today to bring wildflowers in the grass.");
+  assert.equal(sceneCaption(garden, tend(days("xxxxxxxxxxxxxxx"))).title, "Fourteen days. The garden is whole.");
+  assert.equal(sceneCaption(garden, tend(days("xxxxxxxxxxxxxx."))).line, "Sit today to keep the full moon on the water.");
+  assert.equal(sceneCaption(garden, tend(days("xxxxxxxxxxxxxxx"))).line, "Today kept the full moon on the water.");
   assert.ok(MIND_TABS.includes("meditate"));
 });
 

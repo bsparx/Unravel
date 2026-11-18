@@ -5,15 +5,14 @@ import { ChevronDown, Feather, Lamp, MoonStar, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { InfoTip } from "@/components/info-tip";
+import { SceneCard } from "@/components/scenes/scene-card";
 import { DuaArch, DuaWindow } from "@/components/dua-arch";
 import { GratitudeEvening, GratitudePage } from "@/components/gratitude-page";
 import { PracticeTemplatePicker, type TemplateChoice } from "@/components/practice-template-picker";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { PracticeView } from "@/lib/mind-data";
-import { cn } from "@/lib/utils";
 import {
   templateLabel,
   templateOrDefault,
@@ -141,7 +140,10 @@ export function PracticePanel({
   };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-10">
+    <div className="space-y-10">
+      <SceneCard tab={kind} tending={view.tending} />
+
+      <div className="mx-auto max-w-2xl space-y-10">
       {/* The template, always in reach. */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1">
@@ -224,39 +226,6 @@ export function PracticePanel({
         )}
       </section>
 
-      {/* Two weeks of dots. Written or not; no streak is counted, and a gap
-          is just a day. */}
-      <section aria-label="The last two weeks" className="space-y-2">
-        <div className="flex items-center gap-1">
-          <h3 className="text-body font-medium">Last two weeks</h3>
-        </div>
-        <ol className="flex flex-wrap gap-1.5">
-          {view.days.map((day) => {
-            const today = day.dateISO === view.todayISO;
-            return (
-              <li key={day.dateISO}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span
-                      tabIndex={0}
-                      aria-label={`${day.label}, ${day.written ? "written" : "no page"}`}
-                      className={cn(
-                        "focus-visible:ring-ring block size-4 rounded-full transition-colors focus-visible:ring-2 focus-visible:outline-none",
-                        day.written ? copy.dot : "border-border border bg-transparent",
-                        today && "ring-foreground/30 ring-2 ring-offset-2 ring-offset-[var(--background)]",
-                      )}
-                    />
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    {today ? "Today" : day.label} · {day.written ? "written" : "no page"}
-                  </TooltipContent>
-                </Tooltip>
-              </li>
-            );
-          })}
-        </ol>
-      </section>
-
       {/* The journal: gratitude as a list of evenings, du'a as a wall of
           windows. */}
       {view.past.length > 0 && (
@@ -294,6 +263,8 @@ export function PracticePanel({
           )}
         </section>
       )}
+
+      </div>
 
       {kind === "dua" && (
         <PastDua

@@ -10,6 +10,7 @@ import { itemsToBody } from "@/lib/practices";
 import {
   type ActionState,
   cuid,
+  disputationRevisitSchema,
   disputationSchema,
   fieldErrorsFrom,
   formValues,
@@ -82,6 +83,33 @@ export async function setWishStatus(formData: FormData): Promise<ActionState> {
   return { status: "success" };
 }
 
+/**
+ * Today's rehearsal of a wish: its outcome pictured, its obstacle named, its
+ * if-then said. Once a day per wish; doing it again is a no-op. The day is
+ * today in the user's own zone, never one sent by the client.
+ */
+export async function rehearseWish(id: string): Promise<ActionState> {
+  const user = await requireUser();
+  const parsed = cuid.safeParse(id);
+  if (!parsed.success) return { status: "error", message: "That wish no longer exists." };
+
+  const wish = await prisma.wish.findFirst({
+    where: { id: parsed.data, userId: user.id, status: "ACTIVE" },
+    select: { id: true },
+  });
+  if (!wish) return { status: "error", message: "That wish no longer exists." };
+
+  const date = todayLocal(user.timezone);
+  await prisma.wishRehearsal.upsert({
+    where: { wishId_date: { wishId: wish.id, date } },
+    create: { userId: user.id, wishId: wish.id, date },
+    update: {},
+  });
+
+  revalidatePath("/mind");
+  return { status: "success" };
+}
+
 export async function deleteWish(id: string): Promise<void> {
   const user = await requireUser();
   const parsed = cuid.safeParse(id);
@@ -119,6 +147,33 @@ export async function saveDisputation(formData: FormData): Promise<ActionState> 
   } else {
     await prisma.disputation.create({ data: { userId: user.id, ...data } });
   }
+
+  revalidatePath("/mind");
+  return { status: "success" };
+}
+
+/**
+ * Reread a disputation today, and say how strongly the old belief holds now.
+ * Once a day per disputation; revisiting again the same day updates the rating.
+ */
+export async function revisitDisputation(formData: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  const parsed = disputationRevisitSchema.safeParse(formValues(formData));
+  if (!parsed.success) return invalid(parsed.error);
+
+  const entry = await prisma.disputation.findFirst({
+    where: { id: parsed.data.id, userId: user.id },
+    select: { id: true },
+  });
+  if (!entry) return { status: "error", message: "That entry no longer exists." };
+
+  const date = todayLocal(user.timezone);
+  const belief = parsed.data.belief ?? null;
+  await prisma.disputationRevisit.upsert({
+    where: { disputationId_date: { disputationId: entry.id, date } },
+    create: { userId: user.id, disputationId: entry.id, date, belief },
+    update: { belief },
+  });
 
   revalidatePath("/mind");
   return { status: "success" };

@@ -1534,12 +1534,16 @@
 }
 
 /* ---------------------------------------------------------------------------
-   Meditation — the moonlit garden.
+   The Mind scenes.
 
-   A garden at night that fills in as minutes are sat: a pond, trees,
-   lanterns, fireflies. Cotton candy sees it at lavender twilight with peach
-   lantern light; the night theme at true midnight with a white moon. During
-   a session the whole scene takes a --breath value (0 to 1) and the pond's
+   Six places, one per practice, each kept by the last two weeks: a stage for
+   every day kept in the fourteen that count (lib/tending.ts). Each has a
+   light and a dark sky. Cotton candy sees the garden at lavender twilight,
+   the terrace at golden hour, the courtyard before dawn, the nook on a warm
+   evening, the summit at a candy dawn and the harbour on a pastel afternoon;
+   the night theme takes each one into the dark.
+
+   During a sitting the garden takes a --breath value (0 to 1) and the pond's
    ripples and the lanterns' glow swell and settle with it.
 --------------------------------------------------------------------------- */
 
@@ -1551,10 +1555,13 @@
   --garden-moon: #fff7ea;
   --garden-moon-shade: #e2d2ee;
   --garden-hill-far: #9783c6;
+  --garden-treeline: #8574b8;
   --garden-hill: #8170b6;
   --garden-ground: #6a59a1;
+  --garden-mist: #ffffff;
   --garden-leaf: #b5dcc4;
   --garden-leaf-tree: #5b8e86;
+  --garden-leaf-lit: #a8d4c4;
   --garden-bark: #4a3a64;
   --garden-water-1: #93a8ea;
   --garden-water-2: #5d6db9;
@@ -1567,11 +1574,184 @@
   --garden-stone-dark: #66579a;
   --garden-wood: #8b5d6e;
   --garden-koi: #ff8a5c;
+  --garden-koi-spot: #ffffff;
   --garden-lily: #86c4a0;
   --garden-blossom: #ffc4dd;
+  --garden-blossom-lit: #ffe6f1;
   --garden-heron: #f1ebfa;
+  --garden-fore: #4f4088;
+  --garden-vignette: #2a1d5c;
   /* The session's veil over the garden, so white type reads on it. */
   --garden-veil: rgba(48, 32, 96, 0.42);
+
+  --terrace-sky-1: #f7c6c9;
+  --terrace-sky-2: #fbd3b8;
+  --terrace-sky-3: #ffe4b0;
+  --terrace-sun: #ffcb6b;
+  --terrace-sun-show: 1;
+  --terrace-star: #fffbe8;
+  --terrace-hill-far: #e2a9b4;
+  --terrace-hill: #c98ea6;
+  --terrace-hedge: #6f9a78;
+  --terrace-hedge-lit: #a5c98e;
+  --terrace-olive: #8aa58e;
+  --terrace-olive-lit: #c3d6b4;
+  --terrace-bark: #7a5a4c;
+  --terrace-paper-1: #ff9e7a;
+  --terrace-paper-2: #ffd36e;
+  --terrace-house: #f6dccb;
+  --terrace-roof: #c46a5d;
+  --terrace-glass: #7a6f9e;
+  --terrace-lit: #ffe08f;
+  --terrace-wall: #ecc9b0;
+  --terrace-wall-cap: #f8e2cf;
+  --terrace-floor: #dc9f80;
+  --terrace-floor-line: rgba(140, 70, 50, 0.22);
+  --terrace-wood: #8c5d48;
+  --terrace-cord: #6e4a3e;
+  --terrace-lantern: #ff9640;
+  --terrace-lantern-core: #ffe7a8;
+  --terrace-cloth: #fff6ea;
+  --terrace-shadow: rgba(120, 60, 50, 0.2);
+  --terrace-pot: #cf7650;
+  --terrace-herb: #5c8f63;
+  --terrace-jasmine: #ffffff;
+  --terrace-teapot: #5f8fb4;
+  --terrace-cup: #f4efe7;
+  --terrace-steam: rgba(255, 255, 255, 0.75);
+  --terrace-bread: #d99a52;
+  --terrace-bread-score: #f5d29a;
+  --terrace-fig: #6d3a5e;
+  --terrace-candle: #fff3dc;
+  --terrace-cat: #5a4250;
+
+  --court-sky-1: #8f86cf;
+  --court-sky-2: #b5a8e0;
+  --court-sky-3: #e9c3dc;
+  --court-star: #ffffff;
+  --court-moon: #fff2c4;
+  --court-milky: #ffffff;
+  --court-fajr: #ffd4c4;
+  --court-silhouette: #8277b8;
+  --court-wall: #e9dcf2;
+  --court-wall-shade: #b9a6d6;
+  --court-cornice: #f6efff;
+  --court-arch: #5b4e8f;
+  --court-arch-floor: #8a7cbf;
+  --court-floor: #d8c9ec;
+  --court-tile-line: rgba(90, 70, 150, 0.18);
+  --court-lamp: #ffb35c;
+  --court-lamp-glass: #ffd796;
+  --court-chain: #6b5a8f;
+  --court-water: #9fb4f0;
+  --court-water-deep: #6f7fcf;
+  --court-water-light: #ffffff;
+  --court-stone: #c9b8e3;
+  --court-palm: #4f8a74;
+  --court-palm-trunk: #8b6a6a;
+  --court-palm-ring: #6e5252;
+  --court-date: #b5623f;
+  --court-rug: #b8456a;
+  --court-rug-2: #ffd27a;
+  --court-jasmine: #ffffff;
+  --court-leaf: #5f9073;
+
+  --nook-wall-1: #f6e2d3;
+  --nook-wall-2: #ecd0bf;
+  --nook-panel: #e2bfa9;
+  --nook-trim: #c99a80;
+  --nook-out-1: #b9a8e8;
+  --nook-out-2: #ffc7b0;
+  --nook-out-hill: #8b7bb8;
+  --nook-out-tree: #6a5d9a;
+  --nook-star: #ffffff;
+  --nook-moon: #fff6e0;
+  --nook-moon-shade: #e3d3c4;
+  --nook-curtain: #c97a7a;
+  --nook-stone: #d8c2b4;
+  --nook-hearth: #4d3a3a;
+  --nook-shelf: #8a5d45;
+  --nook-gilt: #f2d38c;
+  --nook-book-1: #b5534a;
+  --nook-book-2: #4f7a8c;
+  --nook-book-3: #d9a441;
+  --nook-book-4: #6f5a9a;
+  --nook-book-5: #5c8a5c;
+  --nook-wire: #6e4a3e;
+  --nook-light: #ffcc75;
+  --nook-paper: #fbf3e4;
+  --nook-pot: #c9714f;
+  --nook-leaf: #5c9065;
+  --nook-floor: #b9805d;
+  --nook-floor-line: rgba(90, 50, 30, 0.25);
+  --nook-fire: #ff8a3d;
+  --nook-fire-core: #ffd56b;
+  --nook-log: #5a3a2a;
+  --nook-rug: #c86b6b;
+  --nook-rug-2: #f6d28a;
+  --nook-cat: #4d3a42;
+  --nook-chair: #6f7fb0;
+  --nook-chair-lit: #8a99c8;
+  --nook-cup: #fbf5ec;
+  --nook-steam: rgba(255, 255, 255, 0.75);
+  --nook-lamp-pole: #4a3a33;
+  --nook-shade: #f2c28a;
+  --nook-dark: #3a2230;
+
+  --summit-sky-1: #9b9be6;
+  --summit-sky-2: #c9b4ee;
+  --summit-sky-3: #ffd0d8;
+  --summit-rose: #ff9ab8;
+  --summit-sun: #ffcf6b;
+  --summit-star: #ffffff;
+  --summit-far: #a99ad8;
+  --summit-snow: #ffffff;
+  --summit-rock: #8c7fc4;
+  --summit-rock-shade: #6f62a8;
+  --summit-ravine: #4a3f80;
+  --summit-alpenglow: #ffb3a0;
+  --summit-path: #fff3e0;
+  --summit-wood: #6e4a3e;
+  --summit-flag: #ff6f91;
+  --summit-bird: #4a3f80;
+  --summit-valley: #7e6fb8;
+  --summit-near: #5d5096;
+  --summit-mist: #ffffff;
+  --summit-pine: #3f6b6a;
+  --summit-pine-lit: #6fa39a;
+  --summit-trunk: #4a3a3a;
+  --summit-tent: #ff8a65;
+  --summit-lamp: #ffcf6b;
+  --summit-stone: #b9b0dc;
+  --summit-stone-lit: #d8d0f0;
+  --summit-flower: #ffd1e6;
+  --summit-flower-2: #fff0a8;
+
+  --harbour-storm-1: #8d93ad;
+  --harbour-storm-2: #b3b6c8;
+  --harbour-clear-1: #8fc4f2;
+  --harbour-clear-2: #c7e4fb;
+  --harbour-clear-3: #fde7ef;
+  --harbour-sun: #ffd36b;
+  --harbour-cloud: #9aa0b8;
+  --harbour-cloud-dark: #7c8199;
+  --harbour-cloud-white: #ffffff;
+  --harbour-gull: #3d4560;
+  --harbour-rock: #6f6a80;
+  --harbour-rock-shade: #575268;
+  --harbour-grass: #7fb886;
+  --harbour-tower: #f4f1f7;
+  --harbour-stripe: #d0505a;
+  --harbour-lantern-room: #4a4f66;
+  --harbour-lamp: #ffd36b;
+  --harbour-cottage: #ece6dc;
+  --harbour-smoke: rgba(255, 255, 255, 0.7);
+  --harbour-sea-1: #6f8fb8;
+  --harbour-sea-2: #4a6590;
+  --harbour-foam: #ffffff;
+  --harbour-boat: #6e4a3e;
+  --harbour-sail: #fff8ee;
+  --harbour-rain: #e6ecf7;
 }
 
 .dark {
@@ -1582,10 +1762,13 @@
   --garden-moon: #f4efe0;
   --garden-moon-shade: #c9c3b0;
   --garden-hill-far: #131b46;
+  --garden-treeline: #0c1236;
   --garden-hill: #0e1539;
   --garden-ground: #0a102e;
+  --garden-mist: #8fa0e0;
   --garden-leaf: #4a8577;
   --garden-leaf-tree: #1f4a47;
+  --garden-leaf-lit: #3f7a72;
   --garden-bark: #2b2441;
   --garden-water-1: #1e2f69;
   --garden-water-2: #101a45;
@@ -1598,20 +1781,194 @@
   --garden-stone-dark: #262a53;
   --garden-wood: #5c4046;
   --garden-koi: #ff9a6b;
+  --garden-koi-spot: #fff4e6;
   --garden-lily: #2f6b56;
   --garden-blossom: #f3a6c8;
+  --garden-blossom-lit: #ffd6e8;
   --garden-heron: #cfd6ea;
+  --garden-fore: #04071c;
+  --garden-vignette: #000000;
   --garden-veil: rgba(4, 6, 24, 0.5);
+
+  --terrace-sky-1: #1c1a45;
+  --terrace-sky-2: #4a2d5e;
+  --terrace-sky-3: #c26a62;
+  --terrace-sun: #ff9a52;
+  --terrace-sun-show: 0.55;
+  --terrace-star: #fff4d6;
+  --terrace-hill-far: #3a2953;
+  --terrace-hill: #2a1f45;
+  --terrace-hedge: #1f3a33;
+  --terrace-hedge-lit: #35584a;
+  --terrace-olive: #3b5249;
+  --terrace-olive-lit: #5d7867;
+  --terrace-bark: #3a2a2c;
+  --terrace-paper-1: #ff8f6b;
+  --terrace-paper-2: #ffc85c;
+  --terrace-house: #4a3a52;
+  --terrace-roof: #6d3a48;
+  --terrace-glass: #1d1a3a;
+  --terrace-lit: #ffc867;
+  --terrace-wall: #57414f;
+  --terrace-wall-cap: #6b5262;
+  --terrace-floor: #4a3340;
+  --terrace-floor-line: rgba(0, 0, 0, 0.28);
+  --terrace-wood: #4f342c;
+  --terrace-cord: #2c1f22;
+  --terrace-lantern: #ffad55;
+  --terrace-lantern-core: #fff0b8;
+  --terrace-cloth: #e7d6c6;
+  --terrace-shadow: rgba(0, 0, 0, 0.3);
+  --terrace-pot: #a8553a;
+  --terrace-herb: #4d8060;
+  --terrace-jasmine: #f4f0ff;
+  --terrace-teapot: #5d7fa3;
+  --terrace-cup: #e8e0d4;
+  --terrace-steam: rgba(255, 255, 255, 0.45);
+  --terrace-bread: #c4843f;
+  --terrace-bread-score: #e9be7e;
+  --terrace-fig: #4c2742;
+  --terrace-candle: #f2e6d0;
+  --terrace-cat: #1c1320;
+
+  --court-sky-1: #03061a;
+  --court-sky-2: #0b1238;
+  --court-sky-3: #1d2259;
+  --court-star: #ffffff;
+  --court-moon: #f6dc9c;
+  --court-milky: #c9d2ff;
+  --court-fajr: #e69b8c;
+  --court-silhouette: #0a0f2e;
+  --court-wall: #232a55;
+  --court-wall-shade: #151a3d;
+  --court-cornice: #343c72;
+  --court-arch: #070a1f;
+  --court-arch-floor: #1a1f45;
+  --court-floor: #1c2147;
+  --court-tile-line: rgba(255, 255, 255, 0.06);
+  --court-lamp: #ffc46b;
+  --court-lamp-glass: #ffe3a6;
+  --court-chain: #8c86b8;
+  --court-water: #2a3f86;
+  --court-water-deep: #121c4d;
+  --court-water-light: #c4ceff;
+  --court-stone: #3a4170;
+  --court-palm: #2c5a4d;
+  --court-palm-trunk: #4b3a3a;
+  --court-palm-ring: #2e2424;
+  --court-date: #8f4630;
+  --court-rug: #8f2f4f;
+  --court-rug-2: #e0b25c;
+  --court-jasmine: #f4f0ff;
+  --court-leaf: #3d6b55;
+
+  --nook-wall-1: #2b2233;
+  --nook-wall-2: #221b2b;
+  --nook-panel: #2f2436;
+  --nook-trim: #4a3644;
+  --nook-out-1: #060a24;
+  --nook-out-2: #1c2259;
+  --nook-out-hill: #0b1030;
+  --nook-out-tree: #070b24;
+  --nook-star: #ffffff;
+  --nook-moon: #f4efe0;
+  --nook-moon-shade: #c9c3b0;
+  --nook-curtain: #5a2f3f;
+  --nook-stone: #3d3240;
+  --nook-hearth: #120c12;
+  --nook-shelf: #5a3c2e;
+  --nook-gilt: #d9b46a;
+  --nook-book-1: #8f3f3a;
+  --nook-book-2: #3b6070;
+  --nook-book-3: #b58632;
+  --nook-book-4: #54457a;
+  --nook-book-5: #46704a;
+  --nook-wire: #2a1d22;
+  --nook-light: #ffc061;
+  --nook-paper: #e8dcc6;
+  --nook-pot: #9c5038;
+  --nook-leaf: #3e7050;
+  --nook-floor: #3e2a28;
+  --nook-floor-line: rgba(0, 0, 0, 0.3);
+  --nook-fire: #ff8a3d;
+  --nook-fire-core: #ffd56b;
+  --nook-log: #2a1a14;
+  --nook-rug: #7a3442;
+  --nook-rug-2: #c9a053;
+  --nook-cat: #120c12;
+  --nook-chair: #3c4670;
+  --nook-chair-lit: #4d5a88;
+  --nook-cup: #e8e0d4;
+  --nook-steam: rgba(255, 255, 255, 0.45);
+  --nook-lamp-pole: #1e1618;
+  --nook-shade: #e0a860;
+  --nook-dark: #05030a;
+
+  --summit-sky-1: #050a24;
+  --summit-sky-2: #1a1a4d;
+  --summit-sky-3: #4a2e63;
+  --summit-rose: #c45a7a;
+  --summit-sun: #ffb35c;
+  --summit-star: #ffffff;
+  --summit-far: #1c1f4a;
+  --summit-snow: #c9d0f0;
+  --summit-rock: #2b2d63;
+  --summit-rock-shade: #1d1f4a;
+  --summit-ravine: #0b0c26;
+  --summit-alpenglow: #ff9a7a;
+  --summit-path: #d9d2f0;
+  --summit-wood: #4b3229;
+  --summit-flag: #ff6f91;
+  --summit-bird: #e6e2ff;
+  --summit-valley: #161942;
+  --summit-near: #0d0f2e;
+  --summit-mist: #b9c0ff;
+  --summit-pine: #1f3b3d;
+  --summit-pine-lit: #36605c;
+  --summit-trunk: #20181a;
+  --summit-tent: #e0664a;
+  --summit-lamp: #ffc46b;
+  --summit-stone: #4a4d80;
+  --summit-stone-lit: #6a6da0;
+  --summit-flower: #f3a6c8;
+  --summit-flower-2: #ffe08a;
+
+  --harbour-storm-1: #141824;
+  --harbour-storm-2: #252b3c;
+  --harbour-clear-1: #1b3a6b;
+  --harbour-clear-2: #4f6fa0;
+  --harbour-clear-3: #f0a37a;
+  --harbour-sun: #ffb35c;
+  --harbour-cloud: #2d3446;
+  --harbour-cloud-dark: #1c2130;
+  --harbour-cloud-white: #e6e9f5;
+  --harbour-gull: #e6e9f5;
+  --harbour-rock: #262634;
+  --harbour-rock-shade: #1a1a26;
+  --harbour-grass: #3f7a52;
+  --harbour-tower: #d9d6e3;
+  --harbour-stripe: #b8434d;
+  --harbour-lantern-room: #1c1f2d;
+  --harbour-lamp: #ffd37a;
+  --harbour-cottage: #4a4552;
+  --harbour-smoke: rgba(220, 225, 240, 0.45);
+  --harbour-sea-1: #1c2c4d;
+  --harbour-sea-2: #0e1830;
+  --harbour-foam: #b9c6e6;
+  --harbour-boat: #3a2a26;
+  --harbour-sail: #e8e2d8;
+  --harbour-rain: #9fb0d0;
 }
 
-.garden-scene [data-fx] {
+.mind-scene [data-fx],
+.mind-scene [data-grow] {
   transform-box: fill-box;
   transform-origin: center;
 }
 
-/* The breath: ripples widen and lanterns brighten on the in-breath. Driven
-   by --breath, which the session writes each frame; outside a session it's
-   unset and everything rests. */
+/* The breath: in a sitting, ripples widen and lanterns brighten on the
+   in-breath. Driven by --breath, which the session writes each frame;
+   outside a session it's unset and everything rests. */
 .garden-scene [data-fx="ripple"] {
   transform: scale(calc(0.85 + var(--breath, 0.3) * 0.35));
   opacity: calc(0.25 + var(--breath, 0.3) * 0.45);
@@ -1623,56 +1980,178 @@
   transform: scale(calc(0.92 + var(--breath, 0.3) * 0.16));
 }
 
+/* The lighthouse turns about its lamp, not its own middle. */
+.mind-scene [data-fx="beam"] {
+  transform-box: view-box;
+  transform-origin: 996px 147px;
+}
+
 @media (prefers-reduced-motion: no-preference) {
-  .garden-scene [data-fx="twinkle"] {
-    animation: garden-twinkle 4s ease-in-out infinite;
-  }
-  .garden-scene [data-fx="firefly"] {
-    animation: garden-firefly 7s ease-in-out infinite;
-  }
-  .garden-scene [data-fx="sway"] {
+  .mind-scene [data-fx="twinkle"] { animation: scene-twinkle 4s ease-in-out infinite; }
+  .mind-scene [data-fx="firefly"] { animation: scene-firefly 7s ease-in-out infinite; }
+  .mind-scene [data-fx="sway"] {
     transform-origin: bottom center;
-    animation: garden-sway 9s ease-in-out infinite;
+    animation: scene-sway 9s ease-in-out infinite;
   }
-  .garden-scene [data-fx="swim"] {
-    animation: garden-swim 14s ease-in-out infinite;
-  }
-  .garden-scene [data-fx="meteor"] {
-    animation: garden-meteor 9s ease-in infinite;
-  }
-  .garden-scene [data-grow] {
-    transform-box: fill-box;
+  .mind-scene [data-fx="swim"] { animation: scene-swim 14s ease-in-out infinite; }
+  .mind-scene [data-fx="meteor"] { animation: scene-meteor 9s ease-in infinite; }
+  .mind-scene [data-fx="drift"] { animation: scene-drift 26s ease-in-out infinite alternate; }
+  .mind-scene [data-fx="shimmer"] { animation: scene-shimmer 3.2s ease-in-out infinite; }
+  .mind-scene [data-fx="petal"] { animation: scene-petal 7s ease-in infinite; }
+  .mind-scene [data-fx="breathe"] {
     transform-origin: bottom center;
-    animation: garden-grow 1.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: scene-breathe 4.5s ease-in-out infinite;
+  }
+  .mind-scene [data-fx="rise"] { animation: scene-rise 16s ease-in-out infinite; }
+  .mind-scene [data-fx="steam"] { animation: scene-steam 3.6s ease-out infinite; }
+  .mind-scene [data-fx="flicker"] {
+    transform-origin: bottom center;
+    animation: scene-flicker 1.4s ease-in-out infinite;
+  }
+  .mind-scene [data-fx="flow"] { animation: scene-shimmer 1.8s ease-in-out infinite; }
+  .mind-scene [data-fx="rays"] { animation: scene-rays 6s ease-in-out infinite; }
+  .mind-scene [data-fx="flutter"] {
+    transform-origin: left center;
+    animation: scene-flutter 1.6s ease-in-out infinite;
+  }
+  .mind-scene [data-fx="glide"] { animation: scene-glide 12s ease-in-out infinite; }
+  .mind-scene [data-fx="beam"] { animation: scene-beam 7s ease-in-out infinite; }
+  .mind-scene [data-fx="smoke"] { animation: scene-smoke 5s ease-out infinite; }
+  .mind-scene [data-fx="swell"] { animation: scene-swell 8s ease-in-out infinite alternate; }
+  .mind-scene [data-fx="bob"] { animation: scene-bob 5s ease-in-out infinite; }
+  .mind-scene [data-fx="rain"] { animation: scene-rain 0.7s linear infinite; }
+  .mind-scene [data-fx="flash"] { animation: scene-flash 7s linear infinite; }
+  .mind-scene:not(.garden-scene) [data-fx="glow"] { animation: scene-glow 5s ease-in-out infinite; }
+  .mind-scene:not(.garden-scene) [data-fx="ripple"] { animation: scene-ripple 3s ease-out infinite; }
+
+  /* A stage that has just arrived grows in from its foot. One that also
+     sways starts swaying once it has grown. */
+  .mind-scene [data-grow] {
+    transform-origin: bottom center;
+    animation: scene-grow 1.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .mind-scene [data-grow][data-fx="sway"] {
+    animation:
+      scene-grow 1.6s cubic-bezier(0.22, 1, 0.36, 1) both,
+      scene-sway 9s ease-in-out 1.6s infinite;
+  }
+  .mind-scene [data-grow][data-fx="breathe"] {
+    animation:
+      scene-grow 1.6s cubic-bezier(0.22, 1, 0.36, 1) both,
+      scene-breathe 4.5s ease-in-out 1.6s infinite;
   }
 }
 
-@keyframes garden-twinkle {
+/* Asked for less motion: lightning doesn't flash, it's only a faint mark. */
+@media (prefers-reduced-motion: reduce) {
+  .mind-scene [data-fx="flash"] { opacity: 0.25; }
+}
+
+@keyframes scene-twinkle {
   0%, 100% { opacity: 0.9; }
   50% { opacity: 0.35; }
 }
-@keyframes garden-firefly {
+@keyframes scene-firefly {
   0%, 100% { transform: translate(0, 0); opacity: 0.9; }
   25% { transform: translate(8px, -10px); opacity: 0.3; }
   50% { transform: translate(-6px, -18px); opacity: 1; }
   75% { transform: translate(-10px, -6px); opacity: 0.4; }
 }
-@keyframes garden-sway {
+@keyframes scene-sway {
   0%, 100% { transform: rotate(-0.8deg); }
   50% { transform: rotate(0.8deg); }
 }
-@keyframes garden-swim {
+@keyframes scene-swim {
   0%, 100% { transform: translateX(-40px) scaleX(1); }
   48% { transform: translateX(40px) scaleX(1); }
   52% { transform: translateX(40px) scaleX(-1); }
   98% { transform: translateX(-40px) scaleX(-1); }
 }
-@keyframes garden-meteor {
+@keyframes scene-meteor {
   0%, 80% { transform: translate(0, 0); opacity: 0; }
   83% { opacity: 1; }
   92%, 100% { transform: translate(-180px, 90px); opacity: 0; }
 }
-@keyframes garden-grow {
+@keyframes scene-drift {
+  from { transform: translateX(-40px); }
+  to { transform: translateX(40px); }
+}
+@keyframes scene-shimmer {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.9; }
+}
+@keyframes scene-petal {
+  0% { transform: translate(0, -40px) rotate(0deg); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translate(-30px, 40px) rotate(160deg); opacity: 0; }
+}
+@keyframes scene-breathe {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(1.06); }
+}
+@keyframes scene-rise {
+  0% { transform: translate(0, 30px); opacity: 0; }
+  15% { opacity: 1; }
+  50% { transform: translate(12px, -20px); }
+  85% { opacity: 1; }
+  100% { transform: translate(-6px, -70px); opacity: 0; }
+}
+@keyframes scene-steam {
+  0% { transform: translateY(6px) scaleX(0.8); opacity: 0; }
+  30% { opacity: 1; }
+  100% { transform: translateY(-14px) scaleX(1.2); opacity: 0; }
+}
+@keyframes scene-flicker {
+  0%, 100% { transform: scale(1, 1); }
+  30% { transform: scale(0.94, 1.08); }
+  60% { transform: scale(1.04, 0.95); }
+}
+@keyframes scene-rays {
+  0%, 100% { opacity: 0.1; }
+  50% { opacity: 0.22; }
+}
+@keyframes scene-flutter {
+  0%, 100% { transform: skewY(0deg) scaleX(1); }
+  50% { transform: skewY(5deg) scaleX(0.92); }
+}
+@keyframes scene-glide {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(40px, -12px); }
+}
+@keyframes scene-beam {
+  0%, 100% { transform: rotate(-7deg); }
+  50% { transform: rotate(7deg); }
+}
+@keyframes scene-smoke {
+  0% { transform: translate(0, 0) scale(0.6); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translate(18px, -50px) scale(1.8); opacity: 0; }
+}
+@keyframes scene-swell {
+  from { transform: translateX(-24px); }
+  to { transform: translateX(24px); }
+}
+@keyframes scene-bob {
+  0%, 100% { transform: translateY(0) rotate(-1.5deg); }
+  50% { transform: translateY(4px) rotate(1.5deg); }
+}
+@keyframes scene-rain {
+  from { transform: translate(0, -26px); }
+  to { transform: translate(-8px, 0); }
+}
+@keyframes scene-glow {
+  0%, 100% { opacity: 0.75; }
+  50% { opacity: 1; }
+}
+@keyframes scene-ripple {
+  0% { transform: scale(0.6); opacity: 0.8; }
+  100% { transform: scale(1.25); opacity: 0; }
+}
+@keyframes scene-flash {
+  0%, 62%, 66%, 70%, 100% { opacity: 0; }
+  63%, 69% { opacity: 0.9; }
+}
+@keyframes scene-grow {
   from { transform: scale(0.4); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }

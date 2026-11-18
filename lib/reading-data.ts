@@ -1,6 +1,7 @@
 import type { User } from "@/lib/generated/prisma/client";
 import { addDays, diffInDays, toISODate, toLocalDate, todayLocal } from "@/lib/dates";
 import { prisma } from "@/lib/db";
+import { TEND_DAYS, tend, type Tending } from "@/lib/tending";
 import {
   endOf,
   pagesRead,
@@ -11,7 +12,7 @@ import {
   type ReadingUnit,
 } from "@/lib/reading";
 
-/** The quiet row of dots, as on the other daily tabs. */
+/** Two weeks, as on the other daily tabs. */
 const WEEK_DOTS = 14;
 
 /** What a dialog needs to log a reading against a book. */
@@ -56,6 +57,8 @@ export type ReadingView = {
   days: ReadingDay[];
   todayISO: string;
   week: { pages: number; percent: number };
+  /** The nook: kept by the days read in the last two weeks. */
+  tending: Tending;
 };
 
 export type BookLog = {
@@ -152,7 +155,8 @@ const BOOK_SELECT = {
 /** The Reading tab: every shelf, two weeks of dots and this week's pages. */
 export async function getReading(user: User): Promise<ReadingView> {
   const today = todayLocal(user.timezone);
-  const since = addDays(today, -(WEEK_DOTS - 1));
+  // Fifteen days: two weeks, and the day before them, for the scene's window.
+  const since = addDays(today, -TEND_DAYS);
   const instantLabel = new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
     month: "short",
@@ -193,7 +197,7 @@ export async function getReading(user: User): Promise<ReadingView> {
   });
 
   const days = new Map<string, ReadingDay>();
-  for (let i = 0; i < WEEK_DOTS; i += 1) {
+  for (let i = 0; i <= TEND_DAYS; i += 1) {
     const date = addDays(since, i);
     const iso = toISODate(date);
     days.set(iso, { dateISO: iso, label: dayLabel.format(date), pages: 0, percent: 0, read: false });
@@ -205,7 +209,8 @@ export async function getReading(user: User): Promise<ReadingView> {
     if (log.book.unit === "PERCENT") day.percent += pagesRead(log);
     else day.pages += pagesRead(log);
   }
-  const ordered = [...days.values()];
+  const history = [...days.values()];
+  const ordered = history.slice(-WEEK_DOTS);
   const lastWeek = ordered.slice(-7);
 
   const finished = shelf
@@ -225,6 +230,7 @@ export async function getReading(user: User): Promise<ReadingView> {
       pages: lastWeek.reduce((sum, day) => sum + day.pages, 0),
       percent: lastWeek.reduce((sum, day) => sum + day.percent, 0),
     },
+    tending: tend(history.map((day) => ({ dateISO: day.dateISO, label: day.label, done: day.read }))),
   };
 }
 

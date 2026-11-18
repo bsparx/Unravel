@@ -30,6 +30,8 @@ export type DisputationCard = DisputationFields & {
   createdAt: string;
   /** "16 Nov", in the user's timezone. */
   createdLabel: string;
+  /** The latest time it was reread, and how strongly the belief held then. */
+  revisit: { belief: number | null; label: string; today: boolean } | null;
 };
 
 export type AbcdeKey = "adversity" | "belief" | "consequences" | "disputation" | "energization";

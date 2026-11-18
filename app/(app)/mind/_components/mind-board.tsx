@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 
+import { DisputationRevisit } from "@/components/disputation-revisit";
 import { DisputationRitual } from "@/components/disputation-ritual";
 import type { MeditationChoice } from "@/components/meditation/meditation-picker";
 import { MeditationSession, type SessionResult } from "@/components/meditation/meditation-session";
@@ -13,11 +14,13 @@ import { BookDialog } from "@/components/reading/book-dialog";
 import { LogReadingDialog } from "@/components/reading/log-reading-dialog";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { WishRehearsal } from "@/components/wish-rehearsal";
 import { WoopRitual } from "@/components/woop-ritual";
 import { cn } from "@/lib/utils";
 import type { DisputationCard, DisputationFields } from "@/lib/disputation";
 import type { MindView } from "@/lib/mind-data";
 import type { ShelfBook } from "@/lib/reading-data";
+import type { Tending } from "@/lib/tending";
 import { MIND_TABS, type MindTab } from "@/lib/mind-tabs";
 import {
   itemsToAnswers,
@@ -28,7 +31,14 @@ import {
 import type { WishCard, WoopFields } from "@/lib/woop";
 import { findMeditation } from "@/lib/meditations";
 
-import { saveDisputation, saveMeditation, savePractice, saveWish } from "../actions";
+import {
+  rehearseWish,
+  revisitDisputation,
+  saveDisputation,
+  saveMeditation,
+  savePractice,
+  saveWish,
+} from "../actions";
 import { DisputationsPanel } from "./disputations-panel";
 import { MeditatePanel } from "./meditate-panel";
 import { PracticePanel, type PracticeWriteMode } from "./practice-panel";
@@ -40,7 +50,9 @@ type Editing =
   | { kind: "wish"; card: WishCard | null }
   | { kind: "disputation"; card: DisputationCard | null }
   | { kind: "practice"; practice: PracticeKind; mode: PracticeWriteMode }
-  | { kind: "meditation"; choice: MeditationChoice; before: number }
+  | { kind: "meditation"; choice: MeditationChoice; tending: Tending }
+  | { kind: "rehearse"; card: WishCard }
+  | { kind: "revisit"; card: DisputationCard }
   | { kind: "book" }
   | { kind: "log"; book: ShelfBook }
   | null;
@@ -54,12 +66,14 @@ const LABELS: Record<MindTab, string> = {
   disputations: "Disputations",
 };
 
-// What each daily tab's dot says, done or not yet.
-const DOT: Record<"gratitude" | "dua" | "meditate" | "reading", { colour: string; done: string; not: string; srDone: string; srNot: string }> = {
+// What each tab's dot says, done or not yet.
+const DOT: Record<MindTab, { colour: string; done: string; not: string; srDone: string; srNot: string }> = {
   gratitude: { colour: "bg-[var(--thanks-lantern)]", done: "Today's page is written", not: "Not written yet today", srDone: "(written today)", srNot: "(not written today)" },
   dua: { colour: "bg-[var(--dua-accent)]", done: "Today's page is written", not: "Not written yet today", srDone: "(written today)", srNot: "(not written today)" },
   meditate: { colour: "bg-[var(--garden-light)]", done: "You've sat today", not: "No sitting yet today", srDone: "(sat today)", srNot: "(not yet today)" },
   reading: { colour: "bg-[var(--reading-dot)]", done: "You've read today", not: "No reading yet today", srDone: "(read today)", srNot: "(not yet today)" },
+  wishes: { colour: "bg-[var(--woop-wish)]", done: "You've rehearsed a wish today", not: "No wish rehearsed yet today", srDone: "(rehearsed today)", srNot: "(not yet today)" },
+  disputations: { colour: "bg-[var(--abcde-energization)]", done: "You've argued one back today", not: "None written or revisited today", srDone: "(done today)", srNot: "(not yet today)" },
 };
 
 /**
@@ -186,9 +200,50 @@ export function MindBoard({
     }
   };
 
-  const satToday = (view.meditation.days.at(-1)?.minutes ?? 0) > 0;
-  const readToday = view.reading.days.at(-1)?.read ?? false;
+  // Whether today counts yet, per tab: the same day the scene counts.
+  const doneToday: Record<MindTab, boolean> = {
+    gratitude: view.gratitude.tending.today,
+    dua: view.dua.tending.today,
+    meditate: view.meditation.tending.today,
+    reading: view.reading.tending.today,
+    wishes: view.wishTending.today,
+    disputations: view.disputationTending.today,
+  };
 
+  const onRehearse = async (card: WishCard) => {
+    try {
+      const state = await rehearseWish(card.id);
+      if (state.status === "error") {
+        toast.error(state.message);
+        return false;
+      }
+      setEditing(null);
+      toast.success("Rehearsed. The mountain keeps today.");
+      return true;
+    } catch {
+      toast.error("Couldn't keep that one. Check your connection.");
+      return false;
+    }
+  };
+
+  const onRevisit = async (card: DisputationCard, belief: number | null) => {
+    const formData = new FormData();
+    formData.set("id", card.id);
+    formData.set("belief", belief === null ? "" : String(belief));
+    try {
+      const state = await revisitDisputation(formData);
+      if (state.status === "error") {
+        toast.error(state.message);
+        return false;
+      }
+      setEditing(null);
+      toast.success("Revisited. Still argued.");
+      return true;
+    } catch {
+      toast.error("Couldn't keep that one. Check your connection.");
+      return false;
+    }
+  };
 
   const showNew =
     (tab === "wishes" && active.length > 0) || (tab === "disputations" && disputations.length > 0);
@@ -205,14 +260,8 @@ export function MindBoard({
           >
             {tabs.map((value) => {
               const selected = tab === value;
-              const daily = value === "gratitude" || value === "dua" || value === "meditate" || value === "reading";
-              const writtenToday =
-                value === "meditate"
-                  ? satToday
-                  : value === "reading"
-                    ? readToday
-                    : daily && view[value as "gratitude" | "dua"].today !== null;
-              const dot = daily ? DOT[value] : null;
+              const writtenToday = doneToday[value];
+              const dot = DOT[value];
               return (
                 <button
                   key={value}
@@ -230,25 +279,19 @@ export function MindBoard({
                   )}
                 >
                   {LABELS[value]}
-                  {dot ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span
-                          className={cn(
-                            "size-1.5 rounded-full",
-                            writtenToday ? dot.colour : "border-muted-foreground/50 border",
-                          )}
-                        >
-                          <span className="sr-only">{writtenToday ? dot.srDone : dot.srNot}</span>
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom">{writtenToday ? dot.done : dot.not}</TooltipContent>
-                    </Tooltip>
-                  ) : (
-                    <span className="font-mono text-micro tabular-nums opacity-60">
-                      {value === "wishes" ? active.length : disputations.length}
-                    </span>
-                  )}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span
+                        className={cn(
+                          "size-1.5 rounded-full",
+                          writtenToday ? dot.colour : "border-muted-foreground/50 border",
+                        )}
+                      >
+                        <span className="sr-only">{writtenToday ? dot.srDone : dot.srNot}</span>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">{writtenToday ? dot.done : dot.not}</TooltipContent>
+                  </Tooltip>
                 </button>
               );
             })}
@@ -276,15 +319,20 @@ export function MindBoard({
           <WishesPanel
             active={active}
             settled={settled}
+            tending={view.wishTending}
+            rehearsedToday={view.rehearsedToday}
             onNew={() => setEditing({ kind: "wish", card: null })}
             onOpen={(card) => setEditing({ kind: "wish", card })}
+            onRehearse={(card) => setEditing({ kind: "rehearse", card })}
           />
         )}
         {tab === "disputations" && (
           <DisputationsPanel
             entries={disputations}
+            tending={view.disputationTending}
             onNew={() => setEditing({ kind: "disputation", card: null })}
             onOpen={(card) => setEditing({ kind: "disputation", card })}
+            onRevisit={(card) => setEditing({ kind: "revisit", card })}
           />
         )}
         {tab === "meditate" && (
@@ -293,7 +341,7 @@ export function MindBoard({
             onBegin={(choice) => {
               // The tap that begins is the gesture browsers want before sound.
               primeAudio();
-              setEditing({ kind: "meditation", choice, before: view.meditation.totalMinutes });
+              setEditing({ kind: "meditation", choice, tending: view.meditation.tending });
             }}
           />
         )}
@@ -340,12 +388,28 @@ export function MindBoard({
             key={`${editing.choice.kind}-${JSON.stringify(editing.choice.options)}`}
             meditation={meditation}
             options={editing.choice.options}
-            totalMinutesBefore={editing.before}
+            tending={editing.tending}
             onSave={(result) => onSaveMeditation(editing.choice, result)}
             onClose={() => setEditing(null)}
           />
         );
       })()}
+      {editing?.kind === "rehearse" && (
+        <WishRehearsal
+          key={editing.card.id}
+          woop={editing.card}
+          onDone={() => onRehearse(editing.card)}
+          onCancel={() => setEditing(null)}
+        />
+      )}
+      {editing?.kind === "revisit" && (
+        <DisputationRevisit
+          key={editing.card.id}
+          entry={editing.card}
+          onDone={(belief) => onRevisit(editing.card, belief)}
+          onCancel={() => setEditing(null)}
+        />
+      )}
       {editing?.kind === "book" && <BookDialog initial={null} onClose={() => setEditing(null)} />}
       {editing?.kind === "log" && (
         <LogReadingDialog

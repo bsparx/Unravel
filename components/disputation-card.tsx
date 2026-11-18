@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowRight, ChevronDown } from "lucide-react";
+import { ArrowDown, ArrowRight, Check, ChevronDown, RotateCcw } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import {
@@ -23,6 +23,8 @@ export function DisputationTurn({
   expanded = true,
   onToggle,
   toolRoom = false,
+  revisit = null,
+  onRevisit,
   className,
 }: {
   entry: DisputationFields;
@@ -33,6 +35,10 @@ export function DisputationTurn({
   onToggle?: () => void;
   /** Keep the corner clear for the card's tools, pinned top-right on the board. */
   toolRoom?: boolean;
+  /** The latest reread, and how strongly the old belief held then. */
+  revisit?: { belief: number | null; label: string; today: boolean } | null;
+  /** With this, the card offers today's revisit. */
+  onRevisit?: () => void;
   className?: string;
 }) {
   const lenses = DISPUTE_LENSES.filter((lens) => entry[lens.key].trim());
@@ -82,7 +88,7 @@ export function DisputationTurn({
         </div>
       </div>
 
-      {(dateLabel || rated || onToggle) && (
+      {(dateLabel || rated || onToggle || onRevisit) && (
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2.5 border-t border-[var(--woop-line)] px-5 py-3">
           {dateLabel && <span className="text-micro text-[var(--woop-ink-muted)]">{dateLabel}</span>}
           {rated && (
@@ -92,17 +98,41 @@ export function DisputationTurn({
               className="min-w-48 flex-1 sm:max-w-72"
             />
           )}
+          {revisit?.belief != null && (
+            <span className="text-micro text-[var(--woop-ink-muted)]">
+              {revisit.today ? "Today" : revisit.label}:{" "}
+              <span className="font-mono text-[var(--woop-ink)] tabular-nums">{revisit.belief}</span> of 10
+            </span>
+          )}
+          <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-2">
+          {onRevisit &&
+            (revisit?.today ? (
+              <span className="inline-flex items-center gap-1 text-micro font-medium text-[var(--woop-ink-muted)]">
+                <Check className="size-3" aria-hidden />
+                Revisited today
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={onRevisit}
+                className="inline-flex items-center gap-1.5 rounded-full bg-[var(--abcde-energization)] px-3 py-1 text-micro font-medium text-[var(--woop-solid)] transition-[filter,transform] hover:brightness-110 focus-visible:ring-2 focus-visible:ring-[var(--woop-focus)] focus-visible:outline-none active:scale-[0.97]"
+              >
+                <RotateCcw className="size-3" aria-hidden />
+                Revisit
+              </button>
+            ))}
           {onToggle && steps.length > 0 && (
             <button
               type="button"
               onClick={onToggle}
               aria-expanded={expanded}
-              className="ml-auto inline-flex items-center gap-1 rounded-full px-1 text-micro font-medium text-[var(--woop-ink-muted)] transition-colors hover:text-[var(--woop-ink)] focus-visible:ring-2 focus-visible:ring-[var(--woop-focus)] focus-visible:outline-none"
+              className="inline-flex items-center gap-1 rounded-full px-1 text-micro font-medium text-[var(--woop-ink-muted)] transition-colors hover:text-[var(--woop-ink)] focus-visible:ring-2 focus-visible:ring-[var(--woop-focus)] focus-visible:outline-none"
             >
               {expanded ? "Hide the argument" : "Show the argument"}
               <ChevronDown className={cn("size-3 transition-transform duration-200", expanded && "rotate-180")} aria-hidden />
             </button>
           )}
+          </div>
         </div>
       )}
 

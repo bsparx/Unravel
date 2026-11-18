@@ -159,8 +159,13 @@ export const GLOSSARY = {
   },
   garden: {
     title: "The garden",
-    what: "A moonlit garden that fills in as your minutes add up: wildflowers at 5, a pond at 15, a lantern at 60, and on to a full moon at 2,000. Every minute you sit counts, even in a session you end early.",
-    why: "Something you can watch grow makes the practice feel like it's going somewhere. It never wilts: a week away takes nothing from it.",
+    what: "A moonlit garden that holds one thing for each day you sat in the last two weeks: wildflowers, a pond, a lantern, koi, and with fourteen days the full moon on the water. Any sitting counts for its day, however short.",
+    why: "It rewards coming back, not piling up minutes. A missed day takes the newest thing away for two weeks; each day you sit brings something back or keeps what's there.",
+  },
+  scene: {
+    title: "The scene",
+    what: "Each practice has a place of its own, kept by the last fourteen days: one more thing in it for every day you did the practice. Fourteen days in a row and it's whole. Miss a day and the newest thing goes, until that day is two weeks behind you. Today counts the moment it's done, and isn't held against you while it's still open.",
+    why: "Consistency over everything else. There are no points and no totals: a perfect month and a month off end in the same place, and the only way to a whole scene is to keep coming back. Every day you show up either brings something or keeps what's there.",
   },
   reading: {
     title: "Reading",

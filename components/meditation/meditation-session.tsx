@@ -6,7 +6,8 @@ import { Pause, Play, Square, Vibrate, VibrateOff, Volume2, VolumeX } from "luci
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { useWakeLock } from "@/components/use-wake-lock";
 import { cn } from "@/lib/utils";
-import { nextStage, unlockedBetween } from "@/lib/garden";
+import { SCENES, stageAt, stageIdsAt } from "@/lib/scenes";
+import { TEND_DAYS, type Tending } from "@/lib/tending";
 import {
   breathAt,
   dhikrAt,
@@ -54,13 +55,14 @@ const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)"
 export function MeditationSession({
   meditation,
   options: rawOptions,
-  totalMinutesBefore,
+  tending,
   onSave,
   onClose,
 }: {
   meditation: Meditation;
   options: MeditationOptions;
-  totalMinutesBefore: number;
+  /** The garden before this sitting: what it shows, and what today would do. */
+  tending: Tending;
   onSave: (result: SessionResult) => Promise<boolean>;
   onClose: () => void;
 }) {
@@ -302,9 +304,12 @@ export function MeditationSession({
   // ---- what to show
   const remaining = planned > 0 ? Math.max(0, planned - second) : second;
   const cycles = pattern.length ? Math.round(planned / pattern.reduce((s, p) => s + p.seconds, 0)) : 0;
-  const after = totalMinutesBefore + (result && result.status !== "short" ? result.seconds / 60 : 0);
-  const unlocked = result && result.status !== "short" ? unlockedBetween(totalMinutesBefore, after) : [];
-  const coming = nextStage(after);
+  // A kept sitting counts for today: the garden grows if the day leaving its
+  // window was a miss, and holds if it was kept. A second sitting changes nothing.
+  const counted = Boolean(result && result.status !== "short");
+  const after = counted && !tending.today ? tending.ifDone : tending.level;
+  const grown = stageIdsAt(SCENES.meditate, after).slice(tending.level);
+  const brought = after > tending.level ? stageAt(SCENES.meditate, after) : null;
 
   return (
     <Dialog
@@ -327,8 +332,8 @@ export function MeditationSession({
 
         <div ref={scene} className="absolute inset-0" aria-hidden>
           <GardenScene
-            minutes={stage === "done" ? after : totalMinutesBefore}
-            fresh={unlocked.map((s) => s.id)}
+            level={stage === "done" ? after : tending.level}
+            fresh={stage === "done" ? grown : []}
             label={false}
             className="absolute inset-0"
           />
@@ -490,26 +495,26 @@ export function MeditationSession({
                       ? `${taps} remembered.`
                       : meditation.mode === "count"
                         ? `${breaths.rounds} ${breaths.rounds === 1 ? "round" : "rounds"} of ten breaths.`
-                        : result.completed
-                          ? "Every minute stays in the garden."
-                          : "Every minute you sat stays in the garden."}
+                        : "Today's sitting is in the garden."}
                 </p>
-                {unlocked.length > 0 && (
+                {counted && (
                   <div className="mt-5 space-y-2">
-                    <p className="text-sm font-medium">Your garden grew</p>
-                    <ul className="flex flex-wrap justify-center gap-2">
-                      {unlocked.map((stage) => (
-                        <li key={stage.id} className="rounded-full border border-white/30 bg-white/15 px-3 py-1 text-sm">
-                          {stage.name}
-                        </li>
-                      ))}
-                    </ul>
+                    {brought ? (
+                      <>
+                        <p className="text-sm font-medium">The garden grew</p>
+                        <p className="mx-auto w-fit rounded-full border border-white/30 bg-white/15 px-3 py-1 text-sm">
+                          {brought.name.charAt(0).toUpperCase() + brought.name.slice(1)}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-sm font-medium">
+                        {tending.today ? "The garden is kept for today." : "Today keeps the garden as it is."}
+                      </p>
+                    )}
+                    <p className="text-xs text-white/70">
+                      {after === TEND_DAYS ? "Fourteen days. The garden is whole." : `${after} of ${TEND_DAYS} days in the last two weeks`}
+                    </p>
                   </div>
-                )}
-                {result.status !== "short" && coming && (
-                  <p className="mt-4 text-xs text-white/70">
-                    Next: {coming.name.toLowerCase()} at {coming.minutes} minutes
-                  </p>
                 )}
                 <p className="mt-4 text-xs text-white/70" aria-live="polite">
                   {result.status === "saving" ? "Saving…" : result.status === "error" ? "Couldn't save this one. Check your connection." : ""}

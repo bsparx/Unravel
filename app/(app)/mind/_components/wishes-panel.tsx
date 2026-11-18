@@ -4,7 +4,9 @@ import { useState } from "react";
 import { ChevronDown, Feather, Sparkle, Stamp, Undo2, Wind } from "lucide-react";
 import { toast } from "sonner";
 
+import { SceneCard } from "@/components/scenes/scene-card";
 import { WaxSeal, WoopCard } from "@/components/woop-card";
+import type { Tending } from "@/lib/tending";
 import { cn } from "@/lib/utils";
 import type { WishCard } from "@/lib/woop";
 
@@ -12,19 +14,26 @@ import { deleteWish, setWishStatus } from "../actions";
 import { CardTools, SkyEmpty } from "./shared";
 
 /**
- * Wishes are standing cards you come back to, so they sit side by side.
- * Each shows the wish and turns over to the plan.
+ * Wishes are standing cards you come back to, so they sit side by side,
+ * under the summit that rehearsing them keeps. Each shows the wish, turns
+ * over to the plan, and can be rehearsed once a day.
  */
 export function WishesPanel({
   active,
   settled,
+  tending,
+  rehearsedToday,
   onNew,
   onOpen,
+  onRehearse,
 }: {
   active: WishCard[];
   settled: WishCard[];
+  tending: Tending;
+  rehearsedToday: string[];
   onNew: () => void;
   onOpen: (card: WishCard) => void;
+  onRehearse: (card: WishCard) => void;
 }) {
   const [stamping, setStamping] = useState<string | null>(null);
   const [drawer, setDrawer] = useState(false);
@@ -56,6 +65,8 @@ export function WishesPanel({
 
   return (
     <div className="space-y-12">
+      <SceneCard tab="wishes" tending={tending} />
+
       {active.length === 0 ? (
         <SkyEmpty
           sky="woop-sky-wish"
@@ -71,7 +82,13 @@ export function WishesPanel({
         <ul className={cn("grid grid-cols-1 gap-6", active.length === 1 ? "mx-auto max-w-2xl" : "md:grid-cols-2")}>
           {active.map((card) => (
             <li key={card.id} className="group relative">
-              <WoopCard woop={card} footer={`Made ${card.createdLabel}`} className="h-full" />
+              <WoopCard
+                woop={card}
+                footer={`Made ${card.createdLabel}`}
+                rehearsedToday={rehearsedToday.includes(card.id)}
+                onRehearse={() => onRehearse(card)}
+                className="h-full"
+              />
               {stamping === card.id && <WaxSeal className="-right-2 -bottom-4" />}
 
               <CardTools

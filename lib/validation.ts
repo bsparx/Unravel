@@ -872,6 +872,12 @@ export const wishStatusSchema = z.object({
 /** 0..10, or absent. An empty string from the form is "not rated". */
 const conviction = emptyToUndefined(z.coerce.number().int().min(0).max(10));
 
+/** Rereading a disputation, with how strongly the old belief is held now. */
+export const disputationRevisitSchema = z.object({
+  id: cuid,
+  belief: conviction,
+});
+
 const lens = emptyToUndefined(
   z.string().trim().max(DISPUTATION_MAX.lens, "Keep it shorter than that."),
 );

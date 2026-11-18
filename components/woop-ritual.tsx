@@ -27,14 +27,14 @@ import {
 import { WaxSeal, WoopCard } from "./woop-card";
 
 /** Each step's accent: the light the sky gives off at that hour. */
-const ACCENT: Record<WoopKey, string> = {
+export const ACCENT: Record<WoopKey, string> = {
   wish: "text-[var(--woop-wish)]",
   outcome: "text-[var(--woop-outcome)]",
   obstacle: "text-[var(--woop-obstacle)]",
   plan: "text-[var(--woop-plan)]",
 };
 
-const RING: Record<WoopKey, string> = {
+export const RING: Record<WoopKey, string> = {
   wish: "border-[var(--woop-wish)]",
   outcome: "border-[var(--woop-outcome)]",
   obstacle: "border-[var(--woop-obstacle)]",
@@ -42,7 +42,7 @@ const RING: Record<WoopKey, string> = {
 };
 
 /** Night with one star, pre-dawn, cloud in the way, sunrise. */
-const SKIES: readonly RitualSky[] = [
+export const SKIES: readonly RitualSky[] = [
   {
     key: "wish",
     className: "woop-sky-wish",

@@ -387,46 +387,48 @@ model User {
 
   // Body. Exercises and intermittent fasting, each switchable; with both off
   // the page leaves the sidebar and the mobile bar.
-  bodyExercisesEnabled Boolean @default(true)
-  bodyFastingEnabled   Boolean @default(true)
+  bodyExercisesEnabled Boolean  @default(true)
+  bodyFastingEnabled   Boolean  @default(true)
   /// Which fast the plan is: an eating window by the clock, or Islamic
   /// (sawm), Fajr to Maghrib from the prayer city's timings.
   fastKind             FastKind @default(INTERMITTENT)
   /// The eating window, as minutes of the local day (0-1439). End may be
   /// earlier than start: a window that runs past midnight. 12:00-20:00 is 16:8.
-  fastEatStart         Int     @default(720)
-  fastEatEnd           Int     @default(1200)
+  fastEatStart         Int      @default(720)
+  fastEatEnd           Int      @default(1200)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  projects         Project[]
-  tasks            Task[]
-  occurrences      TaskOccurrence[]
-  sessions         FocusSession[]
-  captures         Capture[]
-  dayLogs          DayLog[]
-  journal          JournalEntry[]
-  fasts            Fast[]
-  meditations      MeditationSession[]
-  books            Book[]
-  readingLogs      ReadingLog[]
-  steps            TaskStep[]
-  blocks           TimeBlock[]
-  moneyCategories  MoneyCategory[]
-  transactions     MoneyTransaction[]
-  moneyBudgets     MoneyBudget[]
-  moneyAccounts    MoneyAccount[]
-  transfers        AccountTransfer[]
-  moneyDebts       MoneyDebt[]
-  subscriptions    Subscription[]
-  exerciseRoutines ExerciseRoutine[]
-  prayerChecks     PrayerCheck[]
-  shadowPatterns   ShadowPattern[]
-  shadowLogs       ShadowLog[]
-  weeklyReviews    WeeklyReview[]
-  wishes           Wish[]
-  disputations     Disputation[]
+  projects            Project[]
+  tasks               Task[]
+  occurrences         TaskOccurrence[]
+  sessions            FocusSession[]
+  captures            Capture[]
+  dayLogs             DayLog[]
+  journal             JournalEntry[]
+  fasts               Fast[]
+  meditations         MeditationSession[]
+  books               Book[]
+  readingLogs         ReadingLog[]
+  steps               TaskStep[]
+  blocks              TimeBlock[]
+  moneyCategories     MoneyCategory[]
+  transactions        MoneyTransaction[]
+  moneyBudgets        MoneyBudget[]
+  moneyAccounts       MoneyAccount[]
+  transfers           AccountTransfer[]
+  moneyDebts          MoneyDebt[]
+  subscriptions       Subscription[]
+  exerciseRoutines    ExerciseRoutine[]
+  prayerChecks        PrayerCheck[]
+  shadowPatterns      ShadowPattern[]
+  shadowLogs          ShadowLog[]
+  weeklyReviews       WeeklyReview[]
+  wishes              Wish[]
+  disputations        Disputation[]
+  wishRehearsals      WishRehearsal[]
+  disputationRevisits DisputationRevisit[]
 }
 
 // ---------------------------------------------------------------- lists
@@ -1246,10 +1248,30 @@ model Wish {
   settledAt DateTime?
   sortOrder Float      @default(0)
 
+  rehearsals WishRehearsal[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId, status, sortOrder])
+}
+
+/// A day a wish was rehearsed: its outcome pictured, its obstacle named, its
+/// if-then said. One per wish per day; any rehearsal keeps the wishes scene.
+model WishRehearsal {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wishId String
+  wish   Wish   @relation(fields: [wishId], references: [id], onDelete: Cascade)
+
+  /// The user's own calendar day, stored at UTC midnight.
+  date DateTime @db.Date
+
+  createdAt DateTime @default(now())
+
+  @@unique([wishId, date])
+  @@index([userId, date])
 }
 
 /// One ABCDE disputation (Martin Seligman, *Learned Optimism*).
@@ -1279,10 +1301,34 @@ model Disputation {
   /// 0..10: how strongly it's held after disputing. Optional.
   beliefAfter  Int?
 
+  revisits DisputationRevisit[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId, createdAt])
+}
+
+/// A day a disputation was reread, with how strongly the old belief is held
+/// now. One per disputation per day; a revisit keeps the disputations scene
+/// as much as writing a new one.
+model DisputationRevisit {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  disputationId String
+  disputation   Disputation @relation(fields: [disputationId], references: [id], onDelete: Cascade)
+
+  /// The user's own calendar day, stored at UTC midnight.
+  date   DateTime @db.Date
+  /// 0..10: how strongly the old belief is held today. Optional.
+  belief Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([disputationId, date])
+  @@index([userId, date])
 }
 
 // ---------------------------------------------------------------- money
@@ -1732,9 +1778,9 @@ model Fast {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  kind      FastKind  @default(INTERMITTENT)
-  startedAt DateTime
-  endedAt   DateTime?
+  kind          FastKind  @default(INTERMITTENT)
+  startedAt     DateTime
+  endedAt       DateTime?
   /// The goal when it started, in minutes. A snapshot: changing the eating
   /// window later never rewrites how an old fast is judged.
   targetMinutes Int
@@ -1800,7 +1846,7 @@ model Book {
 
   startedAt  DateTime?
   finishedAt DateTime?
-  sortOrder  Float       @default(0)
+  sortOrder  Float     @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

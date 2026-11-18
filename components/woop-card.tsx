@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Sunrise, Undo2 } from "lucide-react";
+import { Check, EyeClosed, Sunrise, Undo2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { woopClause, type WoopFields } from "@/lib/woop";
@@ -10,6 +10,10 @@ const EDGE = "ring-1 ring-[var(--woop-glass-edge)] shadow-[0_24px_48px_-28px_rgb
 
 const FACE_BUTTON =
   "inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--woop-glass-edge)] bg-[var(--woop-glass)] px-3 py-1.5 text-micro font-medium text-[var(--woop-ink)] backdrop-blur-sm transition-colors hover:bg-[var(--woop-hover)] focus-visible:ring-2 focus-visible:ring-[var(--woop-focus)] focus-visible:outline-none active:scale-[0.97]";
+
+/** Today's rehearsal: the one action on the card that keeps the summit. */
+const REHEARSE_BUTTON =
+  "inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--woop-plan)] px-3 py-1.5 text-micro font-medium text-[var(--woop-plan-ink)] shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] transition-[filter,transform] hover:brightness-105 focus-visible:ring-2 focus-visible:ring-[var(--woop-focus)] focus-visible:outline-none active:scale-[0.97]";
 
 /**
  * A wish, kept as a card with two faces, because a WOOP is two thoughts held
@@ -25,6 +29,8 @@ export function WoopCard({
   layout = "flip",
   compact = false,
   footer,
+  onRehearse,
+  rehearsedToday = false,
   className,
 }: {
   woop: WoopFields;
@@ -33,6 +39,9 @@ export function WoopCard({
   compact?: boolean;
   /** A line under the front face's content: when it was made, or settled. */
   footer?: React.ReactNode;
+  /** With this, the front offers today's rehearsal. */
+  onRehearse?: () => void;
+  rehearsedToday?: boolean;
   className?: string;
 }) {
   if (layout === "stacked") {
@@ -48,18 +57,31 @@ export function WoopCard({
     );
   }
 
-  return <FlipCard woop={woop} compact={compact} footer={footer} className={className} />;
+  return (
+    <FlipCard
+      woop={woop}
+      compact={compact}
+      footer={footer}
+      onRehearse={onRehearse}
+      rehearsedToday={rehearsedToday}
+      className={className}
+    />
+  );
 }
 
 function FlipCard({
   woop,
   compact,
   footer,
+  onRehearse,
+  rehearsedToday,
   className,
 }: {
   woop: WoopFields;
   compact: boolean;
   footer?: React.ReactNode;
+  onRehearse?: () => void;
+  rehearsedToday: boolean;
   className?: string;
 }) {
   const [flipped, setFlipped] = useState(false);
@@ -96,15 +118,29 @@ function FlipCard({
         <Front woop={woop} compact={compact} room />
         <div className="mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-2 pt-6">
           <div className="min-w-0 text-micro text-[var(--woop-ink-muted)]">{footer}</div>
-          <button
-            ref={toBack}
-            type="button"
-            onClick={() => turn(true)}
-            className={FACE_BUTTON}
-          >
-            <Sunrise className="size-3.5" aria-hidden />
-            See the plan
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {onRehearse &&
+              (rehearsedToday ? (
+                <span className="inline-flex items-center gap-1.5 px-1 text-micro font-medium text-[var(--woop-ink-muted)]">
+                  <Check className="size-3.5" aria-hidden />
+                  Rehearsed today
+                </span>
+              ) : (
+                <button type="button" onClick={onRehearse} className={REHEARSE_BUTTON}>
+                  <EyeClosed className="size-3.5" aria-hidden />
+                  Rehearse
+                </button>
+              ))}
+            <button
+              ref={toBack}
+              type="button"
+              onClick={() => turn(true)}
+              className={FACE_BUTTON}
+            >
+              <Sunrise className="size-3.5" aria-hidden />
+              See the plan
+            </button>
+          </div>
         </div>
       </section>
 
