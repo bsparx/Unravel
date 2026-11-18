@@ -133,19 +133,23 @@ export function LogReadingDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && !pending && onClose()}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] gap-0 overflow-y-auto p-0 sm:max-w-xl">
+      <DialogContent
+        sheetOnPhone
+        className="max-h-[calc(100dvh-2rem)] gap-0 overflow-y-auto p-0 sm:max-w-xl lg:max-w-2xl xl:max-w-3xl"
+      >
         <form
+          className="flex min-h-full flex-col"
           onSubmit={submit}
           onKeyDown={(event) => {
             if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) submit();
           }}
         >
-          <DialogHeader className="flex-row items-center gap-4 px-6 pt-6 pb-5 text-left">
-            <div className="w-12 shrink-0">
+          <DialogHeader className="flex-row items-center gap-4 px-6 pt-6 pr-12 pb-5 text-left max-sm:pt-[max(1.5rem,env(safe-area-inset-top))] xl:px-8 xl:pt-8">
+            <div className="w-12 shrink-0 xl:w-14">
               <BookCover title={book.title} cover={book.cover} plain />
             </div>
             <div className="min-w-0 space-y-0.5">
-              <DialogTitle className="font-display line-clamp-2 text-xl leading-snug">
+              <DialogTitle className="font-display line-clamp-2 text-xl leading-snug xl:text-2xl">
                 {log ? "Edit this reading" : book.title}
               </DialogTitle>
               <DialogDescription>
@@ -158,7 +162,7 @@ export function LogReadingDialog({
             </div>
           </DialogHeader>
 
-          <div className="space-y-6 px-6 pb-6">
+          <div className="flex-1 space-y-6 px-6 pb-6 xl:space-y-7 xl:px-8 xl:pb-8">
             {/* Where you started and stopped. */}
             <div className="space-y-3">
               <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-3">
@@ -279,7 +283,7 @@ export function LogReadingDialog({
                       setError(null);
                     }}
                     placeholder={prompt}
-                    className="font-display text-paper-ink placeholder:text-paper-ink-muted/80 field-sizing-content min-h-[7.6rem] resize-none rounded-none border-0 bg-transparent px-0 py-0 text-[1.05rem] leading-[1.9rem] shadow-none focus-visible:ring-0 dark:bg-transparent"
+                    className="font-display text-paper-ink placeholder:text-paper-ink-muted/80 field-sizing-content min-h-[7.6rem] resize-none rounded-none border-0 bg-transparent px-0 py-0 text-[1.05rem] leading-[1.9rem] shadow-none focus-visible:ring-0 lg:min-h-[9.5rem] xl:text-[1.125rem] dark:bg-transparent"
                   />
                 </div>
               </div>
@@ -335,7 +339,7 @@ export function LogReadingDialog({
             )}
           </div>
 
-          <DialogFooter className="bg-background/95 border-border sticky bottom-0 z-10 mx-0 mb-0 gap-2 rounded-b-xl border-t px-6 py-4 backdrop-blur">
+          <DialogFooter className="bg-background/95 border-border sticky bottom-0 z-10 mx-0 mb-0 gap-2 rounded-b-xl border-t px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur max-sm:flex-row max-sm:justify-end max-sm:rounded-none xl:px-8">
             <Button type="button" variant="ghost" disabled={pending} onClick={onClose}>
               Cancel
             </Button>

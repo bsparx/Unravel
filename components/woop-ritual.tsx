@@ -264,7 +264,7 @@ export function WoopRitual({
 
       {phase === "picture" && step.picture && (
         <div key={`picture-${step.key}`} className="woop-step-in flex flex-col items-center gap-6 text-center">
-          <div className="relative grid size-40 place-items-center sm:size-48">
+          <div className="relative grid size-40 place-items-center sm:size-48 xl:size-60">
             <span className={cn("woop-breathe absolute inset-0 rounded-full border-2 opacity-70", RING[step.key])} />
             <span className={cn("woop-breathe absolute inset-5 rounded-full border opacity-40 [animation-delay:-2s]", RING[step.key])} />
             <span className={cn("absolute inset-12 rounded-full bg-current opacity-15 blur-xl", ACCENT[step.key])} />
@@ -273,11 +273,11 @@ export function WoopRitual({
             <EyeClosed
               aria-hidden
               strokeWidth={1.5}
-              className={cn("woop-breathe relative size-12 sm:size-14", ACCENT[step.key])}
+              className={cn("woop-breathe relative size-12 sm:size-14 xl:size-16", ACCENT[step.key])}
             />
           </div>
           <div className="space-y-1">
-            <p className="font-display text-xl text-[var(--woop-ink)] italic sm:text-2xl">{step.picture}</p>
+            <p className="font-display text-xl text-[var(--woop-ink)] italic sm:text-2xl xl:text-[1.875rem]">{step.picture}</p>
             <p className="text-sm text-[var(--woop-ink-muted)]">
               Breathe with the ring. Take as long as it takes.
             </p>
@@ -286,7 +286,7 @@ export function WoopRitual({
       )}
 
       {phase === "review" && (
-        <div className="woop-card-in relative mx-auto w-full max-w-md">
+        <div className="woop-card-in relative mx-auto w-full max-w-md lg:max-w-xl xl:max-w-2xl">
           <WoopCard woop={fields} layout="stacked" />
           {sealing && <WaxSeal className="-right-3 -bottom-5" />}
         </div>

@@ -362,7 +362,7 @@ export function PracticeRitual({
       )}
 
       {phase === "review" && built.ok && (
-        <div className="woop-card-in relative mx-auto w-full max-w-md">
+        <div className="woop-card-in relative mx-auto w-full max-w-md lg:max-w-xl xl:max-w-2xl">
           {kind === "gratitude" ? (
             <GratitudePage templateName={templateLabel(template, count)} items={built.items} />
           ) : (

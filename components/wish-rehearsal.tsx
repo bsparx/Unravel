@@ -126,19 +126,19 @@ export function WishRehearsal({
     >
       <div key={beat.key} className="woop-step-in flex flex-col items-center gap-6 text-center">
         {beat.key === "plan" ? (
-          <p className="font-display max-w-xl text-2xl leading-snug text-balance text-[var(--woop-ink)] sm:text-3xl">
+          <p className="font-display max-w-2xl text-2xl leading-snug text-balance text-[var(--woop-ink)] sm:text-3xl xl:text-[2.5rem]">
             <span className="text-[var(--woop-ink-muted)]">If {woopClause(woop.obstacle)},</span>{" "}
             <span className={ACCENT.plan}>then I will</span> {woopClause(woop.plan)}.
           </p>
         ) : (
           <>
-            <div className="relative grid size-32 place-items-center sm:size-40">
+            <div className="relative grid size-32 place-items-center sm:size-40 xl:size-52">
               <span className={cn("woop-breathe absolute inset-0 rounded-full border-2 opacity-70", RING[beat.key])} />
               <span className={cn("woop-breathe absolute inset-5 rounded-full border opacity-40 [animation-delay:-2s]", RING[beat.key])} />
               <span className={cn("absolute inset-10 rounded-full bg-current opacity-15 blur-xl", ACCENT[beat.key])} />
-              <EyeClosed aria-hidden strokeWidth={1.5} className={cn("woop-breathe relative size-10 sm:size-12", ACCENT[beat.key])} />
+              <EyeClosed aria-hidden strokeWidth={1.5} className={cn("woop-breathe relative size-10 sm:size-12 xl:size-14", ACCENT[beat.key])} />
             </div>
-            <p className="font-display max-w-xl text-xl leading-snug text-balance text-[var(--woop-ink)] italic sm:text-2xl">
+            <p className="font-display max-w-2xl text-xl leading-snug text-balance text-[var(--woop-ink)] italic sm:text-2xl xl:text-[1.875rem]">
               {woop[beat.key]}
             </p>
           </>

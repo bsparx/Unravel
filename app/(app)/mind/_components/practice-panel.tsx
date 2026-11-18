@@ -328,7 +328,8 @@ function PastDua({ page, onClose }: { page: PracticePage | null; onClose: () => 
     <Dialog open={page !== null} onOpenChange={(next) => !next && onClose()}>
       <DialogContent
         showCloseButton={false}
-        className="gap-3 p-3 sm:max-w-xl"
+        sheetOnPhone
+        className="gap-3 p-3 max-sm:content-start max-sm:pt-[max(0.75rem,env(safe-area-inset-top))] max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:max-w-xl lg:max-w-2xl"
         // Land on the page, not on its delete button (the first control).
         onOpenAutoFocus={(event) => {
           event.preventDefault();
@@ -353,7 +354,14 @@ function PastDua({ page, onClose }: { page: PracticePage | null; onClose: () => 
                 }}
               />
             </div>
-            <Button type="button" variant="ghost" className="justify-self-center rounded-full" onClick={onClose}>
+            {/* On a phone the du'a is the whole screen and can run long, so
+                the way out stays in reach at the bottom. */}
+            <Button
+              type="button"
+              variant="ghost"
+              className="justify-self-center rounded-full max-sm:sticky max-sm:bottom-[max(0.5rem,env(safe-area-inset-bottom))] max-sm:border max-sm:border-border max-sm:bg-background/85 max-sm:px-6 max-sm:backdrop-blur"
+              onClick={onClose}
+            >
               Close
             </Button>
           </>

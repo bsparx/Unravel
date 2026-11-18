@@ -104,18 +104,21 @@ export function BookDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && !pending && onClose()}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-2xl">
-        <form onSubmit={submit} className="space-y-5">
+      <DialogContent
+        sheetOnPhone
+        className="max-h-[calc(100dvh-2rem)] overflow-y-auto max-sm:pt-[max(1.25rem,env(safe-area-inset-top))] sm:max-w-2xl sm:p-6 lg:max-w-3xl xl:p-8"
+      >
+        <form onSubmit={submit} className="flex min-h-full flex-col gap-5 xl:gap-7">
           <DialogHeader>
-            <DialogTitle className="font-display text-2xl">{initial ? "Edit book" : "Add a book"}</DialogTitle>
+            <DialogTitle className="font-display text-2xl xl:text-[1.75rem]">{initial ? "Edit book" : "Add a book"}</DialogTitle>
             <DialogDescription>
               {initial ? "Its readings and notes stay as they are." : "Put it on the shelf. You can change any of this later."}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-6 sm:grid-cols-[11rem_1fr] sm:gap-8">
+          <div className="grid gap-6 sm:grid-cols-[11rem_1fr] sm:gap-8 lg:grid-cols-[13rem_1fr] lg:gap-10">
             {/* The cover, as it'll stand on the shelf. */}
-            <div className="mx-auto w-32 sm:w-full">
+            <div className="mx-auto w-24 sm:w-full">
               <BookCover title={title || "Your book"} author={author} cover={cover} progress={progress} />
             </div>
 
@@ -255,7 +258,7 @@ export function BookDialog({
 
           {errors.form && <FieldError>{errors.form}</FieldError>}
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="mt-auto gap-2 pb-[max(1rem,env(safe-area-inset-bottom))] max-sm:sticky max-sm:-bottom-4 max-sm:rounded-none max-sm:bg-background/95 max-sm:backdrop-blur sm:-mx-6 sm:-mb-6 sm:px-6 xl:-mx-8 xl:-mb-8 xl:px-8">
             <Button type="button" variant="ghost" disabled={pending} onClick={onClose}>
               Cancel
             </Button>

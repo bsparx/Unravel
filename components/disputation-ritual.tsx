@@ -323,7 +323,7 @@ export function DisputationRitual({
       )}
 
       {review && (
-        <div className="woop-card-in mx-auto w-full max-w-md">
+        <div className="woop-card-in mx-auto w-full max-w-md lg:max-w-xl xl:max-w-2xl">
           <DisputationTurn entry={fields} />
         </div>
       )}

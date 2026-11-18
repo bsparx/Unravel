@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { Check } from "lucide-react";
+import { Check, X } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogTitle,
@@ -102,7 +104,18 @@ export function RitualFrame({
     <Dialog open onOpenChange={(open) => !open && !locked && onDismiss()}>
       <DialogContent
         showCloseButton={false}
-        className="isolate flex h-[min(680px,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden border-0 bg-[var(--woop-base)] p-0 text-[var(--woop-ink)] ring-[var(--woop-line)] sm:max-w-3xl"
+        // A phone gets the whole screen: the ritual is the only thing
+        // happening, and the keyboard needs the room.
+        sheetOnPhone
+        className={cn(
+          "isolate flex flex-col gap-0 overflow-hidden border-0 bg-[var(--woop-base)] p-0 text-[var(--woop-ink)] ring-[var(--woop-line)]",
+          // From there it grows with the screen, so a big monitor gets a
+          // big sky rather than a postcard in the middle of it.
+          "sm:h-[min(720px,calc(100dvh-3rem))] sm:max-w-3xl",
+          "lg:h-[min(780px,calc(100dvh-4rem))] lg:max-w-4xl",
+          "xl:h-[min(840px,calc(100dvh-4rem))] xl:max-w-5xl",
+          "2xl:h-[min(920px,calc(100dvh-5rem))] 2xl:max-w-6xl",
+        )}
       >
         {/* The sky: one layer per step, cross-faded. */}
         <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
@@ -131,7 +144,7 @@ export function RitualFrame({
             ref={railRef}
             aria-label={label}
             className={cn(
-              "flex shrink-0 border-b border-[var(--woop-line)] px-4 pt-5 pb-3 sm:w-28 sm:flex-col sm:items-center sm:border-r sm:border-b-0 sm:px-0 sm:py-8",
+              "flex shrink-0 border-b border-[var(--woop-line)] px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-3 sm:w-28 sm:flex-col sm:items-center sm:border-r sm:border-b-0 sm:px-0 sm:py-8 xl:w-36",
               dense
                 ? "snap-x gap-3 overflow-x-auto [scrollbar-width:none] *:snap-center sm:gap-2.5 sm:overflow-x-visible sm:overflow-y-auto [&>*:first-child]:ml-auto [&>*:last-child]:mr-auto sm:[&>*:first-child]:mt-auto sm:[&>*:first-child]:ml-0 sm:[&>*:last-child]:mb-auto sm:[&>*:last-child]:mr-0"
                 : "justify-center gap-4 sm:justify-center sm:gap-5",
@@ -164,7 +177,7 @@ export function RitualFrame({
                       <span
                         className={cn(
                           "font-display leading-none font-medium",
-                          dense ? "text-xl sm:text-2xl" : "text-3xl sm:text-[2.75rem]",
+                          dense ? "text-xl sm:text-2xl xl:text-[1.75rem]" : "text-3xl sm:text-[2.75rem] xl:text-[3.25rem]",
                         )}
                       >
                         {step.letter}
@@ -192,17 +205,33 @@ export function RitualFrame({
             ))}
           </nav>
 
-          <div className="relative flex min-h-0 min-w-0 flex-1 flex-col px-5 pt-5 sm:px-8 sm:pt-8">
+          <div className="relative flex min-h-0 min-w-0 flex-1 flex-col px-5 pt-5 sm:px-8 sm:pt-8 xl:px-12 xl:pt-10">
             <div className="flex shrink-0 items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[0.6875rem] font-medium tracking-[0.2em] text-[var(--woop-ink-muted)] uppercase">
                   {eyebrow}
                 </p>
-                <DialogTitle className="font-display mt-1 text-lg leading-snug font-normal text-balance text-[var(--woop-ink)] sm:truncate sm:text-xl">
+                <DialogTitle className="font-display mt-1 text-lg leading-snug font-normal text-balance text-[var(--woop-ink)] sm:truncate sm:text-xl xl:text-2xl">
                   {title}
                 </DialogTitle>
               </div>
-              {aside}
+              <div className="flex shrink-0 items-center gap-1.5">
+                {aside}
+                {/* A way out from any step. On a phone the ritual is the whole
+                    screen, so there's no outside to tap. */}
+                <DialogClose asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={locked}
+                    aria-label="Close"
+                    className="-mr-1.5 rounded-full text-[var(--woop-ink-muted)] hover:bg-[var(--woop-hover)] hover:text-[var(--woop-ink)]"
+                  >
+                    <X className="size-4" aria-hidden />
+                  </Button>
+                </DialogClose>
+              </div>
             </div>
 
             <p className="sr-only" aria-live="polite">
@@ -211,11 +240,11 @@ export function RitualFrame({
 
             {/* my-auto centres a short step and lets a long one scroll from
                 its top, which justify-center would clip. */}
-            <div className="-mx-5 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-5 [scrollbar-color:var(--woop-line)_transparent] [scrollbar-width:thin] sm:-mx-8 sm:px-8">
-              <div className="my-auto py-6">{children}</div>
+            <div className="-mx-5 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-5 [scrollbar-color:var(--woop-line)_transparent] [scrollbar-width:thin] sm:-mx-8 sm:px-8 xl:-mx-12 xl:px-12">
+              <div className="my-auto py-6 xl:py-10">{children}</div>
             </div>
 
-            <div className="woop-glass -mx-5 flex shrink-0 items-center justify-between gap-2 border-t border-[var(--woop-line)] bg-[var(--woop-scrim)] px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md sm:-mx-8 sm:px-8">
+            <div className="woop-glass -mx-5 flex shrink-0 items-center justify-between gap-2 border-t border-[var(--woop-line)] bg-[var(--woop-scrim)] px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md sm:-mx-8 sm:px-8 xl:-mx-12 xl:px-12 xl:py-4">
               {footer}
             </div>
           </div>
@@ -239,10 +268,10 @@ export function RitualPrompt({
           inherited `text-label`, which beat `text-2xl` below the sm
           breakpoint and shrank every question on a phone. The guide is the
           description instead. */}
-      <h3 className="font-display pb-1 text-2xl leading-[1.15] text-balance text-[var(--woop-ink)] italic sm:text-[2rem]">
+      <h3 className="font-display pb-1 text-2xl leading-[1.15] text-balance text-[var(--woop-ink)] italic sm:text-[2rem] xl:text-[2.5rem]">
         {question}
       </h3>
-      <DialogDescription className="text-[var(--woop-ink-muted)]">{guide}</DialogDescription>
+      <DialogDescription className="text-[var(--woop-ink-muted)] xl:text-[1.0625rem]">{guide}</DialogDescription>
     </div>
   );
 }
@@ -258,7 +287,7 @@ export function RitualGlass({
   return (
     <div
       className={cn(
-        "woop-glass rounded-2xl border border-[var(--woop-glass-edge)] bg-[var(--woop-glass)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_10px_32px_-14px_rgba(3,5,20,0.6)] backdrop-blur-md sm:p-4",
+        "woop-glass rounded-2xl border border-[var(--woop-glass-edge)] bg-[var(--woop-glass)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_10px_32px_-14px_rgba(3,5,20,0.6)] backdrop-blur-md sm:p-4 xl:p-5",
         className,
       )}
     >
@@ -292,7 +321,7 @@ export function RitualCounter({
 
 /** The handwriting textarea every step writes into. */
 export const ritualTextareaClass =
-  "font-hand min-h-12 resize-none border-0 bg-transparent p-0 text-2xl leading-snug text-[var(--woop-ink)] shadow-none placeholder:text-[var(--woop-ink)]/55 focus-visible:ring-0 sm:text-3xl dark:bg-transparent";
+  "font-hand min-h-12 resize-none border-0 bg-transparent p-0 text-2xl leading-snug text-[var(--woop-ink)] shadow-none placeholder:text-[var(--woop-ink)]/55 focus-visible:ring-0 sm:text-3xl xl:text-[2.125rem] dark:bg-transparent";
 
 /** Primary: a cream pill with an inner highlight. No glow. */
 export const ritualPrimaryClass =

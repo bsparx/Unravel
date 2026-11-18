@@ -47,13 +47,24 @@ function DialogOverlay({
   )
 }
 
+/**
+ * A dialog that fills a phone's screen like a sheet, and is a centred box
+ * from `sm` up. For dialogs you write in: on a phone the keyboard takes half
+ * the screen, and a floating card leaves the rest to its margins.
+ */
+const SHEET_ON_PHONE =
+  "max-sm:top-0 max-sm:left-0 max-sm:h-dvh max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:ring-0"
+
 function DialogContent({
   className,
   children,
   showCloseButton = true,
+  sheetOnPhone = false,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  /** Full screen below `sm`, a centred box above. */
+  sheetOnPhone?: boolean
 }) {
   return (
     <DialogPortal>
@@ -62,6 +73,7 @@ function DialogContent({
         data-slot="dialog-content"
         className={cn(
           "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl bg-popover p-4 text-body text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          sheetOnPhone && SHEET_ON_PHONE,
           className
         )}
         {...props}
@@ -71,7 +83,10 @@ function DialogContent({
           <DialogPrimitive.Close data-slot="dialog-close" asChild>
             <Button
               variant="ghost"
-              className="absolute top-2 right-2"
+              className={cn(
+                "absolute top-2 right-2",
+                sheetOnPhone && "max-sm:top-[max(0.5rem,env(safe-area-inset-top))]"
+              )}
               size="icon-sm"
             >
               <XIcon
