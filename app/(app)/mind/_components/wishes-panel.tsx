@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ChevronDown, Feather, Sparkle, Stamp, Undo2, Wind } from "lucide-react";
 import { toast } from "sonner";
 
-import { WaxSeal, WoopIndexCard } from "@/components/woop-card";
+import { WaxSeal, WoopCard } from "@/components/woop-card";
 import { cn } from "@/lib/utils";
 import type { WishCard } from "@/lib/woop";
 
@@ -12,8 +12,8 @@ import { deleteWish, setWishStatus } from "../actions";
 import { CardTools, SkyEmpty } from "./shared";
 
 /**
- * Wishes are standing cards you come back to, so they sit side by side,
- * each a little off-square like cards pinned up by hand.
+ * Wishes are standing cards you come back to, so they sit side by side.
+ * Each shows the wish and turns over to the plan.
  */
 export function WishesPanel({
   active,
@@ -67,22 +67,12 @@ export function WishesPanel({
         />
       ) : (
         // One wish gets the same centred column as a gratitude or du'a page;
-        // two or more sit side by side and fill the width between them.
-        <ul className={cn(active.length === 1 ? "mx-auto max-w-2xl" : "columns-1 gap-8 md:columns-2")}>
-          {active.map((card, index) => (
-            <li key={card.id} className="group relative mb-10 break-inside-avoid pt-2">
-              <WoopIndexCard
-                woop={card}
-                className={cn(
-                  // A header band for the card's tools, beside the tape, so
-                  // they never sit on the wish itself.
-                  "pt-14 transition-transform duration-300 group-hover:rotate-0",
-                  index % 2 ? "rotate-[0.5deg]" : "rotate-[-0.6deg]",
-                  stamping === card.id && "rotate-0",
-                )}
-              />
+        // two or more sit side by side, each row as tall as its taller card.
+        <ul className={cn("grid grid-cols-1 gap-6", active.length === 1 ? "mx-auto max-w-2xl" : "md:grid-cols-2")}>
+          {active.map((card) => (
+            <li key={card.id} className="group relative">
+              <WoopCard woop={card} footer={`Made ${card.createdLabel}`} className="h-full" />
               {stamping === card.id && <WaxSeal className="-right-2 -bottom-4" />}
-              <p className="text-muted-foreground mt-3 pl-1 text-micro">Made {card.createdLabel}</p>
 
               <CardTools
                 label={card.wish}
@@ -117,20 +107,27 @@ export function WishesPanel({
           </button>
 
           {drawer && (
-            <ul className="animate-in fade-in slide-in-from-top-1 mt-5 grid gap-6 duration-200 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="animate-in fade-in slide-in-from-top-1 mt-5 grid grid-cols-1 gap-6 duration-200 sm:grid-cols-2 lg:grid-cols-3">
               {settled.map((card) => (
                 <li key={card.id} className="group relative">
-                  <div className={cn(card.status === "RELEASED" && "opacity-60 saturate-50")}>
-                    <WoopIndexCard woop={card} compact className="rotate-0" />
-                  </div>
-                  <p className="text-muted-foreground mt-2 flex items-center gap-1.5 pl-1 text-micro">
-                    {card.status === "ACHIEVED" ? (
-                      <Stamp className="text-primary size-3" aria-hidden />
-                    ) : (
-                      <Wind className="size-3" aria-hidden />
-                    )}
-                    {card.status === "ACHIEVED" ? "Achieved" : "Let go"} {card.settledLabel}
-                  </p>
+                  <WoopCard
+                    woop={card}
+                    compact
+                    className={cn("h-full", card.status === "RELEASED" && "opacity-60 saturate-50")}
+                    footer={
+                      <span className="flex items-center gap-1.5">
+                        {card.status === "ACHIEVED" ? (
+                          <Stamp className="size-3" aria-hidden />
+                        ) : (
+                          <Wind className="size-3" aria-hidden />
+                        )}
+                        {card.status === "ACHIEVED" ? "Achieved" : "Let go"} {card.settledLabel}
+                      </span>
+                    }
+                  />
+                  {card.status === "ACHIEVED" && (
+                    <WaxSeal className="pointer-events-none -top-3 -left-2 size-12 [&>span]:size-9 [&>span>span]:text-base" />
+                  )}
                   <CardTools
                     label={card.wish}
                     items={[{ label: "Back to the board", icon: Undo2, onSelect: () => void settle(card, "ACTIVE") }]}

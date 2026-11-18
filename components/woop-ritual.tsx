@@ -24,7 +24,7 @@ import {
   ritualTextareaClass,
   type RitualSky,
 } from "./ritual-frame";
-import { WaxSeal, WoopIndexCard } from "./woop-card";
+import { WaxSeal, WoopCard } from "./woop-card";
 
 /** Each step's accent: the light the sky gives off at that hour. */
 const ACCENT: Record<WoopKey, string> = {
@@ -287,7 +287,7 @@ export function WoopRitual({
 
       {phase === "review" && (
         <div className="woop-card-in relative mx-auto w-full max-w-md">
-          <WoopIndexCard woop={fields} />
+          <WoopCard woop={fields} layout="stacked" />
           {sealing && <WaxSeal className="-right-3 -bottom-5" />}
         </div>
       )}

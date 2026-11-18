@@ -5,9 +5,11 @@ import { ChevronDown, Feather, Lamp, MoonStar, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { InfoTip } from "@/components/info-tip";
-import { PracticePageCard } from "@/components/practice-page-card";
+import { DuaArch, DuaWindow } from "@/components/dua-arch";
+import { GratitudeEvening, GratitudePage } from "@/components/gratitude-page";
 import { PracticeTemplatePicker, type TemplateChoice } from "@/components/practice-template-picker";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { PracticeView } from "@/lib/mind-data";
@@ -147,13 +149,13 @@ export function PracticePanel({
           <InfoTip term={copy.term} />
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex max-w-full min-w-0 items-center gap-1">
           <Popover onOpenChange={(open) => !open && flush()}>
             <PopoverTrigger asChild>
-              <Button type="button" variant="outline" size="sm" className="rounded-full">
+              <Button type="button" variant="outline" size="sm" className="max-w-full min-w-0 rounded-full">
                 <Settings2 className="size-3.5" aria-hidden />
                 <span className="text-muted-foreground">Template:</span>
-                {templateLabel(template, choice.count)}
+                <span className="min-w-0 truncate">{templateLabel(template, choice.count)}</span>
                 <ChevronDown className="size-3.5 opacity-60" aria-hidden />
               </Button>
             </PopoverTrigger>
@@ -177,7 +179,7 @@ export function PracticePanel({
       <section aria-label="Today's page" className="space-y-3">
         {view.today ? (
           <div className="group relative">
-            <PracticePageCard
+            <PracticeCard
               kind={kind}
               dateLabel={view.today.dateLabel}
               templateName={view.today.templateName}
@@ -255,21 +257,36 @@ export function PracticePanel({
         </ol>
       </section>
 
-      {/* The journal. */}
+      {/* The journal: gratitude as a list of evenings, du'a as a wall of
+          windows. */}
       {view.past.length > 0 && (
         <section aria-label={copy.earlier} className="space-y-5">
           <h3 className="text-body font-medium">{copy.earlier}</h3>
-          <ol className="space-y-6">
-            {view.past.slice(0, shown).map((page) => (
-              <PastPage
-                key={page.id}
-                kind={kind}
-                page={page}
-                expanded={open === page.id}
-                onToggle={() => setOpen(open === page.id ? null : page.id)}
-              />
-            ))}
-          </ol>
+          {kind === "gratitude" ? (
+            <ol className="space-y-3">
+              {view.past.slice(0, shown).map((page) => (
+                <PastEvening
+                  key={page.id}
+                  page={page}
+                  expanded={open === page.id}
+                  onToggle={() => setOpen(open === page.id ? null : page.id)}
+                />
+              ))}
+            </ol>
+          ) : (
+            <ol className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+              {view.past.slice(0, shown).map((page) => (
+                <li key={page.id}>
+                  <DuaWindow
+                    dateLabel={page.dateLabel}
+                    templateName={page.templateName}
+                    items={page.items}
+                    onOpen={() => setOpen(page.id)}
+                  />
+                </li>
+              ))}
+            </ol>
+          )}
           {view.past.length > shown && (
             <Button type="button" variant="ghost" className="rounded-full" onClick={() => setShown((n) => n + PAGE_SIZE)}>
               Show older
@@ -277,46 +294,100 @@ export function PracticePanel({
           )}
         </section>
       )}
+
+      {kind === "dua" && (
+        <PastDua
+          page={view.past.find((page) => page.id === open) ?? null}
+          onClose={() => setOpen(null)}
+        />
+      )}
     </div>
   );
 }
 
-function PastPage({
+/** Today's page, in its practice's own form. */
+function PracticeCard({
   kind,
+  ...page
+}: {
+  kind: PracticeKind;
+  dateLabel?: string;
+  templateName: string;
+  items: PracticePage["items"];
+}) {
+  return kind === "gratitude" ? <GratitudePage {...page} /> : <DuaArch {...page} />;
+}
+
+/** A past evening: folded to one row, opened to the whole lantern page. */
+function PastEvening({
   page,
   expanded,
   onToggle,
 }: {
-  kind: PracticeKind;
   page: PracticePage;
   expanded: boolean;
   onToggle: () => void;
 }) {
   return (
-    <li className="group relative">
-      <PracticePageCard
-        kind={kind}
-        dateLabel={page.dateLabel}
-        templateName={page.templateName}
-        items={page.items}
-        compact={!expanded}
-      />
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={expanded}
-        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring mt-2 inline-flex items-center gap-1 rounded-full pl-1 text-micro font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
-      >
-        {expanded ? "Fold it back" : "Read the whole page"}
-        <ChevronDown className={cn("size-3 transition-transform duration-200", expanded && "rotate-180")} aria-hidden />
-      </button>
-      <CardTools
-        label={`the page from ${page.dateLabel}`}
-        items={[]}
-        deleteTitle={`Delete the page from ${page.dateLabel}?`}
-        deleteDescription="It's gone for good."
-        onDelete={() => deletePractice(page.id)}
-      />
+    <li>
+      <GratitudeEvening dateLabel={page.dateLabel} items={page.items} expanded={expanded} onToggle={onToggle} />
+      {expanded && (
+        <div className="animate-in fade-in slide-in-from-top-1 group relative mt-3 duration-200">
+          <GratitudePage templateName={page.templateName} items={page.items} />
+          <CardTools
+            label={`the page from ${page.dateLabel}`}
+            items={[]}
+            deleteTitle={`Delete the page from ${page.dateLabel}?`}
+            deleteDescription="It's gone for good."
+            onDelete={() => deletePractice(page.id)}
+          />
+        </div>
+      )}
     </li>
+  );
+}
+
+/**
+ * A past du'a, opened from its window: the whole arch, in a dialog of its
+ * own, so the wall of windows doesn't reflow under you.
+ */
+function PastDua({ page, onClose }: { page: PracticePage | null; onClose: () => void }) {
+  const reading = useRef<HTMLDivElement>(null);
+  return (
+    <Dialog open={page !== null} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent
+        showCloseButton={false}
+        className="gap-3 p-3 sm:max-w-xl"
+        // Land on the page, not on its delete button (the first control).
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          reading.current?.focus({ preventScroll: true });
+        }}
+      >
+        {page && (
+          <>
+            <DialogTitle className="sr-only">Du&apos;a from {page.dateLabel}</DialogTitle>
+            <DialogDescription className="sr-only">{page.templateName}</DialogDescription>
+            <div ref={reading} tabIndex={-1} className="group relative outline-none">
+              <DuaArch dateLabel={page.dateLabel} templateName={page.templateName} items={page.items} />
+              <CardTools
+                label={`the du'a from ${page.dateLabel}`}
+                items={[]}
+                className="md:opacity-100"
+                deleteTitle={`Delete the du'a from ${page.dateLabel}?`}
+                deleteDescription="It's gone for good."
+                onDelete={async () => {
+                  await deletePractice(page.id);
+                  onClose();
+                }}
+              />
+            </div>
+            <Button type="button" variant="ghost" className="justify-self-center rounded-full" onClick={onClose}>
+              Close
+            </Button>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -15,6 +15,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
+/** Glass over whichever sky the card is drawn on. */
+const TOOL =
+  "rounded-full border border-[var(--woop-glass-edge)] bg-[var(--woop-glass)] text-[var(--woop-ink)] backdrop-blur-sm hover:bg-[var(--woop-hover)] hover:text-[var(--woop-ink)]";
+
 /**
  * A card's tools, pinned to its top-right corner: a menu and a delete. Always
  * there on touch; on a pointer they surface on hover or focus so the board
@@ -53,7 +57,7 @@ export function CardTools({
             size="icon-sm"
             disabled={disabled}
             aria-label={`Actions for ${label}`}
-            className="bg-paper/80 text-paper-ink hover:bg-paper-edge/60 hover:text-paper-ink rounded-full"
+            className={TOOL}
           >
             <Ellipsis className="size-4" aria-hidden />
           </Button>
@@ -84,7 +88,7 @@ export function CardTools({
             disabled={disabled}
             onClick={openDialog}
             aria-label={`Delete ${label}`}
-            className="bg-paper/80 text-paper-ink hover:bg-paper-edge/60 hover:text-destructive rounded-full"
+            className={cn(TOOL, "hover:text-destructive")}
           >
             <Trash2 className="size-4" aria-hidden />
           </Button>

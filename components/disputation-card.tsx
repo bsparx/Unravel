@@ -1,4 +1,4 @@
-import { CornerDownRight } from "lucide-react";
+import { ArrowDown, ArrowRight, ChevronDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import {
@@ -7,71 +7,128 @@ import {
   type DisputationFields,
 } from "@/lib/disputation";
 
-import { WashiTape } from "./journal-ornaments";
-
 /**
- * A disputation, filed: an index card on the journal's paper.
+ * A disputation, kept as the turn it made: the storm on one side, with the
+ * belief struck through because it was answered, and the cleared sky on the
+ * other, with what you carry out of it instead. Side by side when the card
+ * is wide enough (a container query, so the ritual's narrow review stacks
+ * too), storm over clear otherwise.
  *
- * Reads top to bottom the way the method runs: what happened, the belief it
- * set off (struck through, because it was answered), and what you're
- * carrying out of it instead. Expanded, it shows the consequences and the
- * argument itself, lens by lens.
+ * Opened, the rest of the weather runs down a line underneath: what
+ * happened, what the belief did, and the argument back, lens by lens.
  */
-export function DisputationIndexCard({
+export function DisputationTurn({
   entry,
+  dateLabel,
   expanded = true,
+  onToggle,
+  toolRoom = false,
   className,
 }: {
   entry: DisputationFields;
-  /** Show C and the lenses, not only A, B and E. */
+  dateLabel?: string;
+  /** Show the argument (A, C and the lenses), not only the turn. */
   expanded?: boolean;
+  /** With this, the card carries its own "Show the argument" switch. */
+  onToggle?: () => void;
+  /** Keep the corner clear for the card's tools, pinned top-right on the board. */
+  toolRoom?: boolean;
   className?: string;
 }) {
   const lenses = DISPUTE_LENSES.filter((lens) => entry[lens.key].trim());
+  const rated = entry.beliefBefore !== null || entry.beliefAfter !== null;
+  const steps = [
+    { key: "adversity", name: "What happened", text: entry.adversity, colour: "var(--abcde-adversity)" },
+    { key: "consequences", name: "What it did", text: entry.consequences, colour: "var(--abcde-consequences)" },
+    ...lenses.map((lens) => ({
+      key: lens.key,
+      name: lens.name,
+      text: entry[lens.key],
+      colour: "var(--abcde-disputation)",
+    })),
+  ].filter((step) => step.text.trim());
 
   return (
     <figure
       className={cn(
-        "border-paper-edge bg-paper text-paper-ink relative rounded-md border px-5 pt-6 pb-5 shadow-[0_18px_40px_-18px_rgba(20,14,6,0.55),0_2px_0_rgba(0,0,0,0.04)]",
+        "@container overflow-hidden rounded-2xl bg-[var(--woop-solid)] text-[var(--woop-ink)] ring-1 ring-[var(--woop-glass-edge)] shadow-[0_24px_48px_-28px_rgba(30,40,80,0.55)]",
         className,
       )}
     >
-      <WashiTape className="absolute -top-2.5 left-6 w-20" rotate="-3deg" />
+      <div className="grid @lg:grid-cols-2">
+        <div className="abcde-sky-belief px-5 pt-5 pb-8 @lg:pr-9 @lg:pb-6">
+          {/* Room for the card's tools, which sit over this corner on a
+              narrow card and over the clear half's on a wide one. Floated, so the
+              text wraps round them. */}
+          {toolRoom && <span aria-hidden className="float-right ml-3 h-8 w-[4.5rem] @lg:hidden" />}
+          <p className="text-micro font-semibold text-[var(--abcde-belief)]">The thought</p>
+          <p className="font-display mt-1.5 text-lg leading-snug break-words text-[var(--woop-ink-muted)] line-through sm:text-xl decoration-[color-mix(in_oklab,var(--abcde-belief)_60%,transparent)] decoration-1">
+            {entry.belief}
+          </p>
+        </div>
 
-      <p className="text-paper-ink-muted text-sm leading-snug">{entry.adversity}</p>
+        <div className="abcde-sky-energization relative px-5 pt-8 pb-6 @lg:pt-5 @lg:pl-9">
+          {/* The turn itself, sitting on the seam. */}
+          <span
+            aria-hidden
+            className="absolute -top-4 left-5 grid size-8 place-items-center rounded-full bg-[var(--woop-solid)] text-[var(--abcde-energization)] ring-1 ring-[var(--woop-glass-edge)] @lg:top-1/2 @lg:-left-4 @lg:-translate-y-1/2"
+          >
+            <ArrowDown className="size-4 @lg:hidden" />
+            <ArrowRight className="hidden size-4 @lg:block" />
+          </span>
+          {toolRoom && <span aria-hidden className="float-right ml-3 hidden h-8 w-[4.5rem] @lg:block" />}
+          <p className="text-micro font-semibold text-[var(--abcde-energization)]">What I carry instead</p>
+          <p className="font-display mt-1.5 text-xl leading-snug break-words">{entry.energization}</p>
+        </div>
+      </div>
 
-      <p className="font-hand mt-2 text-2xl leading-snug decoration-[#c4605a]/70 decoration-2 line-through">
-        {entry.belief}
-      </p>
-
-      {expanded && (
-        <div className="mt-4 space-y-3">
-          <div>
-            <p className="text-paper-ink-muted text-xs font-medium">What it did</p>
-            <p className="font-hand text-xl leading-snug">{entry.consequences}</p>
-          </div>
-          {lenses.map((lens) => (
-            <div key={lens.key}>
-              <p className="text-paper-ink-muted text-xs font-medium">{lens.name}</p>
-              <p className="font-hand text-xl leading-snug">{entry[lens.key]}</p>
-            </div>
-          ))}
+      {(dateLabel || rated || onToggle) && (
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2.5 border-t border-[var(--woop-line)] px-5 py-3">
+          {dateLabel && <span className="text-micro text-[var(--woop-ink-muted)]">{dateLabel}</span>}
+          {rated && (
+            <BeliefMeter
+              before={entry.beliefBefore}
+              after={entry.beliefAfter}
+              className="min-w-48 flex-1 sm:max-w-72"
+            />
+          )}
+          {onToggle && steps.length > 0 && (
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-expanded={expanded}
+              className="ml-auto inline-flex items-center gap-1 rounded-full px-1 text-micro font-medium text-[var(--woop-ink-muted)] transition-colors hover:text-[var(--woop-ink)] focus-visible:ring-2 focus-visible:ring-[var(--woop-focus)] focus-visible:outline-none"
+            >
+              {expanded ? "Hide the argument" : "Show the argument"}
+              <ChevronDown className={cn("size-3 transition-transform duration-200", expanded && "rotate-180")} aria-hidden />
+            </button>
+          )}
         </div>
       )}
 
-      <div className="border-paper-edge mt-4 flex items-start gap-2 border-t pt-3">
-        <CornerDownRight className="text-paper-ink-muted mt-1.5 size-4 shrink-0" aria-hidden />
-        <p className="font-hand decoration-washi text-2xl leading-snug underline decoration-2 underline-offset-4">
-          {entry.energization}
-        </p>
-      </div>
-
-      {(entry.beliefBefore !== null || entry.beliefAfter !== null) && (
-        <BeliefMeter
-          before={entry.beliefBefore}
-          after={entry.beliefAfter}
-          className="mt-4"
-        />
+      {expanded && steps.length > 0 && (
+        <ol
+          className={cn(
+            "relative space-y-5 border-t border-[var(--woop-line)] px-5 pt-5 pb-6",
+            // The line the weather runs down, through every dot.
+            "before:absolute before:top-7 before:bottom-8 before:left-[calc(1.6625rem-0.5px)] before:w-px before:bg-[var(--woop-line)]",
+            onToggle && "animate-in fade-in slide-in-from-top-1 duration-200",
+          )}
+        >
+          {steps.map((step) => (
+            <li key={step.key} className="relative pl-7">
+              <span
+                aria-hidden
+                className="absolute top-1 left-[0.1rem] size-2.5 rounded-full ring-4 ring-[var(--woop-solid)]"
+                style={{ background: step.colour }}
+              />
+              <p className="text-micro font-semibold" style={{ color: step.colour }}>
+                {step.name}
+              </p>
+              <p className="mt-0.5 text-body break-words whitespace-pre-line">{step.text}</p>
+            </li>
+          ))}
+        </ol>
       )}
     </figure>
   );
@@ -104,12 +161,12 @@ export function BeliefMeter({
 
   return (
     <div className={cn("flex items-center gap-3", className)} role="img" aria-label={label}>
-      <span className="text-paper-ink-muted shrink-0 text-xs">Belief</span>
+      <span className="shrink-0 text-micro text-[var(--woop-ink-muted)]">Belief</span>
       <div className="relative h-3 flex-1">
-        <span className="bg-paper-edge absolute inset-x-0 top-1/2 h-px -translate-y-1/2" />
+        <span className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-[var(--woop-line)]" />
         {before !== null && after !== null && (
           <span
-            className="bg-paper-ink/40 absolute top-1/2 h-px -translate-y-1/2"
+            className="absolute top-1/2 h-px -translate-y-1/2 bg-[var(--woop-ink-muted)] opacity-60"
             style={{
               left: pos(Math.min(before, after)),
               width: `${Math.abs(after - before) * 10}%`,
@@ -118,24 +175,22 @@ export function BeliefMeter({
         )}
         {before !== null && (
           <span
-            className="border-paper-ink/60 bg-paper absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px]"
+            className="absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-[var(--woop-ink-muted)] bg-[var(--woop-solid)]"
             style={{ left: pos(before) }}
           />
         )}
         {after !== null && (
           <span
-            className="bg-primary absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full"
+            className="absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--abcde-energization)]"
             style={{ left: pos(after) }}
           />
         )}
       </div>
-      <span className="text-paper-ink shrink-0 font-mono text-xs tabular-nums">
+      <span className="shrink-0 font-mono text-micro tabular-nums">
         {before ?? "?"}
-        <span className="text-paper-ink-muted mx-1">to</span>
+        <span className="mx-1 text-[var(--woop-ink-muted)]">to</span>
         {after ?? "?"}
-        {shift !== null && shift < 0 && (
-          <span className="text-primary ml-1.5">{shift}</span>
-        )}
+        {shift !== null && shift < 0 && <span className="ml-1.5 text-[var(--abcde-energization)]">{shift}</span>}
       </span>
     </div>
   );

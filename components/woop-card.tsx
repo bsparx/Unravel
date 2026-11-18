@@ -1,84 +1,184 @@
-import { cn } from "@/lib/utils";
-import { WOOP_STEPS, woopClause, type WoopFields } from "@/lib/woop";
+"use client";
 
-import { WashiTape } from "./journal-ornaments";
+import { useEffect, useRef, useState } from "react";
+import { Sunrise, Undo2 } from "lucide-react";
+
+import { cn } from "@/lib/utils";
+import { woopClause, type WoopFields } from "@/lib/woop";
+
+const EDGE = "ring-1 ring-[var(--woop-glass-edge)] shadow-[0_24px_48px_-28px_rgba(60,30,110,0.55)]";
+
+const FACE_BUTTON =
+  "inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--woop-glass-edge)] bg-[var(--woop-glass)] px-3 py-1.5 text-micro font-medium text-[var(--woop-ink)] backdrop-blur-sm transition-colors hover:bg-[var(--woop-hover)] focus-visible:ring-2 focus-visible:ring-[var(--woop-focus)] focus-visible:outline-none active:scale-[0.97]";
 
 /**
- * A WOOP, written down: an index card on the journal's paper, taped in.
+ * A wish, kept as a card with two faces, because a WOOP is two thoughts held
+ * against each other: the wish and its best outcome on the front, under the
+ * wishing sky; turn it over and the obstacle and the if-then plan are on
+ * the back, under the morning they're for.
  *
- * The four answers sit on ruled lines with their letters in the margin, and
- * the if-then — the part you actually carry into the work — gets its own
- * underlined line at the foot of the card. The same card closes the ritual
- * and fills the habit log, so the plan you sealed is the plan you find.
+ * `stacked` lays both faces out at once, for the ritual's review, where the
+ * point is to see the whole plan before sealing it.
  */
-export function WoopIndexCard({
+export function WoopCard({
   woop,
-  className,
+  layout = "flip",
   compact = false,
+  footer,
+  className,
 }: {
   woop: WoopFields;
-  className?: string;
-  /** Smaller type and padding, for lists. */
+  layout?: "flip" | "stacked";
+  /** The wish alone on the front, smaller, for the drawer. */
   compact?: boolean;
+  /** A line under the front face's content: when it was made, or settled. */
+  footer?: React.ReactNode;
+  className?: string;
 }) {
+  if (layout === "stacked") {
+    return (
+      <figure className={cn("overflow-hidden rounded-2xl text-[var(--woop-ink)]", EDGE, className)}>
+        <div className="woop-sky-wish px-6 pt-6 pb-6 sm:px-7">
+          <Front woop={woop} />
+        </div>
+        <div className="wish-dawn border-t border-[var(--woop-line)] px-6 pt-5 pb-7 sm:px-7">
+          <Back woop={woop} />
+        </div>
+      </figure>
+    );
+  }
+
+  return <FlipCard woop={woop} compact={compact} footer={footer} className={className} />;
+}
+
+function FlipCard({
+  woop,
+  compact,
+  footer,
+  className,
+}: {
+  woop: WoopFields;
+  compact: boolean;
+  footer?: React.ReactNode;
+  className?: string;
+}) {
+  const [flipped, setFlipped] = useState(false);
+  const toBack = useRef<HTMLButtonElement>(null);
+  const toFront = useRef<HTMLButtonElement>(null);
+  const turned = useRef(false);
+
+  // The button that was pressed goes inert with its face, so focus follows
+  // to the button on the face that came round, once that face is shown
+  // (it stays hidden until the card is edge-on, see `.wish-face`).
+  useEffect(() => {
+    if (!turned.current) return;
+    const timer = window.setTimeout(() => {
+      (flipped ? toFront : toBack).current?.focus({ preventScroll: true });
+    }, 340);
+    return () => window.clearTimeout(timer);
+  }, [flipped]);
+
+  const turn = (next: boolean) => {
+    turned.current = true;
+    setFlipped(next);
+  };
+
+  const pad = compact ? "px-5 pt-5 pb-4" : "px-6 pt-6 pb-5 sm:px-7";
+
   return (
-    <figure
-      className={cn(
-        "border-paper-edge bg-paper text-paper-ink relative rotate-[-0.6deg] rounded-md border shadow-[0_18px_40px_-18px_rgba(20,14,6,0.55),0_2px_0_rgba(0,0,0,0.04)]",
-        compact ? "px-4 pt-5 pb-3" : "px-5 pt-7 pb-5",
-        className,
-      )}
-    >
-      <WashiTape
-        className={cn("absolute -top-2.5 left-1/2 -translate-x-1/2", compact ? "w-16" : "w-24")}
-        rotate="-2deg"
-      />
-      {/* The card's red margin rule, like a real index card. */}
-      <span
-        aria-hidden
-        className={cn(
-          "absolute top-0 bottom-0 w-px bg-[#d9827b]/60",
-          compact ? "left-9" : "left-11",
-        )}
-      />
+    <div className={cn("wish-flip text-[var(--woop-ink)]", className)} data-flipped={flipped}>
+      <section
+        data-face="front"
+        inert={flipped}
+        aria-label="The wish"
+        className={cn("wish-face woop-sky-wish flex flex-col rounded-2xl", EDGE, pad)}
+      >
+        <Front woop={woop} compact={compact} room />
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-2 pt-6">
+          <div className="min-w-0 text-micro text-[var(--woop-ink-muted)]">{footer}</div>
+          <button
+            ref={toBack}
+            type="button"
+            onClick={() => turn(true)}
+            className={FACE_BUTTON}
+          >
+            <Sunrise className="size-3.5" aria-hidden />
+            See the plan
+          </button>
+        </div>
+      </section>
 
-      <dl className={cn("space-y-1.5", compact ? "pl-6" : "pl-7")}>
-        {WOOP_STEPS.map((step) => (
-          <div key={step.key} className="relative">
-            <dt
-              className={cn(
-                "font-display text-paper-ink-muted absolute top-0.5 font-medium",
-                compact ? "-left-6 text-base" : "-left-8 text-xl",
-              )}
-              title={step.name}
-            >
-              {step.letter}
-              <span className="sr-only">, {step.name}: </span>
-            </dt>
-            <dd
-              className={cn(
-                "font-hand border-paper-rule/60 border-b leading-snug",
-                compact ? "text-lg" : "text-xl sm:text-2xl",
-              )}
-            >
-              {woop[step.key]}
-            </dd>
-          </div>
-        ))}
-      </dl>
+      <section
+        data-face="back"
+        inert={!flipped}
+        aria-label="The plan"
+        className={cn("wish-face wish-dawn flex flex-col rounded-2xl", EDGE, pad)}
+      >
+        <Back woop={woop} compact={compact} room />
+        <div className="mt-auto flex justify-end pt-6">
+          <button
+            ref={toFront}
+            type="button"
+            onClick={() => turn(false)}
+            className={FACE_BUTTON}
+          >
+            <Undo2 className="size-3.5" aria-hidden />
+            Back to the wish
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
 
-      <figcaption
+/**
+ * Space for the card's tools, pinned top-right on the board. Floated, so the
+ * text wraps round the corner they sit in and keeps the card's full width
+ * below them.
+ */
+function ToolRoom() {
+  return <span aria-hidden className="float-right ml-3 h-8 w-[4.5rem]" />;
+}
+
+function Front({ woop, compact = false, room = false }: { woop: WoopFields; compact?: boolean; room?: boolean }) {
+  return (
+    <div>
+      {room && <ToolRoom />}
+      <p className="text-micro font-semibold text-[var(--woop-wish)]">Wish</p>
+      <p
         className={cn(
-          "font-display text-paper-ink mt-3 italic",
-          compact ? "pl-6 text-sm" : "pl-7 text-base sm:text-lg",
+          "font-display mt-1 leading-tight break-words",
+          compact ? "text-lg" : "text-2xl sm:text-[1.75rem]",
         )}
       >
-        If {woopClause(woop.obstacle)},{" "}
-        <span className="decoration-washi underline decoration-2 underline-offset-4">
-          then I will {woopClause(woop.plan)}.
-        </span>
-      </figcaption>
-    </figure>
+        {woop.wish}
+      </p>
+      {!compact && woop.outcome && (
+        <>
+          <p className="mt-5 text-micro font-semibold text-[var(--woop-outcome)]">Outcome</p>
+          <p className="mt-1 text-body break-words text-[var(--woop-ink-muted)] italic">{woop.outcome}</p>
+        </>
+      )}
+    </div>
+  );
+}
+
+function Back({ woop, compact = false, room = false }: { woop: WoopFields; compact?: boolean; room?: boolean }) {
+  return (
+    <div>
+      {room && <ToolRoom />}
+      <p className={cn("break-words text-[var(--woop-ink-muted)]", compact ? "text-label" : "text-body")}>
+        <span className="font-semibold text-[var(--woop-obstacle)]">If</span> {woopClause(woop.obstacle)},
+      </p>
+      <p
+        className={cn(
+          "font-display mt-3 leading-snug break-words",
+          compact ? "text-lg" : "text-xl sm:text-2xl",
+        )}
+      >
+        <span className="text-[var(--woop-plan)]">then I will</span> {woopClause(woop.plan)}.
+      </p>
+    </div>
   );
 }
 

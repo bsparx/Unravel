@@ -17,7 +17,7 @@ import {
   type DisputeLens,
 } from "@/lib/disputation";
 
-import { DisputationIndexCard } from "./disputation-card";
+import { DisputationTurn } from "./disputation-card";
 import {
   RitualCounter,
   RitualFrame,
@@ -324,7 +324,7 @@ export function DisputationRitual({
 
       {review && (
         <div className="woop-card-in mx-auto w-full max-w-md">
-          <DisputationIndexCard entry={fields} />
+          <DisputationTurn entry={fields} />
         </div>
       )}
     </RitualFrame>

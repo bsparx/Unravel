@@ -569,6 +569,30 @@ export function groupItems(items: readonly PracticeItem[]): { step: string; line
   return groups;
 }
 
+export type PageGroup = {
+  step: string;
+  lines: PracticeItem[];
+  /** "Good thing 3", "Du'a 2": a counted step, which reads as a list. */
+  numbered: boolean;
+};
+
+/**
+ * Steps as a page shows them. Numbered steps ("Good thing 3") read as a list
+ * and don't need their name; named steps (Hamd, Someone, The letter) keep it
+ * as a small heading, so a page reads the way it was written.
+ */
+export function pageGroups(items: readonly PracticeItem[]): PageGroup[] {
+  return groupItems(items).map((group) => ({
+    ...group,
+    numbered: /\d+$/.test(group.step) || !group.step,
+  }));
+}
+
+/** The first thing written on a page, for a one-line preview. */
+export function firstLine(items: readonly PracticeItem[]): string {
+  return items.find((item) => item.text.trim())?.text.trim() ?? "";
+}
+
 /** Defensive read of the Json column: anything malformed becomes no items. */
 export function readItems(raw: unknown): PracticeItem[] {
   if (!Array.isArray(raw)) return [];

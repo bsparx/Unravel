@@ -933,7 +933,7 @@
 
 @keyframes woop-card-in {
   from { opacity: 0; transform: translateY(24px) rotate(2deg) scale(0.96); }
-  to { opacity: 1; transform: translateY(0) rotate(-0.6deg) scale(1); }
+  to { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); }
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -947,6 +947,81 @@
 
 @media (prefers-reduced-motion: reduce) {
   .woop-seal { transform: rotate(-10deg); }
+}
+
+/* A saved wish's back face: the plan sky, toned down so a long plan stays
+   readable all the way to the card's foot (the ritual's sunrise burns too
+   bright behind text at the bottom). */
+.wish-dawn {
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 120%, rgba(255, 206, 140, 0.8), transparent 70%),
+    radial-gradient(ellipse at 90% 0%, rgba(255, 196, 226, 0.45), transparent 55%),
+    linear-gradient(180deg, #fde6f1 0%, #ffe6d6 55%, #ffdcb8 100%);
+}
+
+.dark .wish-dawn {
+  background:
+    radial-gradient(ellipse 70% 50% at 50% 122%, rgba(255, 170, 100, 0.42), transparent 70%),
+    radial-gradient(1px 1px at 16% 18%, rgba(255, 255, 255, 0.7), transparent 60%),
+    radial-gradient(1px 1px at 78% 12%, rgba(255, 255, 255, 0.6), transparent 60%),
+    linear-gradient(180deg, #1c2056 0%, #352a62 55%, #553866 100%);
+}
+
+/* The flip: two faces in one grid cell, so the card is as tall as its taller
+   face. Each face turns on its own with its back hidden; the face that's
+   away is inert in the markup and takes no clicks here. */
+.wish-flip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  perspective: 1600px;
+}
+
+.wish-face {
+  grid-area: 1 / 1;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.wish-face[data-face="back"] {
+  transform: rotateY(180deg);
+}
+
+.wish-flip[data-flipped="true"] .wish-face[data-face="front"] {
+  transform: rotateY(-180deg);
+}
+
+.wish-flip[data-flipped="true"] .wish-face[data-face="back"] {
+  transform: rotateY(0deg);
+}
+
+/* The face that's turned away is hidden outright as well: backface-visibility
+   alone lets a child with a backdrop blur show through, mirrored. The switch
+   happens halfway through the turn, when the card is edge-on. */
+.wish-flip:not([data-flipped="true"]) .wish-face[data-face="back"],
+.wish-flip[data-flipped="true"] .wish-face[data-face="front"] {
+  pointer-events: none;
+  visibility: hidden;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .wish-face {
+    transition:
+      transform 720ms cubic-bezier(0.2, 0.7, 0.2, 1),
+      visibility 0s linear 300ms;
+  }
+}
+
+/* Asked for less motion: the faces cross-fade in place instead of turning. */
+@media (prefers-reduced-motion: reduce) {
+  .wish-flip .wish-face[data-face],
+  .wish-flip[data-flipped="true"] .wish-face[data-face] {
+    transform: none;
+    transition: opacity 200ms linear, visibility 0s linear 100ms;
+  }
+  .wish-flip:not([data-flipped="true"]) .wish-face[data-face="back"],
+  .wish-flip[data-flipped="true"] .wish-face[data-face="front"] {
+    opacity: 0;
+  }
 }
 
 /* Frosted panels over the sky fall back to a solid night fill when the
@@ -1226,6 +1301,19 @@
   .thanks-lantern[data-lit="true"] { animation: thanks-kindle 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both, thanks-flicker 5s ease-in-out 700ms infinite; }
 }
 
+/* Lanterns in a list of past evenings are already lit: no kindling, no
+   flicker, so a long list doesn't shimmer all at once. */
+.thanks-lantern[data-lit="true"][data-still] {
+  animation: none;
+}
+
+/* The cord a saved page's lanterns hang from: the bottom edge of a half
+   ellipse, so it sags in the middle. Lanterns are placed on the same curve. */
+.lantern-cord {
+  border-bottom: 1px solid var(--thanks-cord);
+  border-radius: 0 0 50% 50% / 0 0 100% 100%;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .thanks-lantern { transition: none; }
 }
@@ -1322,6 +1410,28 @@
 
 @media (prefers-reduced-motion: reduce) {
   .dua-crescent { transition: opacity 300ms linear; }
+}
+
+/* The eight-point star between du'as: two squares, one turned, the same
+   figure as the lattice on the night sky. */
+.dua-star {
+  position: relative;
+  display: block;
+  width: 0.95rem;
+  height: 0.95rem;
+  color: var(--dua-moon);
+}
+
+.dua-star::before,
+.dua-star::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid currentColor;
+}
+
+.dua-star::after {
+  transform: rotate(45deg);
 }
 
 /* ---------------------------------------------------------------------------

@@ -17,7 +17,8 @@ import {
   type PracticeTemplate,
 } from "@/lib/practices";
 
-import { PracticePageCard } from "./practice-page-card";
+import { DuaArch } from "./dua-arch";
+import { GratitudePage } from "./gratitude-page";
 import {
   RitualCounter,
   RitualFrame,
@@ -362,7 +363,11 @@ export function PracticeRitual({
 
       {phase === "review" && built.ok && (
         <div className="woop-card-in relative mx-auto w-full max-w-md">
-          <PracticePageCard kind={kind} templateName={templateLabel(template, count)} items={built.items} />
+          {kind === "gratitude" ? (
+            <GratitudePage templateName={templateLabel(template, count)} items={built.items} />
+          ) : (
+            <DuaArch templateName={templateLabel(template, count)} items={built.items} />
+          )}
         </div>
       )}
     </RitualFrame>
