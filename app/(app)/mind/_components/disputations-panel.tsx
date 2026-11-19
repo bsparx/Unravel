@@ -9,7 +9,7 @@ import type { DisputationCard } from "@/lib/disputation";
 import type { Tending } from "@/lib/tending";
 
 import { deleteDisputation } from "../actions";
-import { CardTools, SkyEmpty } from "./shared";
+import { CardTools, SkyEmpty } from "@/components/panel-shared";
 
 /**
  * Disputations are a record of arguments won, so they read top to bottom,

@@ -10,6 +10,7 @@ import {
   CalendarClock,
   CalendarDays,
   Drama,
+  HandHeart,
   HeartPulse,
   Inbox,
   ListChecks,
@@ -62,6 +63,7 @@ const NAV = [
   { href: "/day", label: "Day", icon: ListChecks },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/mind", label: "Mind", icon: Brain },
+  { href: "/heart", label: "Heart", icon: HandHeart },
   { href: "/body", label: "Body", icon: HeartPulse },
 ] as const;
 
@@ -114,12 +116,15 @@ export function AppShell({
   banner,
   defaultOpen = true,
   mindEnabled = true,
+  heartEnabled = true,
   bodyEnabled = true,
 }: {
   children: React.ReactNode;
   banner?: React.ReactNode;
   /** With every Mind practice switched off, the page leaves the rail. */
   mindEnabled?: boolean;
+  /** Likewise Heart, with gratitude, du'a and recitation all off. */
+  heartEnabled?: boolean;
   /** Likewise Body, with both exercises and fasting off. */
   bodyEnabled?: boolean;
   /** Read from the sidebar_state cookie so the choice survives reloads. */
@@ -129,9 +134,9 @@ export function AppShell({
   // `"/"` works here without a special case: the equality catches it, and
   // `startsWith("//")` is never true. Don't "fix" this into `startsWith(href)`
   // — that would light up Today on every single route.
-  // Mind and Body leave the nav when every one of their practices is off.
+  // Mind, Heart and Body leave the nav when every one of their practices is off.
   const shown = ({ href }: { href: string }) =>
-    (mindEnabled || href !== "/mind") && (bodyEnabled || href !== "/body");
+    (mindEnabled || href !== "/mind") && (heartEnabled || href !== "/heart") && (bodyEnabled || href !== "/body");
   const isActive = (href: string) =>
     pathname === href ||
     pathname.startsWith(`${href}/`) ||

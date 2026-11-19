@@ -49,6 +49,7 @@ export type SettingsValues = {
   mindMeditationEnabled: boolean;
   mindReadingEnabled: boolean;
   mindBrainDumpEnabled: boolean;
+  heartRecitationEnabled: boolean;
   gratitudeTemplate: string;
   gratitudeCount: number;
   duaTemplate: string;
@@ -289,8 +290,54 @@ export function SettingsForm({
             </h2>
             <p className="text-muted-foreground text-label">
               Choose which practices appear on the Mind page: all of them, some,
-              or none. With all seven off, Mind leaves the sidebar. Nothing you
+              or none. With all five off, Mind leaves the sidebar. Nothing you
               have written is deleted when a practice is switched off.
+            </p>
+          </div>
+
+          <div className="space-y-5">
+            <CheckboxField
+              id="mindBrainDumpEnabled"
+              label="Brain dump"
+              hint="A few minutes writing out whatever is in your head, unfiltered. Circle what's actionable and it goes on your task list; the rest folds away. Done on paper counts too."
+              defaultChecked={values.mindBrainDumpEnabled}
+            />
+            <CheckboxField
+              id="mindMeditationEnabled"
+              label="Meditation"
+              hint="Breathing (box, 4-7-8 and more), dhikr, body scan and stillness, from easy to hard, on a full-screen timer. Each day you sit keeps a moonlit garden."
+              defaultChecked={values.mindMeditationEnabled}
+            />
+            <CheckboxField
+              id="mindReadingEnabled"
+              label="Reading"
+              hint="The books you're reading on a shelf. Log where you started and stopped, and what stayed with you; each book gathers its own notes."
+              defaultChecked={values.mindReadingEnabled}
+            />
+            <CheckboxField
+              id="mindWoopEnabled"
+              label="Wishes (WOOP)"
+              hint="Wish, Outcome, Obstacle, Plan. For something you want and the thing in you that gets in the way."
+              defaultChecked={values.mindWoopEnabled}
+            />
+            <CheckboxField
+              id="mindDisputationEnabled"
+              label="Disputations (ABCDE)"
+              hint="For a gloomy thought after a setback: write it down and argue back."
+              defaultChecked={values.mindDisputationEnabled}
+            />
+          </div>
+        </section>
+
+        <section id="heart" className="scroll-mt-8 space-y-4">
+          <div>
+            <h2 className="font-display text-title flex items-center gap-1">
+              Heart <InfoTip term="heart" />
+            </h2>
+            <p className="text-muted-foreground text-label">
+              Choose which practices appear on the Heart page. With all three
+              off, Heart leaves the sidebar. Your pages and recitation days are
+              kept when a practice is switched off.
             </p>
           </div>
 
@@ -336,34 +383,10 @@ export function SettingsForm({
             </div>
 
             <CheckboxField
-              id="mindBrainDumpEnabled"
-              label="Brain dump"
-              hint="A few minutes writing out whatever is in your head, unfiltered. Circle what's actionable and it goes on your task list; the rest folds away. Done on paper counts too."
-              defaultChecked={values.mindBrainDumpEnabled}
-            />
-            <CheckboxField
-              id="mindMeditationEnabled"
-              label="Meditation"
-              hint="Breathing (box, 4-7-8 and more), dhikr, body scan and stillness, from easy to hard, on a full-screen timer. Each day you sit keeps a moonlit garden."
-              defaultChecked={values.mindMeditationEnabled}
-            />
-            <CheckboxField
-              id="mindReadingEnabled"
-              label="Reading"
-              hint="The books you're reading on a shelf. Log where you started and stopped, and what stayed with you; each book gathers its own notes."
-              defaultChecked={values.mindReadingEnabled}
-            />
-            <CheckboxField
-              id="mindWoopEnabled"
-              label="Wishes (WOOP)"
-              hint="Wish, Outcome, Obstacle, Plan. For something you want and the thing in you that gets in the way."
-              defaultChecked={values.mindWoopEnabled}
-            />
-            <CheckboxField
-              id="mindDisputationEnabled"
-              label="Disputations (ABCDE)"
-              hint="For a gloomy thought after a setback: write it down and argue back."
-              defaultChecked={values.mindDisputationEnabled}
+              id="heartRecitationEnabled"
+              label="Daily recitation"
+              hint="A set you choose of Quran and remembrance (the three Quls, Ayat al-Kursi, the end of al-Baqarah and more) in Arabic with transliteration and translation, said with a counter. Each day you finish it keeps an oasis."
+              defaultChecked={values.heartRecitationEnabled}
             />
           </div>
         </section>

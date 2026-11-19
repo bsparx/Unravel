@@ -1,5 +1,5 @@
 /**
- * Gratitude and du'a: the two daily pages on /mind, and the templates they
+ * Gratitude and du'a: the two daily pages on /heart, and the templates they
  * can be written with.
  *
  * A template is a short sequence of steps, one screen each in the ritual.

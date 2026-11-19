@@ -22,6 +22,7 @@ import type { HabitSlot } from "@/lib/generated/prisma/client";
 import { MONEY_COLOR_NAMES } from "@/lib/money-palette";
 import { parseMoneyToCents } from "@/lib/money";
 import { MAX_LOG } from "@/lib/habit-bar";
+import { COUNT_MAX, SET_MAX_ITEMS } from "@/lib/recitation-limits";
 import {
   MAX_INTERVALS,
   MAX_LOGGED_SECONDS,
@@ -638,6 +639,7 @@ export const settingsSchema = z.object({
   mindMeditationEnabled: z.coerce.boolean().default(true),
   mindReadingEnabled: z.coerce.boolean().default(true),
   mindBrainDumpEnabled: z.coerce.boolean().default(true),
+  heartRecitationEnabled: z.coerce.boolean().default(true),
   gratitudeTemplate: z
     .string()
     .refine((id) => findTemplate("gratitude", id) !== null, "Pick a gratitude template.")
@@ -912,6 +914,54 @@ export const brainDumpSchema = z
   .refine((dump) => dump.paper || dump.body.trim().length > 0, {
     message: "There's nothing on the page yet.",
     path: ["body"],
+  });
+
+// ---------------------------------------------------------------- recitation
+
+/** Longest a written recitation's fields may be. */
+export const RECITATION_MAX = { title: 80, text: 4000 } as const;
+
+/**
+ * The daily recitation set, as JSON in a form field: up to thirty keys, each
+ * said 1 to 1000 times. Whether each key is a real catalogue id or one of
+ * your own recitations is checked by the action, which knows whose they are.
+ */
+export const recitationSetSchema = z.object({
+  set: z
+    .string()
+    .transform((raw, ctx) => {
+      try {
+        return JSON.parse(raw) as unknown;
+      } catch {
+        ctx.addIssue({ code: "custom", message: "That set didn't come through." });
+        return z.NEVER;
+      }
+    })
+    .pipe(
+      z
+        .array(
+          z.object({
+            key: z.string().min(1).max(80),
+            count: z.coerce.number().int().min(1, "At least once.").max(COUNT_MAX, `At most ${COUNT_MAX} times.`),
+          }),
+        )
+        .min(1, "Keep at least one recitation in the set.")
+        .max(SET_MAX_ITEMS, `Up to ${SET_MAX_ITEMS} in a set.`),
+    ),
+});
+
+/** A recitation you write yourself. A title, and at least one way to read it. */
+export const customRecitationSchema = z
+  .object({
+    id: cuid.optional(),
+    title: z.string().trim().min(1, "Give it a name.").max(RECITATION_MAX.title, "Keep the name shorter."),
+    arabic: z.string().trim().max(RECITATION_MAX.text, "That's longer than a recitation can keep.").default(""),
+    transliteration: z.string().trim().max(RECITATION_MAX.text, "That's longer than a recitation can keep.").default(""),
+    translation: z.string().trim().max(RECITATION_MAX.text, "That's longer than a recitation can keep.").default(""),
+  })
+  .refine((row) => row.arabic || row.transliteration || row.translation, {
+    message: "Write the words in at least one of Arabic, transliteration or translation.",
+    path: ["arabic"],
   });
 
 const lens = emptyToUndefined(

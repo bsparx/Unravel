@@ -74,6 +74,7 @@
   --font-mono: var(--font-jetbrains);
   --font-heading: var(--font-karla);
   --font-hand: var(--font-caveat);
+  --font-quran: var(--font-indopak), var(--font-amiri-quran), "Amiri Quran", serif;
 
   /* Journal spread paper — the note form is a physical page, in every theme. */
   --color-paper: var(--paper);
@@ -2088,6 +2089,181 @@
   --balloon-light: rgba(255, 230, 200, 0.16);
   --balloon-shade: rgba(4, 4, 22, 0.5);
   --balloon-inner: rgba(255, 170, 80, 0.5);
+}
+
+/* The oasis (daily recitation). Light: a rose-gold dawn over apricot sand
+   and turquoise water. Dark: the hour before fajr, indigo sky, silvered sand
+   and the last stars. */
+:root {
+  --oasis-sky-1: #f4cfe0;
+  --oasis-sky-2: #fbdcd2;
+  --oasis-sky-3: #ffe8c8;
+  --oasis-glow: #ffcf9e;
+  --oasis-sun: #ffac5f;
+  --oasis-sun-core: #fff3dc;
+  --oasis-star: #ffffff;
+  --oasis-stars: 0.35;
+  --oasis-dune-far: #e7b4a0;
+  --oasis-dune-far-shade: #d79b8a;
+  --oasis-dune-mid: #efc196;
+  --oasis-dune-mid-shade: #dea57c;
+  --oasis-sand: #f6d2a5;
+  --oasis-sand-shade: #e4b483;
+  --oasis-sand-light: #fff0d9;
+  --oasis-hollow: #ddaa7c;
+  --oasis-hollow-deep: #c99266;
+  --oasis-hollow-crack: #b67e55;
+  --oasis-stone: #c6a38a;
+  --oasis-water: #4fbdbd;
+  --oasis-water-deep: #237f8f;
+  --oasis-water-light: #e3fffb;
+  --oasis-palm-trunk: #8a5d3e;
+  --oasis-palm-ring: #6a4429;
+  --oasis-palm: #4f8e5c;
+  --oasis-palm-2: #3a6f48;
+  --oasis-reed: #6c9a50;
+  --oasis-date: #c25a2c;
+  --oasis-lantern: #ffc96e;
+  --oasis-lantern-glass: #fff1cf;
+  --oasis-lantern-metal: #6a4838;
+  --oasis-tent: #8b4a3b;
+  --oasis-tent-stripe: #f0c992;
+  --oasis-tent-shade: #5e2f27;
+  --oasis-silhouette: #a8707c;
+  --oasis-adobe: #f6dcc0;
+  --oasis-adobe-shade: #d9ae86;
+  --oasis-adobe-door: #8a5640;
+  --oasis-bird: #5d4a5f;
+  --oasis-flower-1: #df4f78;
+  --oasis-flower-2: #f39a32;
+  --oasis-flower-3: #f6f0ff;
+  --oasis-flower-eye: #ffd25a;
+  --oasis-light: #ffc785;
+  --oasis-rays: 0.3;
+}
+
+.dark {
+  --oasis-sky-1: #070d2c;
+  --oasis-sky-2: #18194d;
+  --oasis-sky-3: #3d2f64;
+  --oasis-glow: #7a4f86;
+  --oasis-sun: #f5a462;
+  --oasis-sun-core: #ffe6c2;
+  --oasis-star: #ffffff;
+  --oasis-stars: 1;
+  --oasis-dune-far: #27275a;
+  --oasis-dune-far-shade: #1d1d4a;
+  --oasis-dune-mid: #34356a;
+  --oasis-dune-mid-shade: #2a2b5c;
+  --oasis-sand: #4f5084;
+  --oasis-sand-shade: #3f4074;
+  --oasis-sand-light: #8a8bb8;
+  --oasis-hollow: #393a6c;
+  --oasis-hollow-deep: #2e2f5e;
+  --oasis-hollow-crack: #24254f;
+  --oasis-stone: #6b6a92;
+  --oasis-water: #2c7f97;
+  --oasis-water-deep: #17465f;
+  --oasis-water-light: #a6eaf3;
+  --oasis-palm-trunk: #3e2f45;
+  --oasis-palm-ring: #2b2133;
+  --oasis-palm: #2a5550;
+  --oasis-palm-2: #1d403f;
+  --oasis-reed: #2f5a4b;
+  --oasis-date: #b25a3a;
+  --oasis-lantern: #ffcf7a;
+  --oasis-lantern-glass: #fff0c8;
+  --oasis-lantern-metal: #2c2234;
+  --oasis-tent: #4d2e47;
+  --oasis-tent-stripe: #b58f73;
+  --oasis-tent-shade: #2f1b2f;
+  --oasis-silhouette: #141537;
+  --oasis-adobe: #6b5a7c;
+  --oasis-adobe-shade: #54466a;
+  --oasis-adobe-door: #261d36;
+  --oasis-bird: #cdc7ea;
+  --oasis-flower-1: #c95479;
+  --oasis-flower-2: #d38a3d;
+  --oasis-flower-3: #d8d2f2;
+  --oasis-flower-eye: #ffd25a;
+  --oasis-light: #ffc785;
+  --oasis-rays: 0.16;
+}
+
+/* Daily recitation: the cards on the Heart page and the full-screen reader.
+   The reader's sky brightens with --dawn (0 to 1) as the set goes on: rose
+   before sunrise to warm day in light, deep night to violet first light in
+   dark. Ink stays within each theme, so the words never lose contrast. */
+@property --dawn {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+:root {
+  --recite-ink: #36223d;
+  --recite-ink-muted: #6a5066;
+  --recite-night-a: #f2d0e2;
+  --recite-night-b: #f9ddd3;
+  --recite-day-a: #fde6d3;
+  --recite-day-b: #fff0cc;
+  --recite-glow: #ffc286;
+  --recite-accent: #1d7f86;
+  --recite-accent-ink: #ffffff;
+  --recite-sun: #e07a37;
+  --recite-bead: rgba(120, 70, 90, 0.18);
+  --recite-glass: rgba(255, 255, 255, 0.55);
+  --recite-glass-edge: rgba(255, 255, 255, 0.8);
+  --recite-line: rgba(120, 70, 90, 0.16);
+  --recite-marker: #b5622e;
+}
+
+.dark {
+  --recite-ink: #f3eefc;
+  --recite-ink-muted: #c2b7dc;
+  --recite-night-a: #070d2c;
+  --recite-night-b: #1a1a4c;
+  --recite-day-a: #1b1b52;
+  --recite-day-b: #4a2f64;
+  --recite-glow: #ef9f63;
+  --recite-accent: #6fd2cf;
+  --recite-accent-ink: #08202a;
+  --recite-sun: #f5ae6a;
+  --recite-bead: rgba(220, 210, 255, 0.2);
+  --recite-glass: rgba(16, 20, 58, 0.5);
+  --recite-glass-edge: rgba(190, 180, 255, 0.22);
+  --recite-line: rgba(200, 190, 255, 0.16);
+  --recite-marker: #f2b07a;
+}
+
+.recite-sky {
+  color: var(--recite-ink);
+  background:
+    radial-gradient(ellipse 90% 70% at 72% 110%, color-mix(in oklab, var(--recite-glow) 55%, transparent), transparent 70%),
+    linear-gradient(165deg, var(--recite-night-a), var(--recite-day-b));
+}
+
+.recite-session {
+  --dawn: 0;
+  color: var(--recite-ink);
+  background:
+    radial-gradient(
+      ellipse 130% 60% at 62% 104%,
+      color-mix(in oklab, var(--recite-glow) calc(20% + var(--dawn) * 55%), transparent),
+      transparent 72%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--recite-night-a), var(--recite-day-a) calc(var(--dawn) * 100%)),
+      color-mix(in oklab, var(--recite-night-b), var(--recite-day-b) calc(var(--dawn) * 100%))
+    );
+  transition: --dawn 1.6s ease;
+}
+
+.recite-arabic {
+  font-family: var(--font-quran);
+  font-feature-settings: "kern", "liga", "calt";
+  word-spacing: 0.06em;
 }
 
 .mind-scene [data-fx],

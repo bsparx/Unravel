@@ -369,9 +369,11 @@ model User {
   prayerRemindersEnabled Boolean @default(false)
   prayerCity             String?
 
-  // Mind. Each practice can be switched off on its own; with all four off the
-  // page leaves the sidebar. Template ids live in lib/practices.ts and are
-  // checked there, not as an enum, so adding a template needs no migration.
+  // Mind and Heart. Each practice can be switched off on its own; a page
+  // whose practices are all off leaves the sidebar. Gratitude and du'a moved
+  // from Mind to Heart but kept their columns (the "mind" prefix is history).
+  // Template ids live in lib/practices.ts and are checked there, not as an
+  // enum, so adding a template needs no migration.
   mindWoopEnabled        Boolean @default(true)
   mindDisputationEnabled Boolean @default(true)
   mindGratitudeEnabled   Boolean @default(true)
@@ -385,6 +387,12 @@ model User {
   duaTemplate            String  @default("adab")
   /// n for the "n du'as" template, 1-10.
   duaCount               Int     @default(3)
+
+  // Heart: daily recitation.
+  heartRecitationEnabled Boolean @default(true)
+  /// The daily set, [{ key, count }]: a catalogue id from lib/recitations.ts
+  /// or "custom:<CustomRecitation.id>". Null is the default set.
+  recitationSet          Json?
 
   // Body. Exercises and intermittent fasting, each switchable; with both off
   // the page leaves the sidebar and the mobile bar.
@@ -431,6 +439,8 @@ model User {
   wishRehearsals      WishRehearsal[]
   disputationRevisits DisputationRevisit[]
   brainDumps          BrainDump[]
+  recitationLogs      RecitationLog[]
+  customRecitations   CustomRecitation[]
 }
 
 // ---------------------------------------------------------------- lists
@@ -1346,6 +1356,42 @@ model BrainDump {
 /// A day a disputation was reread, with how strongly the old belief is held
 /// now. One per disputation per day; a revisit keeps the disputations scene
 /// as much as writing a new one.
+/// A day the whole daily recitation set was finished. One row per day: the
+/// scene grows by these. `items` is the set as it was that day.
+model RecitationLog {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Local calendar day in User.timezone, UTC-midnight DATE.
+  date  DateTime @db.Date
+  items Json
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, date])
+  @@index([userId, date])
+}
+
+/// A recitation you wrote yourself, offered alongside the catalogue. Archived
+/// rather than deleted, so a past day's snapshot still names it.
+model CustomRecitation {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title           String
+  arabic          String    @default("")
+  transliteration String    @default("")
+  translation     String    @default("")
+  archivedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, archivedAt])
+}
+
 model DisputationRevisit {
   id            String      @id @default(cuid())
   userId        String

@@ -5,8 +5,7 @@ import { useState, type ComponentType } from "react";
 import { InfoTip } from "@/components/info-tip";
 import { GardenScene } from "@/components/meditation/garden-scene";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { MindTab } from "@/lib/mind-tabs";
-import { SCENES, sceneCaption, stageIdsAt } from "@/lib/scenes";
+import { SCENES, sceneCaption, stageIdsAt, type SceneKey } from "@/lib/scenes";
 import type { TendDay, Tending } from "@/lib/tending";
 import { cn } from "@/lib/utils";
 
@@ -14,14 +13,16 @@ import { BalloonScene } from "./balloon-scene";
 import { CourtyardScene } from "./courtyard-scene";
 import { HarbourScene } from "./harbour-scene";
 import { NookScene } from "./nook-scene";
+import { OasisScene } from "./oasis-scene";
 import type { SceneProps } from "./scene-frame";
 import { SummitScene } from "./summit-scene";
 import { TerraceScene } from "./terrace-scene";
 
-export const SCENE_ART: Record<MindTab, ComponentType<SceneProps>> = {
+export const SCENE_ART: Record<SceneKey, ComponentType<SceneProps>> = {
   meditate: GardenScene,
   gratitude: TerraceScene,
   dua: CourtyardScene,
+  recitation: OasisScene,
   braindump: BalloonScene,
   reading: NookScene,
   wishes: SummitScene,
@@ -29,9 +30,10 @@ export const SCENE_ART: Record<MindTab, ComponentType<SceneProps>> = {
 };
 
 /** Each practice's own colour for a day kept, as on its tab. */
-const DAY_DOT: Record<MindTab, string> = {
+const DAY_DOT: Record<SceneKey, string> = {
   gratitude: "bg-[var(--thanks-lantern)]",
   dua: "bg-[var(--dua-accent)]",
+  recitation: "bg-[var(--oasis-water)]",
   braindump: "bg-[var(--balloon-env-1)]",
   meditate: "bg-[var(--garden-light)]",
   reading: "bg-[var(--reading-dot)]",
@@ -52,7 +54,7 @@ export function SceneCard({
   note,
   className,
 }: {
-  tab: MindTab;
+  tab: SceneKey;
   tending: Tending;
   note?: (day: TendDay) => string | null;
   className?: string;
@@ -98,7 +100,7 @@ function DayStrip({
   tending,
   note,
 }: {
-  tab: MindTab;
+  tab: SceneKey;
   tending: Tending;
   note?: (day: TendDay) => string | null;
 }) {

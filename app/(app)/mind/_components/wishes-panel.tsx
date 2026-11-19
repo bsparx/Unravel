@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import type { WishCard } from "@/lib/woop";
 
 import { deleteWish, setWishStatus } from "../actions";
-import { CardTools, SkyEmpty } from "./shared";
+import { CardTools, SkyEmpty } from "@/components/panel-shared";
 
 /**
  * Wishes are standing cards you come back to, so they sit side by side,

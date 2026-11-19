@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { SCENE_ART } from "@/components/scenes/scene-card";
-import { MIND_TABS } from "@/lib/mind-tabs";
+import { SCENE_KEYS } from "@/lib/scenes";
 import { SCENES, stageAt } from "@/lib/scenes";
 import { TEND_DAYS } from "@/lib/tending";
 
@@ -27,7 +27,7 @@ export function ScenePreview() {
           />
         </label>
       </div>
-      {MIND_TABS.map((tab) => {
+      {SCENE_KEYS.map((tab) => {
         const Art = SCENE_ART[tab];
         const scene = SCENES[tab];
         const stage = stageAt(scene, level);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 
@@ -12,26 +12,18 @@ import { DisputationRitual } from "@/components/disputation-ritual";
 import type { MeditationChoice } from "@/components/meditation/meditation-picker";
 import { MeditationSession, type SessionResult } from "@/components/meditation/meditation-session";
 import { primeAudio } from "@/components/meditation/sound";
-import { PracticeRitual } from "@/components/practice-ritual";
 import { BookDialog } from "@/components/reading/book-dialog";
 import { LogReadingDialog } from "@/components/reading/log-reading-dialog";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { SectionTabs, useUrlTab, type TabDot } from "@/components/section-tabs";
 import { WishRehearsal } from "@/components/wish-rehearsal";
 import { WoopRitual } from "@/components/woop-ritual";
-import { cn } from "@/lib/utils";
 import type { DisputationCard, DisputationFields } from "@/lib/disputation";
 import type { DumpKind, DumpMinutes } from "@/lib/brain-dump";
 import type { DumpRow, MindView } from "@/lib/mind-data";
 import type { ShelfBook } from "@/lib/reading-data";
 import type { Tending } from "@/lib/tending";
 import { MIND_TABS, type MindTab } from "@/lib/mind-tabs";
-import {
-  itemsToAnswers,
-  templateOrDefault,
-  findTemplate,
-  type PracticeKind,
-} from "@/lib/practices";
 import type { WishCard, WoopFields } from "@/lib/woop";
 import { findMeditation } from "@/lib/meditations";
 
@@ -41,13 +33,11 @@ import {
   saveBrainDump,
   saveDisputation,
   saveMeditation,
-  savePractice,
   saveWish,
 } from "../actions";
 import { BrainDumpPanel } from "./braindump-panel";
 import { DisputationsPanel } from "./disputations-panel";
 import { MeditatePanel } from "./meditate-panel";
-import { PracticePanel, type PracticeWriteMode } from "./practice-panel";
 import { ReadingPanel } from "./reading-panel";
 import { WishesPanel } from "./wishes-panel";
 
@@ -55,7 +45,6 @@ import { WishesPanel } from "./wishes-panel";
 type Editing =
   | { kind: "wish"; card: WishCard | null }
   | { kind: "disputation"; card: DisputationCard | null }
-  | { kind: "practice"; practice: PracticeKind; mode: PracticeWriteMode }
   | { kind: "meditation"; choice: MeditationChoice; tending: Tending }
   | { kind: "rehearse"; card: WishCard }
   | { kind: "revisit"; card: DisputationCard }
@@ -67,8 +56,6 @@ type Editing =
   | null;
 
 const LABELS: Record<MindTab, string> = {
-  gratitude: "Gratitude",
-  dua: "Du'a",
   braindump: "Brain dump",
   meditate: "Meditate",
   reading: "Reading",
@@ -77,9 +64,7 @@ const LABELS: Record<MindTab, string> = {
 };
 
 // What each tab's dot says, done or not yet.
-const DOT: Record<MindTab, { colour: string; done: string; not: string; srDone: string; srNot: string }> = {
-  gratitude: { colour: "bg-[var(--thanks-lantern)]", done: "Today's page is written", not: "Not written yet today", srDone: "(written today)", srNot: "(not written today)" },
-  dua: { colour: "bg-[var(--dua-accent)]", done: "Today's page is written", not: "Not written yet today", srDone: "(written today)", srNot: "(not written today)" },
+const DOT: Record<MindTab, TabDot> = {
   braindump: { colour: "bg-[var(--balloon-env-1)]", done: "You've emptied your head today", not: "No brain dump yet today", srDone: "(done today)", srNot: "(not yet today)" },
   meditate: { colour: "bg-[var(--garden-light)]", done: "You've sat today", not: "No sitting yet today", srDone: "(sat today)", srNot: "(not yet today)" },
   reading: { colour: "bg-[var(--reading-dot)]", done: "You've read today", not: "No reading yet today", srDone: "(read today)", srNot: "(not yet today)" },
@@ -88,9 +73,9 @@ const DOT: Record<MindTab, { colour: string; done: string; not: string; srDone: 
 };
 
 /**
- * /mind: up to six practices behind one switch. The two daily pages come
- * first, because they're the ones you open every day; wishes and
- * disputations are there for when you need them.
+ * /mind: up to five practices behind one switch, for the head: emptying it,
+ * stilling it, feeding it, aiming it and arguing with it. Gratitude and du'a
+ * live on /heart.
  */
 export function MindBoard({
   initialTab,
@@ -101,25 +86,8 @@ export function MindBoard({
 }) {
   const { enabled, active, settled, disputations } = view;
   const tabs = MIND_TABS.filter((tab) => enabled[tab]);
-  const [tab, setTab] = useState<MindTab>(initialTab);
+  const [tab, switchTab] = useUrlTab<MindTab>(initialTab, tabs);
   const [editing, setEditing] = useState<Editing>(null);
-  const selectedTab = useRef<HTMLButtonElement>(null);
-
-  // On a phone the tab row scrolls; keep the open tab in view (a link to
-  // ?tab=wishes otherwise lands with Wishes hidden off the right edge).
-  useEffect(() => {
-    selectedTab.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  }, [tab]);
-
-  // The tab lives in the URL so a reload lands where you were. Native
-  // history keeps it a URL change, not a server round trip.
-  const switchTab = (next: MindTab) => {
-    setTab(next);
-    const url = new URL(window.location.href);
-    if (next === tabs[0]) url.searchParams.delete("tab");
-    else url.searchParams.set("tab", next);
-    window.history.replaceState(null, "", url);
-  };
 
   const onSaveWish = async (fields: WoopFields, id?: string) => {
     const formData = new FormData();
@@ -169,32 +137,6 @@ export function MindBoard({
     }
   };
 
-  const onSavePractice = async (
-    practice: PracticeKind,
-    template: string,
-    count: number,
-    answers: Record<string, string>,
-  ) => {
-    const formData = new FormData();
-    formData.set("kind", practice);
-    formData.set("template", template);
-    formData.set("count", String(count));
-    formData.set("answers", JSON.stringify(answers));
-    try {
-      const state = await savePractice(formData);
-      if (state.status === "error") {
-        toast.error(state.message);
-        return false;
-      }
-      setEditing(null);
-      toast.success(practice === "gratitude" ? "Kept. Every lantern lit." : "Written. Ameen.");
-      return true;
-    } catch {
-      toast.error("Couldn't save that. What you wrote is still here.");
-      return false;
-    }
-  };
-
   const onSaveMeditation = async (choice: MeditationChoice, result: SessionResult) => {
     const formData = new FormData();
     formData.set("kind", choice.kind);
@@ -213,8 +155,6 @@ export function MindBoard({
 
   // Whether today counts yet, per tab: the same day the scene counts.
   const doneToday: Record<MindTab, boolean> = {
-    gratitude: view.gratitude.tending.today,
-    dua: view.dua.tending.today,
     braindump: view.braindump.tending.today,
     meditate: view.meditation.tending.today,
     reading: view.reading.tending.today,
@@ -285,52 +225,16 @@ export function MindBoard({
   return (
     <div>
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-        {/* Scrolls rather than wraps on a phone: four pills don't fit 375px. */}
-        <div className="relative -mx-5 max-w-[calc(100%+2.5rem)] overflow-x-auto px-5 [scrollbar-width:none] sm:mx-0 sm:max-w-full sm:px-0">
-          <div
-            role="tablist"
-            aria-label="Mind sections"
-            className="border-border bg-muted/40 inline-flex rounded-full border p-1"
-          >
-            {tabs.map((value) => {
-              const selected = tab === value;
-              const writtenToday = doneToday[value];
-              const dot = DOT[value];
-              return (
-                <button
-                  key={value}
-                  ref={selected ? selectedTab : undefined}
-                  type="button"
-                  role="tab"
-                  aria-selected={selected}
-                  aria-controls={`mind-${value}`}
-                  onClick={() => switchTab(value)}
-                  className={cn(
-                    "focus-visible:ring-ring inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-1.5 text-label font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:outline-none",
-                    selected
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {LABELS[value]}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span
-                        className={cn(
-                          "size-1.5 rounded-full",
-                          writtenToday ? dot.colour : "border-muted-foreground/50 border",
-                        )}
-                      >
-                        <span className="sr-only">{writtenToday ? dot.srDone : dot.srNot}</span>
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">{writtenToday ? dot.done : dot.not}</TooltipContent>
-                  </Tooltip>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <SectionTabs
+          label="Mind sections"
+          idPrefix="mind"
+          tabs={tabs}
+          value={tab}
+          onChange={switchTab}
+          labels={LABELS}
+          dots={DOT}
+          doneToday={doneToday}
+        />
 
         {/* An empty section carries its own call to action in the sky card;
             one button per intent on screen. */}
@@ -394,16 +298,6 @@ export function MindBoard({
             view={view.reading}
             onAdd={() => setEditing({ kind: "book" })}
             onLog={(book) => setEditing({ kind: "log", book })}
-          />
-        )}
-        {(tab === "gratitude" || tab === "dua") && (
-          <PracticePanel
-            // Keyed by tab only: keying by template remounted the panel on
-            // every stepper click and shut the picker under your finger.
-            key={tab}
-            kind={tab}
-            view={view[tab]}
-            onWrite={(mode) => setEditing({ kind: "practice", practice: tab, mode })}
           />
         )}
       </section>
@@ -491,29 +385,6 @@ export function MindBoard({
           onClose={() => setEditing(null)}
         />
       )}
-      {editing?.kind === "practice" && (() => {
-        const practice = view[editing.practice];
-        const page = editing.mode === "edit" ? practice.today : null;
-        // Editing reopens today's page in the template it was written with;
-        // a new page or a rewrite uses the current one.
-        const template = (page && findTemplate(editing.practice, page.template)) ?? templateOrDefault(editing.practice, practice.template);
-        const count =
-          page && template.counted
-            ? new Set(page.items.map((item) => item.key.split(":")[0])).size
-            : practice.count;
-        return (
-          <PracticeRitual
-            key={`${editing.practice}-${editing.mode}`}
-            kind={editing.practice}
-            template={template}
-            count={count}
-            seed={practice.seed}
-            initial={page ? itemsToAnswers(page.items) : null}
-            onSave={(answers) => onSavePractice(editing.practice, template.id, count, answers)}
-            onCancel={() => setEditing(null)}
-          />
-        );
-      })()}
     </div>
   );
 }

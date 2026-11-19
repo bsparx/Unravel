@@ -99,13 +99,23 @@ export const GLOSSARY = {
   },
   close: {
     title: "Closing the day",
-    what: "Two short steps at night: pick tomorrow's frog and empty what's still on your mind. Then the day hands off to rest. Gratitude lives on the Mind page.",
+    what: "Two short steps at night: pick tomorrow's frog and empty what's still on your mind. Then the day hands off to rest. Gratitude lives on the Heart page.",
     why: "Tomorrow starts already decided, and the day ends instead of trailing off.",
   },
   mind: {
     title: "Mind",
-    what: "Up to seven practices on one page, each switchable in Settings. Gratitude and du'a are a page a day. A brain dump empties your head onto the page for a few minutes. Meditation is a timer for breathing, dhikr and stillness that grows a garden. Reading keeps the books you're reading and the notes each one gathers. WOOP turns a wish into a plan for the obstacle in you. ABCDE takes a gloomy thought after a setback and argues back.",
-    why: "Noticing the good, asking for what you need, wanting well and thinking clearly about setbacks are all skills, and all get easier written down.",
+    what: "Up to five practices for the head, each switchable in Settings. A brain dump empties your head onto the page for a few minutes. Meditation is a timer for breathing, dhikr and stillness that grows a garden. Reading keeps the books you're reading and the notes each one gathers. WOOP turns a wish into a plan for the obstacle in you. ABCDE takes a gloomy thought after a setback and argues back.",
+    why: "Emptying your head, stilling it, feeding it, wanting well and thinking clearly about setbacks are all skills, and all get easier with a place to practise them.",
+  },
+  heart: {
+    title: "Heart",
+    what: "Three daily practices for the heart, each switchable in Settings: a page of gratitude, a page of du'a, and a daily set of recitations from the Quran and the sunnah.",
+    why: "Thanks, asking and remembrance are the heart's side of the day. Kept together, they take a few quiet minutes in one place.",
+  },
+  recitation: {
+    title: "Daily recitation",
+    what: "A set you choose of Quran and remembrance, each shown in Arabic with transliteration and translation, and said as many times as you set: the three Quls, Ayat al-Kursi, the end of al-Baqarah and more. Tap the counter for each time. The day counts once the whole set is said. Each one carries its Sahih hadith.",
+    why: "Small, fixed recitations kept every day add up, and the counter keeps your place so the mind can stay on the words.",
   },
   woop: {
     title: "WOOP",

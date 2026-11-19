@@ -3,14 +3,6 @@ import { addDays, minuteOfDayLocal, toISODate, todayLocal } from "@/lib/dates";
 import { wordCount, type DumpKind } from "@/lib/brain-dump";
 import { prisma } from "@/lib/db";
 import type { DisputationCard } from "@/lib/disputation";
-import {
-  clampCount,
-  templateOrDefault,
-  findTemplate,
-  readItems,
-  type PracticeKind,
-  type PracticePage,
-} from "@/lib/practices";
 import type { WishCard } from "@/lib/woop";
 import {
   findMeditation,
@@ -27,21 +19,6 @@ const HISTORY_DAYS = 90;
 const WEEK_DOTS = 14;
 /** The most brain dumps the tab shows. */
 const DUMP_ROWS = 60;
-
-export type PracticeView = {
-  /** The template new pages are written with. */
-  template: string;
-  count: number;
-  today: PracticePage | null;
-  /** Newest first, today excluded. */
-  past: PracticePage[];
-  /** Today, so the client never has to work out the user's day itself. */
-  todayISO: string;
-  /** Rotates placeholders, stable for the day. */
-  seed: number;
-  /** The scene: a stage up for each day a page is written, down for each day without. */
-  tending: Tending;
-};
 
 export type MeditationRow = {
   id: string;
@@ -103,8 +80,6 @@ export type MindEnabled = {
   reading: boolean;
   wishes: boolean;
   disputations: boolean;
-  gratitude: boolean;
-  dua: boolean;
 };
 
 export type MindView = {
@@ -112,8 +87,6 @@ export type MindView = {
   active: WishCard[];
   settled: WishCard[];
   disputations: DisputationCard[];
-  gratitude: PracticeView;
-  dua: PracticeView;
   meditation: MeditationView;
   reading: ReadingView;
   braindump: BrainDumpView;
@@ -129,8 +102,6 @@ export function mindEnabled(user: User): MindEnabled {
   return {
     wishes: user.mindWoopEnabled,
     disputations: user.mindDisputationEnabled,
-    gratitude: user.mindGratitudeEnabled,
-    dua: user.mindDuaEnabled,
     braindump: user.mindBrainDumpEnabled,
     meditate: user.mindMeditationEnabled,
     reading: user.mindReadingEnabled,
@@ -162,7 +133,6 @@ export async function getMind(user: User): Promise<MindView> {
   const [
     wishes,
     disputations,
-    pages,
     sittings,
     reading,
     rehearsals,
@@ -170,7 +140,6 @@ export async function getMind(user: User): Promise<MindView> {
     lastRevisits,
     dumps,
     dumpDays,
-    pageDays,
     sitDays,
   ] = await Promise.all([
     prisma.wish.findMany({
@@ -180,11 +149,6 @@ export async function getMind(user: User): Promise<MindView> {
     prisma.disputation.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
-    }),
-    prisma.journalEntry.findMany({
-      where: { userId: user.id, kind: { in: ["GRATITUDE", "DUA"] }, date: { gte: since } },
-      orderBy: { date: "desc" },
-      select: { id: true, date: true, kind: true, template: true, items: true, body: true },
     }),
     prisma.meditationSession.findMany({
       where: { userId: user.id, startedAt: { gte: addDays(today, -HISTORY_DAYS) } },
@@ -217,10 +181,6 @@ export async function getMind(user: User): Promise<MindView> {
       where: { userId: user.id },
       select: { date: true, paper: true, seconds: true },
     }),
-    prisma.journalEntry.findMany({
-      where: { userId: user.id, kind: { in: ["GRATITUDE", "DUA"] } },
-      select: { date: true, kind: true },
-    }),
     // Sittings are instants; bucketed into the user's days below.
     prisma.meditationSession.findMany({
       where: { userId: user.id, seconds: { gt: 0 } },
@@ -236,36 +196,6 @@ export async function getMind(user: User): Promise<MindView> {
     timeZone: "UTC",
   });
   const todayISO = toISODate(today);
-
-  const practice = (kind: PracticeKind, templateId: string, count: number): PracticeView => {
-    const journalKind = kind === "gratitude" ? "GRATITUDE" : "DUA";
-    const rows: PracticePage[] = pages
-      .filter((row) => row.kind === journalKind)
-      .map((row) => {
-        const items = readItems(row.items);
-        return {
-          id: row.id,
-          dateISO: toISODate(row.date),
-          dateLabel: dayLabel.format(row.date),
-          template: row.template ?? "",
-          templateName: findTemplate(kind, row.template)?.name ?? "A page",
-          // A page written before templates existed is just its body.
-          items: items.length
-            ? items
-            : [{ key: "body", step: "", label: "", text: row.body }],
-        };
-      });
-    const written = pageDays.filter((row) => row.kind === journalKind).map((row) => toISODate(row.date));
-    return {
-      tending: tend(historySince(todayISO, written, (date) => dayLabel.format(date))),
-      template: templateOrDefault(kind, templateId).id,
-      count: clampCount(count),
-      today: rows.find((row) => row.dateISO === todayISO) ?? null,
-      past: rows.filter((row) => row.dateISO !== todayISO),
-      todayISO,
-      seed: Math.floor(today.getTime() / 86_400_000),
-    };
-  };
 
   const cards: WishCard[] = wishes.map((row) => ({
     id: row.id,
@@ -412,8 +342,6 @@ export async function getMind(user: User): Promise<MindView> {
     disputationTending: tend(historySince(todayISO, disputedDays, (date) => dayLabel.format(date))),
     meditation,
     reading,
-    gratitude: practice("gratitude", user.gratitudeTemplate, user.gratitudeCount),
-    dua: practice("dua", user.duaTemplate, user.duaCount),
     active: cards.filter((card) => card.status === "ACTIVE"),
     // Most recently settled first: what you just finished is what you want
     // to see when you open the drawer.

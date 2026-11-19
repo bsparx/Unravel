@@ -256,7 +256,7 @@ export function PracticeRitual({
           <TooltipContent side="bottom" className="max-w-64 flex-col items-start gap-1">
             <span>{template.blurb}</span>
             <span className="opacity-75">
-              Change the template from the chip on the Mind page. Pages you&apos;ve written keep their own.
+              Change the template from the chip on the Heart page. Pages you&apos;ve written keep their own.
             </span>
           </TooltipContent>
         </Tooltip>

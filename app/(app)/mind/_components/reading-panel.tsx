@@ -13,7 +13,7 @@ import type { ReadingView, ShelfBook } from "@/lib/reading-data";
 import { cn } from "@/lib/utils";
 
 import { setBookStatus } from "../reading-actions";
-import { SkyEmpty } from "./shared";
+import { SkyEmpty } from "@/components/panel-shared";
 
 /**
  * Reading: the books you're reading stand on a shelf, each with a ribbon at

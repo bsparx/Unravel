@@ -20,7 +20,7 @@ import type { BrainDumpView, DumpRow } from "@/lib/mind-data";
 import { cn } from "@/lib/utils";
 
 import { deleteBrainDump } from "../actions";
-import { CardTools } from "./shared";
+import { CardTools } from "@/components/panel-shared";
 
 const PAGE_SIZE = 8;
 

@@ -34,6 +34,7 @@ export async function updateSettings(
     "mindMeditationEnabled",
     "mindReadingEnabled",
     "mindBrainDumpEnabled",
+    "heartRecitationEnabled",
     "bodyExercisesEnabled",
     "bodyFastingEnabled",
   ]) {
@@ -99,6 +100,7 @@ export async function updateSettings(
       mindMeditationEnabled: input.mindMeditationEnabled,
       mindReadingEnabled: input.mindReadingEnabled,
       mindBrainDumpEnabled: input.mindBrainDumpEnabled,
+      heartRecitationEnabled: input.heartRecitationEnabled,
       gratitudeTemplate: input.gratitudeTemplate,
       gratitudeCount: input.gratitudeCount,
       duaTemplate: input.duaTemplate,

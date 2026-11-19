@@ -12,7 +12,7 @@ import { PracticeTemplatePicker, type TemplateChoice } from "@/components/practi
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import type { PracticeView } from "@/lib/mind-data";
+import type { PracticeView } from "@/lib/heart-data";
 import {
   templateLabel,
   templateOrDefault,
@@ -21,7 +21,7 @@ import {
 } from "@/lib/practices";
 
 import { deletePractice, setPracticeTemplate } from "../actions";
-import { CardTools, SkyEmpty } from "./shared";
+import { CardTools, SkyEmpty } from "@/components/panel-shared";
 
 export type PracticeWriteMode = "new" | "edit" | "rewrite";
 

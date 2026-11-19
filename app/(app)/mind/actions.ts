@@ -7,7 +7,6 @@ import { addDays, todayLocal } from "@/lib/dates";
 import { taskTitle } from "@/lib/brain-dump";
 import { prisma } from "@/lib/db";
 import { findMeditation, normalizeOptions, plannedSeconds } from "@/lib/meditations";
-import { itemsToBody } from "@/lib/practices";
 import {
   type ActionState,
   brainDumpSchema,
@@ -17,13 +16,9 @@ import {
   fieldErrorsFrom,
   formValues,
   meditationSessionSchema,
-  practiceEntrySchema,
-  practiceTemplateSchema,
   wishSchema,
   wishStatusSchema,
 } from "@/lib/validation";
-
-const JOURNAL_KIND = { gratitude: "GRATITUDE", dua: "DUA" } as const;
 
 const invalid = (error: Parameters<typeof fieldErrorsFrom>[0]): ActionState => ({
   status: "error",
@@ -187,68 +182,6 @@ export async function deleteDisputation(id: string): Promise<void> {
   if (!parsed.success) return;
   await prisma.disputation.deleteMany({ where: { id: parsed.data, userId: user.id } });
   revalidatePath("/mind");
-}
-
-// ---------------------------------------------------------------- daily pages
-
-/**
- * Write today's gratitude or du'a page. One per day per practice: writing
- * again, even with a different template, replaces today's page. The date is
- * today in the user's own zone, never one sent by the client.
- */
-export async function savePractice(formData: FormData): Promise<ActionState> {
-  const user = await requireUser();
-  const parsed = practiceEntrySchema.safeParse(formValues(formData));
-  if (!parsed.success) {
-    return {
-      status: "error",
-      message: parsed.error.issues[0]?.message ?? "Some of that didn't look right.",
-    };
-  }
-
-  const { kind, template, items } = parsed.data;
-  const date = todayLocal(user.timezone);
-  const data = { template, items, body: itemsToBody(items) };
-
-  await prisma.journalEntry.upsert({
-    where: { userId_date_kind: { userId: user.id, date, kind: JOURNAL_KIND[kind] } },
-    create: { userId: user.id, date, kind: JOURNAL_KIND[kind], ...data },
-    update: data,
-  });
-
-  revalidatePath("/mind");
-  return { status: "success" };
-}
-
-export async function deletePractice(id: string): Promise<void> {
-  const user = await requireUser();
-  const parsed = cuid.safeParse(id);
-  if (!parsed.success) return;
-  // Scoped to the two Mind kinds too, so this can never reach a worry.
-  await prisma.journalEntry.deleteMany({
-    where: { id: parsed.data, userId: user.id, kind: { in: ["GRATITUDE", "DUA"] } },
-  });
-  revalidatePath("/mind");
-}
-
-/** Switch template (and n). Pages already written keep their own. */
-export async function setPracticeTemplate(formData: FormData): Promise<ActionState> {
-  const user = await requireUser();
-  const parsed = practiceTemplateSchema.safeParse(formValues(formData));
-  if (!parsed.success) return invalid(parsed.error);
-
-  const { kind, template, count } = parsed.data;
-  await prisma.user.update({
-    where: { id: user.id },
-    data:
-      kind === "gratitude"
-        ? { gratitudeTemplate: template, gratitudeCount: count }
-        : { duaTemplate: template, duaCount: count },
-  });
-
-  revalidatePath("/mind");
-  revalidatePath("/settings");
-  return { status: "success" };
 }
 
 /**

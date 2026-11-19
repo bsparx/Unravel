@@ -24,6 +24,22 @@ import {
   sessionLength,
 } from "@/lib/meditations";
 import { MIND_TABS } from "@/lib/mind-tabs";
+import { HEART_TABS, enabledHeartTabs } from "@/lib/heart-tabs";
+import {
+  DEFAULT_SET,
+  RECITATIONS,
+  REQUIRED_IDS,
+  arabicDigits,
+  findRecitation,
+  hadithFor,
+  sourcesFor,
+  itemTotal,
+  positionIn,
+  readSet,
+  sessionItem,
+} from "@/lib/recitations";
+import { BISMILLAH, TEXTS } from "@/lib/recitation-texts";
+import { SCENE_KEYS } from "@/lib/scenes";
 import { SCENES, sceneCaption, stageIdsAt } from "@/lib/scenes";
 import { TEND_DAYS, historySince, step as tendStep, tend, type TendDay } from "@/lib/tending";
 import { bookSchema, brainDumpSchema, meditationSessionSchema, readingLogSchema } from "@/lib/validation";
@@ -3953,7 +3969,7 @@ check("history runs from the first day kept, and the strip is the last fourteen"
 });
 
 check("every scene has fourteen named stages, and says what today brings", () => {
-  for (const tab of MIND_TABS) {
+  for (const tab of SCENE_KEYS) {
     const scene = SCENES[tab];
     assert.equal(scene.stages.length, TEND_DAYS, `${tab} has fourteen stages`);
     assert.equal(new Set(scene.stages.map((s) => s.id)).size, TEND_DAYS, `${tab} stage ids are unique`);
@@ -4216,6 +4232,102 @@ check("the overview links to the month it shows, and folds the long tail", () =>
   const folded = foldCategories([row("a", 50), row("b", 40), row("c", 30), row("d", 20), row("z", 0)], 2, (id) => id ?? "all");
   assert.deepEqual(folded.map((bar) => [bar.id, bar.cents]), [["a", 50], ["b", 40], ["rest", 50]]);
   assert.equal(foldCategories([row("a", 5), row("b", 4), row("c", 3)], 2, () => "").length, 3, "one left over keeps its name");
+});
+
+console.log("\nheart — gratitude, du'a and daily recitation");
+
+check("gratitude and du'a moved to Heart; Mind keeps the other five", () => {
+  assert.deepEqual([...HEART_TABS], ["gratitude", "dua", "recitation"]);
+  assert.ok(!(MIND_TABS as readonly string[]).includes("gratitude"));
+  assert.ok(!(MIND_TABS as readonly string[]).includes("dua"));
+  assert.equal(MIND_TABS.length, 5);
+  assert.deepEqual(enabledHeartTabs({ gratitude: false, dua: true, recitation: true }), ["dua", "recitation"]);
+  // Every practice still has its scene, the oasis included.
+  assert.equal(new Set(SCENE_KEYS).size, 8);
+  assert.equal(SCENES.recitation.stages[0].id, "spring");
+  assert.equal(sceneCaption(SCENES.recitation, tend(days("xxxxxxxxxxxxxxx"))).title, "The oasis is in full light.");
+  assert.equal(sceneCaption(SCENES.recitation, tend(days("..............."))).line, "Recite today's set to bring a spring welling up.");
+});
+
+check("every recitation has its words, in all three, and the three asked for are there", () => {
+  for (const id of REQUIRED_IDS) assert.ok(findRecitation(id), `${id} is in the catalogue`);
+  assert.ok(RECITATIONS.length >= 20, "a lot of options");
+  assert.equal(new Set(RECITATIONS.map((item) => item.id)).size, RECITATIONS.length, "ids are unique");
+  for (const item of RECITATIONS) {
+    assert.ok(item.parts.length > 0 && item.defaultCount >= 1, item.id);
+    for (const part of item.parts) {
+      const verses = TEXTS[part.text];
+      assert.ok(verses.length > 0, `${item.id} has words`);
+      for (const verse of verses) {
+        assert.ok(verse.ar.trim() && verse.tr.trim() && verse.en.trim(), `${item.id}: Arabic, transliteration and translation`);
+        assert.match(verse.ar, /[؀-ۿ]/, `${item.id}: the Arabic is Arabic`);
+      }
+    }
+  }
+  // Ayat al-Kursi is one verse, 2:255; the end of al-Baqarah is 285 and 286.
+  // The IndoPak text carries its own ayah ornament and number.
+  assert.equal(TEXTS.kursi.length, 1);
+  assert.ok(TEXTS.kursi[0].ar.endsWith("\u06DD٢٥٥"));
+  // (2:286 also ends a section, so a ruku sign follows its number.)
+  assert.deepEqual(TEXTS["baqarah-end"].map((v) => /\u06DD([٠-٩]+)/.exec(v.ar)?.[1]), ["٢٨٥", "٢٨٦"]);
+  assert.match(TEXTS.kursi[0].en, /^Allāh - there is no deity except Him, the Ever-Living/);
+  assert.ok(!/<|>/.test(TEXTS.kursi[0].en), "footnote markup is stripped");
+  // The surahs' first verses don't repeat the bismillah: it's drawn on its own line.
+  assert.ok(!TEXTS.ikhlas[0].ar.startsWith(BISMILLAH));
+  assert.ok(TEXTS.fatiha[0].ar.startsWith(BISMILLAH), "al-Fatihah's first verse is the bismillah");
+  assert.equal(TEXTS["kahf-ten"].length, 10);
+  assert.equal(arabicDigits(286), "٢٨٦");
+});
+
+check("Sahih only: every recitation carries a graded hadith and a sunnah.com link", () => {
+  for (const item of RECITATIONS) {
+    const list = hadithFor(item.id);
+    assert.ok(list.length > 0, `${item.id} has a hadith`);
+    for (const h of list) {
+      assert.match(h.url, /^https:\/\/sunnah\.com\/(bukhari|muslim|abudawud|tirmidhi|ibnmajah):\d+$/, h.ref);
+      assert.ok(h.text.length > 40, `${h.ref} is quoted`);
+      assert.ok(
+        h.grades.some((g) => /^Sahih/.test(g.grade) && /^(Sahih al-Bukhari|Sahih Muslim|Al-Albani)$/.test(g.by)),
+        `${h.ref} is Sahih`,
+      );
+    }
+    for (const part of item.parts) assert.ok(sourcesFor(part.text).arabic, `${item.id}: its Arabic has a source`);
+  }
+  // A stored set keeps what's still offered and drops what was removed.
+  assert.deepEqual(
+    readSet([{ key: "quls", count: 3 }, { key: "rabbana-atina", count: 1 }, { key: "fatiha", count: 1 }]).map((i) => i.key),
+    ["quls", "fatiha"],
+  );
+});
+
+check("the three Quls: three rounds of Ikhlas, Falaq and Nas is nine readings", () => {
+  const quls = sessionItem({ key: "quls", count: 3 })!;
+  assert.equal(itemTotal(quls), 9);
+  assert.deepEqual(positionIn(quls, 0), { round: 1, part: 0, inPart: 0, done: false });
+  assert.deepEqual(positionIn(quls, 1), { round: 1, part: 1, inPart: 0, done: false });
+  assert.deepEqual(positionIn(quls, 4), { round: 2, part: 1, inPart: 0, done: false });
+  assert.deepEqual(positionIn(quls, 8), { round: 3, part: 2, inPart: 0, done: false });
+  assert.equal(positionIn(quls, 9).done, true);
+  // The tasbih: 33, 33, 33, then the tahlil once.
+  const tasbih = sessionItem({ key: "tasbih", count: 1 })!;
+  assert.equal(itemTotal(tasbih), 100);
+  assert.deepEqual(positionIn(tasbih, 33), { round: 1, part: 1, inPart: 0, done: false });
+  assert.deepEqual(positionIn(tasbih, 99), { round: 1, part: 3, inPart: 0, done: false });
+  const hundred = sessionItem({ key: "subhanallah-100", count: 100 })!;
+  assert.deepEqual(positionIn(hundred, 37), { round: 38, part: 0, inPart: 0, done: false });
+});
+
+check("a stored set is cleaned, and an empty one is the default three", () => {
+  assert.deepEqual(DEFAULT_SET.map((item) => item.key), ["quls", "kursi", "baqarah-end"]);
+  assert.equal(DEFAULT_SET[0].count, 3);
+  assert.deepEqual(readSet(null), DEFAULT_SET);
+  assert.deepEqual(readSet([]), DEFAULT_SET);
+  assert.deepEqual(
+    readSet([{ key: "kursi", count: 0 }, { key: "nope", count: 2 }, { key: "kursi", count: 5 }, { key: "fatiha", count: 99999 }]),
+    [{ key: "kursi", count: 1 }, { key: "fatiha", count: 1000 }],
+  );
+  assert.deepEqual(readSet([{ key: "custom:abc", count: 2 }]), DEFAULT_SET, "someone else's custom id drops out");
+  assert.deepEqual(readSet([{ key: "custom:abc", count: 2 }], new Set(["abc"])), [{ key: "custom:abc", count: 2 }]);
 });
 
 console.log(`\n${passed} checks passed.\n`);

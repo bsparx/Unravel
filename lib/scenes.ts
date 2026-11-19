@@ -1,8 +1,13 @@
-import type { MindTab } from "@/lib/mind-tabs";
+import { HEART_TABS, type HeartTab } from "@/lib/heart-tabs";
+import { MIND_TABS, type MindTab } from "@/lib/mind-tabs";
 import { TEND_DAYS, type Tending } from "@/lib/tending";
 
+/** Every practice that keeps a scene: Mind's and Heart's. */
+export type SceneKey = MindTab | HeartTab;
+export const SCENE_KEYS: readonly SceneKey[] = [...HEART_TABS, ...MIND_TABS];
+
 /**
- * The Mind scenes, one per practice: what each one is, and the fourteen things that come
+ * The scenes, one per practice on Mind and Heart: what each one is, and the fourteen things that come
  * into it, one more for each day you keep the practice and one fewer for each day you
  * don't.
  * Stages appear in order and leave in reverse: the newest is the first to
@@ -30,7 +35,7 @@ export type Scene = {
 
 const stages = (list: [string, string][]): SceneStage[] => list.map(([id, name]) => ({ id, name }));
 
-export const SCENES: Record<MindTab, Scene> = {
+export const SCENES: Record<SceneKey, Scene> = {
   braindump: {
     title: "The balloon at first light",
     noun: "balloon",
@@ -118,6 +123,29 @@ export const SCENES: Record<MindTab, Scene> = {
       ["crescent", "the crescent, risen"],
       ["milky-way", "the Milky Way"],
       ["fajr", "the first light of fajr"],
+    ]),
+  },
+  recitation: {
+    title: "The oasis at dawn",
+    noun: "oasis",
+    whole: "The oasis is in full light.",
+    base: "dunes before dawn, a dry hollow between them",
+    act: "Recite today's set",
+    stages: stages([
+      ["spring", "a spring welling up"],
+      ["pool", "the pool, filled"],
+      ["palm", "the first date palm"],
+      ["reeds", "reeds at the water"],
+      ["lantern", "a lantern by the pool"],
+      ["grove", "a grove of palms"],
+      ["birds", "birds come to drink"],
+      ["dates", "dates on the palm"],
+      ["tent", "a tent on the far bank"],
+      ["caravan", "a caravan on the ridge"],
+      ["flowers", "flowers along the bank"],
+      ["mosque", "a small mosque by the water"],
+      ["sunrise", "the sun over the dunes"],
+      ["light", "the oasis in full light"],
     ]),
   },
   reading: {

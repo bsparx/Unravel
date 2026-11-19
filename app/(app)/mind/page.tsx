@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Settings2 } from "lucide-react";
 
 import { InfoTip } from "@/components/info-tip";
@@ -12,23 +13,24 @@ import { MindBoard } from "./_components/mind-board";
 export const metadata = { title: "Mind" };
 
 /**
- * Up to seven practices for the inside of the day, each one switchable in
+ * Up to five practices for the inside of the head, each one switchable in
  * Settings. A brain dump empties your head onto the page for a few minutes
  * and folds it away. Meditation is a full-screen timer that grows a garden; Reading
  * is a shelf of books, each gathering its own notes (/mind/books/[id]).
  *
- * Gratitude and du'a are a page a day, written with a template you choose.
  * Wishes are WOOPs (Oettingen): something you want, the best of having it,
  * the obstacle in you, and the if-then plan for it. Disputations are ABCDEs
  * (Seligman): a setback, the belief it set off, and the argument back. None
- * is tied to a task or a habit on purpose: this page is for what you're
- * grateful for, what you ask for, what you want and how you think.
+ * is tied to a task or a habit on purpose: this page is for what you want
+ * and how you think. Gratitude and du'a moved to /heart.
  */
 export default async function MindPage({ searchParams }: PageProps<"/mind">) {
   const user = await requireUser();
   // Next 16: searchParams is a Promise.
   const [params, view] = await Promise.all([searchParams, getMind(user)]);
   const raw = Array.isArray(params.tab) ? params.tab[0] : params.tab;
+  // Gratitude and du'a live on Heart now; an old link follows them there.
+  if (raw === "gratitude" || raw === "dua") redirect(`/heart?tab=${raw}`);
 
   const tabs = MIND_TABS.filter((tab) => view.enabled[tab]);
   // A tab that's been switched off (or never existed) lands on the first one on.
@@ -51,7 +53,7 @@ export default async function MindPage({ searchParams }: PageProps<"/mind">) {
         <div className="border-border mx-auto max-w-md rounded-2xl border border-dashed px-6 py-14 text-center">
           <p className="font-display text-2xl">Mind is switched off</p>
           <p className="text-muted-foreground mt-2 text-body">
-            Gratitude, du&apos;a, brain dump, meditation, reading, wishes and disputations can each be turned on in Settings, in any mix.
+            Brain dump, meditation, reading, wishes and disputations can each be turned on in Settings, in any mix.
           </p>
           <Button asChild className="mt-6 rounded-full">
             <Link href="/settings#mind">
@@ -67,10 +69,6 @@ export default async function MindPage({ searchParams }: PageProps<"/mind">) {
 
 /** One or two lines built from what's switched on. */
 function intro(enabled: MindEnabled): string {
-  const daily = [
-    enabled.gratitude && "what was good",
-    enabled.dua && "what you're asking for",
-  ].filter(Boolean);
   const dump = enabled.braindump ? "A few minutes to empty your head, and a balloon that rises with it." : "";
   const sit = enabled.meditate ? "Time to sit and breathe, and a garden that grows with it." : "";
   const read = enabled.reading ? "The books you're reading, and what you take from each." : "";
@@ -79,9 +77,8 @@ function intro(enabled: MindEnabled): string {
     enabled.disputations && "the thoughts you argue back",
   ].filter(Boolean) as string[];
 
-  const first = daily.length ? `A page a day for ${daily.join(" and ")}.` : "";
   const second = other.length
     ? `${other.join(", and ")}.`.replace(/^./, (c) => c.toUpperCase())
     : "";
-  return [first, dump, sit, read, second].filter(Boolean).join(" ");
+  return [dump, sit, read, second].filter(Boolean).join(" ");
 }
