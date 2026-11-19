@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronDown, Feather, Sparkle, Stamp, Undo2, Wind } from "lucide-react";
 import { toast } from "sonner";
 
+import { GuideCard } from "@/components/guides/guide-card";
 import { SceneCard } from "@/components/scenes/scene-card";
 import { WaxSeal, WoopCard } from "@/components/woop-card";
 import type { Tending } from "@/lib/tending";
@@ -66,6 +67,7 @@ export function WishesPanel({
   return (
     <div className="space-y-12">
       <SceneCard tab="wishes" tending={tending} />
+      <GuideCard guide="wishes" firstTime={active.length === 0 && settled.length === 0} />
 
       {active.length === 0 ? (
         <SkyEmpty

@@ -1,9 +1,11 @@
 import { DisputationTurn } from "@/components/disputation-card";
 import { DuaArch } from "@/components/dua-arch";
 import { GratitudePage } from "@/components/gratitude-page";
+import { WoopCard } from "@/components/woop-card";
 import type { DisputationFields } from "@/lib/disputation";
 import type { GuideKey } from "@/lib/practice-guides";
 import type { PracticeItem } from "@/lib/practices";
+import type { WoopFields } from "@/lib/woop";
 
 import { GuideArt } from "./guide-art";
 
@@ -38,8 +40,19 @@ export function GuideExample({ guide }: { guide: GuideKey }) {
       return <DumpExample />;
     case "meditate":
       return <SittingExample />;
+    case "wishes":
+      return <WoopCard woop={WOOP} layout="stacked" footer="An example" />;
   }
 }
+
+const WOOP: WoopFields = {
+  wish: "Finish the first draft of my thesis chapter by Friday",
+  outcome:
+    "Walking into Monday's supervision with something real to show, and a weekend that's actually free",
+  obstacle:
+    'I open my phone "for a second" when a paragraph gets hard, and lose the next hour',
+  plan: "put the phone in the other room and write one ugly sentence before I'm allowed to stop",
+};
 
 const DISPUTATION: DisputationFields = {
   adversity:

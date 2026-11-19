@@ -14,7 +14,7 @@
  */
 
 export type GuideKey =
-  "braindump" | "meditate" | "disputations" | "gratitude" | "dua";
+  "braindump" | "meditate" | "wishes" | "disputations" | "gratitude" | "dua";
 
 export type EvidenceKind =
   "meta-analysis" | "review" | "trial" | "study" | "book" | "quran" | "hadith";
@@ -250,6 +250,103 @@ export const GUIDES: Record<GuideKey, PracticeGuide> = {
     ],
     limits:
       "Effects are real but small to moderate, and meditation wasn't better than exercise or therapy. Some of these studies are small. If you have a heart or breathing condition, skip long breath holds.",
+  },
+
+  wishes: {
+    key: "wishes",
+    title: "Wishes (WOOP)",
+    promise:
+      "Turn a wish into a plan for the thing in you that gets in the way.",
+    sky: "woop-sky-wish",
+    steps: [
+      {
+        title: "Wish, then picture the best of it",
+        body: "Name something you want that's challenging but doable, in a few words. Then picture the best thing about getting there, vividly, for a moment.",
+      },
+      {
+        title: "Find the obstacle in you",
+        body: "The honest part: what in you is most likely to stop you? A habit, a feeling, an excuse. Not the world or other people; you.",
+      },
+      {
+        title: "Make it an if-then",
+        body: '"If I reach for my phone when it gets hard, then I\'ll put it in the other room and write one more line." Rehearse the card once a day.',
+      },
+    ],
+    tips: [
+      {
+        title: "The obstacle is inside you",
+        body: '"My boss" isn\'t one you can plan for. "I freeze and put it off when I\'m unsure" is.',
+      },
+      {
+        title: "Tiny, concrete plans",
+        body: '"Open the file and write one sentence" beats "try harder". The plan should be something you could do in a minute.',
+      },
+      {
+        title: "Rehearse it",
+        body: "Reading the if-then again each day keeps it ready for the moment the obstacle shows up.",
+      },
+    ],
+    mistakes: [
+      "Stopping at the outcome. Picturing only the good part feels great and can drain the effort; the obstacle is what makes it work.",
+      "Naming an outside obstacle. Pick the part you control: your reaction, your habit, your mood.",
+      "A vague plan. If you can't picture yourself doing it in the moment, make it smaller.",
+    ],
+    research: [
+      {
+        benefit: "If-then plans help you reach goals",
+        finding:
+          "Pooling 94 independent tests, writing an if-then plan for when and how to act had a medium-to-large effect on reaching goals (d = .65). It helped people get started, stay on track when distracted, and drop failing approaches.",
+        stat: {
+          value: "d = .65",
+          label: "effect of if-then plans across 94 tests",
+        },
+        kind: "meta-analysis",
+        cite: "Gollwitzer & Sheeran, 2006 · Advances in Experimental Social Psychology",
+        url: doi("10.1016/S0065-2601(06)38002-1"),
+        note: "About implementation intentions, the P in WOOP.",
+      },
+      {
+        benefit: "WOOP itself works, with a small-to-medium effect",
+        finding:
+          "Across 21 studies and 15,907 people, mental contrasting with implementation intentions (the method behind WOOP) improved goal attainment (g = 0.34). It worked better when practised with a guide (g = 0.47) than from written instructions alone (g = 0.28).",
+        stat: {
+          value: "g = 0.34",
+          label: "effect on reaching goals, 15,907 people",
+        },
+        kind: "meta-analysis",
+        cite: "Wang, Wang & Gai, 2021 · Frontiers in Psychology",
+        url: doi("10.3389/fpsyg.2021.565202"),
+      },
+      {
+        benefit: "Twice as much exercise for four months",
+        finding:
+          "256 women aged 30–50 were randomised. Those who also learned mental contrasting with if-then plans were twice as physically active as those given health information only, nearly 1 hour more a week, from the first week through all 4 months.",
+        stat: { value: "2×", label: "weekly physical activity" },
+        kind: "trial",
+        cite: "Stadler, Oettingen & Gollwitzer, 2009 · American Journal of Preventive Medicine",
+        url: doi("10.1016/j.amepre.2008.09.021"),
+      },
+      {
+        benefit: "60% more practice, from one 30-minute session",
+        finding:
+          "66 high-school students were randomised before their summer break. Those who did a 30-minute written WOOP-style exercise completed 140 practice questions for a big exam on average, against about 84 for the control group (β = .27, p = .04).",
+        stat: { value: "+60%", label: "practice questions completed" },
+        kind: "trial",
+        cite: "Duckworth et al., 2011 · Educational Psychology",
+        url: doi("10.1080/01443410.2010.506003"),
+      },
+      {
+        benefit: "Why the obstacle matters: daydreaming alone backfires",
+        finding:
+          "40 graduates were followed for 2 years. The more positively they daydreamed about their career, the fewer job offers they got (r = −.39), the less they earned (r = −.29) and the fewer applications they sent (r = −.40). Confident expectations, by contrast, predicted more offers (r = .41).",
+        stat: { value: "r = −.39", label: "positive daydreams vs. job offers" },
+        kind: "study",
+        cite: "Oettingen & Mayer, 2002 · Journal of Personality and Social Psychology",
+        url: doi("10.1037/0022-3514.83.5.1198"),
+      },
+    ],
+    limits:
+      "WOOP's pooled effect is small to medium (g = 0.34), and the meta-analysis found signs of publication bias, so the true effect may be smaller. The daydreaming study is correlational, and several of these samples are small.",
   },
 
   disputations: {

@@ -384,9 +384,88 @@ function DuaArt() {
   );
 }
 
+/** A wish as a starred summit; the path meets a boulder (the obstacle) and bends around it (the if-then). */
+function WoopArt() {
+  const path =
+    "M18 128 C40 116 56 110 72 110 C92 110 96 98 92 86 C88 72 124 58 150 34";
+  return (
+    <g>
+      {/* The wish. */}
+      <path
+        className="ga-twinkle"
+        d="M168 8 l3.2 7 7.6 .8 -5.7 5 1.7 7.4 -6.8 -3.9 -6.8 3.9 1.7 -7.4 -5.7 -5 7.6 -.8 z"
+        fill="var(--woop-wish)"
+      />
+      {/* The mountain and its summit flag. */}
+      <path
+        d="M0 136 L72 74 L104 92 L150 34 L200 136 Z"
+        fill="var(--woop-wish)"
+        opacity={0.14}
+      />
+      <line
+        x1={150}
+        y1={34}
+        x2={150}
+        y2={14}
+        stroke="var(--woop-ink)"
+        strokeWidth={1.6}
+      />
+      <path
+        className="ga-flag"
+        d="M150 14 l16 5 -16 5 z"
+        fill="var(--woop-outcome)"
+      />
+      {/* The way up, around the boulder. */}
+      <path
+        d={path}
+        fill="none"
+        stroke="var(--woop-ink)"
+        strokeOpacity={0.35}
+        strokeWidth={1.6}
+        strokeDasharray="3 4"
+      />
+      <line
+        x1={18}
+        y1={128}
+        x2={150}
+        y2={34}
+        stroke="var(--woop-ink)"
+        strokeOpacity={0.12}
+        strokeWidth={1.2}
+      />
+      <ellipse cx={70} cy={91} rx={14} ry={10} fill="var(--woop-obstacle)" />
+      <path
+        d="M61 87 q7 -5 14 -1"
+        fill="none"
+        stroke="var(--woop-on-ink)"
+        strokeOpacity={0.5}
+        strokeWidth={1.2}
+      />
+      <circle className="ga-climb" r={4.5} fill="var(--woop-plan)" />
+      <g
+        fill="var(--woop-ink)"
+        fontSize={8}
+        fontFamily="var(--font-sans)"
+        opacity={0.7}
+      >
+        <text x={162} y={36}>
+          wish
+        </text>
+        <text x={52} y={82} textAnchor="end">
+          obstacle
+        </text>
+        <text x={100} y={102}>
+          if… then
+        </text>
+      </g>
+    </g>
+  );
+}
+
 const ART: Record<GuideKey, () => React.JSX.Element> = {
   braindump: DumpArt,
   meditate: BreathArt,
+  wishes: WoopArt,
   disputations: AbcdeArt,
   gratitude: GratitudeArt,
   dua: DuaArt,

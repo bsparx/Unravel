@@ -190,8 +190,8 @@ export default function PracticeGuideSheet({
                   </h3>
                   {group.title === "What studies found" && (
                     <p className="text-muted-foreground text-micro">
-                      Reading the numbers: an effect size (d) of about 0.2 is
-                      small, 0.5 medium and 0.8 large. A correlation (r) runs
+                      Reading the numbers: an effect size (d or g) of about 0.2
+                      is small, 0.5 medium and 0.8 large. A correlation (r) runs
                       from −1 to 1; the further from 0, the stronger. A p under
                       .05 means the result is unlikely to be chance.
                     </p>

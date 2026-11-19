@@ -2744,6 +2744,15 @@
   offset-distance: 0%;
   offset-rotate: 0deg;
 }
+.guide-art .ga-climb {
+  offset-path: path("M18 128 C40 116 56 110 72 110 C92 110 96 98 92 86 C88 72 124 58 150 34");
+  offset-distance: 62%;
+  offset-rotate: 0deg;
+}
+.guide-art .ga-flag {
+  transform-box: fill-box;
+  transform-origin: left center;
+}
 .guide-art .ga-breathe {
   transform-box: fill-box;
   transform-origin: center;
@@ -2789,6 +2798,15 @@
   }
   .guide-art .ga-rise {
     animation: ga-rise 3.2s ease-out infinite;
+  }
+  .guide-art .ga-climb {
+    animation: ga-climb 7s ease-in-out infinite;
+  }
+  .guide-art .ga-flag {
+    animation: ga-flag 2.4s ease-in-out infinite;
+  }
+  .guide-art .ga-twinkle {
+    animation: ga-glow-star 3s ease-in-out infinite;
   }
 }
 
@@ -2852,4 +2870,16 @@
   0% { transform: translateY(0); opacity: 0; }
   20% { opacity: 1; }
   100% { transform: translateY(-46px); opacity: 0; }
+}
+@keyframes ga-climb {
+  0% { offset-distance: 0%; }
+  85%, 100% { offset-distance: 100%; }
+}
+@keyframes ga-flag {
+  0%, 100% { transform: scaleX(1); }
+  50% { transform: scaleX(0.8); }
+}
+@keyframes ga-glow-star {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
 }

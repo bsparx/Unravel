@@ -4334,7 +4334,7 @@ check("a stored set is cleaned, and an empty one is the default three", () => {
 console.log("\npractice guides");
 
 check("every guide has three steps, sourced research and an honest limit", () => {
-  assert.deepEqual([...GUIDE_KEYS].sort(), ["braindump", "disputations", "dua", "gratitude", "meditate"]);
+  assert.deepEqual([...GUIDE_KEYS].sort(), ["braindump", "disputations", "dua", "gratitude", "meditate", "wishes"]);
   for (const key of GUIDE_KEYS) {
     const guide = GUIDES[key];
     assert.equal(guide.key, key);

@@ -322,7 +322,8 @@ export function SettingsForm({
               label="Wishes (WOOP)"
               hint="Wish, Outcome, Obstacle, Plan. For something you want and the thing in you that gets in the way."
               defaultChecked={values.mindWoopEnabled}
-            />
+              extra={<ResearchLink guide="wishes" />}
+              />
             <CheckboxField
               id="mindDisputationEnabled"
               label="Disputations (ABCDE)"
