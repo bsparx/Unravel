@@ -58,7 +58,7 @@ export function DebtDialog({
 
   const [direction, setDirection] = useState<DebtDraft["direction"]>(draft.direction);
   const [counterparty, setCounterparty] = useState(draft.counterparty);
-  const [amountText, setAmountText] = useState(() => rupeesInput(draft.amountCents));
+  const [amountText, setAmountText] = useState(() => (draft.amountCents > 0 ? rupeesInput(draft.amountCents) : ""));
   const [date, setDate] = useState(draft.date);
   const [note, setNote] = useState(draft.note);
 
@@ -76,7 +76,7 @@ export function DebtDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent sheetOnPhone className="max-sm:bg-background max-sm:content-start sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-display">
             {editing ? "Edit this IOU" : "Who owes who"}
@@ -215,7 +215,7 @@ export function DebtDialog({
             ) : (
               <span />
             )}
-            <div className="flex gap-2">
+            <div className="flex gap-2 max-sm:[&>*]:flex-1">
               <Button type="button" variant="ghost" onClick={onClose}>
                 Cancel
               </Button>

@@ -97,7 +97,7 @@ export function MoneyDialog({
   const [categoryId, setCategoryId] = useState(draft.categoryId ?? "none");
   const [date, setDate] = useState(draft.date);
   const [budgetId, setBudgetId] = useState(draft.budgetId ?? "none");
-  const [amountText, setAmountText] = useState(() => rupeesInput(draft.amountCents));
+  const [amountText, setAmountText] = useState(() => (draft.amountCents > 0 ? rupeesInput(draft.amountCents) : ""));
   const [note, setNote] = useState(draft.note);
 
   const options = kind === "INCOME" ? categories.income : categories.expense;
@@ -152,7 +152,7 @@ export function MoneyDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent sheetOnPhone className="max-sm:bg-background max-sm:content-start sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-display">
             {settling
@@ -244,7 +244,7 @@ export function MoneyDialog({
               value={accountId}
               onValueChange={setAccountId}
             >
-              <SelectTrigger id="money-account">
+              <SelectTrigger id="money-account" className="w-full">
                 <SelectValue placeholder="Pick an account" />
               </SelectTrigger>
               <SelectContent>
@@ -265,7 +265,7 @@ export function MoneyDialog({
           <div className="space-y-1.5">
             <Label htmlFor="money-category">Category</Label>
             <Select name="categoryId" value={categoryId} onValueChange={setCategoryId}>
-              <SelectTrigger id="money-category">
+              <SelectTrigger id="money-category" className="w-full">
                 <SelectValue placeholder="Pick a category" />
               </SelectTrigger>
               <SelectContent>
@@ -291,7 +291,7 @@ export function MoneyDialog({
                 value={budgetId}
                 onValueChange={setBudgetId}
               >
-                <SelectTrigger id="money-budget">
+                <SelectTrigger id="money-budget" className="w-full">
                   <SelectValue placeholder="No budget" />
                 </SelectTrigger>
                 <SelectContent>
@@ -369,7 +369,7 @@ export function MoneyDialog({
             ) : (
               <span />
             )}
-            <div className="flex gap-2">
+            <div className="flex gap-2 max-sm:[&>*]:flex-1">
               <Button type="button" variant="ghost" onClick={onClose}>
                 Cancel
               </Button>

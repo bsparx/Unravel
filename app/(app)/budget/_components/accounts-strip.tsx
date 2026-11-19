@@ -24,7 +24,7 @@ export function AccountsStrip({ accounts }: { accounts: Account[] }) {
         <h2 className="text-title">Accounts</h2>
         <Link
           href="/budget/accounts"
-          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex items-center gap-0.5 rounded-md text-label transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring -my-2 inline-flex min-h-9 items-center gap-0.5 rounded-md text-label transition-colors focus-visible:ring-2 focus-visible:outline-none"
         >
           Manage
           <ChevronRight className="size-3.5" aria-hidden />

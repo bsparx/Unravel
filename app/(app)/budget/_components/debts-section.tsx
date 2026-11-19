@@ -223,7 +223,7 @@ function Pocket({
                   title={debt.settled ? "Uncross" : "Settle"}
                   onClick={() => onSettle(debt)}
                   className={cn(
-                    "focus-visible:ring-ring inline-flex size-7 shrink-0 items-center justify-center rounded-full border transition-colors focus-visible:ring-2 focus-visible:outline-none",
+                    "focus-visible:ring-ring inline-flex size-9 shrink-0 items-center justify-center rounded-full border transition-colors focus-visible:ring-2 focus-visible:outline-none",
                     debt.settled
                       ? "border-border bg-accent text-muted-foreground"
                       : tone === "in"

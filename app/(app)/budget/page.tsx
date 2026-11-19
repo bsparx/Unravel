@@ -149,7 +149,7 @@ export default async function BudgetPage({ searchParams }: PageProps<"/budget">)
           <Delta now={compare.thisIncomeCents} then={compare.incomeCents} label={compare.label} goodWhenUp />
           <Link
             href={monthLedgerHref("INCOME", month.monthISO, todayISO)}
-            className="hover:text-foreground focus-visible:ring-ring inline-flex items-center gap-1 rounded-sm underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-none"
+            className="hover:text-foreground focus-visible:ring-ring -my-2 inline-flex min-h-9 items-center gap-1 rounded-sm underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-none"
           >
             See income
             <ArrowRight className="size-3.5" aria-hidden />
@@ -175,7 +175,7 @@ export default async function BudgetPage({ searchParams }: PageProps<"/budget">)
           action={
             <Link
               href={monthLedgerHref("EXPENSE", month.monthISO, todayISO)}
-              className="text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex shrink-0 items-center gap-1 rounded-md text-label transition-colors focus-visible:ring-2 focus-visible:outline-none"
+              className="text-muted-foreground hover:text-foreground focus-visible:ring-ring -my-2 inline-flex min-h-9 shrink-0 items-center gap-1 rounded-md text-label transition-colors focus-visible:ring-2 focus-visible:outline-none"
             >
               All expenses
               <ArrowRight className="size-3.5" aria-hidden />
@@ -214,13 +214,13 @@ export default async function BudgetPage({ searchParams }: PageProps<"/budget">)
               <div className="flex items-center gap-3 text-label">
                 <Link
                   href={monthLedgerHref("INCOME", month.monthISO, todayISO)}
-                  className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                  className="text-muted-foreground hover:text-foreground focus-visible:ring-ring -my-2 inline-flex min-h-9 items-center rounded-md px-1 transition-colors focus-visible:ring-2 focus-visible:outline-none"
                 >
                   Income
                 </Link>
                 <Link
                   href={monthLedgerHref("EXPENSE", month.monthISO, todayISO)}
-                  className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                  className="text-muted-foreground hover:text-foreground focus-visible:ring-ring -my-2 inline-flex min-h-9 items-center rounded-md px-1 transition-colors focus-visible:ring-2 focus-visible:outline-none"
                 >
                   Expenses
                 </Link>

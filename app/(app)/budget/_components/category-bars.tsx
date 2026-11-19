@@ -7,7 +7,7 @@ import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/
 import { formatMoneyCompact } from "@/lib/money";
 import { CATEGORY_COLORS } from "@/lib/money-palette";
 
-import { MoneyTooltip } from "./chart-bits";
+import { ChartFrame, MoneyTooltip } from "./chart-bits";
 import { useLedgerNav } from "./ledger-shell";
 import type { CategoryBar } from "../_lib/ledger";
 
@@ -44,8 +44,13 @@ export function CategoryBars({
 
   const color = tone === "in" ? "var(--money-in)" : "var(--money-out)";
   const total = rows.reduce((sum, row) => sum + row.cents, 0);
+  // Only what the chart reads. Recharts copies a data point's SVG-looking
+  // fields onto its bar, so an `id`, `href` or `color` would land in the DOM.
   const data = rows.map((row) => ({
-    ...row,
+    rowId: row.id,
+    name: row.name,
+    cents: row.cents,
+    link: row.href,
     value: row.cents / 100,
     fill: row.color === null || (selectedId !== null && row.id !== selectedId) ? "var(--money-quiet)" : color,
     dot: row.color ? (CATEGORY_COLORS[row.color] ?? "var(--muted-foreground)") : "var(--muted-foreground)",
@@ -54,73 +59,77 @@ export function CategoryBars({
 
   return (
     <>
-      <ChartContainer config={config} className="aspect-auto w-full" style={{ height: rows.length * ROW + 4 }}>
-        <BarChart
-          accessibilityLayer
-          data={data}
-          layout="vertical"
-          margin={{ left: 0, right: 76, top: 4, bottom: 0 }}
-          barCategoryGap={0}
-        >
-          <XAxis type="number" hide domain={[0, "dataMax"]} />
-          <YAxis type="category" dataKey="name" hide />
-          <ChartTooltip
-            cursor={false}
-            content={({ active, payload }) => {
-              const row = payload?.[0]?.payload as (typeof data)[number] | undefined;
-              if (!active || !row) return null;
-              const share = total > 0 ? Math.round((row.cents / total) * 100) : 0;
-              return (
-                <MoneyTooltip
-                  title={row.name}
-                  rows={[{ key: "value", label: `${share}% of it`, color: row.fill, cents: row.cents }]}
+      <ChartFrame style={{ height: rows.length * ROW + 4 }}>
+        {(size) => (
+          <ChartContainer config={config} initialDimension={size} className="aspect-auto h-full w-full">
+            <BarChart
+              accessibilityLayer
+              data={data}
+              layout="vertical"
+              margin={{ left: 0, right: 76, top: 4, bottom: 0 }}
+              barCategoryGap={0}
+            >
+              <XAxis type="number" hide domain={[0, "dataMax"]} />
+              <YAxis type="category" dataKey="name" hide />
+              <ChartTooltip
+                cursor={false}
+                content={({ active, payload }) => {
+                  const row = payload?.[0]?.payload as (typeof data)[number] | undefined;
+                  if (!active || !row) return null;
+                  const share = total > 0 ? Math.round((row.cents / total) * 100) : 0;
+                  return (
+                    <MoneyTooltip
+                      title={row.name}
+                      rows={[{ key: "value", label: `${share}% of it`, color: row.fill, cents: row.cents }]}
+                    />
+                  );
+                }}
+              />
+              <Bar
+                dataKey="value"
+                radius={[0, 4, 4, 0]}
+                maxBarSize={12}
+                minPointSize={2}
+                className="cursor-pointer"
+                onClick={(_, index) => {
+                  const row = data[index];
+                  if (row) go(row.link);
+                }}
+              >
+                {data.map((row) => (
+                  <Cell key={row.rowId} fill={row.fill} />
+                ))}
+                <LabelList
+                  dataKey="name"
+                  content={({ x, y, index }) => {
+                    const row = data[Number(index)];
+                    if (!row) return null;
+                    const left = Number(x);
+                    const top = Number(y);
+                    return (
+                      <g>
+                        <circle cx={left + 4} cy={top - 10} r={4} fill={row.dot} />
+                        <text x={left + 14} y={top - 6} fontSize={13} style={{ fill: "var(--foreground)" }}>
+                          {truncate(row.name)}
+                        </text>
+                      </g>
+                    );
+                  }}
                 />
-              );
-            }}
-          />
-          <Bar
-            dataKey="value"
-            radius={[0, 4, 4, 0]}
-            maxBarSize={12}
-            minPointSize={2}
-            className="cursor-pointer"
-            onClick={(_, index) => {
-              const row = data[index];
-              if (row) go(row.href);
-            }}
-          >
-            {data.map((row) => (
-              <Cell key={row.id} fill={row.fill} />
-            ))}
-            <LabelList
-              dataKey="name"
-              content={({ x, y, index }) => {
-                const row = data[Number(index)];
-                if (!row) return null;
-                const left = Number(x);
-                const top = Number(y);
-                return (
-                  <g>
-                    <circle cx={left + 4} cy={top - 10} r={4} fill={row.dot} />
-                    <text x={left + 14} y={top - 6} fontSize={13} style={{ fill: "var(--foreground)" }}>
-                      {truncate(row.name)}
-                    </text>
-                  </g>
-                );
-              }}
-            />
-            <LabelList
-              dataKey="value"
-              position="right"
-              offset={8}
-              fontSize={12}
-              className="tabular-nums"
-              style={{ fill: "var(--muted-foreground)" }}
-              formatter={(value) => formatMoneyCompact(Math.round(Number(value) * 100))}
-            />
-          </Bar>
-        </BarChart>
-      </ChartContainer>
+                <LabelList
+                  dataKey="value"
+                  position="right"
+                  offset={8}
+                  fontSize={12}
+                  className="tabular-nums"
+                  style={{ fill: "var(--muted-foreground)" }}
+                  formatter={(value) => formatMoneyCompact(Math.round(Number(value) * 100))}
+                />
+              </Bar>
+            </BarChart>
+          </ChartContainer>
+        )}
+      </ChartFrame>
 
       <table className="sr-only">
         <caption>{label}</caption>

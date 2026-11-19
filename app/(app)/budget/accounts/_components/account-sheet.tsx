@@ -46,7 +46,7 @@ export function AccountSheet({
 }) {
   return (
     <Sheet open={Boolean(account)} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="sm:max-w-md" side="right">
+      <SheetContent className="max-sm:data-[side=right]:w-full sm:max-w-md" side="right">
         {account && (
           <AccountSheetBody
             key={account.id}
@@ -269,7 +269,7 @@ function AccountSheetBody({
                 type="button"
                 aria-label="Previous month"
                 onClick={() => goMonth(prevISO)}
-                className="focus-visible:ring-ring text-muted-foreground hover:text-foreground rounded-md p-1 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                className="focus-visible:ring-ring text-muted-foreground hover:text-foreground grid size-9 place-items-center rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
               >
                 <ChevronLeft className="size-4" aria-hidden />
               </button>
@@ -278,12 +278,12 @@ function AccountSheetBody({
                   type="button"
                   aria-label="Next month"
                   onClick={() => goMonth(nextISO)}
-                  className="focus-visible:ring-ring text-muted-foreground hover:text-foreground rounded-md p-1 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                  className="focus-visible:ring-ring text-muted-foreground hover:text-foreground grid size-9 place-items-center rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
                 >
                   <ChevronRight className="size-4" aria-hidden />
                 </button>
               ) : (
-                <span className="text-muted-foreground/40 p-1" aria-hidden>
+                <span className="text-muted-foreground/40 grid size-9 place-items-center" aria-hidden>
                   <ChevronRight className="size-4" />
                 </span>
               )}

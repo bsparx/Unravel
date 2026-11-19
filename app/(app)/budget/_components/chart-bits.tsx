@@ -1,12 +1,14 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { formatMoneyCompact } from "@/lib/money";
+import { cn } from "@/lib/utils";
 
 /**
  * The small pieces every budget chart shares, so they read as one family:
- * the axis numbers, the tooltip box and the card a chart sits in.
+ * the axis numbers, the tooltip box, the frame a chart is drawn in and the
+ * card it sits on.
  *
  * Chart data is in rupees, not paise, so the axis lands on round numbers a
  * person would say (0, 5K, 10K) instead of round numbers of paise.
@@ -16,6 +18,43 @@ const COMPACT = new Intl.NumberFormat("en-PK", { notation: "compact", maximumFra
 
 /** Axis ticks: 0, 950, 1.5K, 24.5K, 2.5M. */
 export const rupeeTick = (rupees: number) => COMPACT.format(rupees);
+
+type Size = { width: number; height: number };
+
+/**
+ * The box a chart is drawn in, measured before the chart first draws.
+ *
+ * Recharts can't know its box on the server, so left alone it renders at a
+ * stock 320 by 200 and corrects itself once the page is live. Until then the
+ * bars were squeezed into the wrong height (the first category's name rode up
+ * over the card's subtitle) and could poke past a phone's edge. So the server
+ * sends only the empty box, at its real height; the browser measures it
+ * before the first paint and the chart starts at the right size. Resizes
+ * after that are the chart's own business.
+ */
+export function ChartFrame({
+  className,
+  style,
+  children,
+}: {
+  className?: string;
+  style?: CSSProperties;
+  children: (size: Size) => ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState<Size | null>(null);
+
+  useLayoutEffect(() => {
+    const box = ref.current?.getBoundingClientRect();
+    if (box) setSize({ width: Math.round(box.width), height: Math.round(box.height) });
+  }, []);
+
+  return (
+    <div ref={ref} className={cn("relative w-full min-w-0", className)} style={style}>
+      {size && children(size)}
+    </div>
+  );
+}
 
 /**
  * The tooltip, value first: the reader already knows which bar they're on

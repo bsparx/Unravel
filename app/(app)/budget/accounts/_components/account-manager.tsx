@@ -161,7 +161,7 @@ export function AccountManager({
                       onClick={() => setTransferFrom(account)}
                       aria-label={`Move money out of ${account.name}`}
                       title="Move money to another account"
-                      className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded-md p-1.5 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                      className="text-muted-foreground hover:text-foreground focus-visible:ring-ring grid size-10 place-items-center rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
                     >
                       <ArrowLeftRight className="size-4" aria-hidden />
                     </button>
@@ -170,7 +170,7 @@ export function AccountManager({
                     type="button"
                     onClick={() => setOpened(account)}
                     aria-label={`Open ${account.name}`}
-                    className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded-md p-1.5 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                    className="text-muted-foreground hover:text-foreground focus-visible:ring-ring grid size-10 place-items-center rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
                   >
                     <ChevronRight className="size-4" aria-hidden />
                   </button>
@@ -225,7 +225,7 @@ export function AccountManager({
       />
 
       <Dialog open={newOpen} onOpenChange={(open) => !open && setNewOpen(false)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent sheetOnPhone className="max-sm:bg-background max-sm:content-start sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="font-display">New account</DialogTitle>
             <DialogDescription>

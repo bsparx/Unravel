@@ -67,7 +67,7 @@ export function TransferDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent sheetOnPhone className="max-sm:bg-background max-sm:content-start sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="font-display">Move money</DialogTitle>
           <DialogDescription>
@@ -84,7 +84,7 @@ export function TransferDialog({
             <div className="space-y-1.5">
               <Label htmlFor="transfer-from">From</Label>
               <Select value={fromId} onValueChange={setFromId}>
-                <SelectTrigger id="transfer-from">
+                <SelectTrigger id="transfer-from" className="w-full">
                   <SelectValue placeholder="Account" />
                 </SelectTrigger>
                 <SelectContent>
@@ -109,7 +109,7 @@ export function TransferDialog({
             <div className="space-y-1.5">
               <Label htmlFor="transfer-to">To</Label>
               <Select value={toId} onValueChange={setToId}>
-                <SelectTrigger id="transfer-to">
+                <SelectTrigger id="transfer-to" className="w-full">
                   <SelectValue placeholder="Account" />
                 </SelectTrigger>
                 <SelectContent>

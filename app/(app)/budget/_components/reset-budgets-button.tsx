@@ -31,7 +31,7 @@ export function ResetBudgetsButton() {
         <button
           type="button"
           onClick={open}
-          className="text-destructive/80 hover:text-destructive focus-visible:ring-ring inline-flex items-center gap-1.5 rounded-md text-label transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          className="text-destructive/80 hover:text-destructive focus-visible:ring-ring inline-flex min-h-9 items-center gap-1.5 rounded-md text-label transition-colors focus-visible:ring-2 focus-visible:outline-none"
         >
           <RotateCcw className="size-4" aria-hidden />
           Start from scratch

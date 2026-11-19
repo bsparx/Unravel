@@ -265,7 +265,7 @@ export function BudgetsSection({
       />
 
       <Dialog open={newOpen} onOpenChange={(open) => !open && setNewOpen(false)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent sheetOnPhone className="max-sm:bg-background max-sm:content-start sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="font-display">New budget</DialogTitle>
             <DialogDescription>

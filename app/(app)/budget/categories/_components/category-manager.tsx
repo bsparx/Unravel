@@ -74,30 +74,35 @@ function AddCategoryForm({ kind }: { kind: "INCOME" | "EXPENSE" }) {
           onChange={(event) => setName(event.target.value)}
           maxLength={40}
           placeholder="New category…"
-          className="flex-1"
+          className="min-w-0 flex-1"
         />
-        <div className="flex gap-1.5">
-          {COLORS.map((option) => (
-            <button
-              key={option}
-              type="button"
-              onClick={() => setColor(option)}
-              aria-pressed={color === option}
-              aria-label={`${option} colour`}
-              className={cn(
-                "focus-visible:ring-ring size-5 rounded-full transition-transform focus-visible:ring-2 focus-visible:outline-none",
-                color === option && "scale-110",
-              )}
-              style={{
-                backgroundColor: CATEGORY_COLORS[option],
-              }}
-            />
-          ))}
-        </div>
-        <Button type="submit" size="sm" disabled={pending || name.trim() === ""}>
+        <Button type="submit" size="sm" className="shrink-0" disabled={pending || name.trim() === ""}>
           <Plus className="size-4" aria-hidden />
           Add
         </Button>
+      </div>
+      {/* Its own row, so ten colours never push "Add" off a phone's edge.
+          Each dot sits in a 32px target that's easy to hit. */}
+      <div className="-mx-1.5 flex flex-wrap" role="group" aria-label="Colour">
+        {COLORS.map((option) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => setColor(option)}
+            aria-pressed={color === option}
+            aria-label={`${option} colour`}
+            className="focus-visible:ring-ring grid size-8 place-items-center rounded-full focus-visible:ring-2 focus-visible:outline-none"
+          >
+            <span
+              aria-hidden
+              className={cn(
+                "size-5 rounded-full transition-transform",
+                color === option && "ring-foreground/60 ring-offset-background scale-110 ring-2 ring-offset-1",
+              )}
+              style={{ backgroundColor: CATEGORY_COLORS[option] }}
+            />
+          </button>
+        ))}
       </div>
       {error && (
         <p role="alert" className="text-destructive text-label">
@@ -154,7 +159,7 @@ function EditCategoryDialog({ category }: { category: BudgetCategory }) {
         <button
           type="button"
           aria-label={`Edit ${category.name}`}
-          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded-md p-1.5 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring grid size-10 place-items-center rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
         >
           <Pencil className="size-4" aria-hidden />
         </button>
@@ -263,7 +268,7 @@ function CategoryRow({ category }: { category: BudgetCategory }) {
               type="button"
               onClick={open}
               aria-label={`Archive ${category.name}`}
-              className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded-md p-1.5 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+              className="text-muted-foreground hover:text-foreground focus-visible:ring-ring grid size-10 place-items-center rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
             >
               <Archive className="size-4" aria-hidden />
             </button>

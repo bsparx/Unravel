@@ -18,7 +18,9 @@ const SECTIONS = [
 /**
  * The budget's sections, one row of pills. It lives in the budget layout, so
  * it stays put while a section loads beneath it. On a phone the row scrolls
- * sideways rather than wrapping into a second line.
+ * sideways rather than wrapping into a second line. Inline containment keeps
+ * the row's full width from counting as the page's minimum: without it, the
+ * main column beside the sidebar was pushed past the window on tablets.
  */
 export function BudgetNav() {
   const pathname = usePathname();
@@ -37,7 +39,7 @@ export function BudgetNav() {
   }, [pathname]);
 
   return (
-    <nav ref={scroller} aria-label="Budget" className="-mx-5 mb-6 overflow-x-auto px-5 [scrollbar-width:none] md:mx-0 md:px-0">
+    <nav ref={scroller} aria-label="Budget" className="-mx-5 mb-6 overflow-x-auto px-5 [contain:inline-size] [scrollbar-width:none] md:mx-0 md:px-0">
       <ul className="flex w-max gap-1">
         {SECTIONS.map((section) => {
           const active =

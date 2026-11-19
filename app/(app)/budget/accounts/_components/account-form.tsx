@@ -84,7 +84,7 @@ export function AccountForm({
 
       <div className="space-y-1.5">
         <Label>Colour</Label>
-        <div className="flex gap-2">
+        <div className="-mx-1.5 flex flex-wrap">
           {COLORS.map((option) => (
             <button
               key={option}
@@ -92,12 +92,17 @@ export function AccountForm({
               onClick={() => setColor(option)}
               aria-pressed={color === option}
               aria-label={`${option} colour`}
-              className={cn(
-                "focus-visible:ring-ring size-6 rounded-full transition-transform focus-visible:ring-2 focus-visible:outline-none",
-                color === option && "scale-110",
-              )}
-              style={{ backgroundColor: CATEGORY_COLORS[option] }}
-            />
+              className="focus-visible:ring-ring grid size-9 place-items-center rounded-full focus-visible:ring-2 focus-visible:outline-none"
+            >
+              <span
+                aria-hidden
+                className={cn(
+                  "size-6 rounded-full transition-transform",
+                  color === option && "ring-foreground/60 ring-offset-background scale-110 ring-2 ring-offset-1",
+                )}
+                style={{ backgroundColor: CATEGORY_COLORS[option] }}
+              />
+            </button>
           ))}
         </div>
       </div>

@@ -3,16 +3,10 @@
 import { useRouter } from "next/navigation";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
-import {
-  ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
-  ChartTooltip,
-  type ChartConfig,
-} from "@/components/ui/chart";
+import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
 import { formatMoneyCompact } from "@/lib/money";
 
-import { MoneyTooltip, rupeeTick } from "./chart-bits";
+import { ChartFrame, MoneyTooltip, rupeeTick } from "./chart-bits";
 import type { BudgetOverview } from "../_lib/queries";
 
 const CONFIG = {
@@ -54,79 +48,83 @@ export function MonthlyChart({ months, activeStart }: { months: Month[]; activeS
 
   return (
     <>
-      <ChartContainer config={CONFIG} className="aspect-auto min-h-60 w-full flex-1">
-        <BarChart
-          accessibilityLayer
-          data={data}
-          margin={{ left: 0, right: 4, top: 8, bottom: 0 }}
-          barGap={2}
-          barCategoryGap="22%"
-          className="cursor-pointer"
-          onClick={(state) => open(state?.activeTooltipIndex)}
-        >
-          <CartesianGrid vertical={false} />
-          <XAxis
-            dataKey="tick"
-            tickLine={false}
-            axisLine={false}
-            tickMargin={8}
-            tick={({ x, y, payload, index }) => {
-              const active = data[index]?.start === activeStart;
-              return (
-                <text
-                  x={x}
-                  y={y}
-                  dy={10}
-                  textAnchor="middle"
-                  fontSize={12}
-                  fontWeight={active ? 600 : 400}
-                  style={{ fill: active ? "var(--foreground)" : "var(--muted-foreground)" }}
-                >
-                  {payload.value}
-                </text>
-              );
-            }}
-          />
-          <YAxis tickLine={false} axisLine={false} width={44} tickFormatter={rupeeTick} />
-          <ChartTooltip
-            cursor={{ fill: "var(--accent)", opacity: 0.45 }}
-            content={({ active, payload }) => {
-              const month = payload?.[0]?.payload as Month | undefined;
-              if (!active || !month) return null;
-              return (
-                <MoneyTooltip
-                  title={month.label}
-                  rows={[
-                    { key: "in", label: "came in", color: "var(--money-in)", cents: month.incomeCents },
-                    { key: "out", label: "went out", color: "var(--money-out)", cents: month.expenseCents },
-                  ]}
-                  footer={keptLine(month)}
-                />
-              );
-            }}
-          />
-          <ChartLegend
-            verticalAlign="top"
-            align="right"
-            itemSorter={null}
-            content={<ChartLegendContent verticalAlign="top" className="justify-end" />}
-          />
-          <Bar
-            dataKey="income"
-            fill="var(--color-income)"
-            radius={[4, 4, 0, 0]}
-            maxBarSize={22}
-            onClick={(_, index) => open(index)}
-          />
-          <Bar
-            dataKey="expense"
-            fill="var(--color-expense)"
-            radius={[4, 4, 0, 0]}
-            maxBarSize={22}
-            onClick={(_, index) => open(index)}
-          />
-        </BarChart>
-      </ChartContainer>
+      <ChartFrame className="min-h-60 flex-1">
+        {(size) => (
+          <ChartContainer config={CONFIG} initialDimension={size} className="aspect-auto h-full w-full">
+            <BarChart
+              accessibilityLayer
+              data={data}
+              margin={{ left: 0, right: 4, top: 8, bottom: 0 }}
+              barGap={2}
+              barCategoryGap="22%"
+              className="cursor-pointer"
+              onClick={(state) => open(state?.activeTooltipIndex)}
+            >
+              <CartesianGrid vertical={false} />
+              <XAxis
+                dataKey="tick"
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+                tick={({ x, y, payload, index }) => {
+                  const active = data[index]?.start === activeStart;
+                  return (
+                    <text
+                      x={x}
+                      y={y}
+                      dy={10}
+                      textAnchor="middle"
+                      fontSize={12}
+                      fontWeight={active ? 600 : 400}
+                      style={{ fill: active ? "var(--foreground)" : "var(--muted-foreground)" }}
+                    >
+                      {payload.value}
+                    </text>
+                  );
+                }}
+              />
+              <YAxis tickLine={false} axisLine={false} width={44} tickFormatter={rupeeTick} />
+              <ChartTooltip
+                cursor={{ fill: "var(--accent)", opacity: 0.45 }}
+                content={({ active, payload }) => {
+                  const month = payload?.[0]?.payload as Month | undefined;
+                  if (!active || !month) return null;
+                  return (
+                    <MoneyTooltip
+                      title={month.label}
+                      rows={[
+                        { key: "in", label: "came in", color: "var(--money-in)", cents: month.incomeCents },
+                        { key: "out", label: "went out", color: "var(--money-out)", cents: month.expenseCents },
+                      ]}
+                      footer={keptLine(month)}
+                    />
+                  );
+                }}
+              />
+              <ChartLegend
+                verticalAlign="top"
+                align="right"
+                itemSorter={null}
+                content={<ChartLegendContent verticalAlign="top" className="justify-end" />}
+              />
+              <Bar
+                dataKey="income"
+                fill="var(--color-income)"
+                radius={[4, 4, 0, 0]}
+                maxBarSize={22}
+                onClick={(_, index) => open(index)}
+              />
+              <Bar
+                dataKey="expense"
+                fill="var(--color-expense)"
+                radius={[4, 4, 0, 0]}
+                maxBarSize={22}
+                onClick={(_, index) => open(index)}
+              />
+            </BarChart>
+          </ChartContainer>
+        )}
+      </ChartFrame>
 
       <table className="sr-only">
         <caption>Money in and out by month</caption>

@@ -58,7 +58,7 @@ export function BudgetDetailSheet({
 }) {
   return (
     <Sheet open={Boolean(budget)} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="sm:max-w-md" side="right">
+      <SheetContent className="max-sm:data-[side=right]:w-full sm:max-w-md" side="right">
         {budget && (
           <BudgetSheetBody
             key={budget.id}
@@ -117,7 +117,7 @@ function BudgetSheetBody({
 
   return (
     <Sheet open={Boolean(budget)} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="sm:max-w-md" side="right">
+      <SheetContent className="max-sm:data-[side=right]:w-full sm:max-w-md" side="right">
         {budget && !editing && (
           <>
             <SheetHeader className="pr-10">
