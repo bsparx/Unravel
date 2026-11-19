@@ -18,7 +18,7 @@ const DEFAULT_CHOICE: MeditationChoice = { kind: "box", options: { n: 4, minutes
 const PAGE_SIZE = 10;
 
 /**
- * Meditation: the garden the last two weeks have kept, the meditations to
+ * Meditation: the garden as the days have kept it, the meditations to
  * choose from, and the sittings so far.
  */
 export function MeditatePanel({

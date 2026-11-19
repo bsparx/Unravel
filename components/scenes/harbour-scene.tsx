@@ -47,7 +47,7 @@ function WaveBand({ y, amp, len, shade, foam, delay }: { y: number; amp: number;
 /**
  * The harbour after the storm. The one scene that clears rather than fills:
  * a storm over the harbour, rain and high water and a dark lighthouse, and
- * fourteen days that take it apart, the beam lit, the rain easing, the sea
+ * fourteen kept days that take it apart, the beam lit, the rain easing, the sea
  * settling, the sun breaking through, a boat going out, a rainbow, and at
  * last a clear sky. Miss days and the weather comes back.
  */

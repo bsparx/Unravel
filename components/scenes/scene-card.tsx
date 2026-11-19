@@ -10,6 +10,7 @@ import { SCENES, sceneCaption, stageIdsAt } from "@/lib/scenes";
 import type { TendDay, Tending } from "@/lib/tending";
 import { cn } from "@/lib/utils";
 
+import { BalloonScene } from "./balloon-scene";
 import { CourtyardScene } from "./courtyard-scene";
 import { HarbourScene } from "./harbour-scene";
 import { NookScene } from "./nook-scene";
@@ -21,6 +22,7 @@ export const SCENE_ART: Record<MindTab, ComponentType<SceneProps>> = {
   meditate: GardenScene,
   gratitude: TerraceScene,
   dua: CourtyardScene,
+  braindump: BalloonScene,
   reading: NookScene,
   wishes: SummitScene,
   disputations: HarbourScene,
@@ -30,6 +32,7 @@ export const SCENE_ART: Record<MindTab, ComponentType<SceneProps>> = {
 const DAY_DOT: Record<MindTab, string> = {
   gratitude: "bg-[var(--thanks-lantern)]",
   dua: "bg-[var(--dua-accent)]",
+  braindump: "bg-[var(--balloon-env-1)]",
   meditate: "bg-[var(--garden-light)]",
   reading: "bg-[var(--reading-dot)]",
   wishes: "bg-[var(--woop-wish)]",
@@ -38,8 +41,8 @@ const DAY_DOT: Record<MindTab, string> = {
 
 /**
  * A practice's scene, at the top of its tab: the place itself, a line on
- * where it stands and what today does for it, and the fourteen days that
- * count. When a save brings a new stage, it grows in.
+ * where it stands and what today does for it, and the last fourteen days.
+ * When a save brings a new stage, it grows in.
  *
  * `note` says what a day held ("12 min", "20 pages"), for the tooltips.
  */
@@ -89,7 +92,7 @@ export function SceneCard({
   );
 }
 
-/** The fourteen days that count, and today while it's still open. */
+/** The last fourteen days, and today while it's still open. */
 function DayStrip({
   tab,
   tending,

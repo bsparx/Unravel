@@ -1960,6 +1960,120 @@
   --harbour-rain: #9fb0d0;
 }
 
+/* The balloon at first light (brain dump). Cotton candy sees it on a
+   periwinkle-to-apricot morning over mint fields; the night theme puts it
+   under the last stars, every burner glowing. */
+:root {
+  --balloon-sky-1: #a9b6f0;
+  --balloon-sky-2: #dcc6f0;
+  --balloon-sky-3: #ffdccb;
+  --balloon-stars: 0;
+  --balloon-star: #ffffff;
+  --balloon-cloud: #ffffff;
+  --balloon-sun: #ffd27a;
+  --balloon-far: #c4b8ea;
+  --balloon-mid-far: #a7cdd3;
+  --balloon-mid: #96caa9;
+  --balloon-near: #80bd94;
+  --balloon-ground: #69aa82;
+  --balloon-grass: #4e9670;
+  --balloon-hedge: #6aa889;
+  --balloon-river: #9fd0f6;
+  --balloon-river-far: #c9dcfb;
+  --balloon-river-edge: #7fb6e0;
+  --balloon-shine: #ffffff;
+  --balloon-trunk: #6b5a5a;
+  --balloon-poplar: #4f9274;
+  --balloon-poplar-lit: #86c39e;
+  --balloon-field-1: #cdb9f0;
+  --balloon-field-2: #ffe39a;
+  --balloon-field-3: #bde8c8;
+  --balloon-field-4: #ffc4d1;
+  --balloon-house: #fbe3ec;
+  --balloon-house-2: #e7dcfb;
+  --balloon-roof: #e27d92;
+  --balloon-roof-2: #8e8ad6;
+  --balloon-window: #8fa2d2;
+  --balloon-steeple: #ece2fb;
+  --balloon-mill: #efe6fb;
+  --balloon-mill-shade: #c8b8e8;
+  --balloon-sail: #7f74b4;
+  --balloon-wool: #fffaf7;
+  --balloon-sheep-face: #4a3f5c;
+  --balloon-bird: #4a3f80;
+  --balloon-env-1: #ff8fa6;
+  --balloon-env-2: #fff3ea;
+  --balloon-env-3: #8fc7ef;
+  --balloon-two-1: #b8a5f2;
+  --balloon-two-2: #a3e2c4;
+  --balloon-seam: rgba(70, 45, 110, 0.22);
+  --balloon-skirt: #7a5a6a;
+  --balloon-basket: #b98458;
+  --balloon-basket-dark: #8a5a3b;
+  --balloon-rope: #6e5a52;
+  --balloon-flame: #ffad42;
+  --balloon-flame-core: #fff3c2;
+  --balloon-burn-glow: 0.35;
+  --balloon-light: rgba(255, 255, 255, 0.42);
+  --balloon-shade: rgba(70, 45, 120, 0.3);
+  --balloon-inner: rgba(255, 196, 120, 0.18);
+}
+
+.dark {
+  --balloon-sky-1: #060a26;
+  --balloon-sky-2: #17184a;
+  --balloon-sky-3: #3d2c64;
+  --balloon-stars: 1;
+  --balloon-cloud: #4c4a88;
+  --balloon-sun: #ffb35c;
+  --balloon-far: #25265c;
+  --balloon-mid-far: #1d2f55;
+  --balloon-mid: #1a384a;
+  --balloon-near: #16393d;
+  --balloon-ground: #112e30;
+  --balloon-grass: #0b2224;
+  --balloon-hedge: #10292d;
+  --balloon-river: #3a5a9a;
+  --balloon-river-far: #5a6fb0;
+  --balloon-river-edge: #2a4278;
+  --balloon-shine: #d6e0ff;
+  --balloon-trunk: #1b2228;
+  --balloon-poplar: #0f2a2f;
+  --balloon-poplar-lit: #22494d;
+  --balloon-field-1: #3b3470;
+  --balloon-field-2: #4f4a3a;
+  --balloon-field-3: #234843;
+  --balloon-field-4: #563352;
+  --balloon-house: #2f2c58;
+  --balloon-house-2: #36315f;
+  --balloon-roof: #6c3653;
+  --balloon-roof-2: #2c2b66;
+  --balloon-window: #ffcf7a;
+  --balloon-steeple: #36315f;
+  --balloon-mill: #2f2c58;
+  --balloon-mill-shade: #24224a;
+  --balloon-sail: #8b87c6;
+  --balloon-wool: #cfc9e6;
+  --balloon-sheep-face: #15122a;
+  --balloon-bird: #c9cdf5;
+  --balloon-env-1: #e0627f;
+  --balloon-env-2: #ebded3;
+  --balloon-env-3: #4f86c6;
+  --balloon-two-1: #7d68c8;
+  --balloon-two-2: #3f9a80;
+  --balloon-seam: rgba(10, 8, 30, 0.35);
+  --balloon-skirt: #3a2a36;
+  --balloon-basket: #7a5038;
+  --balloon-basket-dark: #4d3123;
+  --balloon-rope: #8f7f76;
+  --balloon-flame: #ffad42;
+  --balloon-flame-core: #fff3c2;
+  --balloon-burn-glow: 0.75;
+  --balloon-light: rgba(255, 230, 200, 0.16);
+  --balloon-shade: rgba(4, 4, 22, 0.5);
+  --balloon-inner: rgba(255, 170, 80, 0.5);
+}
+
 .mind-scene [data-fx],
 .mind-scene [data-grow] {
   transform-box: fill-box;
@@ -2015,6 +2129,9 @@
     animation: scene-flutter 1.6s ease-in-out infinite;
   }
   .mind-scene [data-fx="glide"] { animation: scene-glide 12s ease-in-out infinite; }
+  .mind-scene [data-fx="spin"] { animation: scene-spin 18s linear infinite; }
+  /* A kept day lifts the balloon; a missed one lets it sink. */
+  .balloon-scene .balloon-rise { transition: transform 2.6s cubic-bezier(0.33, 1, 0.68, 1); }
   .mind-scene [data-fx="beam"] { animation: scene-beam 7s ease-in-out infinite; }
   .mind-scene [data-fx="smoke"] { animation: scene-smoke 5s ease-out infinite; }
   .mind-scene [data-fx="swell"] { animation: scene-swell 8s ease-in-out infinite alternate; }
@@ -2151,6 +2268,9 @@
   0%, 62%, 66%, 70%, 100% { opacity: 0; }
   63%, 69% { opacity: 0.9; }
 }
+@keyframes scene-spin {
+  to { transform: rotate(360deg); }
+}
 @keyframes scene-grow {
   from { transform: scale(0.4); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
@@ -2244,4 +2364,137 @@
   .book-ribbon {
     transition: height 700ms cubic-bezier(0.2, 0.7, 0.2, 1);
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Brain dump: the morning sky it's written under, the page whose older lines
+   fade so you keep going, the circle drawn round a to-do, and the airmail
+   envelope a finished dump folds into.
+--------------------------------------------------------------------------- */
+
+:root {
+  --dump-paper: #fffbfe;
+  --dump-flap: #f7eef8;
+  --dump-crease: rgba(84, 52, 116, 0.18);
+  --dump-air-a: #ff8fa6;
+  --dump-air-b: #8fb0ef;
+  --dump-seal: #ffffff;
+}
+
+.dark {
+  --dump-paper: #1f2150;
+  --dump-flap: #262a5e;
+  --dump-crease: rgba(255, 255, 255, 0.12);
+  --dump-air-a: #c95c76;
+  --dump-air-b: #4f70ba;
+  --dump-seal: #2f3470;
+}
+
+.dump-sky {
+  background:
+    radial-gradient(ellipse 70% 50% at 88% 0%, rgba(255, 205, 228, 0.55), transparent 62%),
+    radial-gradient(ellipse 80% 55% at 8% 100%, rgba(255, 214, 190, 0.6), transparent 65%),
+    linear-gradient(180deg, #e2e6ff 0%, #efe2f8 55%, #ffe7dc 100%);
+}
+
+.dark .dump-sky {
+  background:
+    radial-gradient(ellipse 70% 50% at 88% 0%, rgba(120, 90, 200, 0.28), transparent 62%),
+    radial-gradient(ellipse 80% 55% at 8% 100%, rgba(255, 150, 90, 0.14), transparent 65%),
+    linear-gradient(180deg, #070b26 0%, #141748 58%, #2a2254 100%);
+}
+
+/* The page: it starts low, and what scrolls up fades out. */
+.dump-page {
+  --fade: 5.5rem;
+  padding-top: var(--fade);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fade));
+  mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fade));
+  caret-color: var(--balloon-env-1);
+  scrollbar-width: none;
+}
+
+.dump-page::-webkit-scrollbar { display: none; }
+
+.dump-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--woop-line) transparent;
+}
+
+@media (min-width: 640px) {
+  .dump-page { --fade: 8rem; }
+}
+
+/* The envelope, seen from the back: airmail stripes round a pale face. */
+.dump-envelope {
+  padding: 5px;
+  border-radius: 14px;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--dump-air-a) 0 9px,
+    var(--dump-paper) 9px 14px,
+    var(--dump-air-b) 14px 23px,
+    var(--dump-paper) 23px 28px
+  );
+  box-shadow: 0 14px 30px -20px rgba(40, 30, 90, 0.55);
+}
+
+.dump-envelope-big { padding: 7px; border-radius: 18px; }
+
+.dump-envelope-face {
+  border-radius: 10px;
+  background: var(--dump-paper);
+}
+
+.dump-envelope-big .dump-envelope-face { border-radius: 12px; }
+
+.dump-flap { transform-origin: top center; }
+
+.dump-seal {
+  background: var(--dump-seal);
+  box-shadow:
+    0 0 0 2px var(--dump-air-a),
+    0 4px 10px -4px rgba(40, 30, 90, 0.45);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dump-card { transition: transform 260ms cubic-bezier(0.2, 0.7, 0.2, 1); }
+  .dump-card-open .dump-flap { transition: transform 360ms cubic-bezier(0.2, 0.7, 0.2, 1); }
+  .dump-card-open:hover,
+  .dump-card-open:focus-visible { transform: translateY(-3px) rotate(-0.6deg); }
+  .dump-card-open:hover .dump-flap,
+  .dump-card-open:focus-visible .dump-flap { transform: scaleY(0.82); }
+
+  /* A circle drawn round a line, as with a pen. */
+  .dump-circle path {
+    stroke-dasharray: 1.1;
+    animation: dump-circle 460ms cubic-bezier(0.3, 0.7, 0.2, 1) both;
+  }
+
+  /* The finished page folds into its envelope and the flap comes down. */
+  .dump-fold { animation: dump-fold 900ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  .dump-fold .dump-flap { animation: dump-flap 700ms 420ms cubic-bezier(0.3, 0.8, 0.3, 1) both; }
+  .dump-fold .dump-seal { animation: dump-seal 420ms 1000ms cubic-bezier(0.3, 1.4, 0.5, 1) both; }
+}
+
+@keyframes dump-circle {
+  from { stroke-dashoffset: 1.1; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes dump-fold {
+  from { transform: translateY(18px) scale(1.12, 1.5); opacity: 0; }
+  40% { opacity: 1; }
+  to { transform: none; opacity: 1; }
+}
+
+@keyframes dump-flap {
+  from { transform: scaleY(-1); }
+  to { transform: scaleY(1); }
+}
+
+/* Scale only: the seal is centred with Tailwind's own translate property. */
+@keyframes dump-seal {
+  from { transform: scale(0.2); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
 }

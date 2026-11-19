@@ -33,8 +33,8 @@ function Pine({ x, y, s }: { x: number; y: number; s: number }) {
  * The summit at sunrise. A valley before dawn under a mountain, and
  * fourteen things that come as the morning does: a cairn, the path, a tent,
  * the bridge over the ravine, first light on the peak, the mist lifting, a
- * lake that holds the sky, and at last the sun at the summit, one for each
- * day of the last two weeks you rehearsed a wish.
+ * lake that holds the sky, and at last the sun at the summit, one more for
+ * each day you rehearse a wish.
  */
 export function SummitScene({ level, fresh = [], className, label = true }: SceneProps) {
   const { has, stage } = stager(SCENE, level, fresh);

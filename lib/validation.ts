@@ -30,6 +30,7 @@ import {
 } from "@/lib/timer-math";
 import { MAX_REMIND_DAYS } from "@/lib/subscriptions";
 import { DISPUTATION_MAX } from "@/lib/disputation";
+import { DUMP_KINDS, DUMP_MAX_CHARS, DUMP_MAX_TASKS, DUMP_TASK_CHARS } from "@/lib/brain-dump";
 import { WOOP_MAX } from "@/lib/woop";
 import {
   PRACTICE_MAX_COUNT,
@@ -636,6 +637,7 @@ export const settingsSchema = z.object({
   mindDuaEnabled: z.coerce.boolean().default(true),
   mindMeditationEnabled: z.coerce.boolean().default(true),
   mindReadingEnabled: z.coerce.boolean().default(true),
+  mindBrainDumpEnabled: z.coerce.boolean().default(true),
   gratitudeTemplate: z
     .string()
     .refine((id) => findTemplate("gratitude", id) !== null, "Pick a gratitude template.")
@@ -877,6 +879,40 @@ export const disputationRevisitSchema = z.object({
   id: cuid,
   belief: conviction,
 });
+
+/**
+ * A brain dump, typed or done on paper. `tasks` arrives as a JSON list of the
+ * lines circled at the sort; a typed dump needs something on the page.
+ */
+export const brainDumpSchema = z
+  .object({
+    kind: z.enum(DUMP_KINDS),
+    body: z.string().max(DUMP_MAX_CHARS, "That's longer than a dump can keep.").default(""),
+    paper: z.coerce.boolean().default(false),
+    seconds: z.coerce.number().int().min(0).max(60 * 60).default(0),
+    tasks: z
+      .string()
+      .default("[]")
+      .transform((raw, ctx) => {
+        try {
+          const list: unknown = JSON.parse(raw);
+          if (Array.isArray(list) && list.every((item) => typeof item === "string")) return list as string[];
+        } catch {
+          // Not JSON: reported below.
+        }
+        ctx.addIssue({ code: "custom", message: "Those tasks didn't come through." });
+        return z.NEVER;
+      })
+      .pipe(
+        z
+          .array(z.string().trim().min(1).max(DUMP_TASK_CHARS))
+          .max(DUMP_MAX_TASKS, `Up to ${DUMP_MAX_TASKS} at a time.`),
+      ),
+  })
+  .refine((dump) => dump.paper || dump.body.trim().length > 0, {
+    message: "There's nothing on the page yet.",
+    path: ["body"],
+  });
 
 const lens = emptyToUndefined(
   z.string().trim().max(DISPUTATION_MAX.lens, "Keep it shorter than that."),

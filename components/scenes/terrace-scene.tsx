@@ -44,8 +44,8 @@ function CordLantern({ t, size = 1 }: { t: number; size?: number }) {
  * The lantern terrace. A terrace at golden hour (dusk, at night) with a
  * bare cord between two posts, and fourteen things that gather on it: the
  * first lantern, then herbs, tea, a lit window, bread and figs, a cat, the
- * full garland, and at last the evening star, one for each day of the last
- * two weeks you wrote down what was good.
+ * full garland, and at last the evening star, one more for each day you
+ * write down what was good.
  */
 export function TerraceScene({ level, fresh = [], className, label = true }: SceneProps) {
   const { stage } = stager(SCENE, level, fresh);

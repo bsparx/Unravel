@@ -1,5 +1,6 @@
 import type { User } from "@/lib/generated/prisma/client";
-import { addDays, toISODate, todayLocal } from "@/lib/dates";
+import { addDays, minuteOfDayLocal, toISODate, todayLocal } from "@/lib/dates";
+import { wordCount, type DumpKind } from "@/lib/brain-dump";
 import { prisma } from "@/lib/db";
 import type { DisputationCard } from "@/lib/disputation";
 import {
@@ -18,12 +19,14 @@ import {
   type MeditationOptions,
 } from "@/lib/meditations";
 import { getReading, type ReadingView } from "@/lib/reading-data";
-import { TEND_DAYS, historyFrom, tend, type Tending } from "@/lib/tending";
+import { TEND_DAYS, historySince, tend, type Tending } from "@/lib/tending";
 
 /** How far back the journal on each daily tab reaches. */
 const HISTORY_DAYS = 90;
 /** Two weeks of sitting minutes, for the garden's day notes. */
 const WEEK_DOTS = 14;
+/** The most brain dumps the tab shows. */
+const DUMP_ROWS = 60;
 
 export type PracticeView = {
   /** The template new pages are written with. */
@@ -36,7 +39,7 @@ export type PracticeView = {
   todayISO: string;
   /** Rotates placeholders, stable for the day. */
   seed: number;
-  /** The scene: kept by the pages written in the last two weeks. */
+  /** The scene: a stage up for each day a page is written, down for each day without. */
   tending: Tending;
 };
 
@@ -59,11 +62,43 @@ export type MeditationView = {
   todayISO: string;
   /** What the picker opens on: the last sitting's choice. */
   last: { kind: string; options: MeditationOptions } | null;
-  /** The garden: kept by the days sat in the last two weeks. */
+  /** The garden: a stage up for each day you sit, down for each day you don't. */
   tending: Tending;
 };
 
+/** One brain dump, as its envelope shows it. */
+export type DumpRow = {
+  id: string;
+  dateISO: string;
+  /** "Thu 19 Nov". */
+  dateLabel: string;
+  /** "08:40", in the user's zone. */
+  time: string;
+  kind: DumpKind;
+  paper: boolean;
+  seconds: number;
+  sent: number;
+  words: number;
+  /** Written today: it stays folded until tomorrow, and its words don't cross. */
+  sealed: boolean;
+  /** Null while sealed, and for a dump done on paper. */
+  body: string | null;
+};
+
+export type BrainDumpView = {
+  /** The balloon: kept by the days you emptied your head. */
+  tending: Tending;
+  todayISO: string;
+  /** Minutes since midnight in the user's zone: picks the kind that suits the hour. */
+  minuteOfDay: number;
+  /** Newest first. */
+  dumps: DumpRow[];
+  /** What a day in the scene's strip held: "5 min", "2 dumps", "On paper". */
+  notes: Record<string, string>;
+};
+
 export type MindEnabled = {
+  braindump: boolean;
   meditate: boolean;
   reading: boolean;
   wishes: boolean;
@@ -81,6 +116,7 @@ export type MindView = {
   dua: PracticeView;
   meditation: MeditationView;
   reading: ReadingView;
+  braindump: BrainDumpView;
   /** The summit: kept by the days a wish was rehearsed. */
   wishTending: Tending;
   /** Wishes rehearsed today. */
@@ -95,6 +131,7 @@ export function mindEnabled(user: User): MindEnabled {
     disputations: user.mindDisputationEnabled,
     gratitude: user.mindGratitudeEnabled,
     dua: user.mindDuaEnabled,
+    braindump: user.mindBrainDumpEnabled,
     meditate: user.mindMeditationEnabled,
     reading: user.mindReadingEnabled,
   };
@@ -117,10 +154,25 @@ export async function getMind(user: User): Promise<MindView> {
   const today = todayLocal(user.timezone);
   const since = addDays(today, -HISTORY_DAYS);
 
-  // Fifteen days back: two weeks, and the day before them, for the scenes.
+  // The strip under each scene shows two weeks and today.
   const tendSince = addDays(today, -TEND_DAYS);
 
-  const [wishes, disputations, pages, sittings, reading, rehearsals, recentRevisits, lastRevisits] = await Promise.all([
+  // A scene is kept by every day since the practice began (lib/tending.ts),
+  // so the days it was done are read all the way back: dates only.
+  const [
+    wishes,
+    disputations,
+    pages,
+    sittings,
+    reading,
+    rehearsals,
+    revisitDays,
+    lastRevisits,
+    dumps,
+    dumpDays,
+    pageDays,
+    sitDays,
+  ] = await Promise.all([
     prisma.wish.findMany({
       where: { userId: user.id },
       orderBy: [{ sortOrder: "desc" }, { createdAt: "desc" }],
@@ -141,11 +193,12 @@ export async function getMind(user: User): Promise<MindView> {
     }),
     getReading(user),
     prisma.wishRehearsal.findMany({
-      where: { userId: user.id, date: { gte: tendSince } },
+      where: { userId: user.id },
       select: { wishId: true, date: true },
     }),
     prisma.disputationRevisit.findMany({
-      where: { userId: user.id, date: { gte: tendSince } },
+      where: { userId: user.id },
+      distinct: ["date"],
       select: { date: true },
     }),
     // The latest revisit of each disputation, for its card.
@@ -154,6 +207,24 @@ export async function getMind(user: User): Promise<MindView> {
       orderBy: { date: "desc" },
       distinct: ["disputationId"],
       select: { disputationId: true, date: true, belief: true },
+    }),
+    prisma.brainDump.findMany({
+      where: { userId: user.id, date: { gte: since } },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      take: DUMP_ROWS,
+    }),
+    prisma.brainDump.findMany({
+      where: { userId: user.id },
+      select: { date: true, paper: true, seconds: true },
+    }),
+    prisma.journalEntry.findMany({
+      where: { userId: user.id, kind: { in: ["GRATITUDE", "DUA"] } },
+      select: { date: true, kind: true },
+    }),
+    // Sittings are instants; bucketed into the user's days below.
+    prisma.meditationSession.findMany({
+      where: { userId: user.id, seconds: { gt: 0 } },
+      select: { startedAt: true },
     }),
   ]);
 
@@ -184,9 +255,9 @@ export async function getMind(user: User): Promise<MindView> {
             : [{ key: "body", step: "", label: "", text: row.body }],
         };
       });
-    const written = new Set(rows.map((row) => row.dateISO));
+    const written = pageDays.filter((row) => row.kind === journalKind).map((row) => toISODate(row.date));
     return {
-      tending: tend(historyFrom(todayISO, (iso) => written.has(iso), (date) => dayLabel.format(date))),
+      tending: tend(historySince(todayISO, written, (date) => dayLabel.format(date))),
       template: templateOrDefault(kind, templateId).id,
       count: clampCount(count),
       today: rows.find((row) => row.dateISO === todayISO) ?? null,
@@ -234,7 +305,11 @@ export async function getMind(user: User): Promise<MindView> {
   const lastMeditation = lastRow ? findMeditation(lastRow.kind) : null;
   const meditation: MeditationView = {
     tending: tend(
-      historyFrom(todayISO, (iso) => (minutesByDay.get(iso) ?? 0) > 0, (date) => dayLabel.format(date)),
+      historySince(
+        todayISO,
+        sitDays.map((row) => localISO.format(row.startedAt)),
+        (date) => dayLabel.format(date),
+      ),
     ),
     recent: sittings.slice(0, 30).map((row) => {
       const found = findMeditation(row.kind);
@@ -263,20 +338,78 @@ export async function getMind(user: User): Promise<MindView> {
 
   // Disputations are instants, bucketed into the user's day like sittings;
   // revisits are already calendar days.
-  const disputedDays = new Set([
+  const disputedDays = [
     ...disputations.map((row) => localISO.format(row.createdAt)),
-    ...recentRevisits.map((row) => toISODate(row.date)),
-  ]);
-  const rehearsedDays = new Set(rehearsals.map((row) => toISODate(row.date)));
+    ...revisitDays.map((row) => toISODate(row.date)),
+  ];
+  const rehearsedDays = rehearsals.map((row) => toISODate(row.date));
   const revisitOf = new Map(lastRevisits.map((row) => [row.disputationId, row]));
+
+  // Brain dumps: today's stay folded, so only their shape crosses to the client.
+  const dumpTime = new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: user.timezone,
+  });
+  // What each recent day held, for the strip's tooltips.
+  const byDay = new Map<string, { count: number; paper: number; seconds: number }>();
+  for (const row of dumpDays) {
+    if (row.date < tendSince) continue;
+    const iso = toISODate(row.date);
+    const day = byDay.get(iso) ?? { count: 0, paper: 0, seconds: 0 };
+    day.count += 1;
+    day.paper += row.paper ? 1 : 0;
+    day.seconds += row.seconds;
+    byDay.set(iso, day);
+  }
+  const braindump: BrainDumpView = {
+    tending: tend(
+      historySince(
+        todayISO,
+        dumpDays.map((row) => toISODate(row.date)),
+        (date) => dayLabel.format(date),
+      ),
+    ),
+    todayISO,
+    minuteOfDay: minuteOfDayLocal(user.timezone),
+    notes: Object.fromEntries(
+      [...byDay].map(([iso, day]) => [
+        iso,
+        day.count > 1
+          ? `${day.count} dumps`
+          : day.paper
+            ? "On paper"
+            : day.seconds < 60
+              ? "Under a minute"
+              : `${Math.round(day.seconds / 60)} min`,
+      ]),
+    ),
+    dumps: dumps.map((row) => {
+      const dateISO = toISODate(row.date);
+      const sealed = dateISO === todayISO;
+      return {
+        id: row.id,
+        dateISO,
+        dateLabel: dayLabel.format(row.date),
+        time: dumpTime.format(row.createdAt),
+        kind: row.kind,
+        paper: row.paper,
+        seconds: row.seconds,
+        sent: row.sent,
+        words: wordCount(row.body),
+        sealed,
+        body: sealed || row.paper ? null : row.body,
+      };
+    }),
+  };
 
   return {
     enabled: mindEnabled(user),
-    wishTending: tend(historyFrom(todayISO, (iso) => rehearsedDays.has(iso), (date) => dayLabel.format(date))),
+    braindump,
+    wishTending: tend(historySince(todayISO, rehearsedDays, (date) => dayLabel.format(date))),
     rehearsedToday: rehearsals.filter((row) => toISODate(row.date) === todayISO).map((row) => row.wishId),
-    disputationTending: tend(
-      historyFrom(todayISO, (iso) => disputedDays.has(iso), (date) => dayLabel.format(date)),
-    ),
+    disputationTending: tend(historySince(todayISO, disputedDays, (date) => dayLabel.format(date))),
     meditation,
     reading,
     gratitude: practice("gratitude", user.gratitudeTemplate, user.gratitudeCount),

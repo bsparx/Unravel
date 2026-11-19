@@ -4,7 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 
+import { BrainDumpPaper } from "@/components/brain-dump-paper";
+import { BrainDumpSession, type DumpResult } from "@/components/brain-dump-session";
 import { DisputationRevisit } from "@/components/disputation-revisit";
+import { DumpLetter } from "@/components/dump-envelope";
 import { DisputationRitual } from "@/components/disputation-ritual";
 import type { MeditationChoice } from "@/components/meditation/meditation-picker";
 import { MeditationSession, type SessionResult } from "@/components/meditation/meditation-session";
@@ -18,7 +21,8 @@ import { WishRehearsal } from "@/components/wish-rehearsal";
 import { WoopRitual } from "@/components/woop-ritual";
 import { cn } from "@/lib/utils";
 import type { DisputationCard, DisputationFields } from "@/lib/disputation";
-import type { MindView } from "@/lib/mind-data";
+import type { DumpKind, DumpMinutes } from "@/lib/brain-dump";
+import type { DumpRow, MindView } from "@/lib/mind-data";
 import type { ShelfBook } from "@/lib/reading-data";
 import type { Tending } from "@/lib/tending";
 import { MIND_TABS, type MindTab } from "@/lib/mind-tabs";
@@ -34,11 +38,13 @@ import { findMeditation } from "@/lib/meditations";
 import {
   rehearseWish,
   revisitDisputation,
+  saveBrainDump,
   saveDisputation,
   saveMeditation,
   savePractice,
   saveWish,
 } from "../actions";
+import { BrainDumpPanel } from "./braindump-panel";
 import { DisputationsPanel } from "./disputations-panel";
 import { MeditatePanel } from "./meditate-panel";
 import { PracticePanel, type PracticeWriteMode } from "./practice-panel";
@@ -53,6 +59,9 @@ type Editing =
   | { kind: "meditation"; choice: MeditationChoice; tending: Tending }
   | { kind: "rehearse"; card: WishCard }
   | { kind: "revisit"; card: DisputationCard }
+  | { kind: "dump"; dump: DumpKind; minutes: DumpMinutes; tending: Tending }
+  | { kind: "dump-paper"; dump: DumpKind }
+  | { kind: "dump-read"; row: DumpRow }
   | { kind: "book" }
   | { kind: "log"; book: ShelfBook }
   | null;
@@ -60,6 +69,7 @@ type Editing =
 const LABELS: Record<MindTab, string> = {
   gratitude: "Gratitude",
   dua: "Du'a",
+  braindump: "Brain dump",
   meditate: "Meditate",
   reading: "Reading",
   wishes: "Wishes",
@@ -70,6 +80,7 @@ const LABELS: Record<MindTab, string> = {
 const DOT: Record<MindTab, { colour: string; done: string; not: string; srDone: string; srNot: string }> = {
   gratitude: { colour: "bg-[var(--thanks-lantern)]", done: "Today's page is written", not: "Not written yet today", srDone: "(written today)", srNot: "(not written today)" },
   dua: { colour: "bg-[var(--dua-accent)]", done: "Today's page is written", not: "Not written yet today", srDone: "(written today)", srNot: "(not written today)" },
+  braindump: { colour: "bg-[var(--balloon-env-1)]", done: "You've emptied your head today", not: "No brain dump yet today", srDone: "(done today)", srNot: "(not yet today)" },
   meditate: { colour: "bg-[var(--garden-light)]", done: "You've sat today", not: "No sitting yet today", srDone: "(sat today)", srNot: "(not yet today)" },
   reading: { colour: "bg-[var(--reading-dot)]", done: "You've read today", not: "No reading yet today", srDone: "(read today)", srNot: "(not yet today)" },
   wishes: { colour: "bg-[var(--woop-wish)]", done: "You've rehearsed a wish today", not: "No wish rehearsed yet today", srDone: "(rehearsed today)", srNot: "(not yet today)" },
@@ -204,6 +215,7 @@ export function MindBoard({
   const doneToday: Record<MindTab, boolean> = {
     gratitude: view.gratitude.tending.today,
     dua: view.dua.tending.today,
+    braindump: view.braindump.tending.today,
     meditate: view.meditation.tending.today,
     reading: view.reading.tending.today,
     wishes: view.wishTending.today,
@@ -241,6 +253,28 @@ export function MindBoard({
       return true;
     } catch {
       toast.error("Couldn't keep that one. Check your connection.");
+      return false;
+    }
+  };
+
+  const onSaveDump = async (result: DumpResult) => {
+    const formData = new FormData();
+    formData.set("kind", result.kind);
+    formData.set("body", result.body);
+    formData.set("seconds", String(result.seconds));
+    formData.set("paper", result.paper ? "true" : "");
+    formData.set("tasks", JSON.stringify(result.tasks));
+    try {
+      const state = await saveBrainDump(formData);
+      if (state.status === "error") {
+        toast.error(state.message);
+        return false;
+      }
+      return true;
+    } catch {
+      toast.error(
+        result.paper ? "Couldn't keep that. Check your connection." : "Couldn't fold that away. What you wrote is still here.",
+      );
       return false;
     }
   };
@@ -335,6 +369,16 @@ export function MindBoard({
             onRevisit={(card) => setEditing({ kind: "revisit", card })}
           />
         )}
+        {tab === "braindump" && (
+          <BrainDumpPanel
+            view={view.braindump}
+            onBegin={(dump, minutes) =>
+              setEditing({ kind: "dump", dump, minutes, tending: view.braindump.tending })
+            }
+            onPaper={(dump) => setEditing({ kind: "dump-paper", dump })}
+            onOpen={(row) => setEditing({ kind: "dump-read", row })}
+          />
+        )}
         {tab === "meditate" && (
           <MeditatePanel
             view={view.meditation}
@@ -410,6 +454,34 @@ export function MindBoard({
           onCancel={() => setEditing(null)}
         />
       )}
+      {editing?.kind === "dump" && (
+        <BrainDumpSession
+          kind={editing.dump}
+          minutes={editing.minutes}
+          tending={editing.tending}
+          onSave={onSaveDump}
+          onClose={() => setEditing(null)}
+        />
+      )}
+      {editing?.kind === "dump-paper" && (
+        <BrainDumpPaper
+          kind={editing.dump}
+          onSave={async (result) => {
+            const ok = await onSaveDump(result);
+            if (ok) {
+              setEditing(null);
+              toast.success(
+                result.tasks.length
+                  ? `Kept, and ${result.tasks.length} sent to your tasks.`
+                  : "Kept. The balloon counts today.",
+              );
+            }
+            return ok;
+          }}
+          onCancel={() => setEditing(null)}
+        />
+      )}
+      {editing?.kind === "dump-read" && <DumpLetter row={editing.row} onClose={() => setEditing(null)} />}
       {editing?.kind === "book" && <BookDialog initial={null} onClose={() => setEditing(null)} />}
       {editing?.kind === "log" && (
         <LogReadingDialog

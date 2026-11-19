@@ -6,7 +6,7 @@ import { Pause, Play, Square, Vibrate, VibrateOff, Volume2, VolumeX } from "luci
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { useWakeLock } from "@/components/use-wake-lock";
 import { cn } from "@/lib/utils";
-import { SCENES, stageAt, stageIdsAt } from "@/lib/scenes";
+import { SCENES, stageAt, stageIdsAt, stageLine, wholeLine } from "@/lib/scenes";
 import { TEND_DAYS, type Tending } from "@/lib/tending";
 import {
   breathAt,
@@ -512,7 +512,7 @@ export function MeditationSession({
                       </p>
                     )}
                     <p className="text-xs text-white/70">
-                      {after === TEND_DAYS ? "Fourteen days. The garden is whole." : `${after} of ${TEND_DAYS} days in the last two weeks`}
+                      {after === TEND_DAYS ? wholeLine(SCENES.meditate) : stageLine(after)}
                     </p>
                   </div>
                 )}

@@ -378,6 +378,7 @@ model User {
   mindDuaEnabled         Boolean @default(true)
   mindMeditationEnabled  Boolean @default(true)
   mindReadingEnabled     Boolean @default(true)
+  mindBrainDumpEnabled   Boolean @default(true)
   gratitudeTemplate      String  @default("good-things")
   /// n for the "n things" gratitude template, 1-10.
   gratitudeCount         Int     @default(3)
@@ -429,6 +430,7 @@ model User {
   disputations        Disputation[]
   wishRehearsals      WishRehearsal[]
   disputationRevisits DisputationRevisit[]
+  brainDumps          BrainDump[]
 }
 
 // ---------------------------------------------------------------- lists
@@ -1307,6 +1309,38 @@ model Disputation {
   updatedAt DateTime @updatedAt
 
   @@index([userId, createdAt])
+}
+
+/// What a brain dump was for. EMPTY is everything in your head, any time
+/// (best first thing, before the phone); TOMORROW is the short practical
+/// list for tomorrow, written in the minutes before bed.
+enum BrainDumpKind {
+  EMPTY
+  TOMORROW
+}
+
+/// A brain dump: whatever is in your head, written out unfiltered for a few
+/// minutes and then left alone. Several a day are fine (a morning dump and a
+/// bedtime list); any one of them keeps the day in the scene.
+model BrainDump {
+  id      String        @id @default(cuid())
+  userId  String
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// The user's own calendar day, stored at UTC midnight.
+  date    DateTime      @db.Date
+  kind    BrainDumpKind @default(EMPTY)
+  /// What was written. Empty when it was done on paper.
+  body    String        @default("")
+  /// Written on paper, away from the phone: only the day is kept here.
+  paper   Boolean       @default(false)
+  /// How long the writing ran, in seconds. 0 on paper.
+  seconds Int           @default(0)
+  /// How many of its lines went to the task list.
+  sent    Int           @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, date])
 }
 
 /// A day a disputation was reread, with how strongly the old belief is held

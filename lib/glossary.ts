@@ -104,7 +104,7 @@ export const GLOSSARY = {
   },
   mind: {
     title: "Mind",
-    what: "Up to six practices on one page, each switchable in Settings. Gratitude and du'a are a page a day. Meditation is a timer for breathing, dhikr and stillness that grows a garden. Reading keeps the books you're reading and the notes each one gathers. WOOP turns a wish into a plan for the obstacle in you. ABCDE takes a gloomy thought after a setback and argues back.",
+    what: "Up to seven practices on one page, each switchable in Settings. Gratitude and du'a are a page a day. A brain dump empties your head onto the page for a few minutes. Meditation is a timer for breathing, dhikr and stillness that grows a garden. Reading keeps the books you're reading and the notes each one gathers. WOOP turns a wish into a plan for the obstacle in you. ABCDE takes a gloomy thought after a setback and argues back.",
     why: "Noticing the good, asking for what you need, wanting well and thinking clearly about setbacks are all skills, and all get easier written down.",
   },
   woop: {
@@ -152,6 +152,11 @@ export const GLOSSARY = {
     what: "The hours you eat in each day. Pick a protocol like 16:8 (fast 16 hours, eat in 8) and when the window opens, or set both ends yourself. A window can run past midnight.",
     why: "A fixed window turns a daily decision into a default. Changing it only affects fasts you start from then on; past fasts keep their own goal.",
   },
+  braindump: {
+    title: "Brain dump",
+    what: "Five or ten minutes of writing out whatever is in your head, unfiltered: tasks, worries, ideas, reminders. When the timer ends you can circle what's actionable and it goes on your task list; the rest folds away and opens tomorrow. Before bed, keep it to a short list for tomorrow.",
+    why: "Your mind keeps rehearsing unfinished things so it won't forget them. Written down, they're stored, and it can let go. Naming a worry also takes some of its heat, and the more specific you are, the more fully it lets go.",
+  },
   meditation: {
     title: "Meditation",
     what: "Pick a practice and sit with it, full screen. Breathing ones show an orb that fills and empties with each breath, with the count inside; box and triangle trace their shape as you go. Dhikr counts on a ring of beads as you tap. Each is marked easy, medium or hard, and some change level with their setting.",
@@ -159,13 +164,13 @@ export const GLOSSARY = {
   },
   garden: {
     title: "The garden",
-    what: "A moonlit garden that holds one thing for each day you sat in the last two weeks: wildflowers, a pond, a lantern, koi, and with fourteen days the full moon on the water. Any sitting counts for its day, however short.",
-    why: "It rewards coming back, not piling up minutes. A missed day takes the newest thing away for two weeks; each day you sit brings something back or keeps what's there.",
+    what: "A moonlit garden that grows one thing for each day you sit: wildflowers, a pond, a lantern, koi, and at the fourteenth the full moon on the water. A day without a sitting takes the newest thing away. Any sitting counts for its day, however short.",
+    why: "It rewards coming back, not piling up minutes. A missed day costs one thing, and the next day you sit brings it straight back.",
   },
   scene: {
     title: "The scene",
-    what: "Each practice has a place of its own, kept by the last fourteen days: one more thing in it for every day you did the practice. Fourteen days in a row and it's whole. Miss a day and the newest thing goes, until that day is two weeks behind you. Today counts the moment it's done, and isn't held against you while it's still open.",
-    why: "Consistency over everything else. There are no points and no totals: a perfect month and a month off end in the same place, and the only way to a whole scene is to keep coming back. Every day you show up either brings something or keeps what's there.",
+    what: "Each practice has a place of its own with fourteen things to come into it. Every day you do the practice brings the next one; every day you miss takes the newest one away. Fourteen and it's whole. Today counts the moment it's done, and isn't held against you while it's still open.",
+    why: "Consistency over everything else. There are no points and no totals, and nothing is banked: a missed day always costs one thing, and the next day you come back always earns it back. Every day you show up brings something, or keeps a whole scene whole.",
   },
   reading: {
     title: "Reading",

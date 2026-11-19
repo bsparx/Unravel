@@ -1,7 +1,7 @@
 import type { User } from "@/lib/generated/prisma/client";
 import { addDays, diffInDays, toISODate, toLocalDate, todayLocal } from "@/lib/dates";
 import { prisma } from "@/lib/db";
-import { TEND_DAYS, tend, type Tending } from "@/lib/tending";
+import { TEND_DAYS, historySince, tend, type Tending } from "@/lib/tending";
 import {
   endOf,
   pagesRead,
@@ -57,7 +57,7 @@ export type ReadingView = {
   days: ReadingDay[];
   todayISO: string;
   week: { pages: number; percent: number };
-  /** The nook: kept by the days read in the last two weeks. */
+  /** The nook: a stage up for each day you read, down for each day you don't. */
   tending: Tending;
 };
 
@@ -155,7 +155,7 @@ const BOOK_SELECT = {
 /** The Reading tab: every shelf, two weeks of dots and this week's pages. */
 export async function getReading(user: User): Promise<ReadingView> {
   const today = todayLocal(user.timezone);
-  // Fifteen days: two weeks, and the day before them, for the scene's window.
+  // Two weeks and today, for the dots and the week's pages.
   const since = addDays(today, -TEND_DAYS);
   const instantLabel = new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
@@ -164,7 +164,7 @@ export async function getReading(user: User): Promise<ReadingView> {
     timeZone: user.timezone,
   });
 
-  const [books, stats, recent] = await Promise.all([
+  const [books, stats, recent, readDays] = await Promise.all([
     prisma.book.findMany({
       where: { userId: user.id },
       orderBy: [{ sortOrder: "desc" }, { createdAt: "desc" }],
@@ -179,6 +179,12 @@ export async function getReading(user: User): Promise<ReadingView> {
     prisma.readingLog.findMany({
       where: { userId: user.id, date: { gte: since } },
       select: { date: true, fromPage: true, toPage: true, book: { select: { unit: true } } },
+    }),
+    // Every day ever read, for the nook: it's kept by all of them (lib/tending.ts).
+    prisma.readingLog.findMany({
+      where: { userId: user.id },
+      distinct: ["date"],
+      select: { date: true },
     }),
   ]);
 
@@ -230,7 +236,13 @@ export async function getReading(user: User): Promise<ReadingView> {
       pages: lastWeek.reduce((sum, day) => sum + day.pages, 0),
       percent: lastWeek.reduce((sum, day) => sum + day.percent, 0),
     },
-    tending: tend(history.map((day) => ({ dateISO: day.dateISO, label: day.label, done: day.read }))),
+    tending: tend(
+      historySince(
+        toISODate(today),
+        readDays.map((row) => toISODate(row.date)),
+        (date) => dayLabel.format(date),
+      ),
+    ),
   };
 }
 

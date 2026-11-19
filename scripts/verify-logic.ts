@@ -25,8 +25,9 @@ import {
 } from "@/lib/meditations";
 import { MIND_TABS } from "@/lib/mind-tabs";
 import { SCENES, sceneCaption, stageIdsAt } from "@/lib/scenes";
-import { TEND_DAYS, tend, type TendDay } from "@/lib/tending";
-import { bookSchema, meditationSessionSchema, readingLogSchema } from "@/lib/validation";
+import { TEND_DAYS, historySince, step as tendStep, tend, type TendDay } from "@/lib/tending";
+import { bookSchema, brainDumpSchema, meditationSessionSchema, readingLogSchema } from "@/lib/validation";
+import { clock, dumpLines, isBedtime, suggestedKind, taskTitle, wordCount } from "@/lib/brain-dump";
 import {
   BOOK_COVER_KEYS,
   checkLogDate,
@@ -3880,45 +3881,58 @@ check("options are normalised, and only exact ones are accepted", () => {
   );
 });
 
-// Fifteen days, oldest first, ending today: "x" done, "." missed.
+// Days, oldest first, ending today: "x" done, "." missed.
 const days = (pattern: string): TendDay[] =>
   [...pattern].map((c, i) => ({ dateISO: `d${i}`, label: `day ${i}`, done: c === "x" }));
 
-check("a scene is kept by the last two weeks, and nothing else", () => {
-  // Fourteen days straight and today: whole.
-  assert.equal(tend(days("xxxxxxxxxxxxxxx")).level, TEND_DAYS);
-  // Today still open isn't held against you: the window ends yesterday.
+check("a scene climbs a stage for each day kept and drops one for each day missed", () => {
+  assert.equal(tend(days("xxxxxxxxxxxxxxx")).level, TEND_DAYS, "fifteen kept: whole, and no further");
+  assert.equal(tend(days("xxxxx..xxx")).level, 6, "five up, two down, three up");
+  assert.equal(tend(days("...............")).level, 0);
+  assert.equal(tend(days("..............x")).level, 1, "today counts the moment it's done");
+  // Today still open isn't held against you.
   const open = tend(days("xxxxxxxxxxxxxx."));
   assert.equal(open.level, 14);
   assert.equal(open.today, false);
   assert.equal(open.ifDone, 14, "doing today keeps it whole");
   assert.equal(open.ifSkipped, 13, "skipping today costs the newest stage");
-  // Nothing at all: the base.
-  assert.equal(tend(days("...............")).level, 0);
-  assert.equal(tend(days("..............x")).level, 1, "today counts the moment it's done");
 });
 
-check("one missed day costs one stage, for exactly two weeks", () => {
-  // A miss five days ago, every other day kept, today done.
-  assert.equal(tend(days("xxxxxxxxx.xxxxx")).level, 13);
-  // The miss is the oldest day in the window ending yesterday: still 13 until today is done...
-  const leaving = tend(days(".xxxxxxxxxxxxx."));
-  assert.equal(leaving.level, 13);
-  // ...and doing today lets the miss go: whole again.
-  assert.equal(leaving.ifDone, 14);
-  assert.equal(tend(days(".xxxxxxxxxxxxxx")).level, 14);
+check("every missed day is made up by a day kept", () => {
+  const whole = "x".repeat(20);
+  assert.equal(tend(days(`${whole}.x`)).level, 14, "one miss, one day back: whole again");
+  assert.equal(tend(days(`${whole}...`)).level, 12, "two misses; today still open");
+  assert.equal(tend(days(`${whole}..xx`)).level, 14, "two misses, two days back");
+  // Alternating holds steady rather than sliding away.
+  assert.equal(tend(days(`xxxxxxxx${".x".repeat(10)}`)).level, 8);
+  // A long break empties it, and it never goes below the base.
+  assert.equal(tend(days(`${whole}${".".repeat(30)}x`)).level, 1);
+  assert.equal(tendStep(0, false), 0);
+  assert.equal(tendStep(14, true), 14);
 });
 
-check("each day kept is progress or maintenance, never a loss", () => {
-  for (let mask = 0; mask < 1 << 14; mask += 97) {
-    const past = Array.from({ length: 14 }, (_, i) => ((mask >> i) & 1 ? "x" : ".")).join("");
+check("each day kept is progress, each miss costs exactly one", () => {
+  for (let mask = 0; mask < 1 << 16; mask += 97) {
+    const past = Array.from({ length: 16 }, (_, i) => ((mask >> i) & 1 ? "x" : ".")).join("");
     const t = tend(days(`${past}.`));
-    assert.ok(t.ifDone === t.level || t.ifDone === t.level + 1, "doing today adds one or keeps it");
-    assert.ok(t.ifSkipped === t.level || t.ifSkipped === t.level - 1, "skipping costs at most one");
+    assert.equal(t.ifDone, Math.min(TEND_DAYS, t.level + 1), "doing today adds one, or keeps it whole");
+    assert.equal(t.ifSkipped, Math.max(0, t.level - 1), "skipping costs one, down to the base");
   }
 });
 
-check("short histories start from nothing, and the window is fourteen days", () => {
+check("history runs from the first day kept, and the strip is the last fourteen", () => {
+  const label = (date: Date) => date.toISOString().slice(5, 10);
+  const run = historySince("2026-11-19", ["2026-10-01", "2026-11-18", "2026-12-01"], label);
+  assert.equal(run[0].dateISO, "2026-10-01");
+  assert.equal(run.at(-1)?.dateISO, "2026-11-19");
+  assert.equal(run.length, 50);
+  assert.equal(run.filter((day) => day.done).length, 2, "a day after today doesn't count");
+  assert.equal(run[0].label, "", "only the days shown are labelled");
+  assert.equal(run.at(-15)?.label, "11-05");
+  assert.equal(historySince("2026-11-19", [], label).length, TEND_DAYS + 1);
+  // A long-kept practice: forty days in a row, then today open.
+  const kept = Array.from({ length: 40 }, (_, i) => new Date(Date.UTC(2026, 9, 10 + i)).toISOString().slice(0, 10));
+  assert.equal(tend(historySince("2026-11-19", kept, label)).level, 14);
   const t = tend(days("xx"));
   assert.equal(t.level, 2);
   assert.equal(t.window.length, TEND_DAYS);
@@ -3935,7 +3949,8 @@ check("every scene has fourteen named stages, and says what today brings", () =>
   assert.deepEqual(stageIdsAt(garden, 0), []);
   assert.equal(sceneCaption(garden, tend(days("..............x"))).line, "Today brought wildflowers in the grass.");
   assert.equal(sceneCaption(garden, tend(days("..............."))).line, "Sit today to bring wildflowers in the grass.");
-  assert.equal(sceneCaption(garden, tend(days("xxxxxxxxxxxxxxx"))).title, "Fourteen days. The garden is whole.");
+  assert.equal(sceneCaption(garden, tend(days("xxxxxxxxxxxxxxx"))).title, "The garden is whole.");
+  assert.equal(sceneCaption(garden, tend(days("xxxxx..xx"))).title, "Stage 5 of 14");
   assert.equal(sceneCaption(garden, tend(days("xxxxxxxxxxxxxx."))).line, "Sit today to keep the full moon on the water.");
   assert.equal(sceneCaption(garden, tend(days("xxxxxxxxxxxxxxx"))).line, "Today kept the full moon on the water.");
   assert.ok(MIND_TABS.includes("meditate"));
@@ -4034,6 +4049,73 @@ check("notes copy out as Markdown in page order, with quotes", () => {
   assert.ok(md.includes("> I went to the woods\n> — p. 12"));
   assert.ok(!md.includes("pp. 40–60"), "a reading with nothing written isn't a note");
   assert.ok(MIND_TABS.includes("reading"));
+});
+
+console.log("\nbrain dump — empty your head");
+
+check("a dump sorts into one piece per line, long lines cut at their sentences", () => {
+  assert.deepEqual(dumpLines("call mum\n\n- buy milk\n* fix the tap\n2. pay rent\n[ ] book dentist"), [
+    "call mum",
+    "buy milk",
+    "fix the tap",
+    "pay rent",
+    "book dentist",
+  ]);
+  assert.deepEqual(
+    dumpLines("I need to email the landlord about the boiler. Also worried about the review on Friday? Ring Sam back"),
+    ["I need to email the landlord about the boiler.", "Also worried about the review on Friday?", "Ring Sam back"],
+  );
+  assert.deepEqual(dumpLines("short line. Stays whole."), ["short line. Stays whole."], "a short line isn't cut");
+  assert.deepEqual(dumpLines("   \n\t\n"), []);
+  assert.deepEqual(dumpLines("-\n•\n..."), [], "markers and stray dots alone aren't lines");
+});
+
+check("a circled line reads as a task title", () => {
+  assert.equal(taskTitle("  buy   milk.  "), "Buy milk");
+  assert.equal(taskTitle("ring the bank;"), "Ring the bank");
+  assert.equal(taskTitle("Is the form due?"), "Is the form due?");
+  const long = taskTitle("a".repeat(260));
+  assert.equal(long.length, 200);
+  assert.ok(long.endsWith("…"));
+});
+
+check("the hour picks the kind: tomorrow's list from eight at night", () => {
+  assert.equal(suggestedKind(7 * 60), "EMPTY");
+  assert.equal(suggestedKind(19 * 60 + 59), "EMPTY");
+  assert.equal(suggestedKind(20 * 60), "TOMORROW");
+  assert.equal(suggestedKind(1 * 60), "TOMORROW");
+  assert.equal(suggestedKind(4 * 60), "EMPTY");
+  assert.equal(isBedtime(20 * 60 + 30), false);
+  assert.equal(isBedtime(22 * 60), true);
+  assert.equal(clock(299.2), "5:00");
+  assert.equal(clock(65), "1:05");
+  assert.equal(clock(-3), "0:00");
+  assert.equal(wordCount("  one two\nthree  "), 3);
+  assert.equal(wordCount(""), 0);
+});
+
+check("a typed dump needs words; one on paper needs none", () => {
+  const ok = (data: Record<string, string>) => brainDumpSchema.safeParse(data).success;
+  assert.equal(ok({ kind: "EMPTY", body: "everything", seconds: "300", tasks: "[]" }), true);
+  assert.equal(ok({ kind: "EMPTY", body: "   ", seconds: "300", tasks: "[]" }), false);
+  assert.equal(ok({ kind: "TOMORROW", body: "", paper: "true", tasks: JSON.stringify(["Pack the bag"]) }), true);
+  assert.equal(ok({ kind: "EMPTY", body: "x", tasks: "not json" }), false);
+  assert.equal(ok({ kind: "EMPTY", body: "x", tasks: JSON.stringify([""]) }), false, "an empty task isn't a task");
+  assert.equal(ok({ kind: "LATER", body: "x", tasks: "[]" }), false);
+  assert.equal(ok({ kind: "EMPTY", body: "x", seconds: "7200", tasks: "[]" }), false);
+  const parsed = brainDumpSchema.parse({ kind: "EMPTY", body: "x", paper: "", tasks: JSON.stringify(["a", "b"]) });
+  assert.equal(parsed.paper, false);
+  assert.deepEqual(parsed.tasks, ["a", "b"]);
+});
+
+check("the balloon rises with the days, and says so", () => {
+  const balloon = SCENES.braindump;
+  assert.equal(sceneCaption(balloon, tend(days("..............."))).line, "Empty your head today to bring the burner, lit.");
+  assert.equal(sceneCaption(balloon, tend(days("..............x"))).line, "Today brought the burner, lit.");
+  assert.equal(sceneCaption(balloon, tend(days("xxxxxxxxxxxxxxx"))).title, "The balloon is in the open sky.");
+  assert.equal(sceneCaption(balloon, tend(days("xxxxxxxxxxxxxx."))).line, "Empty your head today to keep the sun on the balloon.");
+  assert.equal(sceneCaption(SCENES.meditate, tend(days("xxxxxxxxxxxxxxx"))).title, "The garden is whole.");
+  assert.ok(MIND_TABS.includes("braindump"));
 });
 
 console.log(`\n${passed} checks passed.\n`);

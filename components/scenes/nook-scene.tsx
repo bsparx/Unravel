@@ -63,8 +63,8 @@ const LIGHT_SPANS = [
 /**
  * The reading nook. A quiet room in the evening, a window and an empty shelf,
  * and fourteen things that make it a place to read: a lamp, books, a chair,
- * tea, a plant, a cat, the moon at the window, and at last the fire, one for
- * each day of the last two weeks you read.
+ * tea, a plant, a cat, the moon at the window, and at last the fire, one
+ * more for each day you read.
  */
 export function NookScene({ level, fresh = [], className, label = true }: SceneProps) {
   const { has, stage } = stager(SCENE, level, fresh);

@@ -50,8 +50,8 @@ function Lamp({ x, y, size = 1 }: { x: number; y: number; size?: number }) {
  * The night courtyard. An arcade of pointed arches under the night with the
  * crescent low over the wall, and fourteen things that come to it: stars, a
  * lamp in the arch, a fountain, a palm, a rug laid for prayer, and on to the
- * Milky Way and the first pale light of fajr, one for each day of the last
- * two weeks you made du'a.
+ * Milky Way and the first pale light of fajr, one more for each day you
+ * make du'a.
  */
 export function CourtyardScene({ level, fresh = [], className, label = true }: SceneProps) {
   const { has, stage } = stager(SCENE, level, fresh);

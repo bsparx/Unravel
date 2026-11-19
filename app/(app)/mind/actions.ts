@@ -3,12 +3,14 @@
 import { revalidatePath } from "next/cache";
 
 import { requireUser } from "@/lib/auth";
-import { todayLocal } from "@/lib/dates";
+import { addDays, todayLocal } from "@/lib/dates";
+import { taskTitle } from "@/lib/brain-dump";
 import { prisma } from "@/lib/db";
 import { findMeditation, normalizeOptions, plannedSeconds } from "@/lib/meditations";
 import { itemsToBody } from "@/lib/practices";
 import {
   type ActionState,
+  brainDumpSchema,
   cuid,
   disputationRevisitSchema,
   disputationSchema,
@@ -283,5 +285,69 @@ export async function deleteMeditation(id: string): Promise<void> {
   const parsed = cuid.safeParse(id);
   if (!parsed.success) return;
   await prisma.meditationSession.deleteMany({ where: { id: parsed.data, userId: user.id } });
+  revalidatePath("/mind");
+}
+
+// ---------------------------------------------------------------- brain dump
+
+/**
+ * Keep a brain dump: what was written (or only the day, when it was done on
+ * paper), and the lines circled at the sort as todos. Everything goes in
+ * undated, since a dump doesn't know when; a bedtime list is due tomorrow.
+ * The day is today in the user's own zone.
+ */
+export async function saveBrainDump(formData: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  const parsed = brainDumpSchema.safeParse(formValues(formData));
+  if (!parsed.success) return invalid(parsed.error);
+
+  const { kind, body, paper, seconds, tasks } = parsed.data;
+  const date = todayLocal(user.timezone);
+  const titles = tasks.map(taskTitle).filter(Boolean);
+  const dueDate = kind === "TOMORROW" ? addDays(date, 1) : null;
+  const now = Date.now();
+
+  await prisma.$transaction([
+    prisma.brainDump.create({
+      data: {
+        userId: user.id,
+        date,
+        kind,
+        body: paper ? "" : body.trim(),
+        paper,
+        seconds: paper ? 0 : seconds,
+        sent: titles.length,
+      },
+    }),
+    ...(titles.length
+      ? [
+          prisma.task.createMany({
+            data: titles.map((title, i) => ({
+              userId: user.id,
+              type: "TODO" as const,
+              title,
+              dueDate,
+              // Lists sort ascending, so this keeps the order they were written in.
+              sortOrder: now + i,
+            })),
+          }),
+        ]
+      : []),
+  ]);
+
+  revalidatePath("/mind");
+  if (titles.length) {
+    revalidatePath("/");
+    revalidatePath("/day");
+    revalidatePath("/tasks");
+  }
+  return { status: "success" };
+}
+
+export async function deleteBrainDump(id: string): Promise<void> {
+  const user = await requireUser();
+  const parsed = cuid.safeParse(id);
+  if (!parsed.success) return;
+  await prisma.brainDump.deleteMany({ where: { id: parsed.data, userId: user.id } });
   revalidatePath("/mind");
 }

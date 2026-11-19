@@ -2,8 +2,9 @@ import type { MindTab } from "@/lib/mind-tabs";
 import { TEND_DAYS, type Tending } from "@/lib/tending";
 
 /**
- * The six Mind scenes: what each one is, and the fourteen things that come
- * into it, one for each day of the last two weeks you kept the practice.
+ * The Mind scenes, one per practice: what each one is, and the fourteen things that come
+ * into it, one more for each day you keep the practice and one fewer for each day you
+ * don't.
  * Stages appear in order and leave in reverse: the newest is the first to
  * go when a day is missed. See lib/tending.ts for the rule.
  *
@@ -18,6 +19,8 @@ export type Scene = {
   title: string;
   /** "garden", for "The garden is whole." */
   noun: string;
+  /** What a whole scene says, when "The {noun} is whole." doesn't fit. */
+  whole?: string;
   /** What's there with no days kept. */
   base: string;
   stages: readonly SceneStage[];
@@ -28,6 +31,29 @@ export type Scene = {
 const stages = (list: [string, string][]): SceneStage[] => list.map(([id, name]) => ({ id, name }));
 
 export const SCENES: Record<MindTab, Scene> = {
+  braindump: {
+    title: "The balloon at first light",
+    noun: "balloon",
+    whole: "The balloon is in the open sky.",
+    base: "a meadow at first light, the balloon still on the grass",
+    act: "Empty your head today",
+    stages: stages([
+      ["burner", "the burner, lit"],
+      ["filled", "the balloon, filled"],
+      ["aloft", "the balloon, aloft"],
+      ["river", "the river below"],
+      ["poplars", "poplars along the river"],
+      ["sheep", "sheep in the meadow"],
+      ["second", "a second balloon"],
+      ["swallows", "swallows on the wind"],
+      ["fields", "the fields in colour"],
+      ["windmill", "a windmill on the ridge"],
+      ["village", "a village and its steeple"],
+      ["horizon", "balloons on the horizon"],
+      ["cloud", "a ribbon of cloud below"],
+      ["sun", "the sun on the balloon"],
+    ]),
+  },
   meditate: {
     title: "The moonlit garden",
     noun: "garden",
@@ -172,6 +198,16 @@ export function stageAt(scene: Scene, n: number): SceneStage | null {
   return n >= 1 && n <= scene.stages.length ? scene.stages[n - 1] : null;
 }
 
+/** What a scene says once all fourteen stages are there. */
+export function wholeLine(scene: Scene): string {
+  return scene.whole ?? `The ${scene.noun} is whole.`;
+}
+
+/** "Stage 9 of 14": where a scene stands. */
+export function stageLine(level: number): string {
+  return `Stage ${level} of ${TEND_DAYS}`;
+}
+
 /** Sentence case, for a name that starts a line. */
 const upper = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
@@ -182,11 +218,7 @@ const upper = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 export function sceneCaption(scene: Scene, tending: Tending): { title: string; line: string } {
   const { level, today, before, ifDone, ifSkipped } = tending;
   const title =
-    level === TEND_DAYS
-      ? `Fourteen days. The ${scene.noun} is whole.`
-      : level === 0
-        ? upper(scene.base)
-        : `${level} of ${TEND_DAYS} days`;
+    level === TEND_DAYS ? wholeLine(scene) : level === 0 ? upper(scene.base) : stageLine(level);
 
   if (today) {
     if (level > before) {

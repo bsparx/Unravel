@@ -48,6 +48,7 @@ export type SettingsValues = {
   mindDuaEnabled: boolean;
   mindMeditationEnabled: boolean;
   mindReadingEnabled: boolean;
+  mindBrainDumpEnabled: boolean;
   gratitudeTemplate: string;
   gratitudeCount: number;
   duaTemplate: string;
@@ -288,7 +289,7 @@ export function SettingsForm({
             </h2>
             <p className="text-muted-foreground text-label">
               Choose which practices appear on the Mind page: all of them, some,
-              or none. With all six off, Mind leaves the sidebar. Nothing you
+              or none. With all seven off, Mind leaves the sidebar. Nothing you
               have written is deleted when a practice is switched off.
             </p>
           </div>
@@ -335,9 +336,15 @@ export function SettingsForm({
             </div>
 
             <CheckboxField
+              id="mindBrainDumpEnabled"
+              label="Brain dump"
+              hint="A few minutes writing out whatever is in your head, unfiltered. Circle what's actionable and it goes on your task list; the rest folds away. Done on paper counts too."
+              defaultChecked={values.mindBrainDumpEnabled}
+            />
+            <CheckboxField
               id="mindMeditationEnabled"
               label="Meditation"
-              hint="Breathing (box, 4-7-8 and more), dhikr, body scan and stillness, from easy to hard, on a full-screen timer. Your minutes grow a moonlit garden."
+              hint="Breathing (box, 4-7-8 and more), dhikr, body scan and stillness, from easy to hard, on a full-screen timer. Each day you sit keeps a moonlit garden."
               defaultChecked={values.mindMeditationEnabled}
             />
             <CheckboxField

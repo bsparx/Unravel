@@ -54,9 +54,10 @@ function Canopy({ blobs }: { blobs: [number, number, number][] }) {
 
 /**
  * The moonlit garden. A meadow under the moon, and fourteen things that come
- * into it, one for each day of the last two weeks you sat. Hills fade into
- * mist behind, the canopies catch the moon on one side, the moon lies in the
- * pond once there is one, and the full moon comes with a whole fortnight.
+ * into it, one more for each day you sit and one fewer for each day you
+ * don't. Hills fade into mist behind, the canopies catch the moon on one
+ * side, the moon lies in the pond once there is one, and the full moon comes
+ * when the garden is whole.
  *
  * During a session the parent writes `--breath` (0 to 1) on an ancestor and
  * the ripples and lantern glow follow it; see .garden-scene in globals.css.

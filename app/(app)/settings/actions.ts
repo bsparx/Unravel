@@ -33,6 +33,7 @@ export async function updateSettings(
     "mindDuaEnabled",
     "mindMeditationEnabled",
     "mindReadingEnabled",
+    "mindBrainDumpEnabled",
     "bodyExercisesEnabled",
     "bodyFastingEnabled",
   ]) {
@@ -97,6 +98,7 @@ export async function updateSettings(
       mindDuaEnabled: input.mindDuaEnabled,
       mindMeditationEnabled: input.mindMeditationEnabled,
       mindReadingEnabled: input.mindReadingEnabled,
+      mindBrainDumpEnabled: input.mindBrainDumpEnabled,
       gratitudeTemplate: input.gratitudeTemplate,
       gratitudeCount: input.gratitudeCount,
       duaTemplate: input.duaTemplate,

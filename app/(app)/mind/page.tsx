@@ -12,8 +12,9 @@ import { MindBoard } from "./_components/mind-board";
 export const metadata = { title: "Mind" };
 
 /**
- * Up to six practices for the inside of the day, each one switchable in
- * Settings. Meditation is a full-screen timer that grows a garden; Reading
+ * Up to seven practices for the inside of the day, each one switchable in
+ * Settings. A brain dump empties your head onto the page for a few minutes
+ * and folds it away. Meditation is a full-screen timer that grows a garden; Reading
  * is a shelf of books, each gathering its own notes (/mind/books/[id]).
  *
  * Gratitude and du'a are a page a day, written with a template you choose.
@@ -50,7 +51,7 @@ export default async function MindPage({ searchParams }: PageProps<"/mind">) {
         <div className="border-border mx-auto max-w-md rounded-2xl border border-dashed px-6 py-14 text-center">
           <p className="font-display text-2xl">Mind is switched off</p>
           <p className="text-muted-foreground mt-2 text-body">
-            Gratitude, du&apos;a, meditation, reading, wishes and disputations can each be turned on in Settings, in any mix.
+            Gratitude, du&apos;a, brain dump, meditation, reading, wishes and disputations can each be turned on in Settings, in any mix.
           </p>
           <Button asChild className="mt-6 rounded-full">
             <Link href="/settings#mind">
@@ -70,6 +71,7 @@ function intro(enabled: MindEnabled): string {
     enabled.gratitude && "what was good",
     enabled.dua && "what you're asking for",
   ].filter(Boolean);
+  const dump = enabled.braindump ? "A few minutes to empty your head, and a balloon that rises with it." : "";
   const sit = enabled.meditate ? "Time to sit and breathe, and a garden that grows with it." : "";
   const read = enabled.reading ? "The books you're reading, and what you take from each." : "";
   const other = [
@@ -81,5 +83,5 @@ function intro(enabled: MindEnabled): string {
   const second = other.length
     ? `${other.join(", and ")}.`.replace(/^./, (c) => c.toUpperCase())
     : "";
-  return [first, sit, read, second].filter(Boolean).join(" ");
+  return [first, dump, sit, read, second].filter(Boolean).join(" ");
 }
