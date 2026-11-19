@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { FastKindPicker } from "@/components/fasting/kind-picker";
 import { FastWindowPicker } from "@/components/fasting/window-picker";
 import { Button } from "@/components/ui/button";
+import { ResearchLink } from "@/components/guides/guide-card";
 import { InfoTip } from "@/components/info-tip";
 import {
   PracticeTemplatePicker,
@@ -301,12 +302,14 @@ export function SettingsForm({
               label="Brain dump"
               hint="A few minutes writing out whatever is in your head, unfiltered. Circle what's actionable and it goes on your task list; the rest folds away. Done on paper counts too."
               defaultChecked={values.mindBrainDumpEnabled}
+              extra={<ResearchLink guide="braindump" />}
             />
             <CheckboxField
               id="mindMeditationEnabled"
               label="Meditation"
               hint="Breathing (box, 4-7-8 and more), dhikr, body scan and stillness, from easy to hard, on a full-screen timer. Each day you sit keeps a moonlit garden."
               defaultChecked={values.mindMeditationEnabled}
+              extra={<ResearchLink guide="meditate" />}
             />
             <CheckboxField
               id="mindReadingEnabled"
@@ -325,6 +328,7 @@ export function SettingsForm({
               label="Disputations (ABCDE)"
               hint="For a gloomy thought after a setback: write it down and argue back."
               defaultChecked={values.mindDisputationEnabled}
+              extra={<ResearchLink guide="disputations" />}
             />
           </div>
         </section>
@@ -349,6 +353,7 @@ export function SettingsForm({
                 hint="A page a day of what was good. Light a lantern for each one."
                 checked={gratitudeOn}
                 onCheckedChange={setGratitudeOn}
+                extra={<ResearchLink guide="gratitude" />}
               />
               {gratitudeOn && (
                 <div className="space-y-2 sm:pl-7">
@@ -369,6 +374,7 @@ export function SettingsForm({
                 hint="A page a day of what you ask Allah for, in English prompts. Once a day; today's page stays editable."
                 checked={duaOn}
                 onCheckedChange={setDuaOn}
+                extra={<ResearchLink guide="dua" />}
               />
               {duaOn && (
                 <div className="space-y-2 sm:pl-7">
@@ -519,10 +525,13 @@ function CheckboxField({
   defaultChecked,
   checked,
   onCheckedChange,
+  extra,
 }: {
   id: string;
   label: string;
   hint: string;
+  /** Under the hint: a "Research on this" link, say. */
+  extra?: React.ReactNode;
   defaultChecked?: boolean;
   /** Controlled, when something else on the form depends on the box. */
   checked?: boolean;
@@ -542,6 +551,7 @@ function CheckboxField({
           {label}
         </Label>
         <p className="text-muted-foreground text-label">{hint}</p>
+        {extra}
       </div>
     </div>
   );

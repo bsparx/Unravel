@@ -10,7 +10,7 @@ const COLLECTIONS = new Set(["Sahih al-Bukhari", "Sahih Muslim"]);
  * a space after the narrator's colon ("said:Allah's" runs together in the
  * source), and the ﷺ ligature drawn in the Arabic face, which has it.
  */
-function Words({ text }: { text: string }) {
+export function Words({ text }: { text: string }) {
   const spaced = text.replace(/:(?=[A-Z"'“‘])/g, ": ");
   return spaced.split("ﷺ").map((chunk, i) => (
     <span key={i}>

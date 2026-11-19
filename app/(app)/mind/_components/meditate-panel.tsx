@@ -5,6 +5,7 @@ import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { GuideCard } from "@/components/guides/guide-card";
 import { InfoTip } from "@/components/info-tip";
 import { MeditationPicker, type MeditationChoice } from "@/components/meditation/meditation-picker";
 import { SceneCard } from "@/components/scenes/scene-card";
@@ -51,6 +52,8 @@ export function MeditatePanel({
           return sat > 0 ? `${Math.max(1, Math.round(sat))} min` : null;
         }}
       />
+
+      <GuideCard guide="meditate" firstTime={view.recent.length === 0} />
 
       {/* Choose. */}
       <section aria-label="Choose a meditation" className="space-y-4">

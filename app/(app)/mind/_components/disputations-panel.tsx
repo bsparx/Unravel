@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CloudSun, Feather } from "lucide-react";
 
 import { DisputationTurn } from "@/components/disputation-card";
+import { GuideCard } from "@/components/guides/guide-card";
 import { SceneCard } from "@/components/scenes/scene-card";
 import type { DisputationCard } from "@/lib/disputation";
 import type { Tending } from "@/lib/tending";
@@ -34,6 +35,7 @@ export function DisputationsPanel({
   return (
     <div className="space-y-12">
       <SceneCard tab="disputations" tending={tending} />
+      <GuideCard guide="disputations" firstTime={entries.length === 0} />
       <Entries entries={entries} open={open} setOpen={setOpen} onNew={onNew} onOpen={onOpen} onRevisit={onRevisit} />
     </div>
   );

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { ChevronDown, Feather, Lamp, MoonStar, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { GuideCard } from "@/components/guides/guide-card";
 import { InfoTip } from "@/components/info-tip";
 import { SceneCard } from "@/components/scenes/scene-card";
 import { DuaArch, DuaWindow } from "@/components/dua-arch";
@@ -142,6 +143,10 @@ export function PracticePanel({
   return (
     <div className="space-y-10">
       <SceneCard tab={kind} tending={view.tending} />
+
+      <div className="mx-auto max-w-2xl">
+        <GuideCard guide={kind} firstTime={!view.today && view.past.length === 0} />
+      </div>
 
       <div className="mx-auto max-w-2xl space-y-10">
       {/* The template, always in reach. */}

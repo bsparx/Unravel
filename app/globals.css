@@ -2690,3 +2690,166 @@
   from { transform: scale(0.2); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }
+
+/* ---------------------------------------------------------------------------
+   Practice guides: the welcome card's sky for meditation, and the small
+   looping pictures in components/guides/guide-art.tsx. Each picture holds a
+   meaningful still frame; it moves only without reduced motion.
+--------------------------------------------------------------------------- */
+
+.guide-sky-garden {
+  background:
+    radial-gradient(circle at 8% 10%, rgba(255, 247, 234, 0.9) 0 3%, rgba(255, 240, 220, 0.3) 9%, transparent 22%),
+    radial-gradient(ellipse 90% 45% at 50% 110%, rgba(170, 150, 220, 0.45), transparent 70%),
+    linear-gradient(180deg, #e4dcf6 0%, #ebe3f7 55%, #f4e8f2 100%);
+}
+
+.dark .guide-sky-garden {
+  background:
+    radial-gradient(circle at 8% 10%, rgba(255, 247, 234, 0.8) 0 2.5%, rgba(255, 240, 220, 0.14) 8%, transparent 20%),
+    radial-gradient(ellipse 90% 45% at 50% 110%, rgba(110, 90, 190, 0.35), transparent 70%),
+    linear-gradient(180deg, #080b26 0%, #141a48 60%, #22285a 100%);
+}
+
+/* Still frames: everything written, circled, lit and parted. */
+.guide-art .ga-write,
+.guide-art .ga-circle {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+.guide-art .ga-drift {
+  opacity: 0;
+}
+.guide-art .ga-cloud {
+  opacity: 0.35;
+}
+.guide-art .ga-glow {
+  opacity: 0.22;
+}
+.guide-art .ga-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0.4;
+}
+.guide-art .ga-ring:nth-of-type(2) {
+  transform: scale(2);
+  opacity: 0.25;
+}
+.guide-art .ga-ring:nth-of-type(3) {
+  transform: scale(3);
+  opacity: 0.15;
+}
+.guide-art .ga-box-dot {
+  offset-path: path("M52 22 H148 V118 H52 Z");
+  offset-distance: 0%;
+  offset-rotate: 0deg;
+}
+.guide-art .ga-breathe {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .guide-art .ga-drift {
+    animation: ga-drift 3.6s ease-in-out infinite;
+  }
+  .guide-art .ga-write {
+    stroke-dashoffset: 1;
+    animation: ga-write 7s ease-out infinite;
+  }
+  .guide-art .ga-circle {
+    stroke-dashoffset: 1;
+    animation: ga-circle 7s ease-out infinite;
+  }
+  .guide-art .ga-breathe {
+    animation: ga-breathe 16s ease-in-out infinite;
+  }
+  .guide-art .ga-box-dot {
+    animation: ga-box 16s linear infinite;
+  }
+  .guide-art .ga-cloud {
+    animation: ga-cloud 9s ease-in-out infinite;
+  }
+  .guide-art .ga-sun {
+    animation: ga-sun 9s ease-in-out infinite;
+  }
+  .guide-art .ga-arrow {
+    animation: ga-arrow 9s ease-in infinite;
+  }
+  .guide-art .ga-lantern {
+    animation: ga-lantern 6s ease-in-out infinite;
+  }
+  .guide-art .ga-glow {
+    animation: ga-glow 6s ease-in-out infinite;
+  }
+  .guide-art .ga-ring,
+  .guide-art .ga-ring:nth-of-type(2),
+  .guide-art .ga-ring:nth-of-type(3) {
+    animation: ga-ring 4.2s ease-out infinite;
+  }
+  .guide-art .ga-rise {
+    animation: ga-rise 3.2s ease-out infinite;
+  }
+}
+
+@keyframes ga-drift {
+  0% { opacity: 0; transform: translate(0, 0); }
+  15% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translate(54px, -6px); }
+}
+@keyframes ga-write {
+  0% { stroke-dashoffset: 1; }
+  12%, 85% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+@keyframes ga-circle {
+  0%, 50% { stroke-dashoffset: 1; }
+  62%, 88% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+/* 4 in, 4 hold, 4 out, 4 hold. */
+@keyframes ga-breathe {
+  0% { transform: scale(0.55); }
+  25%, 50% { transform: scale(1); }
+  75%, 100% { transform: scale(0.55); }
+}
+@keyframes ga-box {
+  from { offset-distance: 0%; }
+  to { offset-distance: 100%; }
+}
+@keyframes ga-cloud {
+  0%, 35% { opacity: 1; transform: translateX(0); }
+  60%, 85% { opacity: 0.1; transform: translateX(26px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+@keyframes ga-sun {
+  0%, 35% { opacity: 0.25; transform: translateY(14px); }
+  60%, 85% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0.25; transform: translateY(14px); }
+}
+@keyframes ga-arrow {
+  0% { opacity: 0; transform: translateX(-16px); }
+  6% { opacity: 1; }
+  22% { opacity: 1; transform: translateX(44px); }
+  28%, 100% { opacity: 0; transform: translateX(50px); }
+}
+@keyframes ga-lantern {
+  0%, 10% { fill-opacity: 0.18; }
+  25%, 85% { fill-opacity: 1; }
+  100% { fill-opacity: 0.18; }
+}
+@keyframes ga-glow {
+  0%, 10% { opacity: 0; }
+  25%, 85% { opacity: 0.22; }
+  100% { opacity: 0; }
+}
+@keyframes ga-ring {
+  0% { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(3.6); opacity: 0; }
+}
+@keyframes ga-rise {
+  0% { transform: translateY(0); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translateY(-46px); opacity: 0; }
+}

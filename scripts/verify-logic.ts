@@ -39,6 +39,7 @@ import {
   sessionItem,
 } from "@/lib/recitations";
 import { BISMILLAH, TEXTS } from "@/lib/recitation-texts";
+import { GUIDES, GUIDE_KEYS } from "@/lib/practice-guides";
 import { SCENE_KEYS } from "@/lib/scenes";
 import { SCENES, sceneCaption, stageIdsAt } from "@/lib/scenes";
 import { TEND_DAYS, historySince, step as tendStep, tend, type TendDay } from "@/lib/tending";
@@ -4328,6 +4329,31 @@ check("a stored set is cleaned, and an empty one is the default three", () => {
   );
   assert.deepEqual(readSet([{ key: "custom:abc", count: 2 }]), DEFAULT_SET, "someone else's custom id drops out");
   assert.deepEqual(readSet([{ key: "custom:abc", count: 2 }], new Set(["abc"])), [{ key: "custom:abc", count: 2 }]);
+});
+
+console.log("\npractice guides");
+
+check("every guide has three steps, sourced research and an honest limit", () => {
+  assert.deepEqual([...GUIDE_KEYS].sort(), ["braindump", "disputations", "dua", "gratitude", "meditate"]);
+  for (const key of GUIDE_KEYS) {
+    const guide = GUIDES[key];
+    assert.equal(guide.key, key);
+    assert.equal(guide.steps.length, 3, `${key}: three steps`);
+    assert.ok(guide.tips.length >= 3 && guide.mistakes.length >= 3, `${key}: tips and mistakes`);
+    assert.ok(guide.research.length >= 3, `${key}: research`);
+    assert.ok(guide.limits.length > 40, `${key}: limits`);
+    for (const item of guide.research) {
+      assert.ok(item.benefit && item.finding && item.cite, `${key}: ${item.cite}`);
+      if (item.kind === "hadith") assert.match(item.url, /^https:\/\/sunnah\.com\/[a-z]+:\d+[a-z]?$/, item.cite);
+      else if (item.kind === "quran") assert.match(item.url, /^https:\/\/quran\.com\/\d+\/\d+$/, item.cite);
+      else if (item.kind !== "book") assert.match(item.url, /^https:\/\/doi\.org\/10\./, item.cite);
+    }
+  }
+  // The heart's practices carry both kinds of source; du'a leads with scripture.
+  for (const key of ["gratitude", "dua"] as const) {
+    assert.ok(GUIDES[key].research.some((r) => r.kind === "quran" || r.kind === "hadith"), key);
+    assert.ok(GUIDES[key].research.some((r) => r.kind !== "quran" && r.kind !== "hadith"), key);
+  }
 });
 
 console.log(`\n${passed} checks passed.\n`);

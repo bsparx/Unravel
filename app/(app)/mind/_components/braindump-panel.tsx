@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, MoonStar, PenLine, Sunrise } from "lucide-react";
+import { MoonStar, PenLine, Sunrise } from "lucide-react";
 
 import { DumpEnvelope } from "@/components/dump-envelope";
+import { GuideCard } from "@/components/guides/guide-card";
 import { InfoTip } from "@/components/info-tip";
 import { ritualGhostClass, ritualPrimaryClass } from "@/components/ritual-frame";
 import { SceneCard } from "@/components/scenes/scene-card";
@@ -25,30 +26,6 @@ import { CardTools } from "@/components/panel-shared";
 const PAGE_SIZE = 8;
 
 const KIND_ICON = { EMPTY: Sunrise, TOMORROW: MoonStar } as const;
-
-/** The two ways in, and the ideas behind them, kept short. */
-const HOW: { title: string; body: string }[] = [
-  {
-    title: "Unload it",
-    body: "Your mind keeps rehearsing unfinished things so it won't forget them. Written down, they're stored, and it can stop.",
-  },
-  {
-    title: "Name it",
-    body: "Putting a feeling into words takes some of the heat out of it.",
-  },
-  {
-    title: "Be specific",
-    body: "\"Email the landlord about the boiler\" lets go more fully than \"admin\".",
-  },
-  {
-    title: "Paper is best",
-    body: "No notifications, no light. Done it on paper? Log it here so the day counts.",
-  },
-  {
-    title: "Mind the hour",
-    body: "First thing, before your phone, for a noisy morning. Right before bed, keep it to a short list for tomorrow, which helped people fall asleep sooner in a Baylor study; heavier worries are better after dinner.",
-  },
-];
 
 /**
  * Brain dump: the balloon as the days have kept it, a way to start (what
@@ -73,6 +50,8 @@ export function BrainDumpPanel({
   return (
     <div className="space-y-12">
       <SceneCard tab="braindump" tending={view.tending} note={(day) => view.notes[day.dateISO] ?? null} />
+
+      <GuideCard guide="braindump" firstTime={view.dumps.length === 0} />
 
       <section
         aria-labelledby="dump-start"
@@ -167,20 +146,6 @@ export function BrainDumpPanel({
           </Button>
         </div>
 
-        <details className="group/how mt-6 border-t border-[var(--woop-line)] pt-4">
-          <summary className="flex w-fit cursor-pointer list-none items-center gap-1.5 rounded-full text-sm font-medium text-[var(--woop-ink-muted)] hover:text-[var(--woop-ink)] focus-visible:ring-2 focus-visible:ring-[var(--woop-focus)] focus-visible:outline-none [&::-webkit-details-marker]:hidden">
-            How it works
-            <ChevronDown className="size-4 transition-transform group-open/how:rotate-180" aria-hidden />
-          </summary>
-          <dl className="mt-4 grid gap-x-8 gap-y-4 sm:grid-cols-2">
-            {HOW.map((item) => (
-              <div key={item.title} className={cn("space-y-0.5", item.title === "Mind the hour" && "sm:col-span-2")}>
-                <dt className="text-sm font-medium">{item.title}</dt>
-                <dd className="text-sm text-[var(--woop-ink-muted)]">{item.body}</dd>
-              </div>
-            ))}
-          </dl>
-        </details>
       </section>
 
       {view.dumps.length > 0 && (
