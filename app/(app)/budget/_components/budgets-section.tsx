@@ -155,7 +155,7 @@ export function BudgetsSection({
   };
 
   return (
-    <section className="border-border bg-card mb-6 rounded-lg border">
+    <section className="border-border bg-card rounded-lg border">
       <header className="flex items-center justify-between gap-3 px-5 py-4">
         <div>
           <h2 className="text-title">Budgets</h2>

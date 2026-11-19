@@ -1,94 +1,70 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
+/** The overview's shape: header, three figures, two charts, then the lists. */
 export default function Loading() {
   return (
-    <div className="mx-auto w-full max-w-3xl px-5 py-8 md:px-8 md:py-12">
-      <div className="animate-rise space-y-6">
-        <header className="flex flex-wrap items-end justify-between gap-4">
-          <div className="space-y-2">
-            <Skeleton className="h-10 w-32 rounded-lg" />
-            <Skeleton className="h-4 w-72 rounded-md" />
-            <Skeleton className="h-4 w-56 rounded-md" />
-          </div>
-          <div className="flex items-center gap-1">
-            <Skeleton className="size-7 rounded-md" />
-            <Skeleton className="h-5 w-28 rounded-md" />
-            <Skeleton className="size-7 rounded-md" />
-          </div>
-        </header>
-
-        <div className="flex items-center gap-6">
-          <Skeleton className="h-64 w-44 shrink-0 rounded-lg md:h-72 md:w-52" />
-          <div className="min-w-0 flex-1 space-y-3">
-            <Skeleton className="h-3 w-24 rounded-md" />
-            <Skeleton className="h-10 w-44 rounded-md" />
-            <div className="flex gap-8 pt-2">
-              <Skeleton className="h-8 w-24 rounded-md" />
-              <Skeleton className="h-8 w-24 rounded-md" />
-            </div>
-            <Skeleton className="h-4 w-3/4 rounded-md" />
-          </div>
+    <div className="animate-rise space-y-6">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div className="space-y-2">
+          <Skeleton className="h-10 w-36 rounded-lg" />
+          <Skeleton className="h-4 w-56 rounded-md" />
         </div>
-
-        <div className="rounded-lg border p-4">
-          <Skeleton className="mb-4 h-4 w-32 rounded-md" />
-          <Skeleton className="h-44 w-full rounded-md" />
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-9 w-48 rounded-md" />
+          <Skeleton className="h-9 w-28 rounded-md" />
         </div>
+      </header>
 
-        <div className="rounded-lg border">
-          <div className="flex items-center justify-between border-b px-5 py-4">
-            <Skeleton className="h-4 w-20 rounded-md" />
-            <Skeleton className="h-8 w-28 rounded-md" />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-[1.35fr_1fr_1fr]">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className={`rounded-lg border p-5 ${i === 0 ? "sm:col-span-2 lg:col-span-1" : ""}`}>
+            <Skeleton className="h-4 w-28 rounded-md" />
+            <Skeleton className={`mt-3 rounded-md ${i === 0 ? "h-12 w-48" : "h-8 w-36"}`} />
+            <Skeleton className="mt-3 h-4 w-4/5 rounded-md" />
           </div>
-          <div className="space-y-4 border-t px-5 py-4">
-            <Skeleton className="h-16 w-full rounded-md" />
-            <Skeleton className="h-10 w-full rounded-md" />
-          </div>
-        </div>
+        ))}
+      </div>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          <div className="rounded-lg border p-4">
-            <Skeleton className="mb-4 h-4 w-16 rounded-md" />
-            <div className="flex items-end gap-2">
-              {[45, 70, 55, 85, 60].map((height, i) => (
-                <Skeleton
-                  key={i}
-                  className="flex-1 rounded-md"
-                  style={{ height: `${height * 0.45}px` }}
-                />
-              ))}
-            </div>
-          </div>
-          <div className="rounded-lg border p-4">
-            <Skeleton className="mb-4 h-4 w-20 rounded-md" />
-            <div className="flex items-center justify-center gap-6 py-4">
-              <Skeleton className="size-36 rounded-full" />
-              <div className="flex-1 space-y-2.5">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-3.5 w-4/5 rounded-md" />
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-lg border">
-          <div className="flex items-center justify-between border-b px-4 py-3">
-            <Skeleton className="h-4 w-32 rounded-md" />
-            <Skeleton className="h-8 w-28 rounded-md" />
-          </div>
-          <div className="divide-y">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 px-4 py-2.5">
-                <Skeleton className="size-2.5 shrink-0 rounded-full" />
-                <div className="min-w-0 flex-1 space-y-1">
-                  <Skeleton className="h-4 w-2/5 rounded-md" />
-                  <Skeleton className="h-3 w-1/3 rounded-md" />
-                </div>
-                <Skeleton className="h-4 w-16 rounded-md" />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+        <div className="rounded-lg border p-5 lg:col-span-2">
+          <Skeleton className="h-4 w-28 rounded-md" />
+          <div className="mt-6 space-y-5">
+            {[90, 70, 52, 38, 24].map((width) => (
+              <div key={width} className="space-y-2">
+                <Skeleton className="h-3 w-24 rounded-md" />
+                <Skeleton className="h-3 rounded-full" style={{ width: `${width}%` }} />
               </div>
             ))}
           </div>
+        </div>
+        <div className="rounded-lg border p-5 lg:col-span-3">
+          <Skeleton className="h-4 w-32 rounded-md" />
+          <div className="mt-6 flex h-52 items-end gap-3">
+            {[55, 70, 45, 80, 60, 75].map((height, i) => (
+              <div key={i} className="flex flex-1 items-end justify-center gap-0.5">
+                <Skeleton className="w-4 rounded-t-md rounded-b-none" style={{ height: `${height}%` }} />
+                <Skeleton className="w-4 rounded-t-md rounded-b-none" style={{ height: `${height * 0.7}%` }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+        <div className="rounded-lg border lg:col-span-3">
+          <div className="flex items-center justify-between px-5 py-4">
+            <Skeleton className="h-4 w-20 rounded-md" />
+            <Skeleton className="h-8 w-28 rounded-md" />
+          </div>
+          <div className="space-y-3 border-t px-5 py-4">
+            <Skeleton className="h-14 w-full rounded-md" />
+            <Skeleton className="h-10 w-full rounded-md" />
+          </div>
+        </div>
+        <div className="min-w-0 space-y-4 lg:col-span-2">
+          <Skeleton className="h-32 w-full rounded-lg" />
+          <Skeleton className="h-14 w-full rounded-lg" />
+          <Skeleton className="h-14 w-full rounded-lg" />
         </div>
       </div>
     </div>

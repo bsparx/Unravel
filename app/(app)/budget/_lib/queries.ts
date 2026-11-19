@@ -3,15 +3,34 @@
  *
  * Everything is a plain Prisma read on `MoneyTransaction` bucketed by the
  * house rule — a UTC-midnight local day — so a month is a `gte/lt` pair on
- * two UTC-midnight dates, and every aggregate here is a sum over a list the
- * page was going to render anyway. No groupBy gymnastics, no $queryRaw.
+ * two UTC-midnight dates. The overview sums a list it already holds; the
+ * income and expense pages, which can span years, let the database add up
+ * (`aggregate`, `groupBy`) and only fetch the rows they show. No $queryRaw.
  */
 
 import { GLOBAL_OWNER } from "@/lib/budget";
-import { addMonths, formatMonthLabel, startOfMonth } from "@/lib/dates";
+import { addMonths, formatMonthLabel, parseLocalDate, startOfMonth, toISODate } from "@/lib/dates";
 import { prisma } from "@/lib/db";
-import type { MoneyKind, User } from "@/lib/generated/prisma/client";
+import type { Prisma, User } from "@/lib/generated/prisma/client";
 import type { CategoryColor } from "@/lib/money-palette";
+
+import {
+  bucketIndex,
+  bucketUnit,
+  endOfMonth,
+  formatMonthLong,
+  formatSpan,
+  makeBuckets,
+  monthStartISO,
+  previousSpan,
+  resolveSpan,
+  shiftMonthsISO,
+  spanDays,
+  type BucketUnit,
+  type LedgerKind,
+  type LedgerQuery,
+  type Span,
+} from "./ledger";
 
 export type BudgetCategory = {
   id: string;
@@ -22,46 +41,6 @@ export type BudgetCategory = {
   builtIn: boolean;
 };
 
-export type BudgetMonth = {
-  /** "2026-08" — the anchor the page links between months by. */
-  anchor: string;
-  monthLabel: string;
-  incomeCents: number;
-  expenseCents: number;
-  /** The month in week-sized chunks, for the in-vs-out bars. */
-  weeks: { label: string; incomeCents: number; expenseCents: number }[];
-  /**
-   * The running balance, day by day — every day of the month, so the chart
-   * axis is complete even before the days arrive.
-   */
-  balance: { day: number; cents: number }[];
-  /**
-   * The previous month, for the "ahead of / behind last month" reading.
-   * `balance` is indexed by this month's day; days the previous month didn't
-   * have (e.g. the 31st of a 30-day month) are null and the line stops.
-   */
-  lastMonth: {
-    incomeCents: number;
-    expenseCents: number;
-    balance: (number | null)[];
-  };
-  /** Each category that moved money this month, biggest first. */
-  categories: { category: BudgetCategory; totalCents: number }[];
-  /** This month's entries, newest first — the full list, not a sample. */
-  entries: {
-    id: string;
-    date: Date;
-    amountCents: number;
-    note: string | null;
-    category: BudgetCategory;
-    /** The envelope this expense counts against, if any. */
-    budget: { id: string; name: string } | null;
-    /** The account this entry sits in. */
-    account: { id: string; name: string; color: CategoryColor } | null;
-  }[];
-  hasData: boolean;
-};
-
 export type Account = {
   id: string;
   name: string;
@@ -70,6 +49,22 @@ export type Account = {
   /** opening + income − expenses ± transfers, whatever happened so far. */
   balanceCents: number;
   archived: boolean;
+};
+
+/** An account as a picker needs it: no balance, so no sums to wait for. */
+export type AccountOption = Pick<Account, "id" | "name" | "color" | "archived">;
+
+/** One line of the ledger, as every list of entries shows it. */
+export type LedgerEntry = {
+  id: string;
+  date: Date;
+  amountCents: number;
+  note: string | null;
+  category: BudgetCategory;
+  /** The envelope this expense counts against, if any. */
+  budget: { id: string; name: string } | null;
+  /** The account this entry sits in. */
+  account: { id: string; name: string; color: CategoryColor } | null;
 };
 
 export type AccountTransfer = {
@@ -131,152 +126,376 @@ export type BudgetDetail = {
 
 const MS_PER_DAY = 86_400_000;
 
-export async function getBudgetMonth(
-  user: User,
-  anchor: Date,
-): Promise<BudgetMonth> {
-  const start = startOfMonth(anchor);
-  const end = addMonths(start, 1);
-  const prevStart = addMonths(start, -1);
+const isoToDate = (iso: string) => parseLocalDate(iso)!;
 
-  // This month and the one before, for the comparison: independent reads.
-  const [transactions, prevTransactions] = await Promise.all([
-    prisma.moneyTransaction.findMany({
-      where: { userId: user.id, date: { gte: start, lt: end } },
-      include: {
-        category: {
-          select: { id: true, name: true, color: true, kind: true, ownerKey: true },
-        },
-        budget: { select: { id: true, name: true } },
-        account: { select: { id: true, name: true, color: true } },
-      },
-      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-    }),
-    prisma.moneyTransaction.findMany({
-      where: { userId: user.id, date: { gte: prevStart, lt: start } },
-      include: { category: { select: { kind: true } } },
-    }),
-  ]);
+const CATEGORY_SELECT = {
+  id: true,
+  name: true,
+  color: true,
+  kind: true,
+  ownerKey: true,
+} as const;
 
-  const entries = transactions.map((transaction) => ({
-    id: transaction.id,
-    date: transaction.date,
-    amountCents: transaction.amountCents,
-    note: transaction.note,
-    category: {
-      id: transaction.category.id,
-      name: transaction.category.name,
-      color: transaction.category.color as CategoryColor,
-      kind: transaction.category.kind,
-      builtIn: transaction.category.ownerKey === GLOBAL_OWNER,
-    },
-    budget: transaction.budget,
-    account: transaction.account
-      ? {
-          id: transaction.account.id,
-          name: transaction.account.name,
-          color: transaction.account.color as CategoryColor,
-        }
-      : null,
-  }));
+/** What a listed entry joins: enough to draw its row and open it for editing. */
+const ENTRY_INCLUDE = {
+  category: { select: CATEGORY_SELECT },
+  budget: { select: { id: true, name: true } },
+  account: { select: { id: true, name: true, color: true } },
+} as const;
 
-  const sum = (
-    list: { amountCents: number; category: { kind: MoneyKind } }[],
-    kind: "INCOME" | "EXPENSE",
-  ) =>
-    list
-      .filter((transaction) => transaction.category.kind === kind)
-      .reduce((total, transaction) => total + transaction.amountCents, 0);
-
-  const daysInMonth = Math.round((end.getTime() - start.getTime()) / MS_PER_DAY);
-  const weeks = Array.from({ length: Math.ceil(daysInMonth / 7) }, (_, i) => {
-    const first = i * 7 + 1;
-    const last = Math.min(first + 6, daysInMonth);
-    const list = transactions.filter((transaction) => {
-      const day = transaction.date.getUTCDate();
-      return day >= first && day <= last;
-    });
-    return {
-      label: first === last ? `${first}` : `${first}–${last}`,
-      incomeCents: sum(list, "INCOME"),
-      expenseCents: sum(list, "EXPENSE"),
-    };
-  });
-
-  const balance = dailyBalance(transactions, daysInMonth);
-
-  const prevDays = Math.round((start.getTime() - prevStart.getTime()) / MS_PER_DAY);
-  const prevBalance = dailyBalance(prevTransactions, prevDays);
-  const prevList: (number | null)[] = prevBalance.map((point) => point.cents);
-  while (prevList.length < daysInMonth) prevList.push(null);
-  prevList.length = daysInMonth;
-
-  const byCategory = new Map<string, { category: BudgetCategory; totalCents: number }>();
-  for (const transaction of transactions) {
-    const key = transaction.categoryId;
-    const bucket = byCategory.get(key);
-    if (bucket) {
-      bucket.totalCents += transaction.amountCents;
-    } else {
-      byCategory.set(key, {
-        category: {
-          id: transaction.category.id,
-          name: transaction.category.name,
-          color: transaction.category.color as CategoryColor,
-          kind: transaction.category.kind,
-          builtIn: transaction.category.ownerKey === GLOBAL_OWNER,
-        },
-        totalCents: transaction.amountCents,
-      });
-    }
-  }
-
+function toCategory(row: {
+  id: string;
+  name: string;
+  color: string;
+  kind: "INCOME" | "EXPENSE";
+  ownerKey: string;
+}): BudgetCategory {
   return {
-    anchor: start.toISOString().slice(0, 7),
-    monthLabel: formatMonthLabel(start),
-    incomeCents: sum(transactions, "INCOME"),
-    expenseCents: sum(transactions, "EXPENSE"),
-    weeks,
-    balance,
-    lastMonth: {
-      incomeCents: sum(prevTransactions, "INCOME"),
-      expenseCents: sum(prevTransactions, "EXPENSE"),
-      balance: prevList,
-    },
-    categories: [...byCategory.values()].sort(
-      (a, b) => b.totalCents - a.totalCents,
-    ),
-    entries,
-    hasData: transactions.length > 0,
+    id: row.id,
+    name: row.name,
+    color: row.color as CategoryColor,
+    kind: row.kind,
+    builtIn: row.ownerKey === GLOBAL_OWNER,
   };
 }
 
+function toEntry(
+  row: Prisma.MoneyTransactionGetPayload<{ include: typeof ENTRY_INCLUDE }>,
+): LedgerEntry {
+  return {
+    id: row.id,
+    date: row.date,
+    amountCents: row.amountCents,
+    note: row.note,
+    category: toCategory(row.category),
+    budget: row.budget,
+    account: row.account
+      ? { id: row.account.id, name: row.account.name, color: row.account.color as CategoryColor }
+      : null,
+  };
+}
+
+// ---------------------------------------------------------------- overview
+
+export type BudgetOverview = {
+  /** "2026-11-01": the month on show. */
+  monthISO: string;
+  monthLabel: string;
+  /** Whether the month on show is the one running now. */
+  current: boolean;
+  /** Days of the month gone by: today's date in a running month, all of them in a past one. */
+  daysElapsed: number;
+  incomeCents: number;
+  expenseCents: number;
+  /**
+   * The same stretch of the month before, for the arrows: the first nineteen
+   * days of October against the first nineteen of November, a whole month
+   * against a whole month once it's over. `income`/`expense` here are this
+   * month's sums over that same stretch, so the two sides are like for like.
+   */
+  compare: {
+    label: string;
+    incomeCents: number;
+    expenseCents: number;
+    thisIncomeCents: number;
+    thisExpenseCents: number;
+  };
+  /** Six months ending with this one, oldest first, for the in-vs-out bars. */
+  months: { start: string; tick: string; label: string; incomeCents: number; expenseCents: number }[];
+  /** The month's spending by category, biggest first. */
+  spending: { category: BudgetCategory; totalCents: number }[];
+  /** The month's latest few entries. */
+  recent: LedgerEntry[];
+  entryCount: number;
+  hasData: boolean;
+};
+
+/** How many entries the overview lists before pointing at the full pages. */
+const RECENT_ROWS = 6;
+
 /**
- * The running balance by day of month: income minus expense, accumulated.
- * Every day appears (with the running total carried forward), so the chart
- * axis is complete no matter which days have data yet.
+ * One month at a glance, plus the five before it for the trend: a single read
+ * of six months' amounts (small: one row per entry, three columns), summed
+ * here, and the few newest entries in full.
  */
-function dailyBalance(
-  list: { date: Date; amountCents: number; category: { kind: string } }[],
-  daysInMonth: number,
-): { day: number; cents: number }[] {
-  const byDay = new Map<number, number>();
-  for (const transaction of list) {
-    const day = transaction.date.getUTCDate();
-    const delta =
-      transaction.category.kind === "INCOME"
-        ? transaction.amountCents
-        : -transaction.amountCents;
-    byDay.set(day, (byDay.get(day) ?? 0) + delta);
+export async function getBudgetOverview(
+  user: User,
+  anchor: Date,
+  today: Date,
+): Promise<BudgetOverview> {
+  const monthISO = toISODate(startOfMonth(anchor));
+  const todayISO = toISODate(today);
+  const firstISO = monthStartISO(monthISO, -5);
+  const month = { gte: isoToDate(monthISO), lt: isoToDate(monthStartISO(monthISO, 1)) };
+
+  const [rows, recent] = await Promise.all([
+    prisma.moneyTransaction.findMany({
+      where: { userId: user.id, date: { gte: isoToDate(firstISO), lt: month.lt } },
+      select: { date: true, amountCents: true, category: { select: CATEGORY_SELECT } },
+    }),
+    prisma.moneyTransaction.findMany({
+      where: { userId: user.id, date: month },
+      include: ENTRY_INCLUDE,
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      take: RECENT_ROWS,
+    }),
+  ]);
+
+  const dated = rows.map((row) => ({ ...row, iso: toISODate(row.date) }));
+  const sum = (from: string, to: string, kind: LedgerKind) =>
+    dated
+      .filter((row) => row.category.kind === kind && row.iso >= from && row.iso <= to)
+      .reduce((total, row) => total + row.amountCents, 0);
+
+  const monthEnd = endOfMonth(monthISO);
+  const current = monthISO === monthStartISO(todayISO);
+  const stretchEnd = current ? todayISO : monthEnd;
+  const previous = { from: shiftMonthsISO(monthISO, -1), to: shiftMonthsISO(stretchEnd, -1) };
+
+  const months = Array.from({ length: 6 }, (_, i) => {
+    const start = monthStartISO(firstISO, i);
+    const end = endOfMonth(start);
+    const date = isoToDate(start);
+    return {
+      start,
+      tick: new Intl.DateTimeFormat("en-GB", { month: "short", timeZone: "UTC" }).format(date),
+      label: formatMonthLong(start),
+      incomeCents: sum(start, end, "INCOME"),
+      expenseCents: sum(start, end, "EXPENSE"),
+    };
+  });
+
+  const byCategory = new Map<string, { category: BudgetCategory; totalCents: number }>();
+  let entryCount = 0;
+  for (const row of dated) {
+    if (row.iso < monthISO) continue;
+    entryCount += 1;
+    if (row.category.kind !== "EXPENSE") continue;
+    const bucket = byCategory.get(row.category.id);
+    if (bucket) bucket.totalCents += row.amountCents;
+    else byCategory.set(row.category.id, { category: toCategory(row.category), totalCents: row.amountCents });
   }
 
-  const points: { day: number; cents: number }[] = [];
-  let running = 0;
-  for (let day = 1; day <= daysInMonth; day += 1) {
-    running += byDay.get(day) ?? 0;
-    points.push({ day, cents: running });
+  const thisMonth = months[months.length - 1];
+
+  return {
+    monthISO,
+    monthLabel: formatMonthLabel(isoToDate(monthISO)),
+    current,
+    daysElapsed: Math.max(0, Math.min(spanDays(monthISO, stretchEnd), spanDays(monthISO, monthEnd))),
+    incomeCents: thisMonth.incomeCents,
+    expenseCents: thisMonth.expenseCents,
+    compare: {
+      label: formatSpan(previous, todayISO),
+      incomeCents: sum(previous.from, previous.to, "INCOME"),
+      expenseCents: sum(previous.from, previous.to, "EXPENSE"),
+      thisIncomeCents: sum(monthISO, stretchEnd, "INCOME"),
+      thisExpenseCents: sum(monthISO, stretchEnd, "EXPENSE"),
+    },
+    months,
+    spending: [...byCategory.values()].sort((a, b) => b.totalCents - a.totalCents),
+    recent: recent.map(toEntry),
+    entryCount,
+    hasData: entryCount > 0,
+  };
+}
+
+// ---------------------------------------------------------------- ledger
+
+export type LedgerData = {
+  /** The days on show. Null only for "all time" with nothing ever logged. */
+  span: Span | null;
+  /** "November", "Sep – Nov", "All time": what the figures cover. */
+  spanLabel: string;
+  /** The same in dates, even for all time: "19 Nov – 30 Nov". */
+  spanDates: string;
+  unit: BucketUnit;
+  totalCents: number;
+  count: number;
+  /** Per day, or per month over long spans; counted to today, not to the span's end. */
+  average: { cents: number; per: "day" | "month" } | null;
+  biggest: { amountCents: number; title: string; date: Date } | null;
+  /** The same stretch one period earlier. Null for all time. */
+  compare: { totalCents: number; label: string } | null;
+  series: { start: string; end: string; tick: string; label: string; cents: number }[];
+  /**
+   * Totals by category over the same slice, but ignoring the category filter,
+   * so the chart can show the chosen one against the rest.
+   */
+  byCategory: { category: BudgetCategory; totalCents: number; count: number }[];
+  entries: LedgerEntry[];
+  hasMore: boolean;
+  /** This side's live categories for the filter, and the filtered one if it's since been archived. */
+  filterCategories: BudgetCategory[];
+  /** Both sides, live only, for the money dialog's In/Out toggle. */
+  dialogCategories: { income: BudgetCategory[]; expense: BudgetCategory[] };
+  accounts: AccountOption[];
+};
+
+const SORT_ORDER: Record<LedgerQuery["sort"], Prisma.MoneyTransactionOrderByWithRelationInput[]> = {
+  newest: [{ date: "desc" }, { createdAt: "desc" }],
+  oldest: [{ date: "asc" }, { createdAt: "asc" }],
+  largest: [{ amountCents: "desc" }, { date: "desc" }],
+  smallest: [{ amountCents: "asc" }, { date: "desc" }],
+};
+
+/**
+ * One side of the ledger, filtered: the totals, the bars over time, the split
+ * by category and one page of rows. Every read is scoped to the user, so a
+ * foreign category or account id in the URL simply matches nothing.
+ */
+export async function getLedger(
+  user: User,
+  kind: LedgerKind,
+  query: LedgerQuery,
+  todayISO: string,
+): Promise<LedgerData> {
+  const resolved = resolveSpan(query, todayISO);
+  const dateRange = (span: Span) => ({ gte: isoToDate(span.from), lte: isoToDate(span.to) });
+
+  const base: Prisma.MoneyTransactionWhereInput = {
+    userId: user.id,
+    category: { kind },
+    ...(resolved && { date: dateRange(resolved) }),
+    ...(query.accountId && { accountId: query.accountId }),
+    ...(query.q && {
+      OR: [
+        { note: { contains: query.q, mode: "insensitive" } },
+        { category: { name: { contains: query.q, mode: "insensitive" } } },
+      ],
+    }),
+  };
+  const where: Prisma.MoneyTransactionWhereInput = {
+    ...base,
+    ...(query.categoryId && { categoryId: query.categoryId }),
+  };
+  const previous = resolved ? previousSpan(query, resolved, todayISO) : null;
+
+  const [totals, biggest, byDate, byCategory, previousTotals, rows, categories, accounts] =
+    await Promise.all([
+      prisma.moneyTransaction.aggregate({ where, _sum: { amountCents: true }, _count: { _all: true } }),
+      prisma.moneyTransaction.findFirst({
+        where,
+        orderBy: [{ amountCents: "desc" }, { date: "desc" }],
+        select: { amountCents: true, note: true, date: true, category: { select: { name: true } } },
+      }),
+      prisma.moneyTransaction.groupBy({
+        by: ["date"],
+        where,
+        _sum: { amountCents: true },
+        orderBy: { date: "asc" },
+      }),
+      prisma.moneyTransaction.groupBy({
+        by: ["categoryId"],
+        where: base,
+        _sum: { amountCents: true },
+        _count: { _all: true },
+        orderBy: { _sum: { amountCents: "desc" } },
+      }),
+      previous
+        ? prisma.moneyTransaction.aggregate({
+            where: { ...where, date: dateRange(previous) },
+            _sum: { amountCents: true },
+          })
+        : null,
+      prisma.moneyTransaction.findMany({
+        where,
+        include: ENTRY_INCLUDE,
+        orderBy: SORT_ORDER[query.sort],
+        take: query.limit + 1,
+      }),
+      prisma.moneyCategory.findMany({
+        where: { OR: [{ ownerKey: user.id }, { ownerKey: GLOBAL_OWNER }] },
+        orderBy: { sortOrder: "asc" },
+        select: { ...CATEGORY_SELECT, archivedAt: true },
+      }),
+      prisma.moneyAccount.findMany({
+        where: { userId: user.id },
+        orderBy: [{ archivedAt: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
+        select: { id: true, name: true, color: true, archivedAt: true },
+      }),
+    ]);
+
+  // "All time" closes on the first day anything was logged and runs to today
+  // (or to the last entry, if one is dated ahead).
+  let span = resolved;
+  if (!span && byDate.length > 0) {
+    const last = toISODate(byDate[byDate.length - 1].date);
+    span = { from: toISODate(byDate[0].date), to: last > todayISO ? last : todayISO };
   }
-  return points;
+
+  const unit = span ? bucketUnit(span) : "day";
+  const buckets = span ? makeBuckets(span, unit) : [];
+  const series = buckets.map((bucket) => ({
+    start: bucket.start,
+    end: bucket.end,
+    tick: bucket.tick,
+    label: bucket.label,
+    cents: 0,
+  }));
+  for (const row of byDate) {
+    const index = bucketIndex(buckets, toISODate(row.date));
+    if (index >= 0) series[index].cents += row._sum.amountCents ?? 0;
+  }
+
+  const totalCents = totals._sum.amountCents ?? 0;
+  let average: LedgerData["average"] = null;
+  if (span && span.from <= todayISO && totalCents > 0) {
+    const elapsedTo = span.to > todayISO ? todayISO : span.to;
+    if (unit === "month") {
+      const months =
+        (Number(elapsedTo.slice(0, 4)) - Number(span.from.slice(0, 4))) * 12 +
+        (Number(elapsedTo.slice(5, 7)) - Number(span.from.slice(5, 7))) +
+        1;
+      average = { cents: Math.round(totalCents / months), per: "month" };
+    } else {
+      average = { cents: Math.round(totalCents / spanDays(span.from, elapsedTo)), per: "day" };
+    }
+  }
+
+  const lookup = new Map(categories.map((row) => [row.id, toCategory(row)]));
+  const live = categories.filter((row) => row.archivedAt === null).map(toCategory);
+  const filterCategories = live.filter((category) => category.kind === kind);
+  const chosen = query.categoryId ? lookup.get(query.categoryId) : undefined;
+  if (chosen && chosen.kind === kind && !filterCategories.some((category) => category.id === chosen.id)) {
+    filterCategories.push(chosen);
+  }
+
+  return {
+    span,
+    spanLabel: query.range === "all" ? "All time" : span ? formatSpan(span, todayISO) : "",
+    spanDates: span ? formatSpan(span, todayISO) : "",
+    unit,
+    totalCents,
+    count: totals._count._all,
+    average,
+    biggest: biggest
+      ? { amountCents: biggest.amountCents, title: biggest.note || biggest.category.name, date: biggest.date }
+      : null,
+    compare: previous
+      ? { totalCents: previousTotals?._sum.amountCents ?? 0, label: formatSpan(previous, todayISO) }
+      : null,
+    series,
+    byCategory: byCategory.flatMap((row) => {
+      const category = lookup.get(row.categoryId);
+      return category
+        ? [{ category, totalCents: row._sum.amountCents ?? 0, count: row._count._all }]
+        : [];
+    }),
+    entries: rows.slice(0, query.limit).map(toEntry),
+    hasMore: rows.length > query.limit,
+    filterCategories,
+    dialogCategories: {
+      income: live.filter((category) => category.kind === "INCOME"),
+      expense: live.filter((category) => category.kind === "EXPENSE"),
+    },
+    accounts: accounts.map((row) => ({
+      id: row.id,
+      name: row.name,
+      color: row.color as CategoryColor,
+      archived: row.archivedAt !== null,
+    })),
+  };
 }
 
 /**
@@ -672,4 +891,28 @@ export async function getDebts(user: User): Promise<{
   };
 
   return { iOwe: pocket("I_OWE"), owedToMe: pocket("OWED_TO_ME") };
+}
+
+/**
+ * What the IOU ledger stands at, for the overview's one line: the two
+ * outstanding totals, summed by the database.
+ */
+export async function getDebtTotals(user: User): Promise<{
+  iOweCents: number;
+  owedToMeCents: number;
+  open: number;
+}> {
+  const rows = await prisma.moneyDebt.groupBy({
+    by: ["direction"],
+    where: { userId: user.id, settledAt: null },
+    _sum: { amountCents: true },
+    _count: { _all: true },
+  });
+  const total = (direction: "I_OWE" | "OWED_TO_ME") =>
+    rows.find((row) => row.direction === direction)?._sum.amountCents ?? 0;
+  return {
+    iOweCents: total("I_OWE"),
+    owedToMeCents: total("OWED_TO_ME"),
+    open: rows.reduce((count, row) => count + row._count._all, 0),
+  };
 }

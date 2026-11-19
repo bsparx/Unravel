@@ -31,6 +31,9 @@ import {
 
 function revalidateBudgetViews() {
   revalidatePath("/budget");
+  revalidatePath("/budget/expenses");
+  revalidatePath("/budget/income");
+  revalidatePath("/budget/debts");
   revalidatePath("/budget/accounts");
   revalidatePath("/budget/categories");
 }

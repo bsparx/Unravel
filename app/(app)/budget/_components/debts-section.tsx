@@ -65,7 +65,7 @@ export function DebtsSection({
   };
 
   return (
-    <section className="border-border bg-card mb-6 rounded-lg border">
+    <section className="border-border bg-card rounded-lg border">
       <header className="flex items-center justify-between gap-3 border-b px-4 py-3">
         <h2 className="text-title">Who owes who</h2>
         <Button

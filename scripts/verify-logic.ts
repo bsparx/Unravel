@@ -44,6 +44,20 @@ import {
 } from "@/lib/reading";
 import { instantToLocalInput, localInputToInstant, localToInstant } from "@/lib/dates";
 import {
+  bucketIndex,
+  bucketUnit,
+  DEFAULT_QUERY,
+  foldCategories,
+  formatSpan,
+  ledgerSearch,
+  makeBuckets,
+  monthLedgerHref,
+  parseLedgerQuery,
+  previousSpan,
+  resolveSpan,
+  shiftMonthsISO,
+} from "@/app/(app)/budget/_lib/ledger";
+import {
   FAST_PROTOCOLS,
   dailyTotals,
   eatMinutes,
@@ -4116,6 +4130,92 @@ check("the balloon rises with the days, and says so", () => {
   assert.equal(sceneCaption(balloon, tend(days("xxxxxxxxxxxxxx."))).line, "Empty your head today to keep the sun on the balloon.");
   assert.equal(sceneCaption(SCENES.meditate, tend(days("xxxxxxxxxxxxxxx"))).title, "The garden is whole.");
   assert.ok(MIND_TABS.includes("braindump"));
+});
+
+check("a ledger query survives the URL, and junk falls back to defaults", () => {
+  assert.deepEqual(parseLedgerQuery({}), DEFAULT_QUERY);
+  assert.equal(ledgerSearch(DEFAULT_QUERY), "");
+  const q = parseLedgerQuery({ range: "6m", cat: "cmabc12345xyz", q: "  rent  ", sort: "largest", n: "120" });
+  assert.equal(q.range, "6m");
+  assert.equal(q.q, "rent");
+  assert.equal(q.limit, 150, "rounds up to a whole page");
+  assert.deepEqual(parseLedgerQuery(Object.fromEntries(new URLSearchParams(ledgerSearch(q).slice(1)))), q);
+  assert.equal(parseLedgerQuery({ range: "forever", sort: "random", n: "-4", cat: "<script>" }).range, "month");
+  assert.equal(parseLedgerQuery({ cat: "<script>" }).categoryId, null);
+  assert.equal(parseLedgerQuery({ n: "99999" }).limit, 500);
+  // Either bound alone is that day; both, in either order, a span.
+  const swapped = parseLedgerQuery({ from: "2026-11-19", to: "2026-11-01" });
+  assert.deepEqual([swapped.range, swapped.from, swapped.to], ["custom", "2026-11-01", "2026-11-19"]);
+  assert.deepEqual([parseLedgerQuery({ to: "2026-11-05" }).from, parseLedgerQuery({ to: "2026-11-05" }).to], ["2026-11-05", "2026-11-05"]);
+  assert.equal(parseLedgerQuery({ from: "2026-02-31" }).range, "month", "not a real day");
+  assert.equal(parseLedgerQuery({ range: "custom" }).range, "month", "custom without dates");
+});
+
+check("ranges cover whole months, and compare like with like", () => {
+  const today = "2026-11-19";
+  const span = (range: string) => resolveSpan(parseLedgerQuery({ range }), today);
+  assert.deepEqual(span("month"), { from: "2026-11-01", to: "2026-11-30" });
+  assert.deepEqual(span("last-month"), { from: "2026-10-01", to: "2026-10-31" });
+  assert.deepEqual(span("3m"), { from: "2026-09-01", to: "2026-11-30" });
+  assert.deepEqual(span("12m"), { from: "2025-12-01", to: "2026-11-30" });
+  assert.deepEqual(span("year"), { from: "2026-01-01", to: "2026-12-31" });
+  assert.equal(span("all"), null);
+
+  const prev = (range: string) => {
+    const query = parseLedgerQuery({ range });
+    return previousSpan(query, resolveSpan(query, today)!, today);
+  };
+  assert.deepEqual(prev("month"), { from: "2026-10-01", to: "2026-10-19" }, "a running month meets the same days");
+  assert.deepEqual(prev("last-month"), { from: "2026-09-01", to: "2026-09-30" }, "a whole month meets a whole month");
+  assert.deepEqual(prev("year"), { from: "2025-01-01", to: "2025-11-19" });
+  const custom = parseLedgerQuery({ from: "2026-11-10", to: "2026-11-16" });
+  assert.deepEqual(previousSpan(custom, resolveSpan(custom, today)!, today), { from: "2026-11-03", to: "2026-11-09" });
+  assert.equal(shiftMonthsISO("2026-03-31", -1), "2026-02-28");
+  assert.equal(previousSpan(custom, { from: "2026-12-01", to: "2026-12-05" }, today), null, "not started");
+
+  assert.equal(formatSpan({ from: "2026-11-01", to: "2026-11-30" }, today), "November");
+  assert.equal(formatSpan({ from: "2026-10-01", to: "2026-10-19" }, today), "1 – 19 Oct");
+  assert.match(formatSpan({ from: "2026-09-01", to: "2026-11-30" }, today), /^Sept? – Nov$/);
+  assert.equal(formatSpan({ from: "2025-12-01", to: "2026-11-30" }, today), "Dec 2025 – Nov 2026");
+  assert.equal(formatSpan({ from: "2026-01-01", to: "2026-12-31" }, today), "2026");
+  assert.equal(formatSpan({ from: "2025-10-01", to: "2025-10-31" }, today), "October 2025");
+});
+
+check("bars are days, weeks or months, and every day lands in one", () => {
+  const month = { from: "2026-11-01", to: "2026-11-30" };
+  assert.equal(bucketUnit(month), "day");
+  assert.equal(bucketUnit({ from: "2026-09-01", to: "2026-11-30" }), "week");
+  assert.equal(bucketUnit({ from: "2026-01-01", to: "2026-12-31" }), "month");
+  const days = makeBuckets(month, "day");
+  assert.equal(days.length, 30);
+  assert.equal(days[18].tick, "19");
+  const weeks = makeBuckets({ from: "2026-09-01", to: "2026-11-30" }, "week");
+  assert.equal(weeks[0].end, "2026-09-07");
+  assert.equal(weeks[weeks.length - 1].end, "2026-11-30", "the last week stops at the span");
+  const months = makeBuckets({ from: "2026-01-14", to: "2026-12-31" }, "month");
+  assert.equal(months.length, 12);
+  assert.equal(months[0].tick, "Jan");
+  assert.equal(bucketIndex(months, "2026-01-20"), 0);
+  assert.equal(bucketIndex(months, "2026-12-31"), 11);
+  assert.equal(bucketIndex(days, "2026-12-01"), -1);
+  for (const span of [month, { from: "2026-09-01", to: "2026-11-30" }]) {
+    const buckets = makeBuckets(span, bucketUnit(span));
+    for (let i = 1; i < buckets.length; i += 1) {
+      assert.ok(buckets[i].start > buckets[i - 1].end, "no day in two bars");
+    }
+  }
+});
+
+check("the overview links to the month it shows, and folds the long tail", () => {
+  assert.equal(monthLedgerHref("EXPENSE", "2026-11-01", "2026-11-19"), "/budget/expenses");
+  assert.equal(
+    monthLedgerHref("INCOME", "2026-10-01", "2026-11-19", "cmabc12345xyz"),
+    "/budget/income?from=2026-10-01&to=2026-10-31&cat=cmabc12345xyz",
+  );
+  const row = (id: string, cents: number) => ({ category: { id, name: id, color: "amber" as const }, totalCents: cents });
+  const folded = foldCategories([row("a", 50), row("b", 40), row("c", 30), row("d", 20), row("z", 0)], 2, (id) => id ?? "all");
+  assert.deepEqual(folded.map((bar) => [bar.id, bar.cents]), [["a", 50], ["b", 40], ["rest", 50]]);
+  assert.equal(foldCategories([row("a", 5), row("b", 4), row("c", 3)], 2, () => "").length, 3, "one left over keeps its name");
 });
 
 console.log(`\n${passed} checks passed.\n`);

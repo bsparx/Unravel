@@ -57,6 +57,8 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-money-in: var(--money-in);
+  --color-money-out: var(--money-out);
 
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
@@ -285,6 +287,15 @@
   --money-lilac: #8f7ba8;
   --money-peach: #c9976b;
 
+  /* Money in and money out, as chart marks and signed amounts. A blue and a
+     crimson rather than the pink primary against the crimson destructive,
+     which sit too close to tell apart at a glance. Checked for lightness,
+     chroma, colour-blind separation and contrast on the card surface. */
+  --money-in: #4a5fc4;
+  --money-out: #b8344d;
+  /* The rest, when one category is picked out: recessive, not gone. */
+  --money-quiet: color-mix(in oklab, var(--muted-foreground) 28%, transparent);
+
   /* Identity hues, assigned in this order and checked for contrast and
      colour-blind separation on every light surface. Marks only, never text. */
   --id-1: #009390;
@@ -394,6 +405,11 @@
   --money-blush: #d89c96;
   --money-lilac: #ad9cc2;
   --money-peach: #d9ab85;
+
+  /* Stepped down into the dark band so neither glares on the night card. */
+  --money-in: #6d86e6;
+  --money-out: #e8607a;
+  --money-quiet: color-mix(in oklab, var(--muted-foreground) 30%, transparent);
 
   /* The same six hues, stepped for dark surfaces. */
   --id-1: #08a4a0;

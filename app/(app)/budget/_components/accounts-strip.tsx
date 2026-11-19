@@ -7,10 +7,10 @@ import { formatMoneyCompact } from "@/lib/money";
 import type { Account } from "../_lib/queries";
 
 /**
- * Where the month's money actually lives, at a glance: one row per live
- * account with its balance, and a thin bar showing each account's share of
- * the total. Quiet by design — the jar on the hero answers "how much", this
- * answers "where". Archived accounts stay on the accounts page.
+ * Where the money actually lives, at a glance: one row per live account with
+ * its balance, and a thin bar showing each account's share of the total.
+ * Quiet by design: the overview's figures answer "how much", this answers
+ * "where". Archived accounts stay on the accounts page.
  */
 export function AccountsStrip({ accounts }: { accounts: Account[] }) {
   const live = accounts.filter((account) => !account.archived);
@@ -19,7 +19,7 @@ export function AccountsStrip({ accounts }: { accounts: Account[] }) {
   const total = live.reduce((sum, account) => sum + account.balanceCents, 0);
 
   return (
-    <section className="border-border bg-card mb-6 rounded-lg border p-4">
+    <section className="border-border bg-card rounded-lg border p-4 md:p-5">
       <header className="flex items-center justify-between gap-3">
         <h2 className="text-title">Accounts</h2>
         <Link

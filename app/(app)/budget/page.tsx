@@ -1,115 +1,67 @@
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, SlidersHorizontal, Wallet } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { backfillDefaultAccount, ensureDefaultAccount } from "@/lib/accounts";
 import { requireUser } from "@/lib/auth";
 import { ensureGlobalCategories } from "@/lib/budget";
-import {
-  addMonths,
-  parseLocalDate,
-  startOfMonth,
-  todayLocal,
-} from "@/lib/dates";
-import { formatMoneyCompact } from "@/lib/money";
+import { addMonths, parseLocalDate, startOfMonth, todayLocal, toISODate } from "@/lib/dates";
+import { formatMoneyCompact, formatMoneyWhole } from "@/lib/money";
 import { getSubscriptions } from "@/lib/subscriptions-data";
 
 import { AccountsStrip } from "./_components/accounts-strip";
-import { BalanceChart } from "./_components/balance-chart";
-import { BalancePanel } from "./_components/balance-panel";
 import { BudgetsSection } from "./_components/budgets-section";
-import { CategoryDonut } from "./_components/category-donut";
-import { DebtsSection } from "./_components/debts-section";
-import { FlowChart } from "./_components/flow-chart";
+import { CategoryBars } from "./_components/category-bars";
+import { ChartCard } from "./_components/chart-bits";
+import { EntryList, LogMoneyButton } from "./_components/entry-list";
+import { IousStrip } from "./_components/ious-strip";
+import { MonthlyChart } from "./_components/monthly-chart";
 import { ResetBudgetsButton } from "./_components/reset-budgets-button";
+import { Delta, StatTile } from "./_components/stat-tile";
 import { SubscriptionsStrip } from "./_components/subscriptions-strip";
-import { TransactionsSection } from "./_components/transactions-section";
+import { foldCategories, monthLedgerHref } from "./_lib/ledger";
 import {
   getAccounts,
   getBudgetCategories,
-  getBudgetMonth,
+  getBudgetOverview,
   getBudgets,
-  getDebts,
+  getDebtTotals,
+  type BudgetOverview,
 } from "./_lib/queries";
-import type { BudgetMonth } from "./_lib/queries";
 
 export const metadata = { title: "Budget" };
 
-/**
- * The headline sentence, computed server-side — same licence as the
- * calendar's: Server Components don't re-render, so there is nothing to
- * hydrate-mismatch. One sentence, one piece of arithmetic, and it's done
- * for you.
- */
-function headline(month: BudgetMonth): string {
+/** How many categories "Where it went" names before folding the rest. */
+const NAMED_CATEGORIES = 6;
+
+const navLinkClass =
+  "focus-visible:ring-ring text-muted-foreground hover:text-foreground grid size-9 place-items-center rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-none";
+
+/** What the hero figure means, in one sentence. */
+function keptLine(month: BudgetOverview): string {
   const net = month.incomeCents - month.expenseCents;
-  const spent = formatMoneyCompact(month.expenseCents);
-  const earned = formatMoneyCompact(month.incomeCents);
-
-  if (net === 0) {
-    return `In ${month.monthLabel} you spent ${spent} and brought in ${earned} — exactly even.`;
-  }
-  const direction = net > 0 ? "ahead" : "behind";
-  return `In ${month.monthLabel} you spent ${spent} and brought in ${earned} — ${formatMoneyCompact(Math.abs(net))} ${direction}.`;
+  if (!month.hasData) return `Nothing logged in ${month.monthLabel}${month.current ? " yet" : ""}.`;
+  if (net < 0) return `${formatMoneyCompact(-net)} more went out than came in.`;
+  if (month.incomeCents === 0) return "Nothing came in to set it against.";
+  if (net === 0) return "Exactly what came in went out.";
+  return `You kept ${Math.round((net / month.incomeCents) * 100)}% of what came in.`;
 }
 
 /**
- * The pace sentence: this month's balance at this point against the same
- * stretch of last month. For a past month, the whole-month comparison.
- * Null when there is nothing to compare against — silence is better than
- * a made-up number.
+ * The budget at a glance: one month's figures, where its money went, the
+ * last six months side by side, and a line each for the envelopes, the
+ * accounts, the subscriptions and the IOUs. Anything more specific lives a
+ * tap away, on Expenses and Income, where it can be searched and narrowed.
  */
-function paceSentence(
-  month: BudgetMonth,
-  lastMonth: BudgetMonth["lastMonth"],
-  anchor: Date,
-  today: Date,
-): string | null {
-  if (!month.hasData || lastMonth.incomeCents + lastMonth.expenseCents === 0) {
-    return null;
-  }
-
-  const isCurrent = anchor.getUTCMonth() === today.getUTCMonth();
-  const elapsed = isCurrent
-    ? today.getUTCDate()
-    : new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth() + 1, 0))
-        .getUTCDate();
-
-  const idx = Math.min(elapsed, month.balance.length, lastMonth.balance.length) - 1;
-  if (idx < 0) return null;
-
-  const mine = month.balance[idx]?.cents ?? 0;
-  let theirs: number | null = null;
-  for (let i = idx; i >= 0; i--) {
-    if (lastMonth.balance[i] !== null) {
-      theirs = lastMonth.balance[i];
-      break;
-    }
-  }
-  if (theirs === null) return null;
-
-  const diff = mine - theirs;
-  if (diff === 0) return null;
-  const amount = formatMoneyCompact(Math.abs(diff));
-  const ahead = diff > 0 ? "ahead of" : "behind";
-
-  return isCurrent
-    ? `This far into ${month.monthLabel} you&apos;re ${amount} ${ahead} the same stretch last month.`
-    : `${month.monthLabel} finished ${amount} ${ahead} the month before it.`;
-}
-
-export default async function BudgetPage({
-  searchParams,
-}: PageProps<"/budget">) {
+export default async function BudgetPage({ searchParams }: PageProps<"/budget">) {
   const user = await requireUser();
 
   // Next 16: searchParams is a Promise.
   const params = await searchParams;
-  const thisMonth = startOfMonth(todayLocal(user.timezone));
+  const today = todayLocal(user.timezone);
+  const todayISO = toISODate(today);
+  const thisMonth = startOfMonth(today);
   const raw = Array.isArray(params.m) ? params.m[0] : params.m;
-  const anchor =
-    raw && /^\d{4}-\d{2}$/.test(raw)
-      ? (parseLocalDate(`${raw}-01`) ?? thisMonth)
-      : thisMonth;
+  const anchor = raw && /^\d{4}-\d{2}$/.test(raw) ? (parseLocalDate(`${raw}-01`) ?? thisMonth) : thisMonth;
 
   // Two independent setup steps, side by side. Global categories are the
   // floor every account starts from, and accounts came after the ledger: make
@@ -117,148 +69,185 @@ export default async function BudgetPage({
   // it. Both are idempotent, a no-op after the first visit.
   await Promise.all([
     ensureGlobalCategories(),
-    ensureDefaultAccount(user.id).then((mainAccount) =>
-      backfillDefaultAccount(user.id, mainAccount.id),
-    ),
+    ensureDefaultAccount(user.id).then((mainAccount) => backfillDefaultAccount(user.id, mainAccount.id)),
   ]);
 
   const [month, categories, budgets, accounts, debts, subscriptions] = await Promise.all([
-    getBudgetMonth(user, anchor),
+    getBudgetOverview(user, anchor, today),
     getBudgetCategories(user),
     getBudgets(user),
     getAccounts(user),
-    getDebts(user),
+    getDebtTotals(user),
     getSubscriptions(user),
   ]);
 
   const prev = addMonths(anchor, -1);
   const next = addMonths(anchor, 1);
   const canGoForward = next.getTime() <= thisMonth.getTime();
+  const monthName = month.monthLabel.split(" ")[0];
+  const net = month.incomeCents - month.expenseCents;
+  const { compare } = month;
+  const dialog = { accounts, categories, budgets };
+  const liveAccounts = accounts.filter((account) => !account.archived);
 
-  const today = todayLocal(user.timezone);
-  const todayISO = today.toISOString().slice(0, 10);
-  const last = month.lastMonth;
-  const deltaIncome = month.incomeCents - last.incomeCents;
-  const deltaOut = month.expenseCents - last.expenseCents;
+  const spending = foldCategories(month.spending, NAMED_CATEGORIES, (categoryId) =>
+    monthLedgerHref("EXPENSE", month.monthISO, todayISO, categoryId ?? undefined),
+  );
+  const anyMonths = month.months.some((row) => row.incomeCents + row.expenseCents > 0);
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-5 py-8 md:px-8 md:py-12">
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
           <h1 className="text-display">Budget</h1>
           <p className="text-muted-foreground mt-1 text-label">
-            {month.hasData
-              ? headline(month)
-              : `Nothing logged in ${month.monthLabel} yet.`}
+            {month.current ? "This month so far." : `How ${month.monthLabel} went.`}{" "}
+            {month.entryCount > 0 &&
+              `${month.entryCount} ${month.entryCount === 1 ? "entry" : "entries"} logged.`}
           </p>
         </div>
 
-        <nav aria-label="Month" className="flex items-center gap-1">
-          <Link
-            href={`/budget?m=${prev.toISOString().slice(0, 7)}`}
-            aria-label="Previous month"
-            className="focus-visible:ring-ring text-muted-foreground hover:text-foreground rounded-md p-1.5 transition-colors focus-visible:ring-2 focus-visible:outline-none"
-          >
-            <ChevronLeft className="size-4" aria-hidden />
-          </Link>
-          <span className="text-title min-w-28 text-center tabular-nums">
-            {month.monthLabel}
-          </span>
-          {canGoForward ? (
-            <Link
-              href={`/budget?m=${next.toISOString().slice(0, 7)}`}
-              aria-label="Next month"
-              className="focus-visible:ring-ring text-muted-foreground hover:text-foreground rounded-md p-1.5 transition-colors focus-visible:ring-2 focus-visible:outline-none"
-            >
-              <ChevronRight className="size-4" aria-hidden />
+        <div className="flex flex-wrap items-center gap-2">
+          <nav aria-label="Month" className="flex items-center">
+            <Link href={`/budget?m=${toISODate(prev).slice(0, 7)}`} aria-label="Previous month" className={navLinkClass}>
+              <ChevronLeft className="size-4" aria-hidden />
             </Link>
-          ) : (
-            <span className="text-muted-foreground/40 p-1.5" aria-hidden>
-              <ChevronRight className="size-4" />
-            </span>
-          )}
-        </nav>
+            <span className="text-title min-w-32 text-center">{month.monthLabel}</span>
+            {canGoForward ? (
+              <Link href={`/budget?m=${toISODate(next).slice(0, 7)}`} aria-label="Next month" className={navLinkClass}>
+                <ChevronRight className="size-4" aria-hidden />
+              </Link>
+            ) : (
+              <span className="text-muted-foreground/40 grid size-9 place-items-center" aria-hidden>
+                <ChevronRight className="size-4" />
+              </span>
+            )}
+          </nav>
+          <LogMoneyButton todayISO={todayISO} {...dialog} />
+        </div>
       </header>
 
-      <BalancePanel
-        incomeCents={month.incomeCents}
-        expenseCents={month.expenseCents}
-        deltaIncome={deltaIncome}
-        deltaOut={deltaOut}
-        monthLabel={month.monthLabel}
-        paceLine={paceSentence(month, last, anchor, today)}
-        hasData={month.hasData}
-      />
-
-      <AccountsStrip accounts={accounts} />
-
-      <SubscriptionsStrip overview={subscriptions} />
-
-      {month.hasData && (
-        <>
-          <section className="border-border bg-card mb-6 rounded-lg border p-4">
-            <h2 className="text-title mb-3">The month&apos;s stretch</h2>
-            <BalanceChart
-              balance={month.balance}
-              lastMonth={last.balance}
-              monthName={month.monthLabel.split(" ")[0]}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-[1.35fr_1fr_1fr]">
+        <StatTile
+          hero
+          label={month.current ? "Left over so far" : `Left over in ${monthName}`}
+          value={`${net > 0 ? "+" : net < 0 ? "−" : ""}${formatMoneyWhole(Math.abs(net))}`}
+          tone={net < 0 ? "bad" : undefined}
+          className="sm:col-span-2 lg:col-span-1"
+        >
+          <p>{keptLine(month)}</p>
+          {month.hasData && (
+            <Delta
+              now={compare.thisIncomeCents - compare.thisExpenseCents}
+              then={compare.incomeCents - compare.expenseCents}
+              label={compare.label}
+              goodWhenUp
             />
-          </section>
-
-          <BudgetsSection
-            budgets={budgets}
-            accounts={accounts}
-            categories={categories}
-            todayISO={todayISO}
-          />
-
-          <div className="mb-6 grid gap-6 lg:grid-cols-2">
-            <section className="border-border bg-card rounded-lg border p-4">
-              <h2 className="text-title mb-3">In vs out</h2>
-              <FlowChart weeks={month.weeks} />
-            </section>
-            <section className="border-border bg-card rounded-lg border p-4">
-              <h2 className="text-title mb-3">By category</h2>
-              <CategoryDonut categories={month.categories} />
-            </section>
-          </div>
-        </>
-      )}
-
-      <DebtsSection
-        debts={debts}
-        accounts={accounts}
-        categories={categories}
-        budgets={budgets}
-        todayISO={todayISO}
-      />
-
-      <TransactionsSection
-        entries={month.entries}
-        accounts={accounts}
-        categories={categories}
-        budgets={budgets}
-        monthLabel={month.monthLabel}
-        todayISO={todayISO}
-      />
-
-      <div className="mt-4 flex flex-wrap items-center gap-4">
-        <Link
-          href="/budget/accounts"
-          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex items-center gap-1.5 rounded-md text-label transition-colors focus-visible:ring-2 focus-visible:outline-none"
-        >
-          <Wallet className="size-4" aria-hidden />
-          Accounts
-        </Link>
-        <Link
-          href="/budget/categories"
-          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex items-center gap-1.5 rounded-md text-label transition-colors focus-visible:ring-2 focus-visible:outline-none"
-        >
-          <SlidersHorizontal className="size-4" aria-hidden />
-          Manage categories
-        </Link>
-        <ResetBudgetsButton />
+          )}
+        </StatTile>
+        <StatTile label="Came in" value={formatMoneyWhole(month.incomeCents)}>
+          <Delta now={compare.thisIncomeCents} then={compare.incomeCents} label={compare.label} goodWhenUp />
+          <Link
+            href={monthLedgerHref("INCOME", month.monthISO, todayISO)}
+            className="hover:text-foreground focus-visible:ring-ring inline-flex items-center gap-1 rounded-sm underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-none"
+          >
+            See income
+            <ArrowRight className="size-3.5" aria-hidden />
+          </Link>
+        </StatTile>
+        <StatTile label="Went out" value={formatMoneyWhole(month.expenseCents)}>
+          <Delta now={compare.thisExpenseCents} then={compare.expenseCents} label={compare.label} goodWhenUp={false} />
+          <p>
+            {month.daysElapsed > 0 && month.expenseCents > 0
+              ? `About ${formatMoneyCompact(Math.round(month.expenseCents / month.daysElapsed))} a day.`
+              : month.current
+                ? "Nothing spent yet."
+                : "Nothing spent."}
+          </p>
+        </StatTile>
       </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+        <ChartCard
+          title="Where it went"
+          subtitle={`${monthName}'s spending by category. Tap one to see its entries.`}
+          className="lg:col-span-2"
+          action={
+            <Link
+              href={monthLedgerHref("EXPENSE", month.monthISO, todayISO)}
+              className="text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex shrink-0 items-center gap-1 rounded-md text-label transition-colors focus-visible:ring-2 focus-visible:outline-none"
+            >
+              All expenses
+              <ArrowRight className="size-3.5" aria-hidden />
+            </Link>
+          }
+        >
+          {spending.length > 0 ? (
+            <CategoryBars rows={spending} tone="out" label={`${monthName}'s spending by category`} />
+          ) : (
+            <p className="text-muted-foreground py-10 text-center text-label">Nothing spent in {monthName} yet.</p>
+          )}
+        </ChartCard>
+
+        <ChartCard
+          title="Month by month"
+          subtitle="What came in and what went out. Tap a month to open it."
+          className="lg:col-span-3"
+        >
+          {anyMonths ? (
+            <MonthlyChart months={month.months} activeStart={month.monthISO} />
+          ) : (
+            <p className="text-muted-foreground py-10 text-center text-label">
+              Six months of in and out will line up here as you log.
+            </p>
+          )}
+        </ChartCard>
+      </div>
+
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-5">
+        <div className="min-w-0 space-y-4 lg:col-span-3">
+          <BudgetsSection budgets={budgets} accounts={accounts} categories={categories} todayISO={todayISO} />
+
+          <section className="border-border bg-card rounded-lg border">
+            <header className="flex items-center justify-between gap-3 px-4 py-3 md:px-5">
+              <h2 className="text-title">Latest in {monthName}</h2>
+              <div className="flex items-center gap-3 text-label">
+                <Link
+                  href={monthLedgerHref("INCOME", month.monthISO, todayISO)}
+                  className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                >
+                  Income
+                </Link>
+                <Link
+                  href={monthLedgerHref("EXPENSE", month.monthISO, todayISO)}
+                  className="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                >
+                  Expenses
+                </Link>
+              </div>
+            </header>
+            {month.recent.length > 0 ? (
+              <div className="border-border border-t">
+                <EntryList entries={month.recent} showAccount={liveAccounts.length > 1} {...dialog} />
+              </div>
+            ) : (
+              <p className="text-muted-foreground border-border border-t px-4 py-8 text-center text-label md:px-5">
+                Money in or out lands here as you log it.
+              </p>
+            )}
+          </section>
+        </div>
+
+        <div className="min-w-0 space-y-4 lg:col-span-2">
+          <AccountsStrip accounts={accounts} />
+          <SubscriptionsStrip overview={subscriptions} />
+          <IousStrip {...debts} />
+        </div>
+      </div>
+
+      <footer className="pt-2">
+        <ResetBudgetsButton />
+      </footer>
     </div>
   );
 }

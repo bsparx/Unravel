@@ -21,7 +21,7 @@ import { idleState } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 
 import { deleteTransaction, logTransaction, settleDebtWithTransaction, updateTransaction } from "../actions";
-import type { Account, Budget, BudgetCategory } from "../_lib/queries";
+import type { AccountOption, Budget, BudgetCategory } from "../_lib/queries";
 
 export type MoneyDraft = {
   id?: string;
@@ -64,7 +64,7 @@ export function MoneyDialog({
 }: {
   draft: MoneyDraft;
   /** Every account the user can log into, so the picker always has one. */
-  accounts: Account[];
+  accounts: AccountOption[];
   /** Both sides, so the In/Out toggle can swap the options without a round trip. */
   categories: { income: BudgetCategory[]; expense: BudgetCategory[] };
   /** Every envelope, so the picker can offer the ones covering the date. */

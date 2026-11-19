@@ -22,7 +22,7 @@ export function SubscriptionsStrip({
     <Link
       href="/subscriptions"
       className={cn(
-        "bg-card hover:bg-accent/40 focus-visible:ring-ring mb-6 flex items-center gap-3 rounded-lg border px-4 py-3 transition-colors focus-visible:ring-2 focus-visible:outline-none",
+        "bg-card hover:bg-accent/40 focus-visible:ring-ring flex min-h-14 items-center gap-3 rounded-lg border px-4 py-3 md:px-5 transition-colors focus-visible:ring-2 focus-visible:outline-none",
         soon > 0 ? "border-destructive/30" : "border-border",
       )}
     >
