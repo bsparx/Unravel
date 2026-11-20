@@ -16,11 +16,12 @@ export default function Loading() {
               <Skeleton className="h-11 w-14 rounded-[10px]" />
             </div>
             <Skeleton className="h-11 w-36 rounded-[13px]" />
+            <Skeleton className="h-11 w-24 rounded-[10px]" />
           </div>
         </header>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-          {/* The grid — day view is the default, so one wide column. */}
+        <div className="grid grid-cols-1 gap-6">
+          {/* The grid — day view with the right panel collapsed by default. */}
           <div className="bg-card overflow-hidden rounded-[20px] border">
             <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] border-b">
               <div />
@@ -68,54 +69,6 @@ export default function Loading() {
               </div>
             </div>
           </div>
-
-          {/* The scheduling panel */}
-          <aside className="space-y-6">
-            <div className="bg-card rounded-[20px] border p-4">
-              <Skeleton className="mx-auto mb-5 h-5 w-32 rounded-md" />
-              <div className="grid grid-cols-7 gap-x-2 gap-y-4">
-                {Array.from({ length: 42 }).map((_, index) => (
-                  <Skeleton key={index} className="mx-auto size-5 rounded-md" />
-                ))}
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Skeleton className="h-6 w-40 rounded-md" />
-              <Skeleton className="h-4 w-full rounded-md" />
-            </div>
-
-            <div className="space-y-2">
-              <Skeleton className="h-3 w-14 rounded-md" />
-              {Array.from({ length: 2 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="-mx-2 flex items-start gap-2 rounded-md border-b px-2 py-2"
-                >
-                  <Skeleton className="mt-1 size-4 shrink-0 rounded-md" />
-                  <div className="min-w-0 flex-1 space-y-1.5">
-                    <Skeleton className="h-4 w-4/5 rounded-md" />
-                    <Skeleton className="h-3 w-1/2 rounded-md" />
-                  </div>
-                  <Skeleton className="h-6 w-16 shrink-0 rounded-md" />
-                </div>
-              ))}
-
-              <Skeleton className="h-3 w-16 rounded-md pt-1" />
-              {Array.from({ length: 2 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="-mx-2 flex items-start gap-2 rounded-md border-b px-2 py-2"
-                >
-                  <Skeleton className="mt-1 size-4 shrink-0 rounded-md" />
-                  <div className="min-w-0 flex-1 space-y-1.5">
-                    <Skeleton className="h-4 w-3/5 rounded-md" />
-                    <Skeleton className="h-3 w-1/3 rounded-md" />
-                  </div>
-                  <Skeleton className="h-6 w-16 shrink-0 rounded-md" />
-                </div>
-              ))}
-            </div>
-          </aside>
         </div>
       </div>
     </div>

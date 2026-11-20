@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, ListChecks } from "lucide-react";
 
@@ -33,9 +34,18 @@ import { cn } from "@/lib/utils";
 import { CalendarView } from "./_components/calendar-view";
 import type { GridDay } from "./_components/calendar-grid";
 import { CalendarShortcuts, IntentLink } from "./_components/calendar-nav";
+import {
+  CalendarPanelProvider,
+  CalendarPanelToggle,
+  CalendarSplitLayout,
+} from "./_components/calendar-panel";
 import { MonthStrip } from "./_components/month-strip";
 import { SchedulePanel } from "./_components/schedule-panel";
 import { WeekInsights } from "./_components/week-insights";
+import {
+  CALENDAR_PANEL_COOKIE,
+  parseCalendarPanelCookie,
+} from "./_lib/panel-cookie";
 
 export const metadata = { title: "Calendar" };
 
@@ -48,10 +58,15 @@ const WAKING_END = 22 * 60;
 export default async function CalendarPage({
   searchParams,
 }: PageProps<"/calendar">) {
-  const user = await requireUser();
-
-  // Next 16: searchParams is a Promise.
-  const params = await searchParams;
+  const [user, params, cookieStore] = await Promise.all([
+    requireUser(),
+    // Next 16: searchParams is a Promise.
+    searchParams,
+    cookies(),
+  ]);
+  const defaultPanelOpen = parseCalendarPanelCookie(
+    cookieStore.get(CALENDAR_PANEL_COOKIE)?.value,
+  );
   const first = (key: string) => {
     const value = params[key];
     return Array.isArray(value) ? value[0] : value;
@@ -211,8 +226,9 @@ export default async function CalendarPage({
   })();
 
   return (
-    <div className="w-full px-4 py-6 md:px-6 md:py-8">
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+    <CalendarPanelProvider defaultOpen={defaultPanelOpen}>
+      <div className="w-full px-4 py-6 md:px-6 md:py-8">
+        <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-display">
             Calendar <InfoTip term="blocks" className="ml-1" />
@@ -300,57 +316,62 @@ export default async function CalendarPage({
               </Link>
             </Button>
           </div>
+
+          <CalendarPanelToggle unscheduledCount={schedulable.length} />
         </div>
       </header>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <CalendarView
-          days={days}
-          blocks={blocks}
-          prayerBands={prayerBands}
-          todayISO={toISODate(today)}
-          anchorISO={anchorISO}
-          focusBlockId={focusBlockId}
-          timeZone={user.timezone}
-          tasks={schedulable.map((task) => ({
-            id: task.id,
-            title: task.title,
-            cueTitle: task.cueTitle,
-            color: task.color,
-          }))}
-          identities={identities}
-        />
-
-        <aside className="space-y-6">
-          <MonthStrip
-            month={startOfMonth(anchor)}
-            anchor={anchor}
-            weekStart={user.weekStart}
+      <CalendarSplitLayout
+        main={
+          <CalendarView
+            days={days}
+            blocks={blocks}
+            prayerBands={prayerBands}
+            todayISO={toISODate(today)}
+            anchorISO={anchorISO}
+            focusBlockId={focusBlockId}
             timeZone={user.timezone}
-            blockedDays={blockedDays}
+            tasks={schedulable.map((task) => ({
+              id: task.id,
+              title: task.title,
+              cueTitle: task.cueTitle,
+              color: task.color,
+            }))}
+            identities={identities}
           />
-          <section>
-            <h2 className="font-heading text-lg font-semibold">
-              Not on the day yet
-              {schedulable.length > 0 && (
-                <span className="text-muted-foreground font-sans text-label">
-                  {" · "}
-                  <span className="tabular-nums">{schedulable.length}</span> left
-                </span>
-              )}
-            </h2>
-            <p className="text-muted-foreground mt-0.5 mb-3 text-label">
-              Habits due today and everything still open. Drag one onto the
-              grid, or press it in and let it find a gap.
-            </p>
-            <SchedulePanel
-              items={schedulable}
-              dateISO={anchorISO}
-              today={today}
+        }
+        panel={
+          <>
+            <MonthStrip
+              month={startOfMonth(anchor)}
+              anchor={anchor}
+              weekStart={user.weekStart}
+              timeZone={user.timezone}
+              blockedDays={blockedDays}
             />
-          </section>
-        </aside>
-      </div>
+            <section>
+              <h2 className="font-heading text-lg font-semibold">
+                Not on the day yet
+                {schedulable.length > 0 && (
+                  <span className="text-muted-foreground font-sans text-label">
+                    {" · "}
+                    <span className="tabular-nums">{schedulable.length}</span> left
+                  </span>
+                )}
+              </h2>
+              <p className="text-muted-foreground mt-0.5 mb-3 text-label">
+                Habits due today and everything still open. Drag one onto the
+                grid, or press it in and let it find a gap.
+              </p>
+              <SchedulePanel
+                items={schedulable}
+                dateISO={anchorISO}
+                today={today}
+              />
+            </section>
+          </>
+        }
+      />
 
       <WeekInsights
         blocks={weekBlocks}
@@ -370,9 +391,10 @@ export default async function CalendarPage({
         Keys: <kbd className="font-mono">T</kbd> today ·{" "}
         <kbd className="font-mono">J</kbd> / <kbd className="font-mono">K</kbd>{" "}
         next and previous · <kbd className="font-mono">D</kbd> day ·{" "}
-        <kbd className="font-mono">W</kbd> week. Drag a block to move it — across
-        days in week view — and press <kbd className="font-mono">Esc</kbd> to put
-        it back.
+        <kbd className="font-mono">W</kbd> week ·{" "}
+        <kbd className="font-mono">S</kbd> panel. Drag a block to move it —
+        across days in week view — and press <kbd className="font-mono">Esc</kbd>{" "}
+        to put it back.
       </p>
 
       <CalendarShortcuts
@@ -382,6 +404,7 @@ export default async function CalendarPage({
         dayHref={`/calendar?view=day&date=${anchorISO}`}
         weekHref={`/calendar?view=week&date=${anchorISO}`}
       />
-    </div>
+      </div>
+    </CalendarPanelProvider>
   );
 }

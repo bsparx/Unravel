@@ -49,6 +49,18 @@ const isTyping = (target: EventTarget | null): boolean => {
 };
 
 /**
+ * Single-key shortcuts on `/calendar` should stay silent while typing,
+ * while a modifier is held, or while a modal dialog owns focus.
+ */
+export function shouldIgnoreCalendarShortcut(event: KeyboardEvent): boolean {
+  if (event.defaultPrevented || event.repeat) return true;
+  if (event.metaKey || event.ctrlKey || event.altKey) return true;
+  if (isTyping(event.target)) return true;
+  if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return true;
+  return false;
+}
+
+/**
  * Google Calendar's keys, for the same reason it has them: moving through
  * days is the thing you do most here, and it shouldn't need the mouse.
  *
@@ -84,10 +96,7 @@ export function CalendarShortcuts({
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.repeat) return;
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
-      if (isTyping(event.target)) return;
-      if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+      if (shouldIgnoreCalendarShortcut(event)) return;
 
       const href = routes[event.key.toLowerCase()];
       if (!href) return;

@@ -61,6 +61,20 @@ import {
 } from "@/lib/reading";
 import { instantToLocalInput, localInputToInstant, localToInstant } from "@/lib/dates";
 import {
+  CALENDAR_PANEL_COOKIE,
+  CALENDAR_PANEL_MAX_AGE,
+  formatCalendarPanelCookie,
+  parseCalendarPanelCookie,
+} from "@/app/(app)/calendar/_lib/panel-cookie";
+import {
+  computeWidgetPosition,
+  endTimeOptions,
+  formatEndMinuteLabel,
+  isoToPickerDate,
+  pickerDateToISO,
+  startTimeOptions,
+} from "@/app/(app)/calendar/_lib/block-widget";
+import {
   bucketIndex,
   bucketUnit,
   DEFAULT_QUERY,
@@ -4354,6 +4368,87 @@ check("every guide has three steps, sourced research and an honest limit", () =>
     assert.ok(GUIDES[key].research.some((r) => r.kind === "quran" || r.kind === "hadith"), key);
     assert.ok(GUIDES[key].research.some((r) => r.kind !== "quran" && r.kind !== "hadith"), key);
   }
+});
+
+console.log("\ncalendar panel cookie");
+
+check("calendar right panel defaults to collapsed and only opens on explicit true", () => {
+  assert.equal(parseCalendarPanelCookie(undefined), false);
+  assert.equal(parseCalendarPanelCookie(""), false);
+  assert.equal(parseCalendarPanelCookie("false"), false);
+  assert.equal(parseCalendarPanelCookie("1"), false);
+  assert.equal(parseCalendarPanelCookie("true"), true);
+  assert.equal(
+    formatCalendarPanelCookie(true),
+    `${CALENDAR_PANEL_COOKIE}=true; path=/; max-age=${CALENDAR_PANEL_MAX_AGE}; samesite=lax`,
+  );
+  assert.equal(
+    formatCalendarPanelCookie(false),
+    `${CALENDAR_PANEL_COOKIE}=false; path=/; max-age=${CALENDAR_PANEL_MAX_AGE}; samesite=lax`,
+  );
+});
+
+console.log("\ncalendar block widget helpers");
+
+check("floating widget places right, flips left near right edge, and centers on wide day view", () => {
+  const card = { width: 432, height: 480 };
+  const viewport = { width: 1280, height: 800 };
+
+  // Week-view left column: plenty of room to the right.
+  const right = computeWidgetPosition({
+    anchor: { left: 120, right: 260, top: 220, bottom: 280 },
+    card,
+    viewport,
+  });
+  assert.equal(right.placement, "right");
+  assert.equal(right.left, 272);
+  assert.equal(right.top, 196);
+
+  // Week-view right-edge column: flips left of the column.
+  const left = computeWidgetPosition({
+    anchor: { left: 1080, right: 1220, top: 220, bottom: 280 },
+    card,
+    viewport,
+  });
+  assert.equal(left.placement, "left");
+  assert.equal(left.left, 1080 - 12 - 432);
+
+  // Full-width Day view: neither side fits, so center over the column.
+  const centered = computeWidgetPosition({
+    anchor: { left: 100, right: 1240, top: 680, bottom: 720 },
+    card,
+    viewport,
+  });
+  assert.equal(centered.placement, "center");
+  assert.equal(centered.left, Math.round((100 + 1240) / 2 - 432 / 2));
+  // Clamped above the bottom viewport edge.
+  assert.equal(centered.top, 800 - 16 - 480);
+
+  // No anchor falls back to viewport center.
+  const noAnchor = computeWidgetPosition({ anchor: null, card, viewport });
+  assert.equal(noAnchor.placement, "center");
+  assert.equal(noAnchor.left, Math.round((1280 - 432) / 2));
+  assert.equal(noAnchor.top, Math.round((800 - 480) / 2));
+});
+
+check("time picker options step by 15m, keep off-grid values, and format midnight as 24:00", () => {
+  const starts = startTimeOptions(9 * 60 + 5);
+  assert.equal(starts[0], 0);
+  assert.equal(starts.at(-1), 23 * 60 + 45);
+  assert.ok(starts.includes(9 * 60 + 5), "keeps non-15m existing start");
+  assert.equal(starts.length, 97);
+
+  const ends = endTimeOptions(9 * 60, 9 * 60 + 25);
+  assert.equal(ends[0], 9 * 60 + 15);
+  assert.ok(ends.includes(9 * 60 + 25), "keeps non-15m existing end");
+  assert.equal(ends.at(-1), 1440);
+  assert.equal(formatEndMinuteLabel(1440), "24:00");
+  assert.equal(formatEndMinuteLabel(9 * 60 + 30), "09:30");
+
+  const picked = isoToPickerDate("2026-11-20");
+  assert.ok(picked);
+  assert.equal(pickerDateToISO(picked), "2026-11-20");
+  assert.equal(isoToPickerDate("2026-02-31"), undefined);
 });
 
 console.log(`\n${passed} checks passed.\n`);

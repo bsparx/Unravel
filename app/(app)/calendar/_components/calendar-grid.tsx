@@ -54,6 +54,7 @@ import {
   calendarChipStyle,
   calendarInkStyle,
   isCalendarColor,
+  type CalendarColor,
 } from "@/lib/calendar-colors";
 import {
   activePlanItem,
@@ -78,6 +79,20 @@ import {
 import { PrayerBands } from "./prayer-bands";
 import { PrayerTimes } from "./prayer-times";
 import { TransitionStrip } from "./transition-strip";
+import {
+  formatEndMinuteLabel,
+  type AnchorRect,
+} from "../_lib/block-widget";
+
+export type DraftPreview = {
+  dateISO: string;
+  startMinute: number;
+  endMinute: number;
+  title: string;
+  kind: "WORK" | "RECOVERY" | "BUFFER" | "DAYDREAM";
+  identityColorSlot: number | null;
+  taskColor: CalendarColor | null;
+};
 
 /**
  * Vertical scale. Two pixels per minute makes an hour 120px — a 15-minute
@@ -299,6 +314,7 @@ export function CalendarGrid({
   todayISO,
   anchorISO,
   focusBlockId,
+  draftPreview,
   onCreate,
   onEdit,
   onDropItem,
@@ -313,9 +329,11 @@ export function CalendarGrid({
   anchorISO: string;
   /** A block `/day` linked straight to: opened onto, and ringed for a moment. */
   focusBlockId: string | null;
+  /** Live ghost block shown on the grid while creating a new block. */
+  draftPreview?: DraftPreview | null;
   /** A slot was clicked or dragged into a span: open the editor on it. */
-  onCreate: (dateISO: string, span: Span) => void;
-  onEdit: (block: CalendarBlock) => void;
+  onCreate: (dateISO: string, span: Span, anchorRect?: AnchorRect) => void;
+  onEdit: (block: CalendarBlock, anchorRect?: AnchorRect) => void;
   /** Something was dragged in from the panel and let go at `startMinute`. */
   onDropItem: (item: PlanDragItem, dateISO: string, startMinute: number) => void;
   /** …and let go *on* a block that already exists: add it to that time. */
@@ -516,6 +534,7 @@ export function CalendarGrid({
 
       event.preventDefault();
       event.stopPropagation();
+      const chipEl = event.currentTarget as HTMLElement;
 
       const minuteAt = (clientY: number) =>
         snap((clientY - grid.getBoundingClientRect().top) / MINUTE_PX);
@@ -614,7 +633,15 @@ export function CalendarGrid({
           latest.endMinute !== origin.endMinute;
         // A click that never moved is a click, not a drag — don't write a no-op.
         if (moved) commit(latest);
-        else if (mode === "move") onEdit(block);
+        else if (mode === "move") {
+          const rect = chipEl.getBoundingClientRect();
+          onEdit(block, {
+            left: rect.left,
+            right: rect.right,
+            top: rect.top,
+            bottom: rect.bottom,
+          });
+        }
       };
 
       const onMove = (moveEvent: PointerEvent) => {
@@ -842,6 +869,11 @@ export function CalendarGrid({
               selected={day.dateISO === selectedDay.dateISO}
               draggingId={drag && drag.dateISO === day.dateISO ? drag.id : null}
               flashId={flashId}
+              draftPreview={
+                draftPreview && draftPreview.dateISO === day.dateISO
+                  ? draftPreview
+                  : null
+              }
               onBeginDrag={beginDrag}
               onCreate={onCreate}
               onEdit={onEdit}
@@ -903,8 +935,8 @@ const SelectedDayAgenda = memo(function SelectedDayAgenda({
   blocks: CalendarBlock[];
   relation: DayRelation;
   onToggleBeat: (block: CalendarBlock, index: number) => void;
-  onCreate: (dateISO: string, span: { startMinute: number; endMinute: number }) => void;
-  onEdit: (block: CalendarBlock) => void;
+  onCreate: (dateISO: string, span: { startMinute: number; endMinute: number }, anchorRect?: AnchorRect) => void;
+  onEdit: (block: CalendarBlock, anchorRect?: AnchorRect) => void;
   onToggleDone: (block: CalendarBlock) => void;
   onToggleTask: (block: CalendarBlock, taskId: string) => void;
   onDropCue: (block: CalendarBlock) => void;
@@ -1347,12 +1379,23 @@ const SlotLayer = memo(function SlotLayer({
 }: {
   dateISO: string;
   dayLabel: string;
-  onCreate: (dateISO: string, span: Span) => void;
+  onCreate: (dateISO: string, span: Span, anchorRect?: AnchorRect) => void;
 }) {
   const layerRef = useRef<HTMLDivElement>(null);
   const [creating, setCreating] = useState<Span | null>(null);
   /** The click that follows a real drag must not also create. */
   const skipNextClickRef = useRef(false);
+
+  const anchorForSpan = (span: Span): AnchorRect | undefined => {
+    const col = layerRef.current?.getBoundingClientRect();
+    if (!col) return undefined;
+    return {
+      left: col.left,
+      right: col.right,
+      top: col.top + span.startMinute * MINUTE_PX,
+      bottom: col.top + span.endMinute * MINUTE_PX,
+    };
+  };
 
   const slotMinute = (target: EventTarget): number | null => {
     const raw = (target as HTMLElement).dataset?.slot;
@@ -1408,7 +1451,7 @@ const SlotLayer = memo(function SlotLayer({
       if (create && latest.endMinute - latest.startMinute >= MIN_BLOCK_MINUTES) {
         // The trailing click would otherwise create a second block.
         skipNextClickRef.current = true;
-        onCreate(dateISO, latest);
+        onCreate(dateISO, latest, anchorForSpan(latest));
       }
     };
     const onUp = () => finish(true);
@@ -1433,7 +1476,8 @@ const SlotLayer = memo(function SlotLayer({
         }
         // Keyboard, touch and plain mouse presses all land here: create with
         // the default length at this slot.
-        onCreate(dateISO, spanOfLength(minute, PLAN_DEFAULT_MINUTES));
+        const span = spanOfLength(minute, PLAN_DEFAULT_MINUTES);
+        onCreate(dateISO, span, anchorForSpan(span));
       }}
     >
       <SlotButtons dayLabel={dayLabel} />
@@ -1478,6 +1522,7 @@ const DayColumn = memo(function DayColumn({
   selected,
   draggingId,
   flashId,
+  draftPreview,
   onBeginDrag,
   onCreate,
   onEdit,
@@ -1501,9 +1546,11 @@ const DayColumn = memo(function DayColumn({
   draggingId: string | null;
   /** A block another page pointed at; it wears a ring for a moment. */
   flashId: string | null;
+  /** Live ghost block when creating a new block on this day. */
+  draftPreview: DraftPreview | null;
   onBeginDrag: BeginDrag;
-  onCreate: (dateISO: string, span: Span) => void;
-  onEdit: (block: CalendarBlock) => void;
+  onCreate: (dateISO: string, span: Span, anchorRect?: AnchorRect) => void;
+  onEdit: (block: CalendarBlock, anchorRect?: AnchorRect) => void;
   onToggleDone: (block: CalendarBlock) => void;
   onToggleTask: (block: CalendarBlock, taskId: string) => void;
   onToggleBeat: (block: CalendarBlock, index: number) => void;
@@ -1706,9 +1753,60 @@ const DayColumn = memo(function DayColumn({
           onEdit={onEdit}
         />
       ))}
+
+      {draftPreview && <DraftPreviewBlock preview={draftPreview} />}
     </div>
   );
 });
+
+/**
+ * Live ghost preview shown on the grid while creating a new block in the
+ * floating widget — resizing, shifting, and re-tinting in real time just like
+ * Google Calendar's unsaved event card.
+ */
+function DraftPreviewBlock({ preview }: { preview: DraftPreview }) {
+  const minutes = Math.max(MIN_BLOCK_MINUTES, preview.endMinute - preview.startMinute);
+  const heightPx = Math.max(BLOCK_MIN_HEIGHT_PX, minutes * MINUTE_PX - 2);
+  const compact = minutes < COMPACT_MINUTES;
+
+  const tint =
+    preview.kind === "WORK" && preview.identityColorSlot !== null
+      ? identityChipStyle(preview.identityColorSlot)
+      : preview.taskColor
+        ? calendarChipStyle(preview.taskColor)
+        : null;
+
+  return (
+    <div
+      aria-hidden
+      className={cn(
+        "pointer-events-none absolute inset-x-0.5 z-20 flex flex-col overflow-hidden rounded-xl border px-2.5 shadow-md ring-2 ring-primary/35 transition-[top,height] duration-150",
+        compact ? "justify-center py-0.5" : "py-1.5",
+        tint ? "text-foreground" : KIND_STYLES[preview.kind],
+      )}
+      style={{
+        top: preview.startMinute * MINUTE_PX,
+        height: heightPx,
+        ...tint,
+      }}
+    >
+      <p
+        className={cn(
+          "truncate text-label leading-tight font-medium",
+          !preview.title.trim() && "text-muted-foreground italic font-normal",
+        )}
+      >
+        {preview.title.trim() || "(No title)"}
+      </p>
+      {!compact && (
+        <p className="text-muted-foreground mt-0.5 truncate font-mono text-micro tabular-nums">
+          {formatMinuteOfDay(preview.startMinute)} –{" "}
+          {formatEndMinuteLabel(preview.endMinute)}
+        </p>
+      )}
+    </div>
+  );
+}
 
 function DropPreview({
   startMinute,
@@ -1946,15 +2044,29 @@ const BlockChip = memo(function BlockChip({
   onToggleDone: (block: CalendarBlock) => void;
   onToggleTask: (block: CalendarBlock, taskId: string) => void;
   onDropCue: (block: CalendarBlock) => void;
-  onEdit: (block: CalendarBlock) => void;
+  onEdit: (block: CalendarBlock, anchorRect?: AnchorRect) => void;
 }) {
+  const chipRef = useRef<HTMLDivElement>(null);
   const onPointerDown = (event: React.PointerEvent, mode: "move" | "resize") =>
     onBeginDrag(event, block, mode);
   const onToggleDone = () => toggleDone(block);
   const onToggleTask = (taskId: string) => toggleTask(block, taskId);
   const onToggleBeat = (index: number) => toggleBeat(block, index);
   const onDropCue = () => dropCue(block);
-  const onEdit = () => edit(block);
+  const onEdit = () => {
+    const rect = chipRef.current?.getBoundingClientRect();
+    edit(
+      block,
+      rect
+        ? {
+            left: rect.left,
+            right: rect.right,
+            top: rect.top,
+            bottom: rect.bottom,
+          }
+        : undefined,
+    );
+  };
   /** A finger never drags a block (see `beginDrag`), so its tap has to open it. */
   const touchRef = useRef(false);
 
@@ -2040,6 +2152,7 @@ const BlockChip = memo(function BlockChip({
 
   return (
     <div
+      ref={chipRef}
       className={cn(
         "group focus-visible:ring-ring absolute z-10 flex flex-col overflow-hidden rounded-xl border select-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none",
         tight ? "py-0" : "py-1",

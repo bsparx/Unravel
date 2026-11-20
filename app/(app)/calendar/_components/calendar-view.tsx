@@ -10,8 +10,14 @@ import type { CalendarBlock } from "@/lib/time-blocks";
 import { idleState } from "@/lib/validation";
 
 import { addTaskToBlock, scheduleTask } from "../actions";
+import type { AnchorRect } from "../_lib/block-widget";
 import { BlockDialog, type BlockDraft } from "./block-dialog";
-import { CalendarGrid, NowProvider, type GridDay } from "./calendar-grid";
+import {
+  CalendarGrid,
+  NowProvider,
+  type DraftPreview,
+  type GridDay,
+} from "./calendar-grid";
 
 /**
  * Owns the one piece of state the calendar genuinely needs on the client: which
@@ -48,12 +54,18 @@ export function CalendarView({
   identities: { id: string; name: string; colorSlot: number }[];
 }) {
   const [draft, setDraft] = useState<BlockDraft | null>(null);
+  const [anchorRect, setAnchorRect] = useState<AnchorRect | null>(null);
+  const [preview, setPreview] = useState<DraftPreview | null>(null);
   const [, startTransition] = useTransition();
 
   // Stable identity: the dialog's toast effect depends on it, and a fresh
   // function every render would re-run that effect on every CalendarView
   // render — including the 30-second now-tick.
-  const closeDialog = useCallback(() => setDraft(null), []);
+  const closeDialog = useCallback(() => {
+    setDraft(null);
+    setAnchorRect(null);
+    setPreview(null);
+  }, []);
 
   // Stable for the same reason, and one more: the grid's columns and chips are
   // memoised, and a handler that changed identity every render would undo it.
@@ -82,7 +94,21 @@ export function CalendarView({
   );
 
   const onCreate = useCallback(
-    (dateISO: string, span: { startMinute: number; endMinute: number }) => {
+    (
+      dateISO: string,
+      span: { startMinute: number; endMinute: number },
+      rect?: AnchorRect,
+    ) => {
+      setAnchorRect(rect ?? null);
+      setPreview({
+        dateISO,
+        startMinute: span.startMinute,
+        endMinute: span.endMinute,
+        title: "",
+        kind: "WORK",
+        identityColorSlot: null,
+        taskColor: null,
+      });
       setDraft({
         dateISO,
         ...span,
@@ -100,7 +126,9 @@ export function CalendarView({
     [],
   );
 
-  const onEdit = useCallback((block: CalendarBlock) => {
+  const onEdit = useCallback((block: CalendarBlock, rect?: AnchorRect) => {
+    setAnchorRect(rect ?? null);
+    setPreview(null);
     setDraft({
       id: block.id,
       dateISO: block.dateISO,
@@ -164,6 +192,7 @@ export function CalendarView({
           todayISO={todayISO}
           anchorISO={anchorISO}
           focusBlockId={focusBlockId}
+          draftPreview={preview}
           onCreate={onCreate}
           onEdit={onEdit}
           onDropItem={onDropItem}
@@ -177,8 +206,10 @@ export function CalendarView({
         <BlockDialog
           key={draft.id ?? `new-${draft.dateISO}-${draft.startMinute}`}
           draft={draft}
+          anchorRect={anchorRect}
           tasks={tasks}
           identities={identities}
+          onPreviewChange={setPreview}
           onClose={closeDialog}
         />
       )}
