@@ -72,6 +72,25 @@ export function DayDetailSheet({
   const mindItems = selectedItems.filter((item) => item.group === "mind");
   const heartItems = selectedItems.filter((item) => item.group === "heart");
 
+  const practiceTimeEntries = [...mindItems, ...heartItems]
+    .map((item) => ({ item, entry: day.items[item.id] }))
+    .filter(
+      ({ entry }) =>
+        entry &&
+        (entry.status === "done" || entry.status === "bonus") &&
+        typeof entry.practiceSeconds === "number" &&
+        entry.practiceSeconds > 0,
+    );
+
+  const productiveSubtitle =
+    day.sessions.length > 0 && practiceTimeEntries.length > 0
+      ? `${day.sessions.length} focus · ${practiceTimeEntries.length} mind/heart`
+      : day.sessions.length > 0
+        ? `${day.sessions.length} ${day.sessions.length === 1 ? "entry" : "entries"}`
+        : practiceTimeEntries.length > 0
+          ? `${practiceTimeEntries.length} mind & heart`
+          : "Nothing tracked";
+
   const activeHabits = habitItems.filter((item) => {
     const status = day.items[item.id]?.status;
     return status !== "inactive" && status !== "bonus";
@@ -183,19 +202,17 @@ export function DayDetailSheet({
                 <p
                   className={cn(
                     "mt-1 font-mono text-heading font-semibold tabular-nums",
-                    day.productiveSeconds > 0
+                    summary.totalProductiveSeconds > 0
                       ? "text-running"
                       : "text-muted-foreground",
                   )}
                 >
-                  {day.productiveSeconds > 0
-                    ? formatDuration(day.productiveSeconds)
+                  {summary.totalProductiveSeconds > 0
+                    ? formatDuration(summary.totalProductiveSeconds)
                     : "0m"}
                 </p>
                 <p className="mt-0.5 text-micro text-muted-foreground">
-                  {day.sessions.length > 0
-                    ? `${day.sessions.length} ${day.sessions.length === 1 ? "entry" : "entries"}`
-                    : "Nothing tracked"}
+                  {productiveSubtitle}
                 </p>
               </div>
             </div>
@@ -299,11 +316,11 @@ export function DayDetailSheet({
             </section>
           )}
 
-          {/* Productive time sessions */}
+          {/* Productive time sessions + credited Mind & Heart practices */}
           <section className="space-y-2.5">
             <SectionHeading icon={Clock} label="Productive time" />
 
-            {day.sessions.length > 0 ? (
+            {day.sessions.length > 0 || practiceTimeEntries.length > 0 ? (
               <ul className="divide-y divide-border/50 rounded-2xl border border-border/60 bg-card/60">
                 {day.sessions.map((session) => (
                   <li
@@ -338,6 +355,36 @@ export function DayDetailSheet({
                           {formatDuration(session.overtimeSeconds)}
                         </p>
                       )}
+                    </div>
+                  </li>
+                ))}
+                {practiceTimeEntries.map(({ item, entry }) => (
+                  <li
+                    key={`practice:${item.id}`}
+                    className="flex items-center justify-between gap-3 px-4 py-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-label font-medium text-foreground">
+                        {item.title}
+                      </p>
+                      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-micro text-muted-foreground">
+                        {entry.completedTime && (
+                          <span className="font-mono tabular-nums">
+                            {entry.completedTime}
+                          </span>
+                        )}
+                        <span>{item.scheduleLabel}</span>
+                        {entry.detail && <span>· {entry.detail}</span>}
+                        {entry.practiceTimeAssumed && (
+                          <span>· assumed 10m</span>
+                        )}
+                      </p>
+                    </div>
+
+                    <div className="shrink-0 text-right">
+                      <span className="font-mono text-label font-semibold text-running tabular-nums">
+                        {formatDuration(entry.practiceSeconds ?? 0)}
+                      </span>
                     </div>
                   </li>
                 ))}
@@ -401,6 +448,7 @@ function ItemRow({
   const isSkipped = status === "skipped";
   const isOpen = status === "open";
   const checkedTime = isDone ? entry?.completedTime ?? null : null;
+  const creditedSeconds = isDone ? entry?.practiceSeconds ?? 0 : 0;
 
   return (
     <li className="flex items-center justify-between gap-3 px-4 py-3">
@@ -452,24 +500,43 @@ function ItemRow({
         </div>
       </div>
 
-      <span
-        className={cn(
-          "shrink-0 text-right text-micro font-medium",
-          isDone
-            ? "font-mono text-flow tabular-nums"
-            : isSkipped
-              ? "rounded-full bg-muted px-2 py-0.5 text-muted-foreground"
-              : "text-muted-foreground/75",
+      <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
+        {creditedSeconds > 0 && (
+          <span
+            className="font-mono text-micro font-semibold text-running tabular-nums"
+            title={
+              entry?.practiceTimeAssumed
+                ? "Assumed 10 min (no duration logged)"
+                : undefined
+            }
+          >
+            {formatDuration(creditedSeconds)}
+            {entry?.practiceTimeAssumed && (
+              <span className="ml-1 font-sans text-[10px] font-normal text-muted-foreground">
+                est.
+              </span>
+            )}
+          </span>
         )}
-      >
-        {isDone
-          ? checkedTime ?? "Done"
-          : isSkipped
-            ? "Skipped"
-            : isOpen
-              ? "Still open"
-              : "Not done"}
-      </span>
+        <span
+          className={cn(
+            "text-micro font-medium",
+            isDone
+              ? "font-mono text-flow tabular-nums"
+              : isSkipped
+                ? "rounded-full bg-muted px-2 py-0.5 text-muted-foreground"
+                : "text-muted-foreground/75",
+          )}
+        >
+          {isDone
+            ? checkedTime ?? "Done"
+            : isSkipped
+              ? "Skipped"
+              : isOpen
+                ? "Still open"
+                : "Not done"}
+        </span>
+      </div>
     </li>
   );
 }

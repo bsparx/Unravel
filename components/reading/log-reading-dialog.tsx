@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ChevronDown, Quote } from "lucide-react";
+import { ArrowRight, ChevronDown, Clock, Quote } from "lucide-react";
 import { toast } from "sonner";
 
 import { saveReadingLog } from "@/app/(app)/mind/reading-actions";
@@ -22,6 +22,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { addDays, parseLocalDate, toISODate } from "@/lib/dates";
 import {
   NOTE_PROMPTS,
+  READING_DEFAULT_MINUTES,
+  READING_MAX_MINUTES,
   READING_NOTE_MAX,
   READING_QUOTE_MAX,
   amountLabel,
@@ -62,6 +64,7 @@ export function LogReadingDialog({
 
   const [from, setFrom] = useState(String(log ? log.fromPage : book.position));
   const [to, setTo] = useState(log ? String(log.toPage) : "");
+  const [minutes, setMinutes] = useState(log?.minutes != null ? String(log.minutes) : "");
   const [when, setWhen] = useState<When>(
     !log || log.dateISO === todayISO ? "today" : log.dateISO === yesterdayISO ? "yesterday" : "other",
   );
@@ -102,6 +105,7 @@ export function LogReadingDialog({
     formData.set("date", dateISO);
     formData.set("fromPage", from === "" ? "0" : from);
     formData.set("toPage", to === "" ? (from === "" ? "0" : from) : to);
+    formData.set("minutes", minutes.trim());
     formData.set("note", note);
     formData.set("quote", quoteOpen ? quote : "");
     formData.set("quotePage", quoteOpen && quote.trim() ? quotePage || (to === "" ? "" : to) : "");
@@ -120,7 +124,16 @@ export function LogReadingDialog({
             action: { label: "Open notes", onClick: () => router.push(`/mind/books/${book.id}`) },
           });
         } else {
-          toast.success(log ? "Reading updated." : moved > 0 ? `${amountLabel(book.unit, moved)} read.` : "Note kept.");
+          const loggedMinutes = minutes.trim() ? Number(minutes) : 0;
+          toast.success(
+            log
+              ? "Reading updated."
+              : moved > 0
+                ? `${amountLabel(book.unit, moved)} read.`
+                : loggedMinutes > 0
+                  ? `${loggedMinutes} min logged.`
+                  : "Note kept.",
+          );
         }
         onClose();
       } catch {
@@ -232,6 +245,66 @@ export function LogReadingDialog({
                   </span>
                 </label>
               )}
+            </div>
+
+            {/* Time spent reading (optional; assumes 10 min in stats if left blank). */}
+            <div className="space-y-2.5">
+              <div className="flex items-baseline justify-between gap-2">
+                <Label htmlFor="log-minutes" className="inline-flex items-center gap-1.5 text-label font-medium">
+                  <Clock className="text-muted-foreground size-3.5" aria-hidden />
+                  Time read
+                  <span className="text-muted-foreground font-normal">(optional)</span>
+                </Label>
+                <span className="text-muted-foreground text-micro">
+                  {minutes.trim() ? `${minutes.trim()} min` : `Assumes ${READING_DEFAULT_MINUTES} min if blank`}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative w-28">
+                  <Input
+                    id="log-minutes"
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={READING_MAX_MINUTES}
+                    value={minutes}
+                    placeholder={String(READING_DEFAULT_MINUTES)}
+                    aria-invalid={error?.field === "minutes"}
+                    onChange={(event) => {
+                      setMinutes(event.target.value);
+                      setError(null);
+                    }}
+                    className="pr-11 font-mono tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  />
+                  <span className="text-muted-foreground pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-micro">
+                    min
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {[10, 15, 20, 30, 45, 60].map((preset) => {
+                    const selected = minutes.trim() === String(preset);
+                    return (
+                      <button
+                        key={preset}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => {
+                          setMinutes(selected ? "" : String(preset));
+                          setError(null);
+                        }}
+                        className={cn(
+                          "focus-visible:ring-ring rounded-full border px-3 py-1 font-mono text-micro tabular-nums transition-colors focus-visible:ring-2 focus-visible:outline-none active:scale-95",
+                          selected
+                            ? "border-primary bg-primary/15 text-foreground font-medium"
+                            : "border-border hover:bg-muted text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        {preset}m
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
             {/* When. */}

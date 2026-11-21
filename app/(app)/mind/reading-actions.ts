@@ -29,6 +29,7 @@ const invalid = (error: Parameters<typeof fieldErrorsFrom>[0]): ActionState => {
 
 const refresh = (bookId?: string) => {
   revalidatePath("/mind");
+  revalidatePath("/stats");
   if (bookId) revalidatePath(`/mind/books/${bookId}`);
 };
 
@@ -138,6 +139,7 @@ export async function deleteBook(id: string): Promise<void> {
   if (!parsed.success) return;
   await prisma.book.deleteMany({ where: { id: parsed.data, userId: user.id } });
   revalidatePath("/mind");
+  revalidatePath("/stats");
 }
 
 export type SaveLogState = ActionState & { finished?: boolean };
@@ -152,7 +154,7 @@ export async function saveReadingLog(formData: FormData): Promise<SaveLogState> 
   const parsed = readingLogSchema.safeParse(formValues(formData));
   if (!parsed.success) return invalid(parsed.error);
 
-  const { id, bookId, date, fromPage, toPage, note, quote, quotePage, finished } = parsed.data;
+  const { id, bookId, date, fromPage, toPage, minutes, note, quote, quotePage, finished } = parsed.data;
 
   const book = await prisma.book.findFirst({
     where: { id: bookId, userId: user.id },
@@ -175,6 +177,7 @@ export async function saveReadingLog(formData: FormData): Promise<SaveLogState> 
     date: day,
     fromPage,
     toPage,
+    minutes: minutes ?? null,
     note: note || null,
     quote: quote || null,
     // A page with no line to go with it means nothing.

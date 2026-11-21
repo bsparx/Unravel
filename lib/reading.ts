@@ -15,6 +15,10 @@ export const BOOK_PAGES_MAX = 20_000;
 export const READING_NOTE_MAX = 5000;
 export const READING_QUOTE_MAX = 1000;
 export const BOOK_SUMMARY_MAX = 20_000;
+/** Assumed duration in stats when a reading sitting is logged without minutes. */
+export const READING_DEFAULT_MINUTES = 10;
+/** Longest single reading sitting that can be logged (10 hours). */
+export const READING_MAX_MINUTES = 600;
 
 /**
  * Cloth bindings. A cover is a physical object, like the journal paper, so

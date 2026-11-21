@@ -13,6 +13,17 @@ import { heartEnabled } from "@/lib/heart-data";
 import { enabledHeartTabs } from "@/lib/heart-tabs";
 import { mindEnabled } from "@/lib/mind-data";
 import { MIND_TABS } from "@/lib/mind-tabs";
+import {
+  HEART_TIME_HINTS,
+  MIND_TIME_HINTS,
+  brainDumpDaySeconds,
+  disputationPracticeSeconds,
+  journalPracticeDuration,
+  meditationPracticeSeconds,
+  readingDayDuration,
+  recitationPracticeSeconds,
+  woopPracticeSeconds,
+} from "@/lib/practice-time";
 import { pagesRead } from "@/lib/reading";
 import { describeRecurrence, isDueOn } from "@/lib/recurrence";
 import {
@@ -157,6 +168,7 @@ export async function getStatsOverview(
             date: true,
             fromPage: true,
             toPage: true,
+            minutes: true,
             createdAt: true,
             book: { select: { title: true, unit: true } },
           },
@@ -194,7 +206,13 @@ export async function getStatsOverview(
             kind: { in: journalKinds },
             date: { gte: from, lte: to },
           },
-          select: { date: true, kind: true, createdAt: true },
+          select: {
+            date: true,
+            kind: true,
+            template: true,
+            items: true,
+            createdAt: true,
+          },
         })
       : Promise.resolve([]),
 
@@ -271,12 +289,14 @@ export async function getStatsOverview(
       group: "mind" as const,
       title: MIND_PRACTICE_LABELS[tab],
       scheduleLabel: "Mind",
+      timeHint: MIND_TIME_HINTS[tab],
     })),
     ...enabledHeart.map((tab) => ({
       id: heartItemId(tab),
       group: "heart" as const,
       title: HEART_PRACTICE_LABELS[tab],
       scheduleLabel: "Heart",
+      timeHint: HEART_TIME_HINTS[tab],
     })),
   ];
 
@@ -327,31 +347,37 @@ export async function getStatsOverview(
 
   const brainDumpByDay = new Map<
     string,
-    { count: number; paper: number; seconds: number; firstAt: Date | null }
+    {
+      count: number;
+      paper: number;
+      entries: { seconds: number; paper: boolean }[];
+      firstAt: Date | null;
+    }
   >();
   for (const row of brainDumps) {
     const iso = toISODate(row.date);
     const cur = brainDumpByDay.get(iso) ?? {
       count: 0,
       paper: 0,
-      seconds: 0,
+      entries: [],
       firstAt: null,
     };
     cur.count += 1;
     cur.paper += row.paper ? 1 : 0;
-    cur.seconds += row.seconds;
+    cur.entries.push({ seconds: row.seconds, paper: row.paper });
     cur.firstAt = pickEarliest(cur.firstAt, row.createdAt, iso);
     brainDumpByDay.set(iso, cur);
   }
 
   const meditationByDay = new Map<
     string,
-    { seconds: number; firstAt: Date | null }
+    { seconds: number; count: number; firstAt: Date | null }
   >();
   for (const row of meditations) {
     const iso = localISO.format(row.startedAt);
-    const cur = meditationByDay.get(iso) ?? { seconds: 0, firstAt: null };
+    const cur = meditationByDay.get(iso) ?? { seconds: 0, count: 0, firstAt: null };
     cur.seconds += row.seconds;
+    cur.count += 1;
     cur.firstAt = pickEarliest(cur.firstAt, row.startedAt, iso);
     meditationByDay.set(iso, cur);
   }
@@ -362,6 +388,7 @@ export async function getStatsOverview(
       pages: number;
       percent: number;
       logs: number;
+      durations: { minutes: number | null }[];
       bookTitle: string | null;
       firstAt: Date | null;
     }
@@ -372,10 +399,12 @@ export async function getStatsOverview(
       pages: 0,
       percent: 0,
       logs: 0,
+      durations: [],
       bookTitle: null,
       firstAt: null,
     };
     cur.logs += 1;
+    cur.durations.push({ minutes: row.minutes });
     if (row.book.unit === "PERCENT") cur.percent += pagesRead(row);
     else cur.pages += pagesRead(row);
     cur.bookTitle ??= row.book.title;
@@ -411,21 +440,33 @@ export async function getStatsOverview(
     disputationByDay.set(iso, cur);
   }
 
-  const gratitudeByDay = new Map<string, Date | null>();
-  const duaByDay = new Map<string, Date | null>();
+  const gratitudeByDay = new Map<
+    string,
+    { firstAt: Date | null; label: string; seconds: number }
+  >();
+  const duaByDay = new Map<
+    string,
+    { firstAt: Date | null; label: string; seconds: number }
+  >();
   for (const row of journalEntries) {
     const iso = toISODate(row.date);
     if (row.kind === "GRATITUDE") {
-      gratitudeByDay.set(
-        iso,
-        pickEarliest(gratitudeByDay.get(iso) ?? null, row.createdAt, iso),
-      );
+      const info = journalPracticeDuration("gratitude", row.template, row.items);
+      const prev = gratitudeByDay.get(iso);
+      gratitudeByDay.set(iso, {
+        firstAt: pickEarliest(prev?.firstAt ?? null, row.createdAt, iso),
+        label: info.label,
+        seconds: info.seconds,
+      });
     }
     if (row.kind === "DUA") {
-      duaByDay.set(
-        iso,
-        pickEarliest(duaByDay.get(iso) ?? null, row.createdAt, iso),
-      );
+      const info = journalPracticeDuration("dua", row.template, row.items);
+      const prev = duaByDay.get(iso);
+      duaByDay.set(iso, {
+        firstAt: pickEarliest(prev?.firstAt ?? null, row.createdAt, iso),
+        label: info.label,
+        seconds: info.seconds,
+      });
     }
   }
 
@@ -571,33 +612,39 @@ export async function getStatsOverview(
       let done = false;
       let detail: string | null = null;
       let firstAt: Date | null = null;
+      let practiceSeconds = 0;
+      let practiceTimeAssumed = false;
 
       if (tab === "braindump") {
         const entry = brainDumpByDay.get(iso);
         if (entry && entry.count > 0) {
           done = true;
           firstAt = entry.firstAt;
+          practiceSeconds = brainDumpDaySeconds(entry.entries);
           detail =
             entry.count > 1
               ? `${entry.count} dumps`
               : entry.paper > 0
                 ? "On paper"
-                : entry.seconds >= 60
-                  ? formatDuration(entry.seconds)
-                  : "Written";
+                : "Written";
         }
       } else if (tab === "meditate") {
         const entry = meditationByDay.get(iso);
         if (entry && entry.seconds > 0) {
           done = true;
           firstAt = entry.firstAt;
-          detail = formatDuration(entry.seconds);
+          practiceSeconds = meditationPracticeSeconds(entry.seconds);
+          detail =
+            entry.count > 1 ? `${entry.count} sittings` : "Meditated";
         }
       } else if (tab === "reading") {
         const entry = readingByDay.get(iso);
         if (entry && entry.logs > 0) {
           done = true;
           firstAt = entry.firstAt;
+          const dur = readingDayDuration(entry.durations);
+          practiceSeconds = dur.seconds;
+          practiceTimeAssumed = dur.allAssumed;
           if (entry.pages > 0) {
             detail = `${entry.pages} ${entry.pages === 1 ? "page" : "pages"}`;
           } else if (entry.percent > 0) {
@@ -611,6 +658,7 @@ export async function getStatsOverview(
         if (entry && entry.count > 0) {
           done = true;
           firstAt = entry.firstAt;
+          practiceSeconds = woopPracticeSeconds(entry.count);
           detail = entry.count > 1 ? `${entry.count} rehearsed` : "Rehearsed";
         }
       } else if (tab === "disputations") {
@@ -618,6 +666,7 @@ export async function getStatsOverview(
         if (entry && entry.count > 0) {
           done = true;
           firstAt = entry.firstAt;
+          practiceSeconds = disputationPracticeSeconds(entry.count);
           detail = entry.count > 1 ? `${entry.count} entries` : "Practiced";
         }
       }
@@ -626,31 +675,54 @@ export async function getStatsOverview(
         itemId: id,
         status: done ? "done" : isToday ? "open" : "missed",
         detail,
-        ...(done ? timeFields(firstAt) : {}),
+        ...(done
+          ? {
+              ...timeFields(firstAt),
+              practiceSeconds,
+              ...(practiceTimeAssumed ? { practiceTimeAssumed: true } : {}),
+            }
+          : {}),
       };
     }
 
     // 3. Heart practices (Settings-enabled only)
     for (const tab of enabledHeart) {
       const id = heartItemId(tab);
-      const done =
-        tab === "gratitude"
-          ? gratitudeByDay.has(iso)
-          : tab === "dua"
-            ? duaByDay.has(iso)
-            : recitationByDay.has(iso);
-      const firstAt =
-        tab === "gratitude"
-          ? (gratitudeByDay.get(iso) ?? null)
-          : tab === "dua"
-            ? (duaByDay.get(iso) ?? null)
-            : (recitationByDay.get(iso) ?? null);
+      let done = false;
+      let detail: string | null = null;
+      let firstAt: Date | null = null;
+      let practiceSeconds = 0;
+
+      if (tab === "gratitude") {
+        const entry = gratitudeByDay.get(iso);
+        if (entry) {
+          done = true;
+          firstAt = entry.firstAt;
+          detail = entry.label;
+          practiceSeconds = entry.seconds;
+        }
+      } else if (tab === "dua") {
+        const entry = duaByDay.get(iso);
+        if (entry) {
+          done = true;
+          firstAt = entry.firstAt;
+          detail = entry.label;
+          practiceSeconds = entry.seconds;
+        }
+      } else {
+        if (recitationByDay.has(iso)) {
+          done = true;
+          firstAt = recitationByDay.get(iso) ?? null;
+          detail = "Set completed";
+          practiceSeconds = recitationPracticeSeconds(true);
+        }
+      }
 
       dayItems[id] = {
         itemId: id,
         status: done ? "done" : isToday ? "open" : "missed",
-        detail: done ? (tab === "recitation" ? "Set completed" : "Written") : null,
-        ...(done ? timeFields(firstAt) : {}),
+        detail,
+        ...(done ? { ...timeFields(firstAt), practiceSeconds } : {}),
       };
     }
 

@@ -54,6 +54,7 @@ export async function savePractice(formData: FormData): Promise<ActionState> {
   });
 
   revalidatePath("/heart");
+  revalidatePath("/stats");
   return { status: "success" };
 }
 
@@ -66,6 +67,7 @@ export async function deletePractice(id: string): Promise<void> {
     where: { id: parsed.data, userId: user.id, kind: { in: ["GRATITUDE", "DUA"] } },
   });
   revalidatePath("/heart");
+  revalidatePath("/stats");
 }
 
 /** Switch template (and n). Pages already written keep their own. */
@@ -142,6 +144,7 @@ export async function completeRecitation(): Promise<ActionState> {
   });
 
   revalidatePath("/heart");
+  revalidatePath("/stats");
   return { status: "success" };
 }
 
@@ -152,6 +155,7 @@ export async function undoRecitation(): Promise<void> {
     where: { userId: user.id, date: todayLocal(user.timezone) },
   });
   revalidatePath("/heart");
+  revalidatePath("/stats");
 }
 
 /**

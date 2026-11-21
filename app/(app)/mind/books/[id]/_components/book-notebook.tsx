@@ -478,6 +478,11 @@ function NoteEntry({
           {rangeLabel(unit, log.fromPage, log.toPage)}
         </p>
         <p className="text-paper-ink-muted text-[0.7rem] sm:mt-0.5">{log.dateLabel}</p>
+        {log.minutes != null && (
+          <p className="text-paper-ink-muted font-mono text-[0.7rem] tabular-nums sm:mt-0.5">
+            {log.minutes} min
+          </p>
+        )}
       </div>
 
       <div className="min-w-0 space-y-3 px-5 pt-2 pb-4 sm:py-4 sm:pr-24 sm:pl-6">

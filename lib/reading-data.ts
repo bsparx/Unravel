@@ -68,6 +68,8 @@ export type BookLog = {
   dateLabel: string;
   fromPage: number;
   toPage: number;
+  /** Optional minutes tracked by the user; null assumes 10 min in stats. */
+  minutes: number | null;
   note: string | null;
   quote: string | null;
   quotePage: number | null;
@@ -296,6 +298,7 @@ export async function getBook(user: User, id: string): Promise<BookView | null> 
       dateLabel: dayLabel.format(log.date),
       fromPage: log.fromPage,
       toPage: log.toPage,
+      minutes: log.minutes,
       note: log.note,
       quote: log.quote,
       quotePage: log.quotePage,

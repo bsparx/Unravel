@@ -79,6 +79,8 @@ export type TrackableItem = {
   scheduleLabel: string;
   /** Habits only: the small named promise, shown in day details. */
   minimalTask?: string | null;
+  /** Mind/Heart only: assigned duration rule hint ("10m", "5m", "1–10m", etc.). */
+  timeHint?: string | null;
 };
 
 export type DayItemStatus =
@@ -98,6 +100,13 @@ export type DayItemEntry = {
   completedAtMs?: number | null;
   /** Formatted local HH:MM check-off time (e.g. "07:15"), null when unavailable. */
   completedTime?: string | null;
+  /**
+   * Credited Mind/Heart practice duration for this day (seconds).
+   * Always omitted/0 for regular Task habits so focus/manual time is never double-counted.
+   */
+  practiceSeconds?: number;
+  /** True when the credited time was assumed (e.g. Reading logged without duration -> 10m). */
+  practiceTimeAssumed?: boolean;
 };
 
 export type DaySessionEntry = {
@@ -179,17 +188,22 @@ export type DaySummary = {
   firstTime: string | null;
   /** ID of the first habit/practice done that day. */
   firstItemId: string | null;
+  /** Credited Mind & Heart practice time (seconds) across selected completed items. */
+  practiceSeconds: number;
+  /** Total productive time for this day: focus/manual time + Mind/Heart practice time. */
+  totalProductiveSeconds: number;
 };
 
 /**
- * Compute one day's completion counts over the user's selected items.
+ * Compute one day's completion counts, first habit timestamp, and combined
+ * productive time over the user's selected items.
  *
  * Items marked `inactive` (or `bonus` — done on an unscheduled day) are NEVER
  * added to `active`, so an off-day for a Mon/Wed/Fri habit never penalizes
  * Tuesday's score.
  */
 export function summarizeDay(
-  day: Pick<StatsDayRecord, "items">,
+  day: Pick<StatsDayRecord, "items" | "productiveSeconds">,
   selectedIds: ReadonlySet<string>,
 ): DaySummary {
   let done = 0;
@@ -200,6 +214,7 @@ export function summarizeDay(
   let firstAtMs: number | null = null;
   let firstTime: string | null = null;
   let firstItemId: string | null = null;
+  let practiceSeconds = 0;
 
   for (const id of selectedIds) {
     const entry = day.items[id];
@@ -227,15 +242,20 @@ export function summarizeDay(
         break;
     }
 
-    if (
-      (entry.status === "done" || entry.status === "bonus") &&
-      typeof entry.completedAtMs === "number" &&
-      entry.completedTime
-    ) {
-      if (firstAtMs === null || entry.completedAtMs < firstAtMs) {
-        firstAtMs = entry.completedAtMs;
-        firstTime = entry.completedTime;
-        firstItemId = id;
+    if (entry.status === "done" || entry.status === "bonus") {
+      if (
+        typeof entry.practiceSeconds === "number" &&
+        entry.practiceSeconds > 0
+      ) {
+        practiceSeconds += entry.practiceSeconds;
+      }
+
+      if (typeof entry.completedAtMs === "number" && entry.completedTime) {
+        if (firstAtMs === null || entry.completedAtMs < firstAtMs) {
+          firstAtMs = entry.completedAtMs;
+          firstTime = entry.completedTime;
+          firstItemId = id;
+        }
       }
     }
   }
@@ -254,6 +274,8 @@ export function summarizeDay(
     firstAtMs,
     firstTime,
     firstItemId,
+    practiceSeconds,
+    totalProductiveSeconds: day.productiveSeconds + practiceSeconds,
   };
 }
 
@@ -263,15 +285,19 @@ export type RangeSummary = {
   percent: number | null;
   perfectDays: number;
   activeHabitDays: number;
+  /** Focus/manual time + credited Mind & Heart practice time across the window. */
   totalProductiveSeconds: number;
+  /** Mind & Heart portion included in `totalProductiveSeconds`. */
+  totalPracticeSeconds: number;
   activeTimeDays: number;
   avgProductiveSeconds: number;
   todayProductiveSeconds: number;
+  todayPracticeSeconds: number;
   todayDone: number;
   todayActive: number;
 };
 
-/** Roll up the selected items and productive time across the window. */
+/** Roll up the selected items and combined productive time across the window. */
 export function summarizeRange(
   days: readonly StatsDayRecord[],
   selectedIds: ReadonlySet<string>,
@@ -281,8 +307,10 @@ export function summarizeRange(
   let perfectDays = 0;
   let activeHabitDays = 0;
   let totalProductiveSeconds = 0;
+  let totalPracticeSeconds = 0;
   let activeTimeDays = 0;
   let todayProductiveSeconds = 0;
+  let todayPracticeSeconds = 0;
   let todayDone = 0;
   let todayActive = 0;
 
@@ -295,11 +323,13 @@ export function summarizeRange(
       if (s.done === s.active) perfectDays += 1;
     }
 
-    totalProductiveSeconds += day.productiveSeconds;
-    if (day.productiveSeconds > 0) activeTimeDays += 1;
+    totalProductiveSeconds += s.totalProductiveSeconds;
+    totalPracticeSeconds += s.practiceSeconds;
+    if (s.totalProductiveSeconds > 0) activeTimeDays += 1;
 
     if (day.isToday) {
-      todayProductiveSeconds = day.productiveSeconds;
+      todayProductiveSeconds = s.totalProductiveSeconds;
+      todayPracticeSeconds = s.practiceSeconds;
       todayDone = s.done;
       todayActive = s.active;
     }
@@ -312,10 +342,12 @@ export function summarizeRange(
     perfectDays,
     activeHabitDays,
     totalProductiveSeconds,
+    totalPracticeSeconds,
     activeTimeDays,
     avgProductiveSeconds:
       activeTimeDays > 0 ? Math.round(totalProductiveSeconds / activeTimeDays) : 0,
     todayProductiveSeconds,
+    todayPracticeSeconds,
     todayDone,
     todayActive,
   };

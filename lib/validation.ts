@@ -52,6 +52,7 @@ import {
   BOOK_PAGES_MAX,
   BOOK_SUMMARY_MAX,
   BOOK_TITLE_MAX,
+  READING_MAX_MINUTES,
   READING_NOTE_MAX,
   READING_QUOTE_MAX,
   isBookCover,
@@ -1169,6 +1170,13 @@ export const readingLogSchema = z
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a day."),
     fromPage: page,
     toPage: page,
+    minutes: emptyToUndefined(
+      z.coerce
+        .number()
+        .int("Use whole minutes.")
+        .min(1, "At least 1 minute.")
+        .max(READING_MAX_MINUTES, `Keep one sitting under ${READING_MAX_MINUTES} minutes.`),
+    ),
     note: z.string().trim().max(READING_NOTE_MAX, `Keep the note under ${READING_NOTE_MAX} characters.`).optional().or(z.literal("")),
     quote: z.string().trim().max(READING_QUOTE_MAX, `Keep the line under ${READING_QUOTE_MAX} characters.`).optional().or(z.literal("")),
     quotePage: emptyToUndefined(page),
@@ -1178,7 +1186,7 @@ export const readingLogSchema = z
     if (value.toPage < value.fromPage) {
       ctx.addIssue({ code: "custom", path: ["toPage"], message: "Where you stopped comes after where you started." });
     }
-    if (value.toPage === value.fromPage && !value.note && !value.quote) {
+    if (value.toPage === value.fromPage && !value.note && !value.quote && value.minutes === undefined) {
       ctx.addIssue({ code: "custom", path: ["toPage"], message: "Move the page on, or write a note." });
     }
   });

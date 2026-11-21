@@ -40,6 +40,24 @@ import {
 } from "@/lib/recitations";
 import { BISMILLAH, TEXTS } from "@/lib/recitation-texts";
 import { GUIDES, GUIDE_KEYS } from "@/lib/practice-guides";
+import {
+  BRAIN_DUMP_DEFAULT_SECONDS,
+  BRAIN_DUMP_MAX_SECONDS,
+  BRAIN_DUMP_MIN_SECONDS,
+  DISPUTATION_SECONDS,
+  READING_DEFAULT_SECONDS,
+  RECITATION_SECONDS,
+  WOOP_SECONDS,
+  brainDumpDaySeconds,
+  brainDumpEntrySeconds,
+  disputationPracticeSeconds,
+  journalPracticeDuration,
+  meditationPracticeSeconds,
+  readingDayDuration,
+  readingEntryDuration,
+  recitationPracticeSeconds,
+  woopPracticeSeconds,
+} from "@/lib/practice-time";
 import { SCENE_KEYS } from "@/lib/scenes";
 import { SCENES, sceneCaption, stageIdsAt } from "@/lib/scenes";
 import { TEND_DAYS, historySince, step as tendStep, tend, type TendDay } from "@/lib/tending";
@@ -4761,6 +4779,190 @@ check("first habit time picks the earliest check-off among selected items", () =
   const none = summarizeDay(day, new Set(["h2"]));
   assert.equal(none.firstTime, null);
   assert.equal(none.firstItemId, null);
+});
+
+console.log("\nmind & heart — assigned practice times");
+
+check("meditation, WOOP, disputation, and recitation follow exact duration rules", () => {
+  // Meditation uses exact time meditated.
+  assert.equal(meditationPracticeSeconds(0), 0);
+  assert.equal(meditationPracticeSeconds(745), 745);
+  assert.equal(meditationPracticeSeconds(-10), 0);
+
+  // WOOP and Disputation are 10 minutes static when completed that day.
+  assert.equal(WOOP_SECONDS, 600);
+  assert.equal(DISPUTATION_SECONDS, 600);
+  assert.equal(woopPracticeSeconds(0), 0);
+  assert.equal(woopPracticeSeconds(1), 600);
+  assert.equal(woopPracticeSeconds(3), 600);
+  assert.equal(disputationPracticeSeconds(0), 0);
+  assert.equal(disputationPracticeSeconds(1), 600);
+  assert.equal(disputationPracticeSeconds(2), 600);
+
+  // Daily recitation is 5 minutes static when completed.
+  assert.equal(RECITATION_SECONDS, 300);
+  assert.equal(recitationPracticeSeconds(false), 0);
+  assert.equal(recitationPracticeSeconds(true), 300);
+});
+
+check("every gratitude and du'a template maps to its template-specific duration", () => {
+  // Every template in lib/practices.ts must return a positive duration.
+  for (const tpl of GRATITUDE_TEMPLATES) {
+    const dur = journalPracticeDuration("gratitude", tpl.id, []);
+    assert.ok(dur.minutes >= 1 && dur.seconds === dur.minutes * 60, `gratitude:${tpl.id}`);
+  }
+  for (const tpl of DUA_TEMPLATES) {
+    const dur = journalPracticeDuration("dua", tpl.id, []);
+    assert.ok(dur.minutes >= 1 && dur.seconds === dur.minutes * 60, `dua:${tpl.id}`);
+  }
+
+  // Spot-check each Gratitude template.
+  assert.equal(journalPracticeDuration("gratitude", "three-lenses", []).seconds, 4 * 60);
+  assert.equal(journalPracticeDuration("gratitude", "what-went-well", []).seconds, 5 * 60);
+  assert.equal(journalPracticeDuration("gratitude", "savour", []).seconds, 7 * 60);
+  assert.equal(journalPracticeDuration("gratitude", "letter", []).seconds, 12 * 60);
+  // Counted Gratitude template scales with how many items were written.
+  const fiveThings = Array.from({ length: 5 }, (_, i) => ({
+    key: `thing-${i + 1}:text`,
+    step: `Good thing ${i + 1}`,
+    label: "Good thing",
+    text: `Item ${i + 1}`,
+  }));
+  const goodFive = journalPracticeDuration("gratitude", "good-things", fiveThings);
+  assert.equal(goodFive.minutes, 3);
+  assert.equal(goodFive.seconds, 180);
+  assert.equal(goodFive.label, "Good things · 5");
+
+  // Spot-check each Du'a template.
+  assert.equal(journalPracticeDuration("dua", "shukr-then-ask", []).seconds, 2 * 60);
+  assert.equal(journalPracticeDuration("dua", "two-worlds", []).seconds, 4 * 60);
+  assert.equal(journalPracticeDuration("dua", "circles", []).seconds, 5 * 60);
+  assert.equal(journalPracticeDuration("dua", "adab", []).seconds, 8 * 60);
+  const eightDuas = Array.from({ length: 8 }, (_, i) => ({
+    key: `dua-${i + 1}:text`,
+    step: `Du'a ${i + 1}`,
+    label: "Du'a",
+    text: `Ask ${i + 1}`,
+  }));
+  const duaEight = journalPracticeDuration("dua", "n-duas", eightDuas);
+  assert.equal(duaEight.minutes, 4);
+  assert.equal(duaEight.seconds, 240);
+
+  // Legacy entries with no stored template fall back to the default template.
+  assert.equal(journalPracticeDuration("gratitude", null, []).seconds, 2 * 60);
+  assert.equal(journalPracticeDuration("dua", null, []).seconds, 8 * 60);
+});
+
+check("brain dump duration stays within 1–10 minutes and reading assumes 10 min if unlogged", () => {
+  assert.equal(BRAIN_DUMP_MIN_SECONDS, 60);
+  assert.equal(BRAIN_DUMP_MAX_SECONDS, 600);
+  assert.equal(BRAIN_DUMP_DEFAULT_SECONDS, 300);
+
+  // Typed dumps clamp to 1..10 min.
+  assert.equal(brainDumpEntrySeconds({ seconds: 25, paper: false }), 60, "clamps up to 1m");
+  assert.equal(brainDumpEntrySeconds({ seconds: 240, paper: false }), 240, "keeps actual 4m");
+  assert.equal(brainDumpEntrySeconds({ seconds: 900, paper: false }), 600, "caps at 10m");
+  // Paper dumps keep logged 1..10m, or default to 5m for legacy 0s rows.
+  assert.equal(brainDumpEntrySeconds({ seconds: 0, paper: true }), 300);
+  assert.equal(brainDumpEntrySeconds({ seconds: 480, paper: true }), 480);
+  assert.equal(
+    brainDumpDaySeconds([
+      { seconds: 300, paper: false },
+      { seconds: 180, paper: true },
+    ]),
+    480,
+  );
+
+  // Reading uses logged minutes or assumes 10 minutes.
+  assert.equal(READING_DEFAULT_SECONDS, 600);
+  assert.deepEqual(readingEntryDuration({ minutes: 25 }), { seconds: 1500, assumed: false });
+  assert.deepEqual(readingEntryDuration({ minutes: null }), { seconds: 600, assumed: true });
+  assert.deepEqual(readingEntryDuration({ minutes: undefined }), { seconds: 600, assumed: true });
+  assert.deepEqual(readingDayDuration([{ minutes: null }]), {
+    seconds: 600,
+    assumedCount: 1,
+    allAssumed: true,
+  });
+  assert.deepEqual(readingDayDuration([{ minutes: 20 }, { minutes: null }]), {
+    seconds: 1800,
+    assumedCount: 1,
+    allAssumed: false,
+  });
+
+  // Reading schema accepts optional minutes and rejects out-of-range values.
+  const baseReading = {
+    bookId: "cm1234567890abcdefgh",
+    date: "2026-11-21",
+    fromPage: "10",
+    toPage: "25",
+  };
+  assert.equal(readingLogSchema.parse({ ...baseReading, minutes: "" }).minutes, undefined);
+  assert.equal(readingLogSchema.parse({ ...baseReading, minutes: "30" }).minutes, 30);
+  assert.equal(readingLogSchema.safeParse({ ...baseReading, minutes: "0" }).success, false);
+  assert.equal(readingLogSchema.safeParse({ ...baseReading, minutes: "999" }).success, false);
+  assert.equal(
+    readingLogSchema.safeParse({ ...baseReading, toPage: "10", minutes: "15" }).success,
+    true,
+    "logging reading time on its own counts as a reading",
+  );
+});
+
+check("mind & heart practice durations add directly into daily and window productive totals", () => {
+  const selected = new Set([
+    "h1",
+    "mind:meditate",
+    "mind:wishes",
+    "mind:reading",
+    "heart:recitation",
+  ]);
+
+  const day1 = mkStatsDay("2026-11-20", 5, 1800, {
+    h1: { itemId: "h1", status: "done" },
+    "mind:meditate": { itemId: "mind:meditate", status: "done", practiceSeconds: 600 },
+    "mind:wishes": { itemId: "mind:wishes", status: "done", practiceSeconds: 600 },
+    "mind:reading": {
+      itemId: "mind:reading",
+      status: "done",
+      practiceSeconds: 600,
+      practiceTimeAssumed: true,
+    },
+    "heart:recitation": { itemId: "heart:recitation", status: "done", practiceSeconds: 300 },
+  });
+
+  // Day 2 has 0 timer time, only Mind/Heart practice time (15m reading + 5m recitation = 20m).
+  const day2 = mkStatsDay(
+    "2026-11-21",
+    6,
+    0,
+    {
+      h1: { itemId: "h1", status: "open" },
+      "mind:meditate": { itemId: "mind:meditate", status: "open" },
+      "mind:wishes": { itemId: "mind:wishes", status: "open" },
+      "mind:reading": { itemId: "mind:reading", status: "done", practiceSeconds: 900 },
+      "heart:recitation": { itemId: "heart:recitation", status: "done", practiceSeconds: 300 },
+    },
+    { isToday: true },
+  );
+
+  const s1 = summarizeDay(day1, selected);
+  assert.equal(s1.practiceSeconds, 2100);
+  assert.equal(s1.totalProductiveSeconds, 3900);
+
+  const s2 = summarizeDay(day2, selected);
+  assert.equal(s2.practiceSeconds, 1200);
+  assert.equal(s2.totalProductiveSeconds, 1200);
+
+  const rollup = summarizeRange([day1, day2], selected);
+  assert.equal(rollup.totalPracticeSeconds, 3300);
+  assert.equal(rollup.totalProductiveSeconds, 5100);
+  assert.equal(rollup.activeTimeDays, 2, "day with only Mind/Heart time still counts as tracked");
+  assert.equal(rollup.avgProductiveSeconds, 2550);
+  assert.equal(rollup.todayProductiveSeconds, 1200);
+  assert.equal(rollup.todayPracticeSeconds, 1200);
+
+  // Deselecting WOOP removes its 10 minutes from the day's total cleanly.
+  const withoutWoop = new Set(["h1", "mind:meditate", "mind:reading", "heart:recitation"]);
+  assert.equal(summarizeDay(day1, withoutWoop).totalProductiveSeconds, 3300);
 });
 
 console.log(`\n${passed} checks passed.\n`);

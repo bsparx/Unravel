@@ -7,6 +7,7 @@ import { addDays, todayLocal } from "@/lib/dates";
 import { taskTitle } from "@/lib/brain-dump";
 import { prisma } from "@/lib/db";
 import { findMeditation, normalizeOptions, plannedSeconds } from "@/lib/meditations";
+import { BRAIN_DUMP_MAX_SECONDS, BRAIN_DUMP_MIN_SECONDS } from "@/lib/practice-time";
 import {
   type ActionState,
   brainDumpSchema,
@@ -104,6 +105,7 @@ export async function rehearseWish(id: string): Promise<ActionState> {
   });
 
   revalidatePath("/mind");
+  revalidatePath("/stats");
   return { status: "success" };
 }
 
@@ -146,6 +148,7 @@ export async function saveDisputation(formData: FormData): Promise<ActionState> 
   }
 
   revalidatePath("/mind");
+  revalidatePath("/stats");
   return { status: "success" };
 }
 
@@ -173,6 +176,7 @@ export async function revisitDisputation(formData: FormData): Promise<ActionStat
   });
 
   revalidatePath("/mind");
+  revalidatePath("/stats");
   return { status: "success" };
 }
 
@@ -182,6 +186,7 @@ export async function deleteDisputation(id: string): Promise<void> {
   if (!parsed.success) return;
   await prisma.disputation.deleteMany({ where: { id: parsed.data, userId: user.id } });
   revalidatePath("/mind");
+  revalidatePath("/stats");
 }
 
 /**
@@ -210,6 +215,7 @@ export async function saveMeditation(formData: FormData): Promise<ActionState> {
   });
 
   revalidatePath("/mind");
+  revalidatePath("/stats");
   return { status: "success" };
 }
 
@@ -219,6 +225,7 @@ export async function deleteMeditation(id: string): Promise<void> {
   if (!parsed.success) return;
   await prisma.meditationSession.deleteMany({ where: { id: parsed.data, userId: user.id } });
   revalidatePath("/mind");
+  revalidatePath("/stats");
 }
 
 // ---------------------------------------------------------------- brain dump
@@ -239,6 +246,11 @@ export async function saveBrainDump(formData: FormData): Promise<ActionState> {
   const titles = tasks.map(taskTitle).filter(Boolean);
   const dueDate = kind === "TOMORROW" ? addDays(date, 1) : null;
   const now = Date.now();
+  const storedSeconds = paper
+    ? seconds > 0
+      ? Math.min(BRAIN_DUMP_MAX_SECONDS, Math.max(BRAIN_DUMP_MIN_SECONDS, seconds))
+      : 0
+    : seconds;
 
   await prisma.$transaction([
     prisma.brainDump.create({
@@ -248,7 +260,7 @@ export async function saveBrainDump(formData: FormData): Promise<ActionState> {
         kind,
         body: paper ? "" : body.trim(),
         paper,
-        seconds: paper ? 0 : seconds,
+        seconds: storedSeconds,
         sent: titles.length,
       },
     }),
@@ -269,6 +281,7 @@ export async function saveBrainDump(formData: FormData): Promise<ActionState> {
   ]);
 
   revalidatePath("/mind");
+  revalidatePath("/stats");
   if (titles.length) {
     revalidatePath("/");
     revalidatePath("/day");
@@ -283,4 +296,5 @@ export async function deleteBrainDump(id: string): Promise<void> {
   if (!parsed.success) return;
   await prisma.brainDump.deleteMany({ where: { id: parsed.data, userId: user.id } });
   revalidatePath("/mind");
+  revalidatePath("/stats");
 }

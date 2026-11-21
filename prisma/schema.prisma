@@ -1949,6 +1949,8 @@ model ReadingLog {
   date      DateTime @db.Date
   fromPage  Int
   toPage    Int
+  /// Optional time spent reading (minutes). Stats assumes 10 min when null.
+  minutes   Int?
   note      String?
   /// A line worth keeping, and the page it's on.
   quote     String?

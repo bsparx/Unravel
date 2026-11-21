@@ -16,8 +16,8 @@
 export const DUMP_KINDS = ["EMPTY", "TOMORROW"] as const;
 export type DumpKind = (typeof DUMP_KINDS)[number];
 
-/** The timer lengths on offer. The Baylor participants wrote for five. */
-export const DUMP_MINUTES = [5, 10] as const;
+/** The timer lengths on offer (1–10 min). The Baylor participants wrote for five. */
+export const DUMP_MINUTES = [1, 3, 5, 10] as const;
 export type DumpMinutes = (typeof DUMP_MINUTES)[number];
 
 /** A dump's longest page, in characters. Ten fast minutes is well under it. */

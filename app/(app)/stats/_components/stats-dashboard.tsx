@@ -315,7 +315,7 @@ export function StatsDashboard({ data }: { data: StatsOverview }) {
           <p className="mt-4 text-label text-muted-foreground">
             {rangeSummary.totalProductiveSeconds === 0 ? (
               data.isLatest
-                ? "Run a timer or log time on any task to see it here."
+                ? "Run a timer, log time, or complete a mind/heart practice to see it here."
                 : "No productive time was tracked during these two weeks."
             ) : (
               <>
@@ -341,6 +341,15 @@ export function StatsDashboard({ data }: { data: StatsOverview }) {
               </>
             )}
           </p>
+          {rangeSummary.totalPracticeSeconds > 0 && (
+            <p className="mt-1 text-micro text-muted-foreground">
+              Includes{" "}
+              <span className="font-mono font-medium text-foreground tabular-nums">
+                {formatDuration(rangeSummary.totalPracticeSeconds)}
+              </span>{" "}
+              from mind &amp; heart
+            </p>
+          )}
         </div>
       </section>
 
@@ -444,8 +453,8 @@ export function StatsDashboard({ data }: { data: StatsOverview }) {
                           }, ${
                             s.firstTime ? `first habit at ${s.firstTime}, ` : ""
                           }${
-                            day.productiveSeconds > 0
-                              ? `${formatDuration(day.productiveSeconds)} productive`
+                            s.totalProductiveSeconds > 0
+                              ? `${formatDuration(s.totalProductiveSeconds)} productive`
                               : "no productive time"
                           }`}
                           className={cn(
@@ -514,13 +523,13 @@ export function StatsDashboard({ data }: { data: StatsOverview }) {
                             <span
                               className={cn(
                                 "block font-mono text-micro leading-none tabular-nums",
-                                day.productiveSeconds > 0
+                                s.totalProductiveSeconds > 0
                                   ? "font-medium text-running"
                                   : "text-muted-foreground/55",
                               )}
                             >
-                              {day.productiveSeconds > 0
-                                ? formatDuration(day.productiveSeconds)
+                              {s.totalProductiveSeconds > 0
+                                ? formatDuration(s.totalProductiveSeconds)
                                 : "—"}
                             </span>
                             {s.firstTime && (
@@ -727,13 +736,13 @@ function DayRowsList({
                 <span
                   className={cn(
                     "min-w-14 text-right font-mono text-label tabular-nums",
-                    day.productiveSeconds > 0
+                    s.totalProductiveSeconds > 0
                       ? "font-medium text-running"
                       : "text-muted-foreground/60",
                   )}
                 >
-                  {day.productiveSeconds > 0
-                    ? formatDuration(day.productiveSeconds)
+                  {s.totalProductiveSeconds > 0
+                    ? formatDuration(s.totalProductiveSeconds)
                     : "—"}
                 </span>
                 <ChevronRight
@@ -921,11 +930,15 @@ function ItemSelectorPopover({
                               {item.title}
                             </span>
                           </span>
-                          {item.group === "habit" && (
+                          {item.group === "habit" ? (
                             <span className="shrink-0 text-micro text-muted-foreground">
                               {item.scheduleLabel}
                             </span>
-                          )}
+                          ) : item.timeHint ? (
+                            <span className="shrink-0 font-mono text-micro text-muted-foreground tabular-nums">
+                              {item.timeHint}
+                            </span>
+                          ) : null}
                         </button>
                       </li>
                     );
