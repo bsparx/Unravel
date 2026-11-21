@@ -22,7 +22,8 @@ import {
 
 // `recovery` is accepted so the close ritual's hand-off can deep-link
 // /timer?mode=recovery. It is never *written* by buildTimerHref — see below.
-const modeParam = z.enum(["pomodoro", "basic", "flow", "recovery"]);
+// `pomodoro-flow` is accepted as a readable alias for `flow`.
+const modeParam = z.enum(["pomodoro", "pomodoro-flow", "basic", "flow", "recovery"]);
 
 const seconds = z.coerce
   .number()
@@ -55,11 +56,12 @@ export function parseTimerParams(
 
 export function toTimerMode(mode: TimerParams["mode"]): TimerMode | undefined {
   if (!mode) return undefined;
+  if (mode === "pomodoro-flow") return "FLOW";
   return mode.toUpperCase() as TimerMode;
 }
 
-export function toModeParam(mode: TimerMode): z.infer<typeof modeParam> {
-  return mode.toLowerCase() as z.infer<typeof modeParam>;
+export function toModeParam(mode: TimerMode): "pomodoro" | "basic" | "flow" | "recovery" {
+  return mode.toLowerCase() as "pomodoro" | "basic" | "flow" | "recovery";
 }
 
 export type TimerLinkInput = {

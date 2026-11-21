@@ -50,12 +50,13 @@ export const FRAGMENT_SHADER = /* glsl */ `
 
   uniform float uMacro;      // fraction of the whole plan remaining, 0..1
   uniform float uMicro;      // fraction of the current interval remaining, 0..1
-  uniform float uOvertime;   // 0..1 past the goal, FLOW only
+  uniform float uOvertime;   // 0..1 past the baseline, Pomodoro Flow only
   uniform float uTime;       // seconds since mount; drives the flourish only
   uniform float uFlourish;   // 0 under prefers-reduced-motion, else 1
   uniform float uDual;       // 1 when both containers are worth drawing
   uniform vec2  uResolution; // drawing-buffer size in device pixels
-  uniform vec3  uRun;        // the live colour: blue on focus, teal on a break
+  uniform vec3  uRun;        // the live colour: blue on focus, slate on break, clay on overrun
+  uniform vec3  uFlow;       // the flow colour: luminous teal past baseline
   uniform vec3  uTrack;      // the spent groove
   uniform float uTicks[${MAX_TICKS}];
 
@@ -68,12 +69,12 @@ export const FRAGMENT_SHADER = /* glsl */ `
   // ("+1:00:00") needs 250. The macro ring moved out to match, so the groove
   // between the two containers keeps its width.
 
-  const float MACRO_OUT = 0.926;
-  const float MACRO_IN  = 0.883;
-  const float WELL_OUT  = 0.850;
-  const float WELL_IN   = 0.700;
-  const float OVER_IN   = 0.944;
-  const float OVER_OUT  = 0.968;
+  const float MACRO_OUT = 0.922;
+  const float MACRO_IN  = 0.880;
+  const float WELL_OUT  = 0.846;
+  const float WELL_IN   = 0.702;
+  const float OVER_IN   = 0.942;
+  const float OVER_OUT  = 0.978;
 
   // Half-width of the gap cut at an interval boundary, in turns.
   const float TICK_HALF = 0.0055;
@@ -138,9 +139,13 @@ export const FRAGMENT_SHADER = /* glsl */ `
     float wellTrack = ring(r, WELL_IN, wellOut, aaR);
     // A soft darkening toward the inner lip: this is the whole "well" reading,
     // and the only thing standing in for the elevation the flat design budget
-    // spends here.
+    // spends here. Once Pomodoro Flow crosses the baseline, the spent well
+    // catches a whisper of the flow tint so the completed ring reads as warm
+    // and alive rather than merely empty.
     float depth = smoothstep(WELL_IN, wellOut, r);
-    vec3 trackCol = uTrack * mix(0.88, 1.04, depth);
+    float flowing = step(0.0001, uOvertime);
+    vec3 trackBase = mix(uTrack, mix(uTrack, uFlow, 0.16), flowing);
+    vec3 trackCol = trackBase * mix(0.88, 1.04, depth);
     col = over(col, vec4(trackCol, wellTrack));
 
     // ---- the well, remaining ----------------------------------------------
@@ -192,12 +197,19 @@ export const FRAGMENT_SHADER = /* glsl */ `
     col = over(col, vec4(uTrack, macroTrack));
     col = over(col, vec4(uRun, macroTrack * wedge(a, uMacro, aaA)));
 
-    // ---- overtime ----------------------------------------------------------
-    // Past the goal the face grows instead of draining. Overtime is
-    // information, not failure, so it is drawn in the same live colour rather
-    // than a warning one.
-    float overRing = ring(r, OVER_IN, OVER_OUT, aaR) * step(0.0001, uOvertime);
-    col = over(col, vec4(uRun, overRing * wedge(a, uOvertime, aaA)));
+    // ---- pomodoro flow overtime -------------------------------------------
+    // Past the baseline the face grows outward instead of draining. Flow is a
+    // distinct, serene state — neither structured countdown nor a break alarm —
+    // so it blooms in uFlow with its own soft leading edge.
+    float overRing = ring(r, OVER_IN, OVER_OUT, aaR) * flowing;
+    float overFill = overRing * wedge(a, uOvertime, aaA);
+    col = over(col, vec4(uFlow * 1.06, overFill));
+
+    float overInside = step(a, uOvertime);
+    float overBehind = clamp(uOvertime - a, 0.0, 1.0);
+    float overEdge = exp(-overBehind * 40.0) * overInside * overFill
+                   * step(0.001, uOvertime) * (1.0 - step(1.0, uOvertime));
+    col.rgb += uFlow * overEdge * 0.55;
 
     // ---- surface -----------------------------------------------------------
     // Dither. Wide gamuts band badly across a gradient this shallow, and a

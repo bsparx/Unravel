@@ -29,26 +29,28 @@ export function ReturnNote({
   const [draft, setDraft] = useState(value ?? "");
 
   return (
-    <label className="mt-6 block w-full max-w-sm text-center">
-      <span className="text-label text-muted-foreground font-medium">
-        When you come back
-      </span>
-      <Input
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-        // Committed on blur and on Enter rather than per keystroke: this writes
-        // to the session row, and one round trip per letter would be absurd.
-        onBlur={() => onCommit(draft)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            event.currentTarget.blur();
-          }
-        }}
-        placeholder={placeholder ?? "what you're in the middle of"}
-        maxLength={140}
-        className="mt-2 text-center"
-      />
-    </label>
+    <div className="animate-rise mt-5 w-full rounded-2xl border border-rest/25 bg-card px-5 py-4">
+      <label className="block text-center">
+        <span className="text-label font-medium text-muted-foreground">
+          When you come back, you&apos;re on
+        </span>
+        <Input
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          // Committed on blur and on Enter rather than per keystroke: this writes
+          // to the session row, and one round trip per letter would be absurd.
+          onBlur={() => onCommit(draft)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              event.currentTarget.blur();
+            }
+          }}
+          placeholder={placeholder ?? "what you're in the middle of"}
+          maxLength={140}
+          className="mt-2.5 text-center"
+        />
+      </label>
+    </div>
   );
 }

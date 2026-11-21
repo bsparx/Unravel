@@ -84,8 +84,8 @@ export const GLOSSARY = {
   },
   timerModes: {
     title: "Timer modes",
-    what: "Pomodoro: focus rounds with short breaks. Flow: count toward a goal and keep going if you're in the zone. Timer: one plain countdown. Recovery: a deliberate break, logged as rest.",
-    why: "Every session is logged against its task, so Statistics can show where your time went.",
+    what: "Pomodoro Flow: work/break rounds (like 25/5) where your work baseline keeps flowing past the mark until you choose to take a break or stop. Pomodoro: strict focus rounds that stop at each boundary. Timer: one plain countdown. Recovery: a deliberate break, logged as rest.",
+    why: "Pomodoro Flow gives you a baseline to aim for without cutting off a real flow state — and every session is logged honestly against its task.",
   },
   behavior: {
     title: "Behavior log",

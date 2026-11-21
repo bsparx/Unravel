@@ -46,59 +46,62 @@ export function TodayLog({
 
   if (total === 0 && log.sessions.length === 0) {
     return (
-      <p className="text-muted-foreground mt-6 text-center text-label">
+      <p className="mt-5 text-center text-label text-muted-foreground">
         Nothing logged on this today yet.
       </p>
     );
   }
 
   return (
-    <section className="mt-6 w-full max-w-sm text-center">
-      <p className="text-muted-foreground text-label">
-        <span
-          className={cn("tabular-nums", live && "text-running font-medium")}
-        >
-          {formatDuration(total)}
-        </span>{" "}
-        {unit === "habit" ? "toward today's habit" : "logged today"}
-        {live && log.committedSeconds > 0 && (
-          <span className="text-muted-foreground">
-            {" "}
-            · {formatDuration(log.committedSeconds)} before this session
-          </span>
-        )}
-      </p>
+    <section className="mt-5 w-full rounded-2xl border border-border/60 bg-card/75 px-5 py-3.5 text-center">
+      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+        <p className="text-label text-muted-foreground">
+          <span
+            className={cn(
+              "font-mono tabular-nums",
+              live ? "font-semibold text-running" : "font-medium text-foreground",
+            )}
+          >
+            {formatDuration(total)}
+          </span>{" "}
+          {unit === "habit" ? "toward today's habit" : "logged today"}
+          {live && log.committedSeconds > 0 && (
+            <span className="text-muted-foreground">
+              {" "}
+              · {formatDuration(log.committedSeconds)} earlier
+            </span>
+          )}
+        </p>
 
-      {log.sessions.length > 0 && (
-        <>
+        {log.sessions.length > 0 && (
           <Button
             variant="ghost"
             size="sm"
-            className="text-muted-foreground mt-1 h-auto py-1 text-label font-normal underline underline-offset-4"
+            className="h-auto min-h-8 px-2 py-1 text-micro font-medium text-muted-foreground underline underline-offset-4 hover:text-foreground"
             onClick={() => setEditing((open) => !open)}
             aria-expanded={editing}
           >
-            {editing ? "Done" : "Fix today's times"}
+            {editing ? "Done" : "Fix times"}
           </Button>
+        )}
+      </div>
 
-          {editing && (
-            <div className="mt-2 text-left">
-              {/* The day's total is a roll-up, so it is not the editable
-                  object — the sessions under it are. Editing the total
-                  directly would have to guess which session was wrong, and on
-                  the day this matters most (one runaway session among several
-                  good ones) it would guess wrong. */}
-              <SessionLog sessions={log.sessions} />
+      {log.sessions.length > 0 && editing && (
+        <div className="mt-3 border-t border-border/50 pt-3 text-left">
+          {/* The day's total is a roll-up, so it is not the editable
+              object — the sessions under it are. Editing the total
+              directly would have to guess which session was wrong, and on
+              the day this matters most (one runaway session among several
+              good ones) it would guess wrong. */}
+          <SessionLog sessions={log.sessions} />
 
-              {live && (
-                <p className="text-muted-foreground mt-2 text-micro">
-                  The session on the clock isn&apos;t here yet — stop it first
-                  and it becomes editable.
-                </p>
-              )}
-            </div>
+          {live && (
+            <p className="mt-2 text-micro text-muted-foreground">
+              The session on the clock isn&apos;t here yet — stop it first and
+              it becomes editable.
+            </p>
           )}
-        </>
+        </div>
       )}
     </section>
   );

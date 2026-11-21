@@ -33,7 +33,7 @@ export function OverrunPanel({
   onExtend: (seconds: number) => void;
 }) {
   return (
-    <div className="animate-rise mt-6 flex w-full max-w-sm flex-col items-center gap-3">
+    <div className="animate-rise mt-6 flex w-full max-w-md flex-col items-center gap-3">
       {returnLabel && (
         <p className="text-center text-label text-balance">
           <span className="text-muted-foreground">You&apos;re on </span>
@@ -41,20 +41,20 @@ export function OverrunPanel({
         </p>
       )}
 
-      <div className="flex items-center gap-2 rounded-full border border-destructive/30 bg-destructive/5 p-1.5 shadow-md shadow-destructive/5 backdrop-blur-xs">
+      <div className="flex flex-wrap items-center justify-center gap-2 rounded-2xl border border-destructive/30 bg-destructive/8 p-1.5">
         <Button
           size="lg"
-          className="bg-destructive text-destructive-foreground hover:bg-destructive/90 min-w-36 rounded-full px-6 shadow-none active:scale-[0.98] transition-all"
+          className="bg-destructive text-white hover:bg-destructive/90 min-w-36 rounded-xl px-6 shadow-none transition-colors"
           onClick={onBack}
         >
-          <ArrowRight className="mr-2 size-4" aria-hidden />
+          <ArrowRight className="mr-1.5 size-4" aria-hidden />
           Back to it
         </Button>
 
         <Button
           variant="outline"
           size="lg"
-          className="rounded-full px-5 border-destructive/30 hover:border-destructive hover:bg-destructive/10 text-foreground transition-all"
+          className="rounded-xl border-destructive/30 bg-background/60 px-5 text-foreground transition-colors hover:border-destructive hover:bg-destructive/10"
           onClick={() => onExtend(EXTENSION_SECONDS)}
         >
           <Plus className="mr-1.5 size-4" aria-hidden />5 more min

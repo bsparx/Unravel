@@ -7,6 +7,7 @@ import {
   clampBreak,
   clampIntervals,
   clampTarget,
+  hasIntervals,
   suggestIntervals,
   type TimerConfig,
 } from "@/lib/timer-math";
@@ -66,14 +67,13 @@ export default async function TimerPage({
       ? 0
       : clampTarget(params.target ?? task?.estimatedSeconds ?? focusSeconds);
 
-  const intervals =
-    mode === "POMODORO"
-      ? clampIntervals(
-          params.intervals ??
-            task?.plannedIntervals ??
-            suggestIntervals(targetSeconds, focusSeconds),
-        )
-      : 1;
+  const intervals = hasIntervals(mode)
+    ? clampIntervals(
+        params.intervals ??
+          task?.plannedIntervals ??
+          suggestIntervals(targetSeconds, focusSeconds),
+      )
+    : 1;
 
   const initialConfig: TimerConfig = {
     mode,

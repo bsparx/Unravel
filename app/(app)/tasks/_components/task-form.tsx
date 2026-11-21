@@ -24,6 +24,7 @@ import { EVERY_DAY, WEEKDAYS } from "@/lib/dates";
 import type { HabitSlot } from "@/lib/generated/prisma/client";
 import { describeRecurrence } from "@/lib/recurrence";
 import {
+  hasIntervals,
   MODE_DESCRIPTIONS,
   MODE_LABELS,
   WORK_MODES,
@@ -553,7 +554,7 @@ export function TaskForm({
         </div>
       </Field>
 
-      {mode === "POMODORO" && (
+      {hasIntervals(mode) && (
         <Field
           label="Split into"
           htmlFor="plannedIntervals"

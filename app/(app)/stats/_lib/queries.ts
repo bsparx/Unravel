@@ -1,543 +1,585 @@
 import "server-only";
 
-import { balanceRatio, describeBalance, recoveryShare } from "@/lib/balance";
-import { summariseBreaks } from "@/lib/break-stats";
 import { prisma } from "@/lib/db";
-import { addDays, startOfWeek, toISODate, todayLocal } from "@/lib/dates";
-import type { TimerMode, User } from "@/lib/generated/prisma/client";
-import { expectedDatesBetween } from "@/lib/recurrence";
+import {
+  addDays,
+  dayOfWeek,
+  formatDuration,
+  toISODate,
+  todayLocal,
+} from "@/lib/dates";
+import type { User } from "@/lib/generated/prisma/client";
+import { heartEnabled } from "@/lib/heart-data";
+import { enabledHeartTabs } from "@/lib/heart-tabs";
+import { mindEnabled } from "@/lib/mind-data";
+import { MIND_TABS } from "@/lib/mind-tabs";
+import { pagesRead } from "@/lib/reading";
+import { describeRecurrence, isDueOn } from "@/lib/recurrence";
+import {
+  HEART_PRACTICE_LABELS,
+  MIND_PRACTICE_LABELS,
+  WINDOW_DAYS,
+  heartItemId,
+  mindItemId,
+  resolveStatsWindow,
+  type DayItemEntry,
+  type DaySessionEntry,
+  type StatsDayRecord,
+  type StatsOverview,
+  type TrackableItem,
+} from "@/lib/stats-summary";
+import type { TimerMode } from "@/lib/timer-math";
 
 /**
- * Every number on /stats.
- *
- * All of it is `groupBy`/`aggregate` — no `$queryRaw` anywhere. That's only
- * possible because `FocusSession.localDate` and `TaskOccurrence.date` are
- * pre-bucketed DATE columns; Prisma can't bucket a timestamp by day, so the
- * denormalization is what keeps this file boring.
- *
- * The two things computed in JS instead — habit adherence denominators and
- * time-of-day — are computed there because the data genuinely isn't in a table,
- * not because the query was awkward.
+ * Everything /stats needs for one 2-week (14-day) window, in one round trip:
+ *  - Every active (non-archived) habit and its recurrence rule
+ *  - Every Settings-enabled Mind and Heart practice
+ *  - Every day's completion status (strictly honouring each habit's active days)
+ *  - Every day's productive time (timer work sessions + manual task/habit logs,
+ *    with breaks and recovery cleanly excluded and zero double-counting)
+ *  - Per-day session breakdown for the Day Details sheet
  */
-
-export type StatsRange = "week" | "month" | "quarter";
-
-export const RANGE_DAYS: Record<StatsRange, number> = {
-  week: 7,
-  month: 30,
-  quarter: 90,
-};
-
-export type StatsData = Awaited<ReturnType<typeof getStats>>;
-
-export async function getStats(user: User, range: StatsRange) {
+export async function getStatsOverview(
+  user: User,
+  endParam?: string | null,
+): Promise<StatsOverview> {
   const today = todayLocal(user.timezone);
-  const days = RANGE_DAYS[range];
-  const from = addDays(today, -(days - 1));
-  const weekStart = startOfWeek(today, user.weekStart);
+  const win = resolveStatsWindow(today, endParam);
+  const { from, to } = win;
+  const todayISO = toISODate(today);
+  const yesterdayISO = toISODate(addDays(today, -1));
 
-  const scope = {
-    userId: user.id,
-    status: "COMPLETED" as const,
-    localDate: { gte: from, lte: today },
-  };
+  // 1-day cushion on both ends when querying UTC timestamps so timezone offsets
+  // near midnight never drop an entry belonging to `from` or `to`.
+  const instantFrom = addDays(from, -1);
+  const instantTo = addDays(to, 2);
 
-  // The headline numbers are work-only. Folding rest into "last 30 days"
-  // silently would make the headline argue with the balance panel below it.
-  const workOnly = { mode: { not: "RECOVERY" as const } };
+  const mind = mindEnabled(user);
+  const heart = heartEnabled(user);
+  const enabledMind = MIND_TABS.filter((tab) => mind[tab]);
+  const enabledHeart = enabledHeartTabs(heart);
+
+  const journalKinds: ("GRATITUDE" | "DUA")[] = [];
+  if (heart.gratitude) journalKinds.push("GRATITUDE");
+  if (heart.dua) journalKinds.push("DUA");
 
   const [
-    totals,
-    recoveryTotals,
-    todayTotals,
-    weekTotals,
-    byDayMode,
-    byTask,
-    byMode,
-    completionsByDay,
-    sessionTimes,
-    intervalCounts,
-    breakIntervals,
-    occurrenceDays,
-    attachedSessionDays,
-    occurrenceTasks,
     habits,
-    habitOccurrences,
+    occurrences,
+    sessions,
+    brainDumps,
+    meditations,
+    readings,
+    wishRehearsals,
+    disputations,
+    disputationRevisits,
+    journalEntries,
+    recitationLogs,
   ] = await Promise.all([
-    prisma.focusSession.aggregate({
-      where: { ...scope, ...workOnly },
-      _sum: { elapsedSeconds: true, overtimeSeconds: true, plannedIntervals: true },
-      _avg: { pausedCount: true },
-      _count: { _all: true },
-    }),
-
-    prisma.focusSession.aggregate({
-      where: { ...scope, mode: "RECOVERY" },
-      _sum: { elapsedSeconds: true },
-      _count: { _all: true },
-    }),
-
-    prisma.focusSession.aggregate({
-      where: {
-        userId: user.id,
-        status: "COMPLETED",
-        localDate: today,
-        ...workOnly,
-      },
-      _sum: { elapsedSeconds: true },
-      _count: { _all: true },
-    }),
-
-    prisma.focusSession.aggregate({
-      where: {
-        userId: user.id,
-        status: "COMPLETED",
-        localDate: { gte: weekStart, lte: today },
-        ...workOnly,
-      },
-      _sum: { elapsedSeconds: true },
-    }),
-
-    // The heatmap and the balance series in one pass. Grouping by mode as well
-    // as date is a superset of the old per-day query — summing across modes
-    // reproduces it exactly — so this costs no extra round trip.
-    prisma.focusSession.groupBy({
-      by: ["localDate", "mode"],
-      where: scope,
-      _sum: { elapsedSeconds: true },
-      orderBy: { localDate: "asc" },
-    }),
-
-    prisma.focusSession.groupBy({
-      by: ["taskId"],
-      where: { ...scope, NOT: { taskId: null } },
-      _sum: { elapsedSeconds: true },
-      _count: { _all: true },
-      orderBy: { _sum: { elapsedSeconds: "desc" } },
-      take: 25,
-    }),
-
-    prisma.focusSession.groupBy({
-      by: ["mode"],
-      where: scope,
-      _sum: { elapsedSeconds: true },
-      _count: { _all: true },
-    }),
-
-    prisma.taskOccurrence.groupBy({
-      by: ["date"],
-      where: {
-        userId: user.id,
-        status: "DONE",
-        date: { gte: from, lte: today },
-      },
-      _count: { _all: true },
-      orderBy: { date: "asc" },
-    }),
-
-    // Hour-of-day has to be bucketed in JS: Prisma can't EXTRACT(hour), and at
-    // this row count it isn't worth another denormalized column.
-    prisma.focusSession.findMany({
-      where: scope,
-      select: { startedAt: true, elapsedSeconds: true },
-    }),
-
-    prisma.sessionInterval.count({
-      where: {
-        kind: "FOCUS",
-        completed: true,
-        session: scope,
-      },
-    }),
-
-    // Breaks, which were unmeasurable until they stopped pausing at their own
-    // boundary. The session's snapshotted settings give what each break was
-    // originally going to be, so a deliberate extension stays separable from an
-    // overrun without another column.
-    prisma.sessionInterval.findMany({
-      where: {
-        kind: { in: ["SHORT_BREAK", "LONG_BREAK"] },
-        endedAt: { not: null },
-        session: scope,
-      },
+    prisma.task.findMany({
+      where: { userId: user.id, type: "HABIT", archivedAt: null },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       select: {
-        kind: true,
-        targetSeconds: true,
-        elapsedSeconds: true,
-        overtimeSeconds: true,
-        session: {
-          select: { shortBreakSeconds: true, longBreakSeconds: true },
+        id: true,
+        title: true,
+        recurrence: {
+          select: {
+            daysOfWeek: true,
+            startDate: true,
+            endDate: true,
+            minimalTask: true,
+            unit: true,
+          },
         },
       },
     }),
 
-    // ---- the manual half of the log --------------------------------------
-    //
-    // Every day's `loggedSeconds` is a superset: session time is incremented
-    // into it at endSession *and* lives on the session row, while time logged
-    // by hand — "I did 25 minutes but the clock never ran" — exists only on
-    // the occurrence. Subtracting the session side from the occurrence side
-    // per bucket isolates exactly the manual minutes, and doing it as two
-    // groupBys means any future drift between the two tables can't inflate
-    // /stats: the maximum it can produce is zero.
-    prisma.taskOccurrence.groupBy({
-      by: ["date"],
-      where: {
-        userId: user.id,
-        date: { gte: from, lte: today },
-      },
-      _sum: { loggedSeconds: true },
-      orderBy: { date: "asc" },
-    }),
-
-    prisma.focusSession.groupBy({
-      by: ["localDate"],
-      where: {
-        userId: user.id,
-        status: "COMPLETED",
-        localDate: { gte: from, lte: today },
-        // Only sessions that were rolled into an occurrence — untethered and
-        // recovery sessions never touch `loggedSeconds`.
-        occurrenceId: { not: null },
-      },
-      _sum: { elapsedSeconds: true },
-      orderBy: { localDate: "asc" },
-    }),
-
-    // Manual time by task, so a task that was only ever logged by hand still
-    // shows up in "where the time went".
-    prisma.taskOccurrence.groupBy({
-      by: ["taskId"],
-      where: {
-        userId: user.id,
-        date: { gte: from, lte: today },
-        loggedSeconds: { gt: 0 },
-      },
-      _sum: { loggedSeconds: true },
-    }),
-
-    // ---- habits ---------------------------------------------------------
-    // Independent of everything above, so they share its round trip. The
-    // history is reached through the relation rather than a list of ids, so
-    // it needn't wait for the habits either.
-    prisma.task.findMany({
-      where: { userId: user.id, type: "HABIT", archivedAt: null },
-      select: { id: true, title: true, recurrence: true },
-    }),
     prisma.taskOccurrence.findMany({
       where: {
         userId: user.id,
-        task: { type: "HABIT", archivedAt: null },
-        status: { in: ["DONE", "SKIPPED"] },
+        date: { gte: from, lte: to },
       },
-      select: { taskId: true, date: true, status: true },
-      orderBy: { date: "asc" },
+      select: {
+        taskId: true,
+        date: true,
+        status: true,
+        minimalTaskDone: true,
+        progress: true,
+        loggedSeconds: true,
+        task: { select: { id: true, title: true, type: true } },
+      },
     }),
+
+    prisma.focusSession.findMany({
+      where: {
+        userId: user.id,
+        status: "COMPLETED",
+        localDate: { gte: from, lte: to },
+      },
+      orderBy: { startedAt: "asc" },
+      select: {
+        id: true,
+        mode: true,
+        localDate: true,
+        startedAt: true,
+        elapsedSeconds: true,
+        overtimeSeconds: true,
+        occurrenceId: true,
+        taskId: true,
+        task: { select: { id: true, title: true } },
+      },
+    }),
+
+    mind.braindump
+      ? prisma.brainDump.findMany({
+          where: { userId: user.id, date: { gte: from, lte: to } },
+          select: { date: true, paper: true, seconds: true },
+        })
+      : Promise.resolve([]),
+
+    mind.meditate
+      ? prisma.meditationSession.findMany({
+          where: {
+            userId: user.id,
+            seconds: { gt: 0 },
+            startedAt: { gte: instantFrom, lt: instantTo },
+          },
+          select: { startedAt: true, seconds: true },
+        })
+      : Promise.resolve([]),
+
+    mind.reading
+      ? prisma.readingLog.findMany({
+          where: { userId: user.id, date: { gte: from, lte: to } },
+          select: {
+            date: true,
+            fromPage: true,
+            toPage: true,
+            book: { select: { title: true, unit: true } },
+          },
+        })
+      : Promise.resolve([]),
+
+    mind.wishes
+      ? prisma.wishRehearsal.findMany({
+          where: { userId: user.id, date: { gte: from, lte: to } },
+          select: { date: true },
+        })
+      : Promise.resolve([]),
+
+    mind.disputations
+      ? prisma.disputation.findMany({
+          where: {
+            userId: user.id,
+            createdAt: { gte: instantFrom, lt: instantTo },
+          },
+          select: { createdAt: true },
+        })
+      : Promise.resolve([]),
+
+    mind.disputations
+      ? prisma.disputationRevisit.findMany({
+          where: { userId: user.id, date: { gte: from, lte: to } },
+          select: { date: true },
+        })
+      : Promise.resolve([]),
+
+    journalKinds.length > 0
+      ? prisma.journalEntry.findMany({
+          where: {
+            userId: user.id,
+            kind: { in: journalKinds },
+            date: { gte: from, lte: to },
+          },
+          select: { date: true, kind: true },
+        })
+      : Promise.resolve([]),
+
+    heart.recitation
+      ? prisma.recitationLog.findMany({
+          where: { userId: user.id, date: { gte: from, lte: to } },
+          select: { date: true },
+        })
+      : Promise.resolve([]),
   ]);
 
-  const breaks = summariseBreaks(
-    breakIntervals.map((interval) => ({
-      plannedSeconds:
-        interval.kind === "LONG_BREAK"
-          ? interval.session.longBreakSeconds
-          : interval.session.shortBreakSeconds,
-      targetSeconds: interval.targetSeconds,
-      elapsedSeconds: interval.elapsedSeconds,
-      overtimeSeconds: interval.overtimeSeconds,
+  // ---- formatters ----------------------------------------------------------
+
+  const localISO = new Intl.DateTimeFormat("en-CA", {
+    timeZone: user.timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  const localTime = new Intl.DateTimeFormat("en-GB", {
+    timeZone: user.timezone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+
+  const shortDateFmt = new Intl.DateTimeFormat("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+
+  const fullDateFmt = new Intl.DateTimeFormat("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "UTC",
+  });
+
+  const monthShortFmt = new Intl.DateTimeFormat("en-GB", {
+    month: "short",
+    timeZone: "UTC",
+  });
+
+  const dayMonthFmt = new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+
+  const sameYear =
+    from.getUTCFullYear() === today.getUTCFullYear() &&
+    to.getUTCFullYear() === today.getUTCFullYear();
+  const windowLabel = sameYear
+    ? `${dayMonthFmt.format(from)} – ${dayMonthFmt.format(to)}`
+    : `${dayMonthFmt.format(from)} ${from.getUTCFullYear()} – ${dayMonthFmt.format(to)} ${to.getUTCFullYear()}`;
+
+  // ---- catalog of trackable items -----------------------------------------
+
+  const activeHabits = habits.filter((h) => h.recurrence !== null);
+
+  const items: TrackableItem[] = [
+    ...activeHabits.map((h) => ({
+      id: h.id,
+      group: "habit" as const,
+      title: h.title,
+      scheduleLabel: describeRecurrence(h.recurrence!.daysOfWeek),
+      minimalTask: h.recurrence!.minimalTask || null,
     })),
-  );
+    ...enabledMind.map((tab) => ({
+      id: mindItemId(tab),
+      group: "mind" as const,
+      title: MIND_PRACTICE_LABELS[tab],
+      scheduleLabel: "Mind",
+    })),
+    ...enabledHeart.map((tab) => ({
+      id: heartItemId(tab),
+      group: "heart" as const,
+      title: HEART_PRACTICE_LABELS[tab],
+      scheduleLabel: "Heart",
+    })),
+  ];
 
-  // ---- manually logged time ----------------------------------------------
+  // ---- index habit occurrences by (taskId, iso) ---------------------------
 
-  const occurrenceSecondsByDate = new Map(
-    occurrenceDays.map((row) => [toISODate(row.date), row._sum.loggedSeconds ?? 0]),
-  );
-
-  const attachedSecondsByDate = new Map(
-    attachedSessionDays.map((row) => [
-      toISODate(row.localDate),
-      row._sum.elapsedSeconds ?? 0,
-    ]),
-  );
-
-  const manualByDate = (iso: string) =>
-    Math.max(
-      0,
-      (occurrenceSecondsByDate.get(iso) ?? 0) - (attachedSecondsByDate.get(iso) ?? 0),
-    );
-
-  // The per-task counterpart. `byTask` already sums every session against the
-  // task (a task-attached session always carries its occurrenceId), so the
-  // occurrence total minus that is the manual total.
-  const sessionSecondsByTask = new Map(
-    byTask.map((row) => [row.taskId, row._sum.elapsedSeconds ?? 0]),
-  );
-
-  const manualSecondsByTask = new Map<string, number>();
-  for (const row of occurrenceTasks) {
-    const taskId = row.taskId;
-    if (!taskId) continue;
-    manualSecondsByTask.set(
-      taskId,
-      Math.max(0, (row._sum.loggedSeconds ?? 0) - (sessionSecondsByTask.get(taskId) ?? 0)),
-    );
+  const habitOccByKey = new Map<
+    string,
+    { status: string; progress: number; loggedSeconds: number }
+  >();
+  for (const occ of occurrences) {
+    if (occ.task.type === "HABIT") {
+      habitOccByKey.set(`${occ.taskId}:${toISODate(occ.date)}`, {
+        status: occ.status,
+        progress: occ.progress,
+        loggedSeconds: occ.loggedSeconds,
+      });
+    }
   }
 
-  // ---- hydrate task names for the "where did the time go" table ------------
+  // ---- index Mind & Heart completions by day ------------------------------
 
-  const taskIds = [
-    ...new Set([
-      ...byTask.map((row) => row.taskId),
-      ...occurrenceTasks.map((row) => row.taskId),
-    ]),
-  ].filter((id): id is string => id !== null);
+  const brainDumpByDay = new Map<
+    string,
+    { count: number; paper: number; seconds: number }
+  >();
+  for (const row of brainDumps) {
+    const iso = toISODate(row.date);
+    const cur = brainDumpByDay.get(iso) ?? { count: 0, paper: 0, seconds: 0 };
+    cur.count += 1;
+    cur.paper += row.paper ? 1 : 0;
+    cur.seconds += row.seconds;
+    brainDumpByDay.set(iso, cur);
+  }
 
-  const tasks = taskIds.length
-    ? await prisma.task.findMany({
-        where: { id: { in: taskIds }, userId: user.id },
-        select: {
-          id: true,
-          title: true,
-          type: true,
-          estimatedSeconds: true,
-          project: { select: { id: true, name: true } },
-        },
-      })
-    : [];
+  const meditationByDay = new Map<string, number>();
+  for (const row of meditations) {
+    const iso = localISO.format(row.startedAt);
+    meditationByDay.set(iso, (meditationByDay.get(iso) ?? 0) + row.seconds);
+  }
 
-  const taskById = new Map(tasks.map((task) => [task.id, task]));
-
-  const timeByTask = byTask
-    .map((row) => {
-      const task = row.taskId ? taskById.get(row.taskId) : undefined;
-      if (!task) return null;
-      return {
-        id: task.id,
-        title: task.title,
-        type: task.type,
-        project: task.project,
-        estimatedSeconds: task.estimatedSeconds,
-        seconds:
-          (row._sum.elapsedSeconds ?? 0) +
-          (row.taskId ? manualSecondsByTask.get(row.taskId) ?? 0 : 0),
-        sessions: row._count._all,
-      };
-    })
-    .filter((row): row is NonNullable<typeof row> => row !== null);
-
-  // Tasks that were only ever logged by hand never produced a session row, so
-  // they can't come from `byTask` — they have to be added whole.
-  const manualOnlyTaskRows = [...manualSecondsByTask]
-    .filter(([taskId, seconds]) => seconds > 0 && !sessionSecondsByTask.has(taskId))
-    .map(([taskId, seconds]) => {
-      const task = taskById.get(taskId);
-      if (!task) return null;
-      return {
-        id: task.id,
-        title: task.title,
-        type: task.type,
-        project: task.project,
-        estimatedSeconds: task.estimatedSeconds,
-        seconds,
-        sessions: 0,
-      };
-    })
-    .filter((row): row is NonNullable<typeof row> => row !== null);
-
-  timeByTask.push(...manualOnlyTaskRows);
-  timeByTask.sort((a, b) => b.seconds - a.seconds);
-
-  // Folded into projects in JS rather than denormalizing projectId onto every
-  // session, which would then need keeping in sync when a task moves list.
-  const projectTotals = new Map<string, { name: string; seconds: number }>();
-  for (const row of timeByTask) {
-    const key = row.project?.id ?? "none";
-    const entry = projectTotals.get(key) ?? {
-      name: row.project?.name ?? "No list",
-      seconds: 0,
+  const readingByDay = new Map<
+    string,
+    { pages: number; percent: number; logs: number; bookTitle: string | null }
+  >();
+  for (const row of readings) {
+    const iso = toISODate(row.date);
+    const cur = readingByDay.get(iso) ?? {
+      pages: 0,
+      percent: 0,
+      logs: 0,
+      bookTitle: null,
     };
-    entry.seconds += row.seconds;
-    projectTotals.set(key, entry);
+    cur.logs += 1;
+    if (row.book.unit === "PERCENT") cur.percent += pagesRead(row);
+    else cur.pages += pagesRead(row);
+    cur.bookTitle ??= row.book.title;
+    readingByDay.set(iso, cur);
   }
 
-  // ---- estimate accuracy --------------------------------------------------
+  const wishByDay = new Map<string, number>();
+  for (const row of wishRehearsals) {
+    const iso = toISODate(row.date);
+    wishByDay.set(iso, (wishByDay.get(iso) ?? 0) + 1);
+  }
 
-  const estimated = timeByTask.filter(
-    (row) => row.estimatedSeconds && row.estimatedSeconds > 0,
+  const disputationByDay = new Map<string, number>();
+  for (const row of disputations) {
+    const iso = localISO.format(row.createdAt);
+    disputationByDay.set(iso, (disputationByDay.get(iso) ?? 0) + 1);
+  }
+  for (const row of disputationRevisits) {
+    const iso = toISODate(row.date);
+    disputationByDay.set(iso, (disputationByDay.get(iso) ?? 0) + 1);
+  }
+
+  const gratitudeDays = new Set<string>();
+  const duaDays = new Set<string>();
+  for (const row of journalEntries) {
+    const iso = toISODate(row.date);
+    if (row.kind === "GRATITUDE") gratitudeDays.add(iso);
+    if (row.kind === "DUA") duaDays.add(iso);
+  }
+
+  const recitationDays = new Set<string>(
+    recitationLogs.map((row) => toISODate(row.date)),
   );
 
-  const ratios = estimated
-    .map((row) => row.seconds / row.estimatedSeconds!)
-    .sort((a, b) => a - b);
+  // ---- index productive sessions & manual logged time by day --------------
 
-  const medianRatio =
-    ratios.length > 0
-      ? ratios.length % 2 === 1
-        ? ratios[(ratios.length - 1) / 2]
-        : (ratios[ratios.length / 2 - 1] + ratios[ratios.length / 2]) / 2
-      : null;
+  const workSecondsByDay = new Map<string, number>();
+  const recoverySecondsByDay = new Map<string, number>();
+  const sessionsByDay = new Map<string, DaySessionEntry[]>();
+  const attachedTaskSecondsByDay = new Map<string, number>();
 
-  const worstUnderestimates = [...estimated]
-    .map((row) => ({
-      ...row,
-      estimatedSeconds: row.estimatedSeconds!,
-      overBy: row.seconds - row.estimatedSeconds!,
-    }))
-    .filter((row) => row.overBy > 0)
-    .sort((a, b) => b.overBy - a.overBy)
-    .slice(0, 5);
+  for (const session of sessions) {
+    const iso = toISODate(session.localDate);
+    if (session.mode === "RECOVERY") {
+      recoverySecondsByDay.set(
+        iso,
+        (recoverySecondsByDay.get(iso) ?? 0) + session.elapsedSeconds,
+      );
+      continue;
+    }
 
-  // ---- habits (fetched with the first round) -----------------------------
+    workSecondsByDay.set(
+      iso,
+      (workSecondsByDay.get(iso) ?? 0) + session.elapsedSeconds,
+    );
 
-  const historyByHabit = new Map<string, Map<string, "DONE" | "SKIPPED">>();
-  for (const occurrence of habitOccurrences) {
-    const map = historyByHabit.get(occurrence.taskId) ?? new Map();
-    map.set(toISODate(occurrence.date), occurrence.status as "DONE" | "SKIPPED");
-    historyByHabit.set(occurrence.taskId, map);
+    if (session.occurrenceId && session.taskId) {
+      const key = `${iso}:${session.taskId}`;
+      attachedTaskSecondsByDay.set(
+        key,
+        (attachedTaskSecondsByDay.get(key) ?? 0) + session.elapsedSeconds,
+      );
+    }
+
+    if (session.elapsedSeconds > 0) {
+      const list = sessionsByDay.get(iso) ?? [];
+      list.push({
+        id: session.id,
+        title: session.task?.title ?? "Open focus",
+        mode: session.mode as TimerMode,
+        seconds: session.elapsedSeconds,
+        overtimeSeconds: session.overtimeSeconds,
+        timeLabel: localTime.format(session.startedAt),
+      });
+      sessionsByDay.set(iso, list);
+    }
   }
 
-  const habitAdherence = habits
-    .filter((habit) => habit.recurrence !== null)
-    .map((habit) => {
+  for (const occ of occurrences) {
+    if (occ.loggedSeconds <= 0) continue;
+    const iso = toISODate(occ.date);
+    const attached = attachedTaskSecondsByDay.get(`${iso}:${occ.taskId}`) ?? 0;
+    const manualSeconds = Math.max(0, occ.loggedSeconds - attached);
+    if (manualSeconds <= 0) continue;
+
+    workSecondsByDay.set(
+      iso,
+      (workSecondsByDay.get(iso) ?? 0) + manualSeconds,
+    );
+
+    const list = sessionsByDay.get(iso) ?? [];
+    list.push({
+      id: `manual:${iso}:${occ.taskId}`,
+      title: occ.task.title,
+      mode: "MANUAL",
+      seconds: manualSeconds,
+      overtimeSeconds: 0,
+      timeLabel: null,
+    });
+    sessionsByDay.set(iso, list);
+  }
+
+  // ---- assemble 14 dense day records --------------------------------------
+
+  const days: StatsDayRecord[] = Array.from({ length: WINDOW_DAYS }, (_, offset) => {
+    const date = addDays(from, offset);
+    const iso = toISODate(date);
+    const isToday = iso === todayISO;
+    const isYesterday = iso === yesterdayISO;
+
+    const dayItems: Record<string, DayItemEntry> = {};
+
+    // 1. Habits — strictly check `isDueOn` so inactive days are never deducted.
+    for (const habit of activeHabits) {
       const rule = {
         daysOfWeek: habit.recurrence!.daysOfWeek,
         startDate: habit.recurrence!.startDate,
         endDate: habit.recurrence!.endDate,
       };
-      const history = historyByHabit.get(habit.id) ?? new Map();
+      const due = isDueOn(rule, date);
+      const occ = habitOccByKey.get(`${habit.id}:${iso}`);
 
-      // Expected days are not rows — they can only be computed.
-      const expected = expectedDatesBetween(rule, from, today);
-      const done = expected.filter(
-        (date) => history.get(toISODate(date)) === "DONE",
-      ).length;
+      let detail: string | null = null;
+      if (occ?.status === "DONE") {
+        if (occ.loggedSeconds >= 60) {
+          detail = formatDuration(occ.loggedSeconds);
+        } else if (occ.progress > 0) {
+          detail =
+            habit.recurrence!.unit === "MINUTES"
+              ? `${occ.progress}m`
+              : `${occ.progress} logged`;
+        }
+      }
 
-      return {
-        id: habit.id,
-        title: habit.title,
-        expected: expected.length,
-        done,
-        adherence:
-          expected.length > 0 ? Math.round((done / expected.length) * 100) : 0,
-      };
-    })
-    .sort((a, b) => b.adherence - a.adherence);
-
-  // ---- time of day --------------------------------------------------------
-
-  const hourFormatter = new Intl.DateTimeFormat("en-GB", {
-    timeZone: user.timezone,
-    hour: "2-digit",
-    hour12: false,
-  });
-
-  const byHour = Array.from({ length: 24 }, (_, hour) => ({
-    hour,
-    seconds: 0,
-  }));
-
-  for (const session of sessionTimes) {
-    const hour = Number(hourFormatter.format(session.startedAt));
-    if (Number.isFinite(hour) && hour >= 0 && hour < 24) {
-      byHour[hour].seconds += session.elapsedSeconds;
+      if (!due) {
+        dayItems[habit.id] = {
+          itemId: habit.id,
+          status: occ?.status === "DONE" ? "bonus" : "inactive",
+          detail,
+        };
+      } else if (occ?.status === "DONE") {
+        dayItems[habit.id] = { itemId: habit.id, status: "done", detail };
+      } else if (occ?.status === "SKIPPED") {
+        dayItems[habit.id] = { itemId: habit.id, status: "skipped", detail: null };
+      } else {
+        dayItems[habit.id] = {
+          itemId: habit.id,
+          status: isToday ? "open" : "missed",
+          detail: null,
+        };
+      }
     }
-  }
 
-  // ---- daily series (dense, so the heatmap has no gaps) -------------------
+    // 2. Mind practices (Settings-enabled only)
+    for (const tab of enabledMind) {
+      const id = mindItemId(tab);
+      let done = false;
+      let detail: string | null = null;
 
-  const workByDate = new Map<string, number>();
-  const restByDate = new Map<string, number>();
+      if (tab === "braindump") {
+        const entry = brainDumpByDay.get(iso);
+        if (entry && entry.count > 0) {
+          done = true;
+          detail =
+            entry.count > 1
+              ? `${entry.count} dumps`
+              : entry.paper > 0
+                ? "On paper"
+                : entry.seconds >= 60
+                  ? formatDuration(entry.seconds)
+                  : "Written";
+        }
+      } else if (tab === "meditate") {
+        const seconds = meditationByDay.get(iso) ?? 0;
+        if (seconds > 0) {
+          done = true;
+          detail = formatDuration(seconds);
+        }
+      } else if (tab === "reading") {
+        const entry = readingByDay.get(iso);
+        if (entry && entry.logs > 0) {
+          done = true;
+          if (entry.pages > 0) {
+            detail = `${entry.pages} ${entry.pages === 1 ? "page" : "pages"}`;
+          } else if (entry.percent > 0) {
+            detail = `+${entry.percent}%`;
+          } else if (entry.bookTitle) {
+            detail = entry.bookTitle;
+          }
+        }
+      } else if (tab === "wishes") {
+        const count = wishByDay.get(iso) ?? 0;
+        if (count > 0) {
+          done = true;
+          detail = count > 1 ? `${count} rehearsed` : "Rehearsed";
+        }
+      } else if (tab === "disputations") {
+        const count = disputationByDay.get(iso) ?? 0;
+        if (count > 0) {
+          done = true;
+          detail = count > 1 ? `${count} entries` : "Practiced";
+        }
+      }
 
-  for (const row of byDayMode) {
-    const iso = toISODate(row.localDate);
-    const seconds = row._sum.elapsedSeconds ?? 0;
-    const bucket = row.mode === "RECOVERY" ? restByDate : workByDate;
-    bucket.set(iso, (bucket.get(iso) ?? 0) + seconds);
-  }
+      dayItems[id] = {
+        itemId: id,
+        status: done ? "done" : isToday ? "open" : "missed",
+        detail,
+      };
+    }
 
-  const completionsByDate = new Map(
-    completionsByDay.map((row) => [toISODate(row.date), row._count._all]),
-  );
+    // 3. Heart practices (Settings-enabled only)
+    for (const tab of enabledHeart) {
+      const id = heartItemId(tab);
+      const done =
+        tab === "gratitude"
+          ? gratitudeDays.has(iso)
+          : tab === "dua"
+            ? duaDays.has(iso)
+            : recitationDays.has(iso);
 
-  const daily = Array.from({ length: days }, (_, offset) => {
-    const date = addDays(from, offset);
-    const iso = toISODate(date);
-    const workSeconds = workByDate.get(iso) ?? 0;
-    const recoverySeconds = restByDate.get(iso) ?? 0;
-    const manualSeconds = manualByDate(iso);
+      dayItems[id] = {
+        itemId: id,
+        status: done ? "done" : isToday ? "open" : "missed",
+        detail: done ? (tab === "recitation" ? "Set completed" : "Written") : null,
+      };
+    }
 
     return {
-      date,
       iso,
-      workSeconds,
-      recoverySeconds,
-      manualSeconds,
-      // The heatmap is about focus, so `seconds` stays work-only and that
-      // component needs no change.
-      seconds: workSeconds + manualSeconds,
-      completions: completionsByDate.get(iso) ?? 0,
+      shortLabel: shortDateFmt.format(date),
+      fullLabel: fullDateFmt.format(date),
+      dayNumber: date.getUTCDate(),
+      monthShort: monthShortFmt.format(date),
+      weekday: dayOfWeek(date),
+      isToday,
+      isYesterday,
+      productiveSeconds: workSecondsByDay.get(iso) ?? 0,
+      recoverySeconds: recoverySecondsByDay.get(iso) ?? 0,
+      items: dayItems,
+      sessions: sessionsByDay.get(iso) ?? [],
     };
   });
 
-  const manualTotal = daily.reduce(
-    (sum, day) => sum + day.manualSeconds,
-    0,
-  );
-
-  const workSeconds = (totals._sum.elapsedSeconds ?? 0) + manualTotal;
-  const recoverySeconds = recoveryTotals._sum.elapsedSeconds ?? 0;
-
   return {
-    range,
+    endISO: win.endISO,
+    windowLabel,
+    isLatest: win.isLatest,
+    prevEndISO: win.prevEndISO,
+    nextEndISO: win.nextEndISO,
+    weekStart: user.weekStart,
+    todayISO,
+    items,
     days,
-    from,
-    today,
-    totals: {
-      seconds: workSeconds,
-      overtimeSeconds: totals._sum.overtimeSeconds ?? 0,
-      sessions: totals._count._all,
-      avgPauses: totals._avg.pausedCount ?? 0,
-      plannedIntervals: totals._sum.plannedIntervals ?? 0,
-      completedIntervals: intervalCounts,
-    },
-    balance: {
-      workSeconds,
-      recoverySeconds,
-      recoverySessions: recoveryTotals._count._all,
-      share: recoveryShare(workSeconds, recoverySeconds),
-      ratio: balanceRatio(workSeconds, recoverySeconds),
-      sentence: describeBalance(workSeconds, recoverySeconds),
-      /** Days you worked and logged no rest at all — the number that actually
-       *  changes behaviour. */
-      daysWithNoRecovery: daily.filter(
-        (day) => day.workSeconds > 0 && day.recoverySeconds === 0,
-      ).length,
-    },
-    breaks,
-    todaySeconds:
-      (todayTotals._sum.elapsedSeconds ?? 0) + manualByDate(toISODate(today)),
-    todaySessions: todayTotals._count._all,
-    weekSeconds:
-      (weekTotals._sum.elapsedSeconds ?? 0) +
-      daily
-        .filter((day) => day.date >= weekStart)
-        .reduce((sum, day) => sum + day.manualSeconds, 0),
-    daily,
-    timeByTask: timeByTask.slice(0, 8),
-    timeByProject: [...projectTotals.values()].sort(
-      (a, b) => b.seconds - a.seconds,
-    ),
-    byMode: byMode.map((row) => ({
-      mode: row.mode as TimerMode,
-      seconds: row._sum.elapsedSeconds ?? 0,
-      sessions: row._count._all,
-    })),
-    estimateAccuracy: {
-      medianRatio,
-      sampleSize: estimated.length,
-      worstUnderestimates,
-    },
-    habitAdherence,
-    byHour,
   };
 }

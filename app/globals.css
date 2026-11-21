@@ -41,6 +41,12 @@
   --color-running-foreground: var(--running-foreground);
   --color-running-muted: var(--running-muted);
 
+  /* Pomodoro Flow past baseline. Calm, luminous teal — distinct from structured
+     running blue, recovery slate, and overrun crimson. */
+  --color-flow: var(--flow);
+  --color-flow-foreground: var(--flow-foreground);
+  --color-flow-muted: var(--flow-muted);
+
   /* Recovery. A peer of --running, not a tint of it — rest gets its own
      colour rather than diluting the "work is moving" signal. */
   --color-rest: var(--rest);
@@ -247,6 +253,12 @@
   --running-foreground: #f7f9ff;
   --running-muted: #dee7fb;
 
+  /* Serene jade-teal for Pomodoro Flow past the baseline — calm and distinct
+     from structured indigo, recovery slate, and overrun crimson. */
+  --flow: #187565;
+  --flow-foreground: #f5fffd;
+  --flow-muted: #dbf4ee;
+
   /* Cool and low-chroma, so recovery reads as a different kind of time at a
      glance rather than as "the timer, but a bit different". */
   --rest: #66748f;
@@ -371,6 +383,11 @@
   --running: #8aa2f0;
   --running-foreground: #0c1226;
   --running-muted: #1c2545;
+
+  /* Aurora mint-teal on the night sky: luminous and restful past the baseline. */
+  --flow: #42d9b8;
+  --flow-foreground: #061c19;
+  --flow-muted: #112c34;
 
   --rest: #93a0bd;
   --rest-foreground: #0c1220;
@@ -713,6 +730,7 @@
     --muted: #fbf1f8;
     --accent: #fde3f0;
     --sidebar: #fffafd;
+    --flow-muted: #dff5ef;
   }
 
   .dark {
@@ -722,6 +740,7 @@
     --muted: #122142;
     --accent: #1a2d5e;
     --sidebar: #0b1631;
+    --flow-muted: #112c34;
   }
 
 
@@ -735,6 +754,7 @@
     --muted: #fbf1f8;
     --accent: #fde3f0;
     --sidebar: #fffafd;
+    --flow-muted: #dff5ef;
   }
 
   .dark {
@@ -744,6 +764,7 @@
     --muted: #122142;
     --accent: #1a2d5e;
     --sidebar: #0b1631;
+    --flow-muted: #112c34;
   }
 
 

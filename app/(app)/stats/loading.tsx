@@ -2,57 +2,53 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Loading() {
   return (
-    <div className="mx-auto w-full max-w-3xl px-5 py-8 md:px-8 md:py-12">
+    <div className="mx-auto w-full max-w-4xl px-4 py-6 md:px-6 md:py-10">
       <div className="animate-rise space-y-6">
-        <header className="flex flex-wrap items-end justify-between gap-4">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-2">
-            <Skeleton className="h-10 w-28 rounded-lg" />
-            <Skeleton className="h-4 w-60 rounded-md" />
+            <Skeleton className="h-10 w-40 rounded-lg" />
+            <Skeleton className="h-4 w-72 rounded-md" />
           </div>
-          <div className="flex gap-1">
-            <Skeleton className="h-7 w-14 rounded-full" />
-            <Skeleton className="h-7 w-14 rounded-full" />
-            <Skeleton className="h-7 w-14 rounded-full" />
-          </div>
+          <Skeleton className="h-11 w-24 rounded-xl" />
         </header>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="rounded-lg border p-5">
-            <Skeleton className="mb-3 h-4 w-32 rounded-md" />
-            <Skeleton className="h-8 w-24 rounded-md" />
-            <Skeleton className="mt-2 h-3 w-2/3 rounded-md" />
+          <div className="rounded-[22px] border border-[var(--card-edge)] bg-card p-6 shadow-[var(--card-shadow)]">
+            <Skeleton className="h-4 w-32 rounded-md" />
+            <Skeleton className="mt-3 h-10 w-36 rounded-md" />
+            <Skeleton className="mt-4 h-2 w-full rounded-full" />
+            <Skeleton className="mt-3 h-3 w-48 rounded-md" />
           </div>
-          <div className="rounded-lg border p-5">
-            <Skeleton className="mb-3 h-4 w-32 rounded-md" />
-            <Skeleton className="h-8 w-24 rounded-md" />
-            <Skeleton className="mt-2 h-3 w-2/3 rounded-md" />
+          <div className="rounded-[22px] border border-[var(--card-edge)] bg-card p-6 shadow-[var(--card-shadow)]">
+            <Skeleton className="h-4 w-28 rounded-md" />
+            <Skeleton className="mt-3 h-10 w-32 rounded-md" />
+            <Skeleton className="mt-5 h-4 w-52 rounded-md" />
           </div>
         </div>
 
-        <div className="rounded-lg border p-4">
-          <Skeleton className="mb-4 h-4 w-36 rounded-md" />
-          <div className="grid grid-cols-7 gap-1.5">
-            {Array.from({ length: 7 * 8 }).map((_, i) => (
+        <div className="rounded-[26px] border border-[var(--card-edge)] bg-card p-6 shadow-[var(--card-shadow)]">
+          <div className="mb-5 flex items-center justify-between">
+            <div className="space-y-2">
+              <Skeleton className="h-6 w-36 rounded-md" />
+              <Skeleton className="h-4 w-52 rounded-md" />
+            </div>
+            <Skeleton className="h-10 w-40 rounded-xl" />
+          </div>
+
+          <div className="grid grid-cols-7 gap-2.5">
+            {Array.from({ length: 14 }).map((_, i) => (
               <Skeleton
                 key={i}
-                className="aspect-square rounded-sm"
-                style={{ opacity: 1 - (i % 5) * 0.15 }}
+                className="h-14 rounded-xl sm:h-[112px] sm:rounded-2xl"
+                style={{ opacity: 1 - (i % 5) * 0.1 }}
               />
             ))}
           </div>
-        </div>
 
-        <div className="space-y-1">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-3 rounded-lg p-2">
-              <Skeleton
-                className="h-3 w-14 shrink-0 rounded-md"
-                style={{ opacity: 1 - (i % 3) * 0.2 }}
-              />
-              <Skeleton className="h-4 flex-1 rounded-md" />
-              <Skeleton className="h-4 w-12 shrink-0 rounded-md" />
-            </div>
-          ))}
+          <div className="mt-6 flex items-center justify-between border-t border-border/50 pt-5">
+            <Skeleton className="h-9 w-36 rounded-xl" />
+            <Skeleton className="h-4 w-28 rounded-md" />
+          </div>
         </div>
       </div>
     </div>

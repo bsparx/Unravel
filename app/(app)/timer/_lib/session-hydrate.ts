@@ -23,13 +23,16 @@ export type HydratedSession = {
   runningSince: number | null;
   intervalIndex: number;
   intervalBaseSeconds: number;
-  /**
-   * Seconds of break time in closed intervals, so the client can reduce the
+  /** Seconds of break time in closed intervals, so the client can reduce the
    * rehydrated wall clock to active time exactly as it does for a session it
    * watched from the start. Closed intervals carry their own `elapsedSeconds`
    * — overruns included — which is the same source the server logs from.
    */
   breakElapsedSeconds: number;
+  /** Seconds flowed past the baseline in already-closed focus intervals. */
+  bankedFlowSeconds: number;
+  /** True when the open focus interval had already passed its baseline on reload. */
+  intervalAlreadyFlowing: boolean;
   /** Seconds added to the open interval by hand, recovered from its target. */
   intervalExtraSeconds: number;
   /** What the open interval says you were in the middle of, if anything. */
@@ -93,6 +96,14 @@ export const getActiveSession = cache(async (
     )
     .reduce((sum, interval) => sum + interval.elapsedSeconds, 0);
 
+  const bankedFlowSeconds = session.intervals
+    .filter(
+      (interval) =>
+        interval.endedAt !== null &&
+        interval.kind === "FOCUS",
+    )
+    .reduce((sum, interval) => sum + interval.overtimeSeconds, 0);
+
   const config: TimerConfig = {
     mode: session.mode,
     targetSeconds: session.targetSeconds,
@@ -113,6 +124,18 @@ export const getActiveSession = cache(async (
       ? Math.max(0, openInterval.targetSeconds - planned.targetSeconds)
       : 0;
 
+  const openElapsedSeconds = openInterval
+    ? openInterval.accumulatedSeconds +
+      (openInterval.runningSince
+        ? Math.max(0, Math.floor((Date.now() - openInterval.runningSince.getTime()) / 1000))
+        : 0)
+    : 0;
+  const intervalAlreadyFlowing =
+    session.mode === "FLOW" &&
+    openInterval?.kind === "FOCUS" &&
+    openInterval.targetSeconds > 0 &&
+    openElapsedSeconds >= openInterval.targetSeconds;
+
   return {
     id: session.id,
     clientKey: session.clientKey,
@@ -122,6 +145,8 @@ export const getActiveSession = cache(async (
     intervalIndex: openInterval?.index ?? 0,
     intervalBaseSeconds,
     breakElapsedSeconds,
+    bankedFlowSeconds,
+    intervalAlreadyFlowing,
     intervalExtraSeconds,
     returnNote: openInterval?.returnNote ?? null,
     reachedTarget: session.reachedTargetAt !== null,

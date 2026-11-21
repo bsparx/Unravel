@@ -21,7 +21,9 @@ import {
   clampBreak,
   clampIntervals,
   clampTarget,
+  hasIntervals,
   isBreakKind,
+  nextRoundExtension,
   type IntervalKind,
   type TimerMode,
 } from "@/lib/timer-math";
@@ -87,7 +89,7 @@ export async function startSession(
   // then read back as a goal that doesn't exist.
   const targetSeconds =
     mode === "RECOVERY" ? 0 : clampTarget(input.targetSeconds);
-  const intervals = mode === "POMODORO" ? clampIntervals(input.intervals) : 1;
+  const intervals = hasIntervals(mode) ? clampIntervals(input.intervals) : 1;
   const shortBreakSeconds =
     input.shortBreakSeconds === undefined
       ? user.shortBreakSeconds
@@ -257,6 +259,7 @@ export async function advanceInterval(
   sessionId: string,
   nextIndex: number,
   completed: boolean,
+  options: { resume?: boolean } = {},
 ): Promise<SessionSnapshot | null> {
   const user = await requireUser();
   const session = await load(user.id, sessionId);
@@ -280,10 +283,18 @@ export async function advanceInterval(
   }
 
   const now = new Date();
-  const shouldRun = session.status === "RUNNING";
+  const shouldRun = session.status === "RUNNING" || options.resume === true;
 
   await prisma.$transaction([
-    ...closeOpenIntervalOps(session, now, completed),
+    ...(options.resume && session.status === "PAUSED"
+      ? [
+          prisma.focusSession.update({
+            where: { id: session.id },
+            data: { status: "RUNNING", runningSince: now, lastBeatAt: now },
+          }),
+        ]
+      : []),
+    ...closeOpenIntervalOps(session, now, true),
     prisma.sessionInterval.upsert({
       where: { sessionId_index: { sessionId: session.id, index: nextIndex } },
       create: {
@@ -295,6 +306,88 @@ export async function advanceInterval(
         runningSince: shouldRun ? now : null,
       },
       update: { runningSince: shouldRun ? now : null },
+    }),
+  ]);
+
+  const updated = await load(user.id, sessionId);
+  return updated ? snapshot(updated, nextIndex) : null;
+}
+
+/**
+ * Append another break + focus round to a live Pomodoro Flow session and
+ * advance directly into that break.
+ *
+ * Lets a user who started a single 25/5 baseline — or who reached the end of
+ * their planned rounds and still has momentum — take their break and roll
+ * smoothly into the next focus block without ending and restarting a session.
+ */
+export async function appendFlowRound(
+  sessionId: string,
+): Promise<SessionSnapshot | null> {
+  const user = await requireUser();
+  const session = await load(user.id, sessionId);
+  if (!session || session.mode !== "FLOW") return null;
+  if (session.status === "COMPLETED" || session.status === "ABANDONED") {
+    return snapshot(session, currentIndex(session));
+  }
+
+  const extension = nextRoundExtension({
+    mode: session.mode,
+    targetSeconds: session.targetSeconds,
+    intervals: session.plannedIntervals,
+    focusSeconds: session.focusSeconds,
+    shortBreakSeconds: session.shortBreakSeconds,
+    longBreakSeconds: session.longBreakSeconds,
+    longBreakEvery: user.longBreakEvery,
+  });
+
+  if (!extension) {
+    return snapshot(session, currentIndex(session));
+  }
+
+  const nextPlan = buildIntervalPlan({
+    mode: session.mode,
+    targetSeconds: extension.targetSeconds,
+    intervals: extension.intervals,
+    focusSeconds: session.focusSeconds,
+    shortBreakSeconds: session.shortBreakSeconds,
+    longBreakSeconds: session.longBreakSeconds,
+    longBreakEvery: user.longBreakEvery,
+  });
+
+  const nextIndex = currentIndex(session) + 1;
+  const nextInterval = nextPlan[nextIndex];
+  if (!nextInterval) {
+    return snapshot(session, currentIndex(session));
+  }
+
+  const now = new Date();
+  const accumulated = serverElapsed(session, now);
+
+  await prisma.$transaction([
+    prisma.focusSession.update({
+      where: { id: session.id },
+      data: {
+        plannedIntervals: extension.intervals,
+        targetSeconds: extension.targetSeconds,
+        status: "RUNNING",
+        accumulatedSeconds: accumulated,
+        runningSince: now,
+        lastBeatAt: now,
+      },
+    }),
+    ...closeOpenIntervalOps(session, now, true),
+    prisma.sessionInterval.upsert({
+      where: { sessionId_index: { sessionId: session.id, index: nextIndex } },
+      create: {
+        sessionId: session.id,
+        index: nextIndex,
+        kind: nextInterval.kind,
+        targetSeconds: nextInterval.targetSeconds,
+        startedAt: now,
+        runningSince: now,
+      },
+      update: { runningSince: now },
     }),
   ]);
 
@@ -718,7 +811,7 @@ function focusElapsedSeconds(session: LoadedSession, now: Date): number {
 function closeOpenIntervalOps(
   session: LoadedSession,
   now: Date,
-  completed: boolean,
+  closing: boolean,
 ) {
   const open = session.intervals.find((interval) => interval.endedAt === null);
   if (!open) return [];
@@ -728,9 +821,8 @@ function closeOpenIntervalOps(
     : 0;
   const elapsed = Math.floor(open.accumulatedSeconds + live);
 
-  // A pause closes nothing — it only freezes the clock.
-  const closing = completed || elapsed >= open.targetSeconds;
-
+  // A pause closes nothing — it only freezes the clock, even when the interval
+  // has already crossed its baseline (Pomodoro Flow) or overrun its break.
   return [
     prisma.sessionInterval.update({
       where: { id: open.id },

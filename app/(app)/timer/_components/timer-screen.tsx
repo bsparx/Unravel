@@ -5,35 +5,40 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
+  ArrowRight,
   Check,
+  Coffee,
   Pause,
   Play,
   Repeat,
   RotateCcw,
   SkipForward,
   Square,
+  Waves,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { StepList } from "@/components/step-list";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useWakeLock } from "@/components/use-wake-lock";
 import { formatClock, formatDuration } from "@/lib/dates";
+import { nextStep, type StepLike } from "@/lib/steps";
 import {
+  hasIntervals,
   INTERVAL_LABELS,
   MODE_LABELS,
+  perFocusSeconds,
   readoutSeconds,
   type TimerConfig,
   type TimerMode,
 } from "@/lib/timer-math";
-import { nextStep, type StepLike } from "@/lib/steps";
 import { cn } from "@/lib/utils";
 
 import { adjustLoggedTime } from "../actions";
-import type { TodayLog as TodayLogData } from "../_lib/today-log";
 import { useTimer, type TimerTask } from "../_hooks/timer-provider";
 import { useThresholdHaptics } from "../_hooks/use-threshold-haptics";
-import { useWakeLock } from "@/components/use-wake-lock";
+import type { TodayLog as TodayLogData } from "../_lib/today-log";
 import { IntervalDotTrack } from "./interval-dot-track";
 import { DurationDial, ModePills } from "./mode-switcher";
 import { OverrunPanel } from "./overrun-panel";
@@ -71,11 +76,14 @@ export function TimerScreen({
   const {
     state,
     plan,
-    elapsedSeconds,
     focusElapsedSeconds,
     intervalElapsedSeconds,
     currentTargetSeconds,
     onBreak,
+    isFocusFlowing,
+    focusFlowSeconds,
+    totalFlowSeconds,
+    nextBreak,
     overrunSeconds,
     isOverrunning,
     extendInterval,
@@ -83,6 +91,7 @@ export function TimerScreen({
     configure,
     reset,
     toggle,
+    takeBreak,
     skipInterval,
     stop,
     discard,
@@ -112,39 +121,48 @@ export function TimerScreen({
     interval: currentInterval,
     intervalElapsedSeconds,
   });
+
   const recovery = state.config.mode === "RECOVERY";
   const isBreak = !recovery && onBreak;
   const isFlow = state.config.mode === "FLOW";
-  const isPomodoro = state.config.mode === "POMODORO";
-  const isOvertime = !recovery && elapsedSeconds > state.config.targetSeconds;
+  const isIntervalMode = hasIntervals(state.config.mode);
   const running = state.phase === "RUNNING";
+  const paused = state.phase === "PAUSED";
   const idle = state.phase === "IDLE";
   const ended = state.phase === "ENDED";
 
-  // During a pomodoro break, count that break down — showing total focus
-  // remaining while you're resting is just wrong. Everything else (recovery
-  // counting up, flow's overrun, a plain countdown) is one shared rule.
-  //
-  // The countdown is measured against focus time, not the wall clock: a break
-  // that ran over must not eat the remaining digits, or the next focus block
-  // would read as 0:00 the moment it starts. `focusElapsedSeconds` is the
-  // client's mirror of what endSession logs — see the provider.
-  //
-  // Once a break is past its time the countdown has nothing left to say, so it
-  // turns around and counts up instead. That number is the whole point of the
-  // state: a break with no number on it is exactly the break that becomes forty
-  // minutes.
+  const blockFocusSeconds = perFocusSeconds(state.config);
+  const focusBlocks = plan.filter((interval) => interval.kind === "FOCUS");
+  const focusIndex = plan
+    .slice(0, state.intervalIndex + 1)
+    .filter((interval) => interval.kind === "FOCUS").length;
+
+  // The face always speaks about the active interval:
+  // - Break overrun: climbs with "+" so a runaway break is unmistakable.
+  // - Break: counts down the break's own remaining time.
+  // - Recovery: climbs calmly from 00:00.
+  // - Focus: counts down this block's baseline (25:00 -> 00:00), and in
+  //   Pomodoro Flow climbs seamlessly past it (25:01, 25:02...) once met.
+  const activeTarget =
+    currentTargetSeconds > 0
+      ? currentTargetSeconds
+      : isIntervalMode
+        ? blockFocusSeconds
+        : state.config.targetSeconds;
+
   const readout = isOverrunning
     ? `+${formatClock(overrunSeconds)}`
     : isBreak && currentInterval
       ? formatClock(Math.max(0, currentTargetSeconds - intervalElapsedSeconds))
-      : formatClock(
-        readoutSeconds(
-          state.config.mode,
-          focusElapsedSeconds,
-          state.config.targetSeconds,
-        ),
-      );
+      : isFocusFlowing
+        ? formatClock(intervalElapsedSeconds)
+        : formatClock(
+            readoutSeconds(
+              state.config.mode,
+              intervalElapsedSeconds,
+              activeTarget,
+            ),
+          );
 
   // Sized against the face, not the viewport: cqw resolves to the ring's
   // container, so the digits shrink with the column on a phone. Stepped down
@@ -174,9 +192,9 @@ export function TimerScreen({
       }
       event.preventDefault();
 
-      // Not during an overrun. Pausing there would freeze the clock on a break
-      // that has already run over, which is precisely how the overrun used to
-      // become invisible — the two buttons are the only ways out on purpose.
+      // Not during a break overrun. Pausing there would freeze the clock on a
+      // break that has already run over, which is precisely how the overrun
+      // used to become invisible — the two buttons are the only ways out.
       if (isOverrunning) return;
       toggle();
     };
@@ -216,11 +234,6 @@ export function TimerScreen({
   const ownTask = state.task && initialTask && state.task.id === initialTask.id;
   const dayLog = ownTask ? todayLog : null;
 
-  const focusBlocks = plan.filter((interval) => interval.kind === "FOCUS");
-  const focusIndex = plan
-    .slice(0, state.intervalIndex + 1)
-    .filter((interval) => interval.kind === "FOCUS").length;
-
   if (ended) {
     return (
       <SessionSummary
@@ -229,283 +242,515 @@ export function TimerScreen({
         sessionId={state.sessionId}
         elapsedSeconds={focusElapsedSeconds}
         targetSeconds={state.config.targetSeconds}
+        flowSeconds={totalFlowSeconds}
+        rounds={focusBlocks.length}
         onAgain={() => reset(state.config, state.task)}
       />
     );
   }
 
+  const backHref = state.task
+    ? state.task.type === "HABIT"
+      ? "/habits"
+      : "/tasks"
+    : "/days";
+  const backLabel = state.task
+    ? state.task.type === "HABIT"
+      ? "Back to habits"
+      : "Back to tasks"
+    : "Back to days";
+
+  const cadenceChip = recovery
+    ? "Recovery"
+    : isIntervalMode
+      ? `${MODE_LABELS[state.config.mode]} · ${Math.round(blockFocusSeconds / 60)}/${Math.round(state.config.shortBreakSeconds / 60)}`
+      : `${MODE_LABELS[state.config.mode]} · ${formatDuration(state.config.targetSeconds)}`;
+
+  const faceEyebrow = isFocusFlowing
+    ? focusBlocks.length > 1
+      ? `Round ${focusIndex} of ${focusBlocks.length} · baseline met`
+      : "Baseline met"
+    : isOverrunning
+      ? INTERVAL_LABELS[currentInterval.kind]
+      : isBreak && currentInterval
+        ? INTERVAL_LABELS[currentInterval.kind]
+        : !idle && !recovery && focusBlocks.length > 1
+          ? `Round ${focusIndex} of ${focusBlocks.length}`
+          : idle && isFlow
+            ? `${formatDuration(blockFocusSeconds)} baseline`
+            : null;
+
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col items-center px-4 py-8 md:px-6 md:py-12">
-      <Button asChild variant="ghost" size="sm" className="mb-6 self-start">
-        <Link href="/days">
-          <ArrowLeft className="size-4" aria-hidden />
-          Back to days
-        </Link>
-      </Button>
+    <div className="mx-auto flex w-full max-w-2xl flex-col items-center px-4 py-6 md:px-6 md:py-10">
+      {/* Quiet top bar */}
+      <div className="mb-5 flex w-full items-center justify-between gap-3">
+        <Button
+          asChild
+          variant="ghost"
+          size="sm"
+          className="-ml-2 text-muted-foreground hover:text-foreground"
+        >
+          <Link href={backHref}>
+            <ArrowLeft className="size-4" aria-hidden />
+            {backLabel}
+          </Link>
+        </Button>
+
+        <span
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-mono text-micro font-medium transition-colors",
+            isFocusFlowing
+              ? "border-flow/35 bg-flow-muted text-flow"
+              : isOverrunning
+                ? "border-destructive/35 bg-destructive/10 text-destructive"
+                : recovery || isBreak
+                  ? "border-rest/30 bg-rest-muted/70 text-rest"
+                  : isFlow
+                    ? "border-flow/25 bg-flow-muted/50 text-flow"
+                    : "border-border/70 bg-card/70 text-muted-foreground",
+          )}
+        >
+          {isFlow && !isBreak && !isOverrunning && (
+            <Waves className="size-3 shrink-0" aria-hidden />
+          )}
+          {cadenceChip}
+        </span>
+      </div>
 
       {hasActiveSession && state.sessionId && (
         <ResumeBanner onDiscard={discard} />
       )}
 
-      {/* The page arrives in three small steps — header, face, controls — all
-          "content settling in" rather than anything that moves on its own. The
-          face's own motion stays exactly what it was: the depletion itself. */}
-      <header className="animate-rise mb-6 text-center">
-        {recovery ? (
-          <>
-            <p className="text-label text-rest font-medium">
-              Recovery
-            </p>
-            <h1 className="font-display mt-1 text-heading text-balance">
-              The other half of the day
-            </h1>
-          </>
-        ) : state.task ? (
-          <>
-            <p className="text-label text-muted-foreground font-medium">
-              {state.task.type === "HABIT" ? (
-                <span className="inline-flex items-center gap-1">
-                  <Repeat className="size-3" aria-hidden />
-                  Habit
-                </span>
-              ) : (
-                "Focusing on"
-              )}
-            </p>
-            <h1 className="font-display mt-1 text-heading text-balance">
-              {state.task.title}
-            </h1>
-            {lens}
-          </>
-        ) : (
-          <>
-            <p className="text-label text-muted-foreground font-medium">
-              No task attached
-            </p>
-            <h1 className="font-display mt-1 text-heading">Just a timer</h1>
-          </>
+      {/* Priority frosted-glass instrument stage */}
+      <section
+        className={cn(
+          "animate-rise relative flex w-full flex-col items-center rounded-[28px] border bg-card px-5 py-7 shadow-[var(--card-shadow)] transition-colors sm:px-10 sm:py-9",
+          isOverrunning
+            ? "border-destructive/40"
+            : isFocusFlowing
+              ? "border-flow/35"
+              : recovery || isBreak
+                ? "border-rest/30"
+                : "border-[var(--card-edge)]",
         )}
-      </header>
-
-      {/* The face is sized by its own w-full, so this wrapper must hand it a
-          definite width — a bare flex item here would shrink-wrap it to its
-          digits and collapse the whole face. */}
-      <div className="animate-rise relative flex w-full flex-col items-center justify-center" style={{ animationDelay: "60ms" }}>
-        {(() => {
-        const face = (
-          <div className="relative z-10 text-center select-none">
-            <p
-              className={cn(
-                "font-mono tabular-nums tracking-tight transition-colors",
-                readoutSize,
-                // Clay, not the running blue and not rest: this is neither work
-                // on the clock nor rest any more. Reusing either colour would
-                // make the one state you need to notice look like the two you
-                // don't.
-                isOverrunning
-                  ? "text-destructive"
-                  : running
-                    ? recovery
-                      ? "text-rest"
-                      : "text-running"
-                    : "text-foreground",
-              )}
-              role="timer"
-              aria-live="off"
-            >
-              {readout}
-            </p>
-
-            <p
-              className={cn(
-                "mt-1.5 text-label font-medium tracking-wide transition-colors",
-                isOverrunning
-                  ? "text-destructive font-semibold"
-                  : "text-muted-foreground",
-              )}
-            >
-              {recovery
-                ? idle
-                  ? "For as long as you like"
-                  : running
-                    ? "Resting"
-                    : "Paused"
-                : idle
-                  ? "Ready when you are"
-                  : isOverrunning
-                    ? "Break's over"
-                    : isFlow && isOvertime
-                      ? "Past your goal"
-                      : isBreak
-                        ? INTERVAL_LABELS[currentInterval.kind]
-                        : focusBlocks.length > 1
-                          ? `Focus ${focusIndex} of ${focusBlocks.length}`
-                          : MODE_LABELS[state.config.mode]}
-            </p>
-          </div>
-        );
-
-        // Recovery gets its own face entirely — see recovery-face.tsx.
-        return recovery ? (
-          <RecoveryFace>{face}</RecoveryFace>
-        ) : (
-          // The clock itself is handed over, not a progress number: the face
-          // re-derives it every frame from Date.now(). Passing `elapsedSeconds`
-          // would tie it back to this component's 4Hz render and put the
-          // stepping straight back in.
-          <TimerFace
-            clock={{
-              accumulatedMs: state.accumulatedMs,
-              runningSince: state.runningSince,
-            }}
-            running={running}
-            plan={plan}
-            intervalIndex={state.intervalIndex}
-            intervalBaseMs={state.intervalBaseMs}
-            config={state.config}
-            overrun={isOverrunning}
-          >
-            {face}
-          </TimerFace>
-        );
-      })()}
-      </div>
-
-      {/* Interval Dot Track for multi-block Pomodoro sessions */}
-      {isPomodoro && focusBlocks.length > 1 && (
-        <div className="mt-5 w-full max-w-sm">
-          <IntervalDotTrack
-            plan={plan}
-            intervalIndex={state.intervalIndex}
-            running={running}
-            idle={idle}
-            onBreak={onBreak}
-          />
-        </div>
-      )}
-
-      {/* Live region kept separate from the ticking digits so screen readers
-          aren't read a new number four times a second. */}
-      <p className="sr-only" aria-live="polite">
-        {running ? "Timer running" : idle ? "Timer ready" : "Timer paused"}
-      </p>
-
-      {/* The overrun takes the controls over entirely rather than adding to
-          them. Leaving Pause and Skip alongside would put four choices in front
-          of someone who has just been pulled back from somewhere else, and the
-          two that matter would be the easiest to miss. */}
-      {isOverrunning ? (
-        <OverrunPanel
-          returnLabel={
-            state.returnNote ?? upNext?.title ?? state.task?.title ?? null
-          }
-          onBack={skipInterval}
-          onExtend={extendInterval}
-        />
-      ) : (
-        <div className="flex flex-col items-center">
-          <div
-            className="animate-rise mt-6 flex items-center gap-2"
-            style={{ animationDelay: "110ms" }}
-          >
-            {idle ? (
-              <Button
-                size="lg"
-                onClick={toggle}
+      >
+        {/* Header */}
+        <header className="mb-5 w-full text-center">
+          {recovery ? (
+            <>
+              <p className="text-label font-medium text-rest">Recovery</p>
+              <h1 className="font-display mt-1 text-[28px] leading-tight text-balance sm:text-[34px]">
+                The other half of the day
+              </h1>
+            </>
+          ) : state.task ? (
+            <>
+              <p className="text-label font-medium text-muted-foreground">
+                {state.task.type === "HABIT" ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Repeat className="size-3.5" aria-hidden />
+                    Habit
+                  </span>
+                ) : (
+                  "Focusing on"
+                )}
+              </p>
+              <h1 className="font-display mt-1 text-[28px] leading-tight text-balance sm:text-[34px]">
+                {state.task.title}
+              </h1>
+              {lens}
+            </>
+          ) : (
+            <>
+              <p
                 className={cn(
-                  "h-12 rounded-lg px-6 text-title font-medium",
-                  recovery
-                    ? "bg-rest text-rest-foreground hover:bg-rest/90"
-                    : "bg-primary text-primary-foreground hover:bg-primary/90",
+                  "text-label font-medium",
+                  isFlow ? "text-flow" : "text-muted-foreground",
                 )}
               >
-                <Play className="mr-2 size-4 fill-current" aria-hidden />
-                {recovery ? "Start recovery" : "Start focus"}
-              </Button>
-            ) : (
-              <>
-                {plan.length > 1 && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={skipInterval}
-                    className="size-11 rounded-lg text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
-                    aria-label="Skip to the next block"
+                {MODE_LABELS[state.config.mode]}
+              </p>
+              <h1 className="font-display mt-1 text-[28px] leading-tight text-balance sm:text-[34px]">
+                {isFlow
+                  ? "Flow with a baseline"
+                  : state.config.mode === "POMODORO"
+                    ? "Focused intervals"
+                    : "Open countdown"}
+              </h1>
+            </>
+          )}
+        </header>
+
+        {/* Clock face — wrapper hands definite width to the container-queried square */}
+        <div
+          className="animate-rise relative flex w-full flex-col items-center justify-center"
+          style={{ animationDelay: "50ms" }}
+        >
+          {(() => {
+            const face = (
+              <div className="relative z-10 flex flex-col items-center px-6 text-center select-none">
+                {faceEyebrow && (
+                  <p
+                    className={cn(
+                      "mb-1 text-micro font-medium tracking-wide transition-colors",
+                      isFocusFlowing
+                        ? "text-flow"
+                        : isOverrunning
+                          ? "text-destructive"
+                          : isBreak
+                            ? "text-rest"
+                            : isFlow && idle
+                              ? "text-flow/85"
+                              : "text-muted-foreground",
+                    )}
                   >
-                    <SkipForward className="size-4" aria-hidden />
-                  </Button>
+                    {faceEyebrow}
+                  </p>
                 )}
 
+                <p
+                  className={cn(
+                    "font-mono leading-none tracking-tight tabular-nums transition-colors",
+                    readoutSize,
+                    isOverrunning
+                      ? "text-destructive"
+                      : isFocusFlowing
+                        ? "text-flow"
+                        : running
+                          ? recovery || isBreak
+                            ? "text-rest"
+                            : "text-running"
+                          : "text-foreground",
+                  )}
+                  role="timer"
+                  aria-live="off"
+                >
+                  {readout}
+                </p>
+
+                {isFocusFlowing ? (
+                  <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full border border-flow/30 bg-flow-muted px-3 py-1 font-mono text-micro font-semibold text-flow tabular-nums">
+                    <Waves className="size-3.5 shrink-0" aria-hidden />
+                    <span>
+                      {paused ? "Flow paused" : "In flow"} · +
+                      {formatClock(focusFlowSeconds)}
+                    </span>
+                  </div>
+                ) : (
+                  <p
+                    className={cn(
+                      "mt-2 text-label font-medium tracking-wide transition-colors",
+                      isOverrunning
+                        ? "font-semibold text-destructive"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    {recovery
+                      ? idle
+                        ? "For as long as you like"
+                        : running
+                          ? "Resting"
+                          : "Paused"
+                      : isOverrunning
+                        ? "Break's over"
+                        : isBreak
+                          ? paused
+                            ? "Break paused"
+                            : "Step away & breathe"
+                          : idle
+                            ? isFlow
+                              ? `${formatDuration(state.config.shortBreakSeconds)} break when ready`
+                              : isIntervalMode
+                                ? `${formatDuration(state.config.shortBreakSeconds)} break · ${focusBlocks.length} ${focusBlocks.length === 1 ? "round" : "rounds"}`
+                                : "Ready when you are"
+                            : paused
+                              ? "Paused"
+                              : isFlow && nextBreak
+                                ? `${formatDuration(nextBreak.seconds)} break after`
+                                : focusBlocks.length > 1
+                                  ? `Focus ${focusIndex} of ${focusBlocks.length}`
+                                  : MODE_LABELS[state.config.mode]}
+                  </p>
+                )}
+              </div>
+            );
+
+            return recovery ? (
+              <RecoveryFace>{face}</RecoveryFace>
+            ) : (
+              <TimerFace
+                clock={{
+                  accumulatedMs: state.accumulatedMs,
+                  runningSince: state.runningSince,
+                }}
+                running={running}
+                plan={plan}
+                intervalIndex={state.intervalIndex}
+                intervalBaseMs={state.intervalBaseMs}
+                currentTargetSeconds={currentTargetSeconds}
+                onBreak={isBreak}
+                config={state.config}
+                overrun={isOverrunning}
+              >
+                {face}
+              </TimerFace>
+            );
+          })()}
+        </div>
+
+        {/* Multi-round progression track for Pomodoro & Pomodoro Flow */}
+        {isIntervalMode && focusBlocks.length > 1 && (
+          <div className="mt-4 w-full max-w-sm">
+            <IntervalDotTrack
+              plan={plan}
+              intervalIndex={state.intervalIndex}
+              mode={state.config.mode}
+              running={running}
+              idle={idle}
+              onBreak={onBreak}
+              flowing={isFocusFlowing}
+              flowSeconds={focusFlowSeconds}
+            />
+          </div>
+        )}
+
+        {/* Live region kept separate from the ticking digits so screen readers
+            aren't read a new number four times a second. */}
+        <p className="sr-only" aria-live="polite">
+          {isFocusFlowing
+            ? "Baseline reached, continuing in flow"
+            : running
+              ? "Timer running"
+              : idle
+                ? "Timer ready"
+                : "Timer paused"}
+        </p>
+
+        {/* Controls deck */}
+        {isOverrunning ? (
+          <OverrunPanel
+            returnLabel={
+              state.returnNote ?? upNext?.title ?? state.task?.title ?? null
+            }
+            onBack={skipInterval}
+            onExtend={extendInterval}
+          />
+        ) : isFocusFlowing ? (
+          /* Pomodoro Flow past baseline: zero pressure, effortless choice */
+          <div className="animate-rise mt-6 flex w-full flex-col items-center gap-3.5">
+            <p className="max-w-sm text-center text-label text-muted-foreground">
+              {formatDuration(currentTargetSeconds)} baseline met — keep
+              flowing, or step away whenever you&apos;re ready.
+            </p>
+
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {nextBreak && !nextBreak.appendsRound ? (
+                <>
+                  <Button
+                    size="lg"
+                    onClick={takeBreak}
+                    className="h-12 rounded-xl bg-flow px-6 text-title font-medium text-flow-foreground hover:bg-flow/90"
+                  >
+                    <Coffee className="size-4" aria-hidden />
+                    Take {formatDuration(nextBreak.seconds)}{" "}
+                    {nextBreak.kind === "LONG_BREAK" ? "long break" : "break"}
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={toggle}
+                    className="h-12 rounded-xl border-border/80 bg-background/40 px-4"
+                  >
+                    {running ? (
+                      <>
+                        <Pause className="size-4 fill-current" aria-hidden />
+                        Pause
+                      </>
+                    ) : (
+                      <>
+                        <Play className="size-4 fill-current" aria-hidden />
+                        Resume
+                      </>
+                    )}
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    size="icon-lg"
+                    onClick={() => void stop()}
+                    className="rounded-xl text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                    aria-label="Finish and log this session"
+                    title="Finish and log"
+                  >
+                    <Square className="size-4" aria-hidden />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    size="lg"
+                    onClick={() => void stop()}
+                    className="h-12 rounded-xl bg-flow px-6 text-title font-medium text-flow-foreground hover:bg-flow/90"
+                  >
+                    <Check className="size-4" aria-hidden />
+                    Finish &amp; log
+                  </Button>
+
+                  {nextBreak?.appendsRound && (
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      onClick={takeBreak}
+                      className="h-12 rounded-xl border-flow/35 bg-flow-muted/35 px-5 text-foreground hover:border-flow/60 hover:bg-flow-muted/65"
+                    >
+                      <Coffee className="size-4 text-flow" aria-hidden />
+                      Take {formatDuration(nextBreak.seconds)}{" "}
+                      {nextBreak.kind === "LONG_BREAK" ? "long break" : "break"}
+                    </Button>
+                  )}
+
+                  <Button
+                    variant="ghost"
+                    size="icon-lg"
+                    onClick={toggle}
+                    className="rounded-xl text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                    aria-label={running ? "Pause flow" : "Resume flow"}
+                    title={running ? "Pause" : "Resume"}
+                  >
+                    {running ? (
+                      <Pause className="size-4 fill-current" aria-hidden />
+                    ) : (
+                      <Play className="size-4 fill-current" aria-hidden />
+                    )}
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center">
+            <div
+              className="animate-rise mt-6 flex flex-wrap items-center justify-center gap-2"
+              style={{ animationDelay: "90ms" }}
+            >
+              {idle ? (
                 <Button
                   size="lg"
                   onClick={toggle}
                   className={cn(
-                    "h-12 rounded-lg px-6 text-title font-medium",
+                    "h-12 rounded-xl px-8 text-title font-medium",
                     recovery
                       ? "bg-rest text-rest-foreground hover:bg-rest/90"
-                      : "bg-running text-running-foreground hover:bg-running/90",
+                      : isFlow
+                        ? "bg-flow text-flow-foreground hover:bg-flow/90"
+                        : "bg-primary text-primary-foreground hover:bg-primary/90",
                   )}
                 >
-                  {running ? (
-                    <>
-                      <Pause className="mr-2 size-4 fill-current" aria-hidden />
-                      Pause
-                    </>
-                  ) : (
-                    <>
-                      <Play className="mr-2 size-4 fill-current" aria-hidden />
-                      Resume
-                    </>
-                  )}
+                  <Play className="size-4 fill-current" aria-hidden />
+                  {recovery
+                    ? "Start recovery"
+                    : isFlow
+                      ? "Start flow"
+                      : "Start focus"}
                 </Button>
+              ) : (
+                <>
+                  {isBreak ? (
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      onClick={skipInterval}
+                      className="h-12 rounded-xl border-border/80 bg-background/40 px-4"
+                    >
+                      <ArrowRight className="size-4" aria-hidden />
+                      Back to focus
+                    </Button>
+                  ) : nextBreak && !nextBreak.appendsRound ? (
+                    <Button
+                      variant="ghost"
+                      size="icon-lg"
+                      onClick={takeBreak}
+                      className="rounded-xl text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                      aria-label="Skip ahead to break"
+                      title="Skip to break"
+                    >
+                      <SkipForward className="size-4" aria-hidden />
+                    </Button>
+                  ) : plan.length > 1 ? (
+                    <Button
+                      variant="ghost"
+                      size="icon-lg"
+                      onClick={skipInterval}
+                      className="rounded-xl text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                      aria-label="Skip to the next block"
+                      title="Next block"
+                    >
+                      <SkipForward className="size-4" aria-hidden />
+                    </Button>
+                  ) : null}
 
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => void stop()}
-                  className="size-11 rounded-lg text-muted-foreground hover:bg-muted/80 hover:text-foreground transition-colors"
-                  aria-label="Stop and log this session"
-                >
-                  <Square className="size-4" aria-hidden />
-                </Button>
-              </>
-            )}
+                  <Button
+                    size="lg"
+                    onClick={toggle}
+                    className={cn(
+                      "h-12 rounded-xl px-7 text-title font-medium",
+                      recovery || isBreak
+                        ? "bg-rest text-rest-foreground hover:bg-rest/90"
+                        : "bg-running text-running-foreground hover:bg-running/90",
+                    )}
+                  >
+                    {running ? (
+                      <>
+                        <Pause className="size-4 fill-current" aria-hidden />
+                        Pause
+                      </>
+                    ) : (
+                      <>
+                        <Play className="size-4 fill-current" aria-hidden />
+                        Resume
+                      </>
+                    )}
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    size="icon-lg"
+                    onClick={() => void stop()}
+                    className="rounded-xl text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                    aria-label="Stop and log this session"
+                    title="Stop and log"
+                  >
+                    <Square className="size-4" aria-hidden />
+                  </Button>
+                </>
+              )}
+            </div>
+
+            {/* Quiet keyboard hint for desktop */}
+            <p className="mt-3 hidden text-micro text-muted-foreground md:block">
+              <kbd className="rounded border border-border bg-muted/70 px-1.5 py-0.5 font-mono text-micro">
+                Space
+              </kbd>{" "}
+              starts and pauses
+            </p>
           </div>
+        )}
 
-          {/* For the hands on the keyboard. The one gesture this screen has
-              is worth naming once, quietly, on the only screen where it
-              exists. */}
-          <p className="text-muted-foreground mt-3 hidden text-micro md:block">
-            <kbd className="border-border bg-muted rounded border px-1.5 py-0.5 font-mono text-micro">
-              Space
-            </kbd>{" "}
-            starts and pauses
-          </p>
-        </div>
-      )}
-
-      {/* Mode selection follows the primary control while idle */}
-      {idle && (
-        <div className="mt-6" style={{ animationDelay: "30ms" }}>
-          <ModePills
-            config={state.config}
-            onChange={(next) => configure(next)}
-          />
-        </div>
-      )}
-
-      {idle && (
-        <details className="mt-6 w-full max-w-md">
-          <summary className="flex min-h-11 cursor-pointer items-center justify-center rounded-lg px-3 text-label text-muted-foreground underline underline-offset-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
-            {recovery ? "About recovery" : "Adjust duration and intervals"}
-          </summary>
-          <DurationDial
-            className="mt-3"
-            config={state.config}
-            onChange={(next) => configure(next)}
-          />
-        </details>
-      )}
+        {/* Idle mode & cadence controls integrated calmly inside the stage */}
+        {idle && (
+          <div className="mt-7 flex w-full flex-col items-center gap-4 border-t border-border/50 pt-6">
+            <ModePills
+              config={state.config}
+              onChange={(next) => configure(next)}
+            />
+            <DurationDial
+              config={state.config}
+              onChange={(next) => configure(next)}
+            />
+          </div>
+        )}
+      </section>
 
       {/* Only while the break is still a break. Once it has run over, the
           answer is what the overrun panel is already holding up — asking for it
@@ -533,8 +778,8 @@ export function TimerScreen({
       )}
 
       {steps.length > 0 && !recovery && (
-        <section className="mt-8 w-full max-w-sm">
-          <h2 className="text-label text-muted-foreground mb-2 text-center font-semibold">
+        <section className="mt-5 w-full rounded-2xl border border-border/60 bg-card/75 px-5 py-4">
+          <h2 className="mb-2.5 text-center text-label font-semibold text-muted-foreground">
             {upNext ? "You're on" : "All the way through"}
           </h2>
           <StepList steps={steps} />
@@ -545,7 +790,7 @@ export function TimerScreen({
         <Button
           variant="ghost"
           size="sm"
-          className="mt-3"
+          className="mt-4 text-muted-foreground hover:text-foreground"
           onClick={async () => {
             await stop({ completedTask: true });
             toast.success(`${state.task?.title} — done.`);
@@ -554,15 +799,6 @@ export function TimerScreen({
           <Check className="size-4" aria-hidden />
           Stop and mark it done
         </Button>
-      )}
-
-      {state.task && (
-        <Link
-          href={state.task.type === "HABIT" ? "/habits" : "/tasks"}
-          className="text-muted-foreground hover:text-foreground mt-10 text-label underline underline-offset-4"
-        >
-          Back to {state.task.type === "HABIT" ? "habits" : "tasks"}
-        </Link>
       )}
     </div>
   );
@@ -573,7 +809,7 @@ function ResumeBanner({ onDiscard }: { onDiscard: () => Promise<void> }) {
   if (dismissed) return null;
 
   return (
-    <div className="border-running/40 bg-running-muted mb-8 flex w-full flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3">
+    <div className="mb-5 flex w-full flex-wrap items-center justify-between gap-3 rounded-2xl border border-running/35 bg-running-muted/85 px-4 py-3">
       <p className="text-label">
         You already had a session going, so this picked up where it left off.
       </p>
@@ -602,6 +838,8 @@ function SessionSummary({
   sessionId,
   elapsedSeconds,
   targetSeconds,
+  flowSeconds,
+  rounds,
   onAgain,
 }: {
   mode: TimerMode;
@@ -609,9 +847,12 @@ function SessionSummary({
   sessionId: string | null;
   elapsedSeconds: number;
   targetSeconds: number;
+  flowSeconds: number;
+  rounds: number;
   onAgain: () => void;
 }) {
   const recovery = mode === "RECOVERY";
+  const isFlow = mode === "FLOW";
 
   // The corrected figure, once someone has corrected it. Kept locally because
   // the provider's clock state is the *measurement*, and a claim about where
@@ -622,82 +863,127 @@ function SessionSummary({
 
   const logged = claimed ?? elapsedSeconds;
   const delta = logged - targetSeconds;
+  const displayFlow =
+    claimed !== null
+      ? Math.max(0, claimed - targetSeconds)
+      : Math.max(flowSeconds, Math.max(0, delta));
 
   return (
     // The same arrival the running screen gets — one settling motion, then
     // stillness. A summary is a landing, not a launch.
-    <div className="animate-rise mx-auto flex w-full max-w-md flex-col items-center px-5 py-16 text-center">
-      <p className="text-label text-muted-foreground font-medium">
-        {recovery ? "Recovery logged" : "Session logged"}
-      </p>
-
-      <p
-        className={cn(
-          "font-mono mt-3 text-6xl tabular-nums",
-          recovery ? "text-rest" : "text-running",
-        )}
-      >
-        {formatClock(logged)}
-      </p>
-
-      {task && !recovery && (
-        <p className="font-display mt-3 text-title text-balance">
-          {task.title}
-        </p>
-      )}
-
-      {/* The one moment the number is worth questioning: it is on screen, it
-          is fresh, and the person still remembers whether the clock was
-          telling the truth. Offered here rather than only on the task page
-          because the runaway case — a timer left on for hours — is exactly the
-          one where nobody goes looking for a settings screen afterwards. */}
-      {sessionId && (
-        <AdjustLogged
-          sessionId={sessionId}
-          loggedSeconds={logged}
-          open={adjusting}
-          onOpen={() => setAdjusting(true)}
-          onClose={() => setAdjusting(false)}
-          onSaved={(seconds) => {
-            setClaimed(seconds);
-            setAdjusting(false);
-          }}
-        />
-      )}
-
-      <p className="text-muted-foreground mt-4 text-label">
-        {recovery ? (
-          // No planned-versus-actual comparison, because there was no plan.
-          // Measuring rest against a target is how it stops being rest.
-          <>That counts for exactly as much as the work did.</>
-        ) : delta > 60 ? (
-          <>
-            That&apos;s {formatDuration(delta)} past the{" "}
-            {formatDuration(targetSeconds)} you planned.
-          </>
-        ) : delta < -60 ? (
-          <>
-            You planned {formatDuration(targetSeconds)} and stopped{" "}
-            {formatDuration(-delta)} short. That still counts.
-          </>
-        ) : (
-          <>Right about the {formatDuration(targetSeconds)} you planned.</>
-        )}
-      </p>
-
-      <div className="mt-8 flex items-center gap-3">
-        <Button asChild className="px-6">
-          <Link href="/days">Back to days</Link>
-        </Button>
-        <Button
-          variant="outline"
-          onClick={onAgain}
-          className="px-6"
+    <div className="mx-auto flex w-full max-w-lg flex-col items-center px-4 py-10 md:py-16">
+      <section className="animate-rise flex w-full flex-col items-center rounded-[28px] border border-[var(--card-edge)] bg-card px-6 py-10 text-center shadow-[var(--card-shadow)] sm:px-10">
+        <span
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-micro font-medium",
+            recovery
+              ? "border-rest/30 bg-rest-muted text-rest"
+              : isFlow && displayFlow > 0
+                ? "border-flow/35 bg-flow-muted text-flow"
+                : "border-border/70 bg-muted/50 text-muted-foreground",
+          )}
         >
-          <RotateCcw className="mr-1.5 size-4" aria-hidden />
-          Go again
-        </Button>
-      </div>
+          {isFlow && <Waves className="size-3" aria-hidden />}
+          {recovery ? "Recovery logged" : `${MODE_LABELS[mode]} logged`}
+        </span>
+
+        <p
+          className={cn(
+            "mt-5 font-mono text-6xl tracking-tight tabular-nums",
+            recovery
+              ? "text-rest"
+              : isFlow && displayFlow > 0
+                ? "text-flow"
+                : "text-running",
+          )}
+        >
+          {formatClock(logged)}
+        </p>
+
+        {task && !recovery && (
+          <p className="font-display mt-3 text-[24px] leading-snug text-balance">
+            {task.title}
+          </p>
+        )}
+
+        {/* Quiet breakdown for Pomodoro Flow & multi-round sessions */}
+        {!recovery && (isFlow || rounds > 1) && (
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+            <span className="rounded-xl border border-border/60 bg-muted/40 px-3 py-1.5 font-mono text-micro text-muted-foreground tabular-nums">
+              Baseline {formatDuration(targetSeconds)}
+            </span>
+            {displayFlow >= 60 && (
+              <span className="rounded-xl border border-flow/30 bg-flow-muted px-3 py-1.5 font-mono text-micro font-medium text-flow tabular-nums">
+                +{formatDuration(displayFlow)} in flow
+              </span>
+            )}
+            {rounds > 1 && (
+              <span className="rounded-xl border border-border/60 bg-muted/40 px-3 py-1.5 font-mono text-micro text-muted-foreground tabular-nums">
+                {rounds} rounds
+              </span>
+            )}
+          </div>
+        )}
+
+        {sessionId && (
+          <AdjustLogged
+            sessionId={sessionId}
+            loggedSeconds={logged}
+            open={adjusting}
+            onOpen={() => setAdjusting(true)}
+            onClose={() => setAdjusting(false)}
+            onSaved={(seconds) => {
+              setClaimed(seconds);
+              setAdjusting(false);
+            }}
+          />
+        )}
+
+        <p className="mt-4 max-w-sm text-label leading-relaxed text-muted-foreground">
+          {recovery ? (
+            // No planned-versus-actual comparison, because there was no plan.
+            // Measuring rest against a target is how it stops being rest.
+            <>That counts for exactly as much as the work did.</>
+          ) : delta > 60 ? (
+            isFlow ? (
+              <>
+                You met your {formatDuration(targetSeconds)} baseline and flowed{" "}
+                {formatDuration(delta)} past it.
+              </>
+            ) : (
+              <>
+                That&apos;s {formatDuration(delta)} past the{" "}
+                {formatDuration(targetSeconds)} you planned.
+              </>
+            )
+          ) : delta < -60 ? (
+            <>
+              You planned {formatDuration(targetSeconds)} and stopped{" "}
+              {formatDuration(-delta)} short. That still counts.
+            </>
+          ) : (
+            <>
+              Right on the {formatDuration(targetSeconds)}{" "}
+              {isFlow ? "baseline" : "you planned"}.
+            </>
+          )}
+        </p>
+
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <Button asChild size="lg" className="rounded-xl px-6">
+            <Link href="/days">Back to days</Link>
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={onAgain}
+            className="rounded-xl px-6"
+          >
+            <RotateCcw className="size-4" aria-hidden />
+            Go again
+          </Button>
+        </div>
+      </section>
     </div>
   );
 }
@@ -738,7 +1024,7 @@ function AdjustLogged({
           setMinutes(String(Math.round(loggedSeconds / 60)));
           onOpen();
         }}
-        className="text-muted-foreground hover:text-foreground mt-3 text-label underline underline-offset-4"
+        className="mt-3 text-label text-muted-foreground underline underline-offset-4 hover:text-foreground"
       >
         That&apos;s not how long it took
       </button>
@@ -792,7 +1078,7 @@ function AdjustLogged({
         className="h-9 w-24 text-center tabular-nums"
         aria-label="Minutes actually spent"
       />
-      <span className="text-muted-foreground text-label">min</span>
+      <span className="text-label text-muted-foreground">min</span>
       <Button size="sm" onClick={() => void save()} disabled={pending}>
         Save
       </Button>

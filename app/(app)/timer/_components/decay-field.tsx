@@ -15,9 +15,9 @@ import {
 import {
   intervalTickFractions,
   liveElapsedMs,
-  macroProgress,
   microProgress,
   overtimeProgress,
+  planMacroProgress,
   type ClockState,
   type PlannedInterval,
   type TimerConfig,
@@ -48,6 +48,9 @@ export type DecayFieldProps = {
   intervalIndex: number;
   /** Milliseconds of the session that elapsed before the current interval. */
   intervalBaseMs: number;
+  /** Target seconds of the active interval, including manual break extensions. */
+  currentTargetSeconds: number;
+  onBreak: boolean;
   config: TimerConfig;
   dual: boolean;
   /** A break past its time. The live colour goes clay. */
@@ -80,6 +83,8 @@ export function DecayField({
   plan,
   intervalIndex,
   intervalBaseMs,
+  currentTargetSeconds,
+  onBreak,
   config,
   dual,
   overrun,
@@ -106,6 +111,8 @@ export function DecayField({
     plan,
     intervalIndex,
     intervalBaseMs,
+    currentTargetSeconds,
+    onBreak,
     config,
     dual,
     overrun,
@@ -122,6 +129,8 @@ export function DecayField({
       plan,
       intervalIndex,
       intervalBaseMs,
+      currentTargetSeconds,
+      onBreak,
       config,
       dual,
       overrun,
@@ -163,6 +172,7 @@ export function DecayField({
       uDual: { value: dual ? 1 : 0 },
       uResolution: { value: new Vector2(1, 1) },
       uRun: { value: new Vector3(...colors.running) },
+      uFlow: { value: new Vector3(...colors.flow) },
       uTrack: { value: new Vector3(...colors.track) },
       uTicks: { value: new Array<number>(MAX_TICKS).fill(TICK_SENTINEL) },
     };
@@ -199,33 +209,40 @@ export function DecayField({
       // Seconds as a float, deliberately unfloored. `elapsedSeconds` in the
       // provider is floored for the digits, which is right there and would
       // reintroduce a one-second staircase here.
-      const elapsedSeconds = elapsedMs / 1000;
       const intervalSeconds = Math.max(0, elapsedMs - p.intervalBaseMs) / 1000;
 
       const interval = p.plan[Math.min(p.intervalIndex, p.plan.length - 1)];
+      const activeTarget =
+        p.currentTargetSeconds > 0
+          ? p.currentTargetSeconds
+          : (interval?.targetSeconds ?? 0);
 
-      uniforms.uMacro.value = macroProgress(elapsedSeconds, p.plan);
-      uniforms.uMicro.value = microProgress(intervalSeconds, interval);
-      uniforms.uOvertime.value = overtimeProgress(
-        elapsedSeconds,
-        p.config.targetSeconds,
+      uniforms.uMacro.value = planMacroProgress(
+        p.plan,
+        p.intervalIndex,
+        intervalSeconds,
       );
+      uniforms.uMicro.value = microProgress(
+        intervalSeconds,
+        interval ? { ...interval, targetSeconds: activeTarget } : undefined,
+      );
+      uniforms.uOvertime.value =
+        p.config.mode === "FLOW" && !p.onBreak && activeTarget > 0
+          ? overtimeProgress(intervalSeconds, activeTarget)
+          : 0;
       uniforms.uDual.value = p.dual ? 1 : 0;
       uniforms.uTime.value = (performance.now() - mountedAt) / 1000;
 
       // The running blue means work is on the clock. During a break the live
-      // colour is teal — the reservation in `design-notes.md` has to survive
-      // the move into a shader, where nothing would ever catch it going wrong.
-      // The running blue is reserved for work on the clock and the teal for a
-      // break; a break that has stopped being a break gets neither, because
-      // wearing either one would make the state you need to notice look like
-      // one of the two you don't.
+      // colour is rest slate; a break that has stopped being a break gets
+      // crimson/clay. Pomodoro Flow's outer flow ring carries its own uFlow.
       const live = p.overrun
         ? p.colors.overrun
-        : interval && interval.kind !== "FOCUS"
+        : p.onBreak
           ? p.colors.rest
           : p.colors.running;
       uniforms.uRun.value.set(...live);
+      uniforms.uFlow.value.set(...p.colors.flow);
       uniforms.uTrack.value.set(...p.colors.track);
 
       const ticks = intervalTickFractions(p.plan);
@@ -342,10 +359,10 @@ export function DecayField({
   // face has no loop running to pick them up, so redraw explicitly.
   useEffect(() => {
     if (!running) drawRef.current?.();
-  }, [colors, config, dual, intervalIndex, overrun, plan, running]);
+  }, [colors, config, currentTargetSeconds, dual, intervalIndex, onBreak, overrun, plan, running]);
 
   return (
-    <div className="relative isolate @container aspect-square w-full max-w-[400px]">
+    <div className="relative isolate @container aspect-square w-full max-w-[356px]">
       <div ref={containerRef} className="absolute inset-0" aria-hidden />
       <div className="absolute inset-0 grid place-items-center">{children}</div>
     </div>

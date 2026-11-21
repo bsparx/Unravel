@@ -147,6 +147,7 @@ import {
   clampLoggedSeconds,
   dualScale,
   endsAutomatically,
+  hasIntervals,
   hasProgressIndicator,
   intervalOverrunSeconds,
   intervalTickFractions,
@@ -154,10 +155,14 @@ import {
   liveElapsedMs,
   loggedElapsedSeconds,
   macroProgress,
+  MAX_INTERVALS,
   MAX_LOGGED_SECONDS,
   microProgress,
+  nextRoundExtension,
   overtimeProgress,
+  perFocusSeconds,
   planFocusSeconds,
+  planMacroProgress,
   planTotalSeconds,
   readoutSeconds,
   sessionKind,
@@ -279,7 +284,20 @@ import {
 import {
   buildTimerHref,
   parseTimerParams,
+  toTimerMode,
 } from "@/lib/timer-url";
+import {
+  calendarWeeks,
+  completionLevel,
+  filterSelectedIds,
+  orderedWeekdayLabels,
+  resolveStatsWindow,
+  summarizeDay,
+  summarizeRange,
+  WINDOW_DAYS,
+  type StatsDayRecord,
+  type TrackableItem,
+} from "@/lib/stats-summary";
 import {
   BODY_PARTS,
   disputationSchema,
@@ -722,14 +740,108 @@ check("a long break lands after every fourth focus block", () => {
   );
 });
 
-check("flow mode is a single block regardless of intervals", () => {
+check("pomodoro flow interleaves breaks like pomodoro while never auto-stopping", () => {
   const plan = buildIntervalPlan({
     mode: "FLOW",
-    targetSeconds: 1800,
+    targetSeconds: 6000, // 4 x 25m baseline
     intervals: 4,
     ...settings,
   });
-  assert.equal(plan.length, 1);
+  assert.deepEqual(
+    plan.map((i) => i.kind),
+    [
+      "FOCUS", "SHORT_BREAK",
+      "FOCUS", "SHORT_BREAK",
+      "FOCUS", "SHORT_BREAK",
+      "FOCUS",
+    ],
+  );
+  assert.equal(planFocusSeconds(plan), 6000);
+  assert.equal(perFocusSeconds({ targetSeconds: 6000, intervals: 4 }), 1500);
+  assert.equal(hasIntervals("FLOW"), true);
+  assert.equal(hasIntervals("POMODORO"), true);
+  assert.equal(hasIntervals("BASIC"), false);
+  assert.equal(hasIntervals("RECOVERY"), false);
+  assert.equal(endsAutomatically("FLOW"), false);
+
+  // A single-round Pomodoro Flow is still one focus block with no forced break.
+  const single = buildIntervalPlan({
+    mode: "FLOW",
+    targetSeconds: 1500,
+    intervals: 1,
+    ...settings,
+  });
+  assert.equal(single.length, 1);
+  assert.equal(single[0].targetSeconds, 1500);
+});
+
+check("pomodoro flow can append another round with short or long break", () => {
+  const ext1 = nextRoundExtension({
+    mode: "FLOW",
+    targetSeconds: 1500,
+    intervals: 1,
+    ...settings,
+  });
+  assert.deepEqual(ext1, {
+    intervals: 2,
+    targetSeconds: 3000,
+    breakKind: "SHORT_BREAK",
+    breakSeconds: 300,
+  });
+
+  // After the 4th focus round, extending opens a long break.
+  const ext4 = nextRoundExtension({
+    mode: "FLOW",
+    targetSeconds: 4 * 1500,
+    intervals: 4,
+    ...settings,
+  });
+  assert.deepEqual(ext4, {
+    intervals: 5,
+    targetSeconds: 5 * 1500,
+    breakKind: "LONG_BREAK",
+    breakSeconds: 900,
+  });
+
+  // Strict Pomodoro and ceiling-hit Flow do not append rounds.
+  assert.equal(
+    nextRoundExtension({
+      mode: "POMODORO",
+      targetSeconds: 1500,
+      intervals: 1,
+      ...settings,
+    }),
+    null,
+  );
+  assert.equal(
+    nextRoundExtension({
+      mode: "FLOW",
+      targetSeconds: MAX_INTERVALS * 1500,
+      intervals: MAX_INTERVALS,
+      ...settings,
+    }),
+    null,
+  );
+});
+
+check("interval-aware macro progress holds cleanly at the tick during flow overtime", () => {
+  // 2 x 25m focus + 5m break = 55m total (3300s).
+  const plan = buildIntervalPlan({
+    mode: "FLOW",
+    targetSeconds: 3000,
+    intervals: 2,
+    ...settings,
+  });
+  // Flowing 10 extra minutes past Block 1's 25m baseline stays anchored at
+  // Block 1's boundary (1800 / 3300 remaining), never stealing from Block 2.
+  const atBoundary = planMacroProgress(plan, 0, 1500);
+  const tenMinIntoFlow = planMacroProgress(plan, 0, 2100);
+  assert.equal(atBoundary, tenMinIntoFlow);
+  assert.equal(Math.round(tenMinIntoFlow * 100), 55);
+
+  // Starting Block 2 after the break starts cleanly with Block 2's full slice.
+  const startBlock2 = planMacroProgress(plan, 2, 0);
+  assert.equal(Math.round(startBlock2 * 100), 45);
 });
 
 console.log("\ntimer — the wall clock");
@@ -877,6 +989,13 @@ check("the page round-trips its own link", () => {
     target: 1200,
     intervals: 2,
   });
+});
+
+check("pomodoro-flow URL alias resolves to FLOW alongside flow", () => {
+  const alias = parseTimerParams({ mode: "pomodoro-flow", target: "1500", intervals: "4" });
+  assert.equal(alias.mode, "pomodoro-flow");
+  assert.equal(toTimerMode(alias.mode), "FLOW");
+  assert.equal(toTimerMode("flow"), "FLOW");
 });
 
 check("a hostile query string degrades to no preferences, never a throw", () => {
@@ -4449,6 +4568,160 @@ check("time picker options step by 15m, keep off-grid values, and format midnigh
   assert.ok(picked);
   assert.equal(pickerDateToISO(picked), "2026-11-20");
   assert.equal(isoToPickerDate("2026-02-31"), undefined);
+});
+
+console.log("\nstatistics — habits, mind/heart, and active-day scoring");
+
+const mkStatsDay = (
+  iso: string,
+  weekday: number,
+  productiveSeconds: number,
+  items: StatsDayRecord["items"],
+  extra: Partial<StatsDayRecord> = {},
+): StatsDayRecord => ({
+  iso,
+  shortLabel: iso,
+  fullLabel: iso,
+  dayNumber: Number(iso.slice(8, 10)),
+  monthShort: "Nov",
+  weekday,
+  isToday: false,
+  isYesterday: false,
+  productiveSeconds,
+  recoverySeconds: 0,
+  items,
+  sessions: [],
+  ...extra,
+});
+
+check("inactive habit days are never deducted from a day's score", () => {
+  const day = mkStatsDay("2026-11-17", 2, 3600, {
+    h1: { itemId: "h1", status: "done" },
+    // Mon/Wed/Fri habit on a Tuesday — inactive, must NOT inflate active count.
+    h2: { itemId: "h2", status: "inactive" },
+    "mind:meditate": { itemId: "mind:meditate", status: "done" },
+    "heart:gratitude": { itemId: "heart:gratitude", status: "missed" },
+  });
+  const selected = new Set(["h1", "h2", "mind:meditate", "heart:gratitude"]);
+  const s = summarizeDay(day, selected);
+  assert.equal(s.done, 2);
+  assert.equal(s.active, 3);
+  assert.equal(s.inactive, 1);
+  assert.equal(s.percent, 67);
+});
+
+check("a day with no active selected habits returns null percent instead of zero", () => {
+  const restDay = mkStatsDay("2026-11-15", 0, 1800, {
+    h1: { itemId: "h1", status: "inactive" },
+    h2: { itemId: "h2", status: "bonus" },
+  });
+  const s = summarizeDay(restDay, new Set(["h1", "h2"]));
+  assert.equal(s.done, 0);
+  assert.equal(s.active, 0);
+  assert.equal(s.bonus, 1);
+  assert.equal(s.inactive, 2);
+  assert.equal(s.ratio, null);
+  assert.equal(s.percent, null);
+  assert.equal(completionLevel(s.done, s.active), "none");
+});
+
+check("range summary rolls up selected items and productive time cleanly", () => {
+  const catalog: TrackableItem[] = [
+    { id: "h1", group: "habit", title: "Read", scheduleLabel: "Every day" },
+    { id: "h2", group: "habit", title: "Gym", scheduleLabel: "Mon, Wed, Fri" },
+    { id: "mind:meditate", group: "mind", title: "Meditation", scheduleLabel: "Mind" },
+    { id: "heart:dua", group: "heart", title: "Du'a", scheduleLabel: "Heart" },
+  ];
+
+  // Exclude heart:dua — only h1, h2, and meditation count.
+  const selected = filterSelectedIds(catalog, new Set(["heart:dua"]));
+  assert.deepEqual([...selected], ["h1", "h2", "mind:meditate"]);
+
+  const days = [
+    mkStatsDay("2026-11-20", 5, 3000, {
+      h1: { itemId: "h1", status: "done" },
+      h2: { itemId: "h2", status: "done" },
+      "mind:meditate": { itemId: "mind:meditate", status: "done" },
+      "heart:dua": { itemId: "heart:dua", status: "missed" },
+    }),
+    mkStatsDay(
+      "2026-11-21",
+      6,
+      1800,
+      {
+        h1: { itemId: "h1", status: "done" },
+        // Gym is inactive on Saturday — must NOT prevent a 2/2 full day!
+        h2: { itemId: "h2", status: "inactive" },
+        "mind:meditate": { itemId: "mind:meditate", status: "done" },
+        "heart:dua": { itemId: "heart:dua", status: "open" },
+      },
+      { isToday: true },
+    ),
+  ];
+
+  const rollup = summarizeRange(days, selected);
+  assert.equal(rollup.done, 5);
+  assert.equal(rollup.active, 5);
+  assert.equal(rollup.percent, 100);
+  assert.equal(rollup.perfectDays, 2);
+  assert.equal(rollup.totalProductiveSeconds, 4800);
+  assert.equal(rollup.avgProductiveSeconds, 2400);
+  assert.equal(rollup.todayProductiveSeconds, 1800);
+  assert.equal(rollup.todayDone, 2);
+  assert.equal(rollup.todayActive, 2);
+});
+
+check("calendar weeks align cleanly to Sunday or Monday weekStart", () => {
+  // Wed 18 Nov (3), Thu 19 Nov (4), Fri 20 Nov (5)
+  const days = [
+    mkStatsDay("2026-11-18", 3, 0, {}),
+    mkStatsDay("2026-11-19", 4, 0, {}),
+    mkStatsDay("2026-11-20", 5, 0, {}),
+  ];
+  const mondayStart = calendarWeeks(days, 1);
+  assert.equal(mondayStart.length, 1);
+  assert.equal(mondayStart[0].length, 7);
+  // Mon(0)=null, Tue(1)=null, Wed(2)=18, Thu(3)=19, Fri(4)=20, Sat(5)=null, Sun(6)=null
+  assert.equal(mondayStart[0][0], null);
+  assert.equal(mondayStart[0][1], null);
+  assert.equal(mondayStart[0][2]?.iso, "2026-11-18");
+  assert.equal(mondayStart[0][4]?.iso, "2026-11-20");
+  assert.equal(mondayStart[0][6], null);
+
+  const sundayStart = calendarWeeks(days, 0);
+  assert.equal(sundayStart[0][3]?.iso, "2026-11-18");
+  assert.deepEqual(orderedWeekdayLabels(1), ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
+  assert.deepEqual(orderedWeekdayLabels(0), ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]);
+});
+
+check("stats window defaults to the last 2 weeks and steps cleanly by 14 days", () => {
+  const today = new Date("2026-11-21T00:00:00.000Z");
+  assert.equal(WINDOW_DAYS, 14);
+
+  const latest = resolveStatsWindow(today);
+  assert.equal(latest.fromISO, "2026-11-08");
+  assert.equal(latest.endISO, "2026-11-21");
+  assert.equal(latest.isLatest, true);
+  assert.equal(latest.prevEndISO, "2026-11-07");
+  assert.equal(latest.nextEndISO, null);
+
+  // One window back: next snaps cleanly to "latest" (/stats).
+  const prev1 = resolveStatsWindow(today, latest.prevEndISO);
+  assert.equal(prev1.fromISO, "2026-10-25");
+  assert.equal(prev1.endISO, "2026-11-07");
+  assert.equal(prev1.isLatest, false);
+  assert.equal(prev1.prevEndISO, "2026-10-24");
+  assert.equal(prev1.nextEndISO, "latest");
+
+  // Two windows back: next steps forward 14 days to prev1's end.
+  const prev2 = resolveStatsWindow(today, prev1.prevEndISO);
+  assert.equal(prev2.fromISO, "2026-10-11");
+  assert.equal(prev2.endISO, "2026-10-24");
+  assert.equal(prev2.nextEndISO, "2026-11-07");
+
+  // Future or invalid dates degrade quietly to the latest 2 weeks.
+  assert.equal(resolveStatsWindow(today, "2026-12-01").isLatest, true);
+  assert.equal(resolveStatsWindow(today, "not-a-date").isLatest, true);
 });
 
 console.log(`\n${passed} checks passed.\n`);

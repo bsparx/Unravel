@@ -35,15 +35,36 @@ export type PlannedInterval = {
 
 export type TimerConfig = {
   mode: TimerMode;
-  /** Total planned focus seconds. In FLOW this is a soft goal, not a limit. */
+  /** Total planned focus seconds. In FLOW this is the sum of focus baselines, not a hard limit. */
   targetSeconds: number;
-  /** Number of focus blocks. Always 1 for BASIC and FLOW. */
+  /** Number of focus blocks. Always 1 for BASIC and RECOVERY. */
   intervals: number;
   focusSeconds: number;
   shortBreakSeconds: number;
   longBreakSeconds: number;
   longBreakEvery: number;
 };
+
+export type CadencePreset = {
+  focusMinutes: number;
+  breakMinutes: number;
+  label: string;
+  hint: string;
+};
+
+/** Common focus/break pairs for Pomodoro and Pomodoro Flow. */
+export const CADENCE_PRESETS: readonly CadencePreset[] = [
+  { focusMinutes: 15, breakMinutes: 3, label: "15 / 3", hint: "Gentle start" },
+  { focusMinutes: 25, breakMinutes: 5, label: "25 / 5", hint: "Classic" },
+  { focusMinutes: 45, breakMinutes: 10, label: "45 / 10", hint: "Deep block" },
+  { focusMinutes: 50, breakMinutes: 10, label: "50 / 10", hint: "Long flow" },
+];
+
+/** Does this mode use focus/break rounds rather than a single continuous block? */
+export const hasIntervals = (mode: TimerMode): boolean =>
+  mode === "POMODORO" || mode === "FLOW";
+
+export const isPomodoroFlow = (mode: TimerMode): boolean => mode === "FLOW";
 
 export const MIN_TARGET_SECONDS = 60;
 export const MAX_TARGET_SECONDS = 8 * 60 * 60;
@@ -86,14 +107,61 @@ export function suggestIntervals(
   return clampIntervals(Math.round(targetSeconds / focusSeconds) || 1);
 }
 
+/** Duration of one focus block in an interval config. */
+export function perFocusSeconds(
+  config: Pick<TimerConfig, "targetSeconds" | "intervals">,
+): number {
+  const count = clampIntervals(config.intervals);
+  return Math.max(MIN_TARGET_SECONDS, Math.round(config.targetSeconds / count));
+}
+
+export type RoundExtension = {
+  intervals: number;
+  targetSeconds: number;
+  breakKind: "SHORT_BREAK" | "LONG_BREAK";
+  breakSeconds: number;
+};
+
+/**
+ * Compute what happens when a Pomodoro Flow user chooses "Take break" at the
+ * end of the final planned focus block: we append the appropriate break (short
+ * or long) plus one more focus block at the same baseline duration.
+ *
+ * Returns null if the mode doesn't support appending rounds or the session is
+ * already at its ceiling.
+ */
+export function nextRoundExtension(config: TimerConfig): RoundExtension | null {
+  if (config.mode !== "FLOW") return null;
+
+  const currentCount = clampIntervals(config.intervals);
+  if (currentCount >= MAX_INTERVALS) return null;
+
+  const focusBlock = perFocusSeconds(config);
+  const nextIntervals = currentCount + 1;
+  const nextTargetSeconds = focusBlock * nextIntervals;
+  if (nextTargetSeconds > MAX_TARGET_SECONDS) return null;
+
+  const isLongBreak =
+    config.longBreakEvery > 0 && currentCount % config.longBreakEvery === 0;
+
+  return {
+    intervals: nextIntervals,
+    targetSeconds: nextTargetSeconds,
+    breakKind: isLongBreak ? "LONG_BREAK" : "SHORT_BREAK",
+    breakSeconds: isLongBreak ? config.longBreakSeconds : config.shortBreakSeconds,
+  };
+}
+
 /**
  * Expand a config into the ordered list of intervals the session will run.
  *
- * POMODORO splits the target into `intervals` equal focus blocks with breaks
- * between them (a long break every `longBreakEvery`). There is deliberately no
- * trailing break — the session ends on focus, so "done" means done.
+ * POMODORO and FLOW (Pomodoro Flow) split the target into `intervals` equal
+ * focus blocks with breaks between them (a long break every `longBreakEvery`).
+ * There is deliberately no trailing break — the session ends on focus, so
+ * "done" means done (and in Pomodoro Flow the user can always choose to take a
+ * break and roll into another round).
  *
- * BASIC and FLOW are a single focus block.
+ * BASIC is a single focus block.
  */
 export function buildIntervalPlan(config: TimerConfig): PlannedInterval[] {
   // Recovery is one open-ended block with no target at all.
@@ -108,15 +176,12 @@ export function buildIntervalPlan(config: TimerConfig): PlannedInterval[] {
     return [{ index: 0, kind: "RECOVERY", targetSeconds: 0 }];
   }
 
-  if (config.mode !== "POMODORO") {
+  if (!hasIntervals(config.mode)) {
     return [{ index: 0, kind: "FOCUS", targetSeconds: config.targetSeconds }];
   }
 
   const count = clampIntervals(config.intervals);
-  const perFocus = Math.max(
-    MIN_TARGET_SECONDS,
-    Math.round(config.targetSeconds / count),
-  );
+  const perFocus = perFocusSeconds(config);
 
   const plan: PlannedInterval[] = [];
   let focusesSoFar = 0;
@@ -343,6 +408,34 @@ export function macroProgress(
 }
 
 /**
+ * Interval-aware macro progress for sessions where an interval can run past
+ * its baseline (Pomodoro Flow) or past its break (break overrun).
+ *
+ * Each finished interval consumes its planned slice, and the active interval
+ * consumes at most its own planned slice. That way flowing ten extra minutes
+ * in block 1 holds cleanly at the block 1 tick mark and never steals room from
+ * block 2 on the outer ring.
+ */
+export function planMacroProgress(
+  plan: PlannedInterval[],
+  intervalIndex: number,
+  intervalElapsedSeconds: number,
+): number {
+  const total = planTotalSeconds(plan);
+  if (total <= 0 || plan.length === 0) return 0;
+
+  const clampedIndex = Math.min(Math.max(0, intervalIndex), plan.length - 1);
+  let consumed = 0;
+  for (let i = 0; i < clampedIndex; i += 1) {
+    consumed += plan[i].targetSeconds;
+  }
+  const currentTarget = plan[clampedIndex]?.targetSeconds ?? 0;
+  consumed += Math.min(Math.max(0, intervalElapsedSeconds), currentTarget);
+
+  return Math.min(1, Math.max(0, 1 - consumed / total));
+}
+
+/**
  * The **micro** container: how much of the interval you are *currently in* is
  * left, 0..1.
  *
@@ -490,15 +583,15 @@ export function readoutSeconds(
 export const MODE_LABELS: Record<TimerMode, string> = {
   POMODORO: "Pomodoro",
   BASIC: "Timer",
-  FLOW: "Flow",
+  FLOW: "Pomodoro Flow",
   RECOVERY: "Recovery",
 };
 
 export const MODE_DESCRIPTIONS: Record<TimerMode, string> = {
-  POMODORO: "Split the time into focus blocks with breaks between them.",
-  BASIC: "One countdown. It stops itself when the time is up.",
-  FLOW: "Keeps running past your goal. You decide when to stop.",
-  RECOVERY: "No target and no countdown. It runs until you come back.",
+  POMODORO: "Focus rounds with breaks. Each block ends automatically.",
+  BASIC: "One plain countdown. Stops itself when the time is up.",
+  FLOW: "A work/break baseline like 25/5 — keeps flowing past the mark until you take a break or stop.",
+  RECOVERY: "No target and no countdown. Runs gently until you come back.",
 };
 
 export const INTERVAL_LABELS: Record<IntervalKind, string> = {

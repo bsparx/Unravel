@@ -38,8 +38,11 @@ export type TimerFaceProps = {
   plan: PlannedInterval[];
   intervalIndex: number;
   intervalBaseMs: number;
+  /** The current interval's target, including any manual break extension. */
+  currentTargetSeconds: number;
+  onBreak: boolean;
   config: TimerConfig;
-  /** A break past its time. The well turns clay rather than staying teal. */
+  /** A break past its time. The well turns clay rather than staying rest. */
   overrun?: boolean;
   children?: React.ReactNode;
 };
@@ -61,6 +64,8 @@ export function TimerFace({
   plan,
   intervalIndex,
   intervalBaseMs,
+  currentTargetSeconds,
+  onBreak,
   config,
   overrun = false,
   children,
@@ -72,11 +77,18 @@ export function TimerFace({
   );
 
   if (!webgl) {
+    const intervalElapsed = Math.max(
+      0,
+      liveElapsedSeconds(clock) - Math.floor(intervalBaseMs / 1000),
+    );
     return (
       <TimerArc
-        elapsedSeconds={liveElapsedSeconds(clock)}
-        targetSeconds={config.targetSeconds}
+        elapsedSeconds={intervalElapsed}
+        targetSeconds={currentTargetSeconds || config.targetSeconds}
         plan={plan}
+        mode={config.mode}
+        onBreak={onBreak}
+        overrun={overrun}
         running={running}
       >
         {children}
@@ -91,6 +103,8 @@ export function TimerFace({
       plan={plan}
       intervalIndex={intervalIndex}
       intervalBaseMs={intervalBaseMs}
+      currentTargetSeconds={currentTargetSeconds}
+      onBreak={onBreak}
       config={config}
       overrun={overrun}
       dual={dualScale(plan)}

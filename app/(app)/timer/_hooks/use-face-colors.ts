@@ -15,9 +15,11 @@ export type Rgb = [number, number, number];
 export type FaceColors = {
   /** The calm blue. Focus, and only focus. */
   running: Rgb;
-  /** Teal. The live colour during a break. */
+  /** Luminous jade/aurora teal. Pomodoro Flow past the baseline. */
+  flow: Rgb;
+  /** Cool slate. The live colour during a break. */
   rest: Rgb;
-  /** Clay. A break that is past its time and still running. */
+  /** Clay/crimson. A break that is past its time and still running. */
   overrun: Rgb;
   /** The spent groove. */
   track: Rgb;
@@ -31,10 +33,11 @@ export type FaceColors = {
  * per call is an infinite render.
  */
 const FALLBACK: FaceColors = {
-  running: [0.231, 0.435, 0.690],
-  rest: [0.184, 0.435, 0.416],
-  overrun: [0.722, 0.361, 0.290],
-  track: [0.914, 0.886, 0.839],
+  running: [0.263, 0.400, 0.769],
+  flow: [0.094, 0.459, 0.396],
+  rest: [0.400, 0.455, 0.561],
+  overrun: [0.722, 0.204, 0.302],
+  track: [0.957, 0.886, 0.937],
 };
 
 /**
@@ -82,7 +85,8 @@ function readColors(): FaceColors {
 
   return {
     running: read("--running", FALLBACK.running),
-    rest: read("--primary", FALLBACK.rest),
+    flow: read("--flow", FALLBACK.flow),
+    rest: read("--rest", FALLBACK.rest),
     overrun: read("--destructive", FALLBACK.overrun),
     track: read("--arc-track", FALLBACK.track),
   };

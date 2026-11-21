@@ -17,12 +17,14 @@ import {
   intervalOverrunSeconds,
   isBreakKind,
   liveElapsedMs,
+  nextRoundExtension,
   type PlannedInterval,
   type TimerConfig,
 } from "@/lib/timer-math";
 
 import {
   advanceInterval,
+  appendFlowRound,
   discardSession,
   endSession,
   extendCurrentInterval,
@@ -88,6 +90,17 @@ type TimerState = {
    */
   overrunSince: number | null;
   /**
+   * `Date.now()` when the current Pomodoro Flow focus block crossed its
+   * baseline, or null. Gates the gentle baseline chime so it fires once per
+   * focus block (and never replays on a reload).
+   */
+  focusFlowSince: number | null;
+  /**
+   * Seconds flowed past the baseline across focus blocks already closed in
+   * this session. Added to the active block's live flow seconds for summaries.
+   */
+  bankedFlowSeconds: number;
+  /**
    * Seconds deliberately added to the current interval by pressing "5 more".
    *
    * Kept apart from the plan because the plan is derived from the config, and a
@@ -107,6 +120,13 @@ type TimerState = {
   returnNote: string | null;
 };
 
+export type NextBreakInfo = {
+  kind: "SHORT_BREAK" | "LONG_BREAK";
+  seconds: number;
+  /** True when taking this break appends a new break + focus round to the plan. */
+  appendsRound: boolean;
+};
+
 type Action =
   | { type: "CONFIGURE"; config: Partial<TimerConfig>; task?: TimerTask }
   | { type: "START"; at: number }
@@ -114,10 +134,18 @@ type Action =
   | { type: "PAUSE"; at: number }
   | { type: "RESUME"; at: number }
   | { type: "REACH_TARGET" }
+  | { type: "ENTER_FLOW"; at: number }
   | { type: "OVERRUN"; at: number }
   | { type: "EXTEND"; seconds: number }
   | { type: "SET_RETURN_NOTE"; note: string | null }
-  | { type: "ADVANCE"; at: number; nextIndex: number }
+  | { type: "ADVANCE"; at: number; nextIndex: number; resume?: boolean }
+  | {
+      type: "APPEND_ROUND_AND_ADVANCE";
+      at: number;
+      intervals: number;
+      targetSeconds: number;
+      nextIndex: number;
+    }
   | { type: "END"; at: number }
   | { type: "RESET"; config: TimerConfig; task: TimerTask }
   | { type: "HYDRATE"; state: TimerState };
@@ -149,6 +177,8 @@ function reducer(state: TimerState, action: Action): TimerState {
         closedBreakSeconds: 0,
         reachedTarget: false,
         overrunSince: null,
+        focusFlowSince: null,
+        bankedFlowSeconds: 0,
         intervalExtraSeconds: 0,
         returnNote: null,
         clientKey: state.phase === "ENDED" ? newClientKey() : state.clientKey,
@@ -173,6 +203,11 @@ function reducer(state: TimerState, action: Action): TimerState {
 
     case "REACH_TARGET":
       return state.reachedTarget ? state : { ...state, reachedTarget: true };
+
+    case "ENTER_FLOW":
+      return state.focusFlowSince !== null
+        ? state
+        : { ...state, focusFlowSince: action.at };
 
     case "OVERRUN":
       return state.overrunSince !== null
@@ -202,20 +237,65 @@ function reducer(state: TimerState, action: Action): TimerState {
       // actual duration — overrun included — because every second of it is
       // break time, whether or not it was claimed by "5 more minutes".
       const leaving = buildIntervalPlan(state.config)[state.intervalIndex];
+      const leavingElapsed = Math.max(
+        0,
+        Math.round((elapsed - state.intervalBaseMs) / 1000),
+      );
       const closedBreak =
-        leaving && isBreakKind(leaving.kind)
-          ? Math.max(0, Math.round((elapsed - state.intervalBaseMs) / 1000))
+        leaving && isBreakKind(leaving.kind) ? leavingElapsed : 0;
+      const closedFlow =
+        leaving && leaving.kind === "FOCUS" && leaving.targetSeconds > 0
+          ? Math.max(0, leavingElapsed - (leaving.targetSeconds + state.intervalExtraSeconds))
           : 0;
+      const shouldRun = state.phase === "RUNNING" || action.resume === true;
 
       return {
         ...state,
+        phase: shouldRun ? "RUNNING" : state.phase,
         intervalIndex: action.nextIndex,
         intervalBaseMs: elapsed,
         accumulatedMs: elapsed,
         closedBreakSeconds: state.closedBreakSeconds + closedBreak,
-        runningSince: state.phase === "RUNNING" ? action.at : null,
-        // All three belong to the interval being left behind.
+        bankedFlowSeconds: state.bankedFlowSeconds + closedFlow,
+        runningSince: shouldRun ? action.at : null,
+        // All four belong to the interval being left behind.
         overrunSince: null,
+        focusFlowSince: null,
+        intervalExtraSeconds: 0,
+        returnNote: null,
+      };
+    }
+
+    case "APPEND_ROUND_AND_ADVANCE": {
+      const elapsed = liveElapsedMs(
+        { accumulatedMs: state.accumulatedMs, runningSince: state.runningSince },
+        action.at,
+      );
+      const leaving = buildIntervalPlan(state.config)[state.intervalIndex];
+      const leavingElapsed = Math.max(
+        0,
+        Math.round((elapsed - state.intervalBaseMs) / 1000),
+      );
+      const closedFlow =
+        leaving && leaving.kind === "FOCUS" && leaving.targetSeconds > 0
+          ? Math.max(0, leavingElapsed - (leaving.targetSeconds + state.intervalExtraSeconds))
+          : 0;
+
+      return {
+        ...state,
+        phase: "RUNNING",
+        config: {
+          ...state.config,
+          intervals: action.intervals,
+          targetSeconds: action.targetSeconds,
+        },
+        intervalIndex: action.nextIndex,
+        intervalBaseMs: elapsed,
+        accumulatedMs: elapsed,
+        bankedFlowSeconds: state.bankedFlowSeconds + closedFlow,
+        runningSince: action.at,
+        overrunSince: null,
+        focusFlowSince: null,
         intervalExtraSeconds: 0,
         returnNote: null,
       };
@@ -243,6 +323,8 @@ function reducer(state: TimerState, action: Action): TimerState {
         task: action.task,
         reachedTarget: false,
         overrunSince: null,
+        focusFlowSince: null,
+        bankedFlowSeconds: 0,
         intervalExtraSeconds: 0,
         returnNote: null,
       };
@@ -273,6 +355,14 @@ type TimerContextValue = {
   currentTargetSeconds: number;
   /** Whether the interval on the clock right now is a break. */
   onBreak: boolean;
+  /** True when a Pomodoro Flow focus block has crossed its baseline and is flowing. */
+  isFocusFlowing: boolean;
+  /** Seconds flowed past the current focus block's baseline. 0 unless flowing. */
+  focusFlowSeconds: number;
+  /** Total flow seconds accrued across the session (banked + current block). */
+  totalFlowSeconds: number;
+  /** Next break reachable from the current focus block (scheduled or appended). */
+  nextBreak: NextBreakInfo | null;
   /** Seconds this break has run past its time. 0 unless overrunning. */
   overrunSeconds: number;
   isOverrunning: boolean;
@@ -284,6 +374,7 @@ type TimerContextValue = {
   pause: () => void;
   resume: () => void;
   toggle: () => void;
+  takeBreak: () => void;
   skipInterval: () => void;
   stop: (options?: { completedTask?: boolean }) => Promise<void>;
   discard: () => Promise<void>;
@@ -448,8 +539,10 @@ export function TimerProvider({
       void stop();
       return;
     }
-    dispatch({ type: "ADVANCE", at: Date.now(), nextIndex });
-    if (state.sessionId) void advanceInterval(state.sessionId, nextIndex, true);
+    dispatch({ type: "ADVANCE", at: Date.now(), nextIndex, resume: true });
+    if (state.sessionId) {
+      void advanceInterval(state.sessionId, nextIndex, true, { resume: true });
+    }
   }, [plan.length, state.intervalIndex, state.sessionId, stop]);
 
   const toggle = useCallback(() => {
@@ -523,6 +616,73 @@ export function TimerProvider({
     intervalElapsedSeconds >= currentTargetSeconds;
 
   /**
+   * Pomodoro Flow past its focus baseline. Stays true while paused too so a
+   * brief interruption mid-flow doesn't hide that you already met the baseline.
+   */
+  const isFocusFlowing =
+    state.config.mode === "FLOW" &&
+    !onBreak &&
+    (state.phase === "RUNNING" || state.phase === "PAUSED") &&
+    currentTargetSeconds > 0 &&
+    intervalElapsedSeconds >= currentTargetSeconds;
+
+  const focusFlowSeconds = isFocusFlowing
+    ? Math.max(0, intervalElapsedSeconds - currentTargetSeconds)
+    : 0;
+
+  const totalFlowSeconds = state.bankedFlowSeconds + focusFlowSeconds;
+
+  const nextBreak = useMemo<NextBreakInfo | null>(() => {
+    if (onBreak || recovery || state.config.mode === "BASIC") return null;
+
+    const upcoming = plan[state.intervalIndex + 1];
+    if (upcoming && isBreakKind(upcoming.kind)) {
+      return {
+        kind: upcoming.kind as "SHORT_BREAK" | "LONG_BREAK",
+        seconds: upcoming.targetSeconds,
+        appendsRound: false,
+      };
+    }
+
+    if (state.config.mode === "FLOW") {
+      const extension = nextRoundExtension(state.config);
+      if (extension) {
+        return {
+          kind: extension.breakKind,
+          seconds: extension.breakSeconds,
+          appendsRound: true,
+        };
+      }
+    }
+
+    return null;
+  }, [onBreak, plan, recovery, state.config, state.intervalIndex]);
+
+  const takeBreak = useCallback(() => {
+    if (!nextBreak) return;
+
+    const nextIndex = state.intervalIndex + 1;
+    if (nextBreak.appendsRound) {
+      const extension = nextRoundExtension(state.config);
+      if (!extension) return;
+      dispatch({
+        type: "APPEND_ROUND_AND_ADVANCE",
+        at: Date.now(),
+        intervals: extension.intervals,
+        targetSeconds: extension.targetSeconds,
+        nextIndex,
+      });
+      if (state.sessionId) void appendFlowRound(state.sessionId);
+      return;
+    }
+
+    dispatch({ type: "ADVANCE", at: Date.now(), nextIndex, resume: true });
+    if (state.sessionId) {
+      void advanceInterval(state.sessionId, nextIndex, true, { resume: true });
+    }
+  }, [nextBreak, state.config, state.intervalIndex, state.sessionId]);
+
+  /**
    * A break that is past its time and still on the clock.
    *
    * Derived, never counted — same rule as every other number here, so a
@@ -548,8 +708,36 @@ export function TimerProvider({
   useEffect(() => {
     if (!isRunning || !targetReached || state.reachedTarget) return;
     dispatch({ type: "REACH_TARGET" });
-    if (settings.soundEnabled) void chime();
-  }, [isRunning, settings.soundEnabled, state.reachedTarget, targetReached]);
+    // Pomodoro Flow plays its own gentle baseline chime on each focus block;
+    // skipping here prevents a double chime on a single-round flow session.
+    if (settings.soundEnabled && state.config.mode !== "FLOW") void chime();
+  }, [
+    isRunning,
+    settings.soundEnabled,
+    state.config.mode,
+    state.reachedTarget,
+    targetReached,
+  ]);
+
+  /**
+   * Pomodoro Flow crossing a focus block's baseline: announce gently once per
+   * focus block, then stay completely out of the way so flow continues.
+   */
+  useEffect(() => {
+    if (!intervalDone || onBreak || state.config.mode !== "FLOW") return;
+    if (state.focusFlowSince !== null) return;
+
+    dispatch({ type: "ENTER_FLOW", at: Date.now() });
+    if (settings.soundEnabled) void flowChime();
+    if (settings.hapticsEnabled) navigator.vibrate?.(FLOW_PATTERN);
+  }, [
+    intervalDone,
+    onBreak,
+    settings.hapticsEnabled,
+    settings.soundEnabled,
+    state.config.mode,
+    state.focusFlowSince,
+  ]);
 
   /**
    * A break running out is the moment this app was previously silent for.
@@ -588,9 +776,10 @@ export function TimerProvider({
     // Breaks are handled above: they overrun in place rather than advancing.
     if (onBreak) return;
 
-    // FLOW never ends on its own — overrunning the goal is the whole feature.
-    // RECOVERY doesn't either, for the opposite reason. One predicate rather
-    // than two literals, so the next mode added can't forget a call site.
+    // FLOW (Pomodoro Flow) never ends on its own — continuing past the
+    // baseline is the whole point. RECOVERY doesn't either, for the opposite
+    // reason. One predicate rather than two literals, so the next mode added
+    // can't forget a call site.
     if (!endsAutomatically(state.config.mode)) return;
 
     const nextIndex = state.intervalIndex + 1;
@@ -602,6 +791,8 @@ export function TimerProvider({
       }
       return;
     }
+
+    if (settings.soundEnabled) void chime();
 
     const nextIsBreak = plan[nextIndex].kind !== "FOCUS";
     const autoStart = nextIsBreak
@@ -623,6 +814,7 @@ export function TimerProvider({
     plan,
     settings.autoStartBreaks,
     settings.autoStartNextFocus,
+    settings.soundEnabled,
     state.config.mode,
     state.intervalIndex,
     state.sessionId,
@@ -649,6 +841,10 @@ export function TimerProvider({
       intervalElapsedSeconds,
       currentTargetSeconds,
       onBreak,
+      isFocusFlowing,
+      focusFlowSeconds,
+      totalFlowSeconds,
+      nextBreak,
       overrunSeconds,
       isOverrunning,
       extendInterval,
@@ -659,6 +855,7 @@ export function TimerProvider({
       pause,
       resume,
       toggle,
+      takeBreak,
       skipInterval,
       stop,
       discard,
@@ -670,10 +867,13 @@ export function TimerProvider({
       discard,
       elapsedMs,
       elapsedSeconds,
-      focusElapsedSeconds,
       extendInterval,
+      focusElapsedSeconds,
+      focusFlowSeconds,
       intervalElapsedSeconds,
+      isFocusFlowing,
       isOverrunning,
+      nextBreak,
       onBreak,
       overrunSeconds,
       pause,
@@ -686,7 +886,9 @@ export function TimerProvider({
       start,
       state,
       stop,
+      takeBreak,
       toggle,
+      totalFlowSeconds,
     ],
   );
 
@@ -733,6 +935,8 @@ function initialState({
       task: null,
       reachedTarget: false,
       overrunSince: null,
+      focusFlowSince: null,
+      bankedFlowSeconds: 0,
       intervalExtraSeconds: 0,
       returnNote: null,
     };
@@ -756,6 +960,8 @@ function initialState({
     // and a reload should not replay a boundary you already heard. The overrun
     // *number* rehydrates for free, because it is derived from the clock.
     overrunSince: null,
+    focusFlowSince: initialSession.intervalAlreadyFlowing ? Date.now() : null,
+    bankedFlowSeconds: initialSession.bankedFlowSeconds,
     intervalExtraSeconds: initialSession.intervalExtraSeconds,
     returnNote: initialSession.returnNote,
   };
@@ -767,6 +973,9 @@ function initialState({
  * ignore — this one is telling you the break is over.
  */
 const OVERRUN_PATTERN = [60, 80, 60];
+
+/** One soft pulse for Pomodoro Flow crossing the baseline — never an alarm. */
+const FLOW_PATTERN = [35];
 
 let audioContext: AudioContext | null = null;
 
@@ -793,6 +1002,39 @@ async function chime() {
       oscillator.connect(gain);
       oscillator.start(now + delay);
       oscillator.stop(now + delay + 1);
+    }
+  } catch {
+    // Audio is a nicety; a blocked AudioContext must never break the timer.
+  }
+}
+
+/**
+ * A gentler, warmer harmonic nudge for Pomodoro Flow's baseline: softer gain
+ * and a relaxed rising fifth so it lands cleanly without pulling you out of
+ * concentration.
+ */
+async function flowChime() {
+  try {
+    audioContext ??= new AudioContext();
+    if (audioContext.state === "suspended") await audioContext.resume();
+
+    const now = audioContext.currentTime;
+    const gain = audioContext.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.08, now + 0.04);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.3);
+    gain.connect(audioContext.destination);
+
+    for (const [frequency, delay] of [
+      [528, 0],
+      [792, 0.16],
+    ] as const) {
+      const oscillator = audioContext.createOscillator();
+      oscillator.type = "sine";
+      oscillator.frequency.value = frequency;
+      oscillator.connect(gain);
+      oscillator.start(now + delay);
+      oscillator.stop(now + delay + 1.15);
     }
   } catch {
     // Audio is a nicety; a blocked AudioContext must never break the timer.

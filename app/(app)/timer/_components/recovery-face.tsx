@@ -21,7 +21,7 @@ const STROKE = 18;
 
 export function RecoveryFace({ children }: { children?: React.ReactNode }) {
   return (
-    <div className="relative isolate @container aspect-square w-full max-w-[400px]">
+    <div className="relative isolate @container aspect-square w-full max-w-[356px]">
       <svg className="size-full" viewBox={`0 0 ${SIZE} ${SIZE}`} aria-hidden>
         <circle
           cx={CENTER}
@@ -30,6 +30,14 @@ export function RecoveryFace({ children }: { children?: React.ReactNode }) {
           fill="none"
           strokeWidth={STROKE}
           className="stroke-rest-track"
+        />
+        <circle
+          cx={CENTER}
+          cy={CENTER}
+          r={RADIUS - STROKE / 2 - 6}
+          fill="none"
+          strokeWidth={1.25}
+          className="stroke-rest/25"
         />
       </svg>
 

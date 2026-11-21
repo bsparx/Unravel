@@ -18,7 +18,11 @@ export function MiniTimerBadge() {
   const pathname = usePathname();
   const {
     state,
-    focusElapsedSeconds,
+    intervalElapsedSeconds,
+    currentTargetSeconds,
+    onBreak,
+    isFocusFlowing,
+    focusFlowSeconds,
     overrunSeconds,
     isOverrunning,
     skipInterval,
@@ -31,23 +35,20 @@ export function MiniTimerBadge() {
   const running = state.phase === "RUNNING";
   const recovery = state.config.mode === "RECOVERY";
 
-  // One rule, shared with the timer screen: flow's overrun, recovery counting
-  // up and a plain countdown are all the same function. A break past its time
-  // is the exception, because it is the one case where the number people need
-  // is how far over they are rather than how far through.
-  //
-  // The countdown is measured against focus time, never the wall clock — a
-  // break that ran over must not eat the remaining digits, or the next focus
-  // block would read as 0:00 from the badge.
+  // Matches the timer face: break overrun climbs with "+", breaks count down
+  // their own remaining time, recovery climbs from zero, and focus counts down
+  // its baseline (climbing past it in Pomodoro Flow).
   const readout = isOverrunning
     ? `+${formatClock(overrunSeconds)}`
-    : formatClock(
-        readoutSeconds(
-          state.config.mode,
-          focusElapsedSeconds,
-          state.config.targetSeconds,
-        ),
-      );
+    : onBreak
+      ? formatClock(Math.max(0, currentTargetSeconds - intervalElapsedSeconds))
+      : formatClock(
+          readoutSeconds(
+            state.config.mode,
+            intervalElapsedSeconds,
+            currentTargetSeconds,
+          ),
+        );
 
   return (
     <div
@@ -63,11 +64,13 @@ export function MiniTimerBadge() {
           ? "border-destructive bg-destructive text-background rounded-lg"
           : "rounded-full",
         !isOverrunning &&
-          (recovery
-            ? "border-rest/40 bg-rest-muted"
-            : running
-              ? "border-running/40 bg-running-muted"
-              : "border-border bg-card"),
+          (isFocusFlowing
+            ? "border-flow/45 bg-flow-muted"
+            : recovery || onBreak
+              ? "border-rest/40 bg-rest-muted"
+              : running
+                ? "border-running/40 bg-running-muted"
+                : "border-border bg-card"),
       )}
     >
       <Link
@@ -79,16 +82,30 @@ export function MiniTimerBadge() {
             "size-1.5 rounded-full",
             isOverrunning
               ? "bg-background"
-              : running
-                ? cn(
-                    "animate-breathe motion-reduce:animate-none",
-                    recovery ? "bg-rest" : "bg-running",
-                  )
-                : "bg-muted-foreground",
+              : isFocusFlowing
+                ? "bg-flow"
+                : running
+                  ? cn(
+                      "animate-breathe motion-reduce:animate-none",
+                      recovery || onBreak ? "bg-rest" : "bg-running",
+                    )
+                  : "bg-muted-foreground",
           )}
           aria-hidden
         />
-        <span className="font-mono text-label tabular-nums">{readout}</span>
+        <span
+          className={cn(
+            "font-mono text-label tabular-nums",
+            isFocusFlowing && !isOverrunning && "text-flow font-semibold",
+          )}
+        >
+          {readout}
+        </span>
+        {isFocusFlowing && !isOverrunning && (
+          <span className="text-flow font-mono text-micro font-medium tabular-nums">
+            +{formatClock(focusFlowSeconds)}
+          </span>
+        )}
         {/* The cue, not the task title: what you were in the middle of is the
             thing that makes coming back cheap. Falls back to the title, which
             is at least better than nothing. */}
