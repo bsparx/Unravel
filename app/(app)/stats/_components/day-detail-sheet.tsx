@@ -13,6 +13,7 @@ import {
   Moon,
   Repeat,
   Sparkles,
+  Sunrise,
   Waves,
 } from "lucide-react";
 
@@ -63,6 +64,9 @@ export function DayDetailSheet({
 
   const summary = summarizeDay(day, selectedIds);
   const selectedItems = items.filter((item) => selectedIds.has(item.id));
+  const firstItem = summary.firstItemId
+    ? selectedItems.find((item) => item.id === summary.firstItemId) ?? null
+    : null;
 
   const habitItems = selectedItems.filter((item) => item.group === "habit");
   const mindItems = selectedItems.filter((item) => item.group === "mind");
@@ -138,61 +142,85 @@ export function DayDetailSheet({
         {/* Scrollable body */}
         <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
           {/* Snapshot pair */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-2xl border border-border/60 bg-muted/40 px-4 py-3.5">
-              <p className="text-micro font-medium text-muted-foreground">
-                Completed
-              </p>
-              <div className="mt-1 flex items-baseline gap-2">
-                <span
+          <div className="space-y-2.5">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-border/60 bg-muted/40 px-4 py-3.5">
+                <p className="text-micro font-medium text-muted-foreground">
+                  Completed
+                </p>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span
+                    className={cn(
+                      "font-mono text-heading font-semibold tabular-nums",
+                      summary.active > 0 && summary.done === summary.active
+                        ? "text-flow"
+                        : "text-foreground",
+                    )}
+                  >
+                    {summary.active > 0
+                      ? `${summary.done}/${summary.active}`
+                      : "—"}
+                  </span>
+                  {summary.percent !== null && (
+                    <span className="font-mono text-label text-muted-foreground tabular-nums">
+                      {summary.percent}%
+                    </span>
+                  )}
+                </div>
+                <p className="mt-0.5 text-micro text-muted-foreground">
+                  {summary.active === 0
+                    ? "No items active"
+                    : summary.inactive > 0
+                      ? `${summary.inactive} not scheduled`
+                      : "All active counted"}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-border/60 bg-muted/40 px-4 py-3.5">
+                <p className="text-micro font-medium text-muted-foreground">
+                  Productive time
+                </p>
+                <p
                   className={cn(
-                    "font-mono text-heading font-semibold tabular-nums",
-                    summary.active > 0 && summary.done === summary.active
-                      ? "text-flow"
-                      : "text-foreground",
+                    "mt-1 font-mono text-heading font-semibold tabular-nums",
+                    day.productiveSeconds > 0
+                      ? "text-running"
+                      : "text-muted-foreground",
                   )}
                 >
-                  {summary.active > 0
-                    ? `${summary.done}/${summary.active}`
-                    : "—"}
-                </span>
-                {summary.percent !== null && (
-                  <span className="font-mono text-label text-muted-foreground tabular-nums">
-                    {summary.percent}%
-                  </span>
-                )}
+                  {day.productiveSeconds > 0
+                    ? formatDuration(day.productiveSeconds)
+                    : "0m"}
+                </p>
+                <p className="mt-0.5 text-micro text-muted-foreground">
+                  {day.sessions.length > 0
+                    ? `${day.sessions.length} ${day.sessions.length === 1 ? "entry" : "entries"}`
+                    : "Nothing tracked"}
+                </p>
               </div>
-              <p className="mt-0.5 text-micro text-muted-foreground">
-                {summary.active === 0
-                  ? "No items active"
-                  : summary.inactive > 0
-                    ? `${summary.inactive} not scheduled`
-                    : "All active counted"}
-              </p>
             </div>
 
-            <div className="rounded-2xl border border-border/60 bg-muted/40 px-4 py-3.5">
-              <p className="text-micro font-medium text-muted-foreground">
-                Productive time
-              </p>
-              <p
-                className={cn(
-                  "mt-1 font-mono text-heading font-semibold tabular-nums",
-                  day.productiveSeconds > 0
-                    ? "text-running"
-                    : "text-muted-foreground",
-                )}
-              >
-                {day.productiveSeconds > 0
-                  ? formatDuration(day.productiveSeconds)
-                  : "0m"}
-              </p>
-              <p className="mt-0.5 text-micro text-muted-foreground">
-                {day.sessions.length > 0
-                  ? `${day.sessions.length} ${day.sessions.length === 1 ? "entry" : "entries"}`
-                  : "Nothing tracked"}
-              </p>
-            </div>
+            {summary.firstTime && (
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-border/55 bg-card/60 px-3.5 py-2.5 text-label">
+                <span className="inline-flex min-w-0 items-center gap-2 text-muted-foreground">
+                  <Sunrise className="size-4 shrink-0 text-flow" aria-hidden />
+                  <span className="truncate">
+                    First habit
+                    {firstItem && (
+                      <>
+                        {" · "}
+                        <span className="font-medium text-foreground">
+                          {firstItem.title}
+                        </span>
+                      </>
+                    )}
+                  </span>
+                </span>
+                <span className="shrink-0 font-mono text-label font-semibold text-foreground tabular-nums">
+                  {summary.firstTime}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Habits section */}
@@ -372,6 +400,7 @@ function ItemRow({
   const isDone = status === "done" || status === "bonus";
   const isSkipped = status === "skipped";
   const isOpen = status === "open";
+  const checkedTime = isDone ? entry?.completedTime ?? null : null;
 
   return (
     <li className="flex items-center justify-between gap-3 px-4 py-3">
@@ -407,17 +436,25 @@ function ItemRow({
           >
             {item.title}
           </p>
-          {item.minimalTask && !isDone && (
+          {isDone && (entry?.detail || status === "bonus") ? (
+            <p className="truncate text-micro text-muted-foreground">
+              {status === "bonus"
+                ? entry?.detail
+                  ? `Off-day · ${entry.detail}`
+                  : "Off-day"
+                : entry?.detail}
+            </p>
+          ) : item.minimalTask && !isDone ? (
             <p className="truncate text-micro text-muted-foreground/80">
               {item.minimalTask}
             </p>
-          )}
+          ) : null}
         </div>
       </div>
 
       <span
         className={cn(
-          "shrink-0 text-micro font-medium",
+          "shrink-0 text-right text-micro font-medium",
           isDone
             ? "font-mono text-flow tabular-nums"
             : isSkipped
@@ -425,17 +462,13 @@ function ItemRow({
               : "text-muted-foreground/75",
         )}
       >
-        {status === "bonus"
-          ? entry?.detail
-            ? `Off-day · ${entry.detail}`
-            : "Off-day"
-          : isDone
-            ? entry?.detail ?? "Done"
-            : isSkipped
-              ? "Skipped"
-              : isOpen
-                ? "Still open"
-                : "Not done"}
+        {isDone
+          ? checkedTime ?? "Done"
+          : isSkipped
+            ? "Skipped"
+            : isOpen
+              ? "Still open"
+              : "Not done"}
       </span>
     </li>
   );

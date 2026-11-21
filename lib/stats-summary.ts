@@ -94,6 +94,10 @@ export type DayItemEntry = {
   status: DayItemStatus;
   /** Optional context for day details ("10m", "18 pages", "On paper", etc.). */
   detail?: string | null;
+  /** Epoch ms when checked off on this calendar day (null if not done or backfilled). */
+  completedAtMs?: number | null;
+  /** Formatted local HH:MM check-off time (e.g. "07:15"), null when unavailable. */
+  completedTime?: string | null;
 };
 
 export type DaySessionEntry = {
@@ -169,6 +173,12 @@ export type DaySummary = {
   ratio: number | null;
   /** 0..100 when at least one selected item was active; null otherwise. */
   percent: number | null;
+  /** Earliest check-off epoch ms among selected completed items that day. */
+  firstAtMs: number | null;
+  /** Formatted local HH:MM of the first habit/practice done that day. */
+  firstTime: string | null;
+  /** ID of the first habit/practice done that day. */
+  firstItemId: string | null;
 };
 
 /**
@@ -187,6 +197,9 @@ export function summarizeDay(
   let skipped = 0;
   let bonus = 0;
   let inactive = 0;
+  let firstAtMs: number | null = null;
+  let firstTime: string | null = null;
+  let firstItemId: string | null = null;
 
   for (const id of selectedIds) {
     const entry = day.items[id];
@@ -213,12 +226,35 @@ export function summarizeDay(
         inactive += 1;
         break;
     }
+
+    if (
+      (entry.status === "done" || entry.status === "bonus") &&
+      typeof entry.completedAtMs === "number" &&
+      entry.completedTime
+    ) {
+      if (firstAtMs === null || entry.completedAtMs < firstAtMs) {
+        firstAtMs = entry.completedAtMs;
+        firstTime = entry.completedTime;
+        firstItemId = id;
+      }
+    }
   }
 
   const ratio = active > 0 ? done / active : null;
   const percent = ratio === null ? null : Math.round(ratio * 100);
 
-  return { done, active, skipped, bonus, inactive, ratio, percent };
+  return {
+    done,
+    active,
+    skipped,
+    bonus,
+    inactive,
+    ratio,
+    percent,
+    firstAtMs,
+    firstTime,
+    firstItemId,
+  };
 }
 
 export type RangeSummary = {

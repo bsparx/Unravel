@@ -4724,4 +4724,43 @@ check("stats window defaults to the last 2 weeks and steps cleanly by 14 days", 
   assert.equal(resolveStatsWindow(today, "not-a-date").isLatest, true);
 });
 
+check("first habit time picks the earliest check-off among selected items", () => {
+  const day = mkStatsDay("2026-11-21", 6, 1800, {
+    h1: {
+      itemId: "h1",
+      status: "done",
+      completedAtMs: Date.parse("2026-11-21T04:30:00Z"),
+      completedTime: "09:30",
+    },
+    "mind:meditate": {
+      itemId: "mind:meditate",
+      status: "done",
+      completedAtMs: Date.parse("2026-11-21T02:15:00Z"),
+      completedTime: "07:15",
+    },
+    "heart:gratitude": {
+      itemId: "heart:gratitude",
+      status: "done",
+      completedAtMs: Date.parse("2026-11-21T16:45:00Z"),
+      completedTime: "21:45",
+    },
+    h2: { itemId: "h2", status: "missed" },
+  });
+
+  // With all selected, Meditation (07:15) is the earliest.
+  const all = summarizeDay(day, new Set(["h1", "h2", "mind:meditate", "heart:gratitude"]));
+  assert.equal(all.firstTime, "07:15");
+  assert.equal(all.firstItemId, "mind:meditate");
+
+  // Excluding Meditation shifts the first habit to h1 (09:30).
+  const withoutMed = summarizeDay(day, new Set(["h1", "h2", "heart:gratitude"]));
+  assert.equal(withoutMed.firstTime, "09:30");
+  assert.equal(withoutMed.firstItemId, "h1");
+
+  // No completed items with timestamps returns null.
+  const none = summarizeDay(day, new Set(["h2"]));
+  assert.equal(none.firstTime, null);
+  assert.equal(none.firstItemId, null);
+});
+
 console.log(`\n${passed} checks passed.\n`);

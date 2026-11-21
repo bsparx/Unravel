@@ -16,6 +16,7 @@ import {
   Repeat,
   RotateCcw,
   SlidersHorizontal,
+  Sunrise,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -421,7 +422,7 @@ export function StatsDashboard({ data }: { data: StatsOverview }) {
                         return (
                           <div
                             key={`pad-${wIdx}-${dIdx}`}
-                            className="min-h-12 sm:min-h-[112px]"
+                            className="min-h-12 sm:min-h-[120px]"
                             aria-hidden
                           />
                         );
@@ -441,12 +442,14 @@ export function StatsDashboard({ data }: { data: StatsOverview }) {
                               ? `${s.done} of ${s.active} done`
                               : "no habits active"
                           }, ${
+                            s.firstTime ? `first habit at ${s.firstTime}, ` : ""
+                          }${
                             day.productiveSeconds > 0
                               ? `${formatDuration(day.productiveSeconds)} productive`
                               : "no productive time"
                           }`}
                           className={cn(
-                            "group relative flex min-h-12 flex-col justify-between rounded-xl border p-1.5 text-left transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:min-h-[112px] sm:rounded-2xl sm:p-3",
+                            "group relative flex min-h-12 flex-col justify-between rounded-xl border p-1.5 text-left transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:min-h-[120px] sm:rounded-2xl sm:p-3",
                             tileToneClass(level, day.isToday),
                           )}
                         >
@@ -468,9 +471,7 @@ export function StatsDashboard({ data }: { data: StatsOverview }) {
                               )}
                             </span>
                             {day.isToday && (
-                              <span
-                                className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-accent-foreground max-sm:hidden"
-                              >
+                              <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-accent-foreground max-sm:hidden">
                                 Today
                               </span>
                             )}
@@ -508,19 +509,30 @@ export function StatsDashboard({ data }: { data: StatsOverview }) {
                             </div>
                           </div>
 
-                          {/* Bottom: productive time */}
-                          <span
-                            className={cn(
-                              "mt-2 hidden font-mono text-micro leading-none tabular-nums sm:block",
-                              day.productiveSeconds > 0
-                                ? "font-medium text-running"
-                                : "text-muted-foreground/55",
+                          {/* Bottom: productive time + first habit time */}
+                          <div className="mt-2 hidden space-y-1 sm:block">
+                            <span
+                              className={cn(
+                                "block font-mono text-micro leading-none tabular-nums",
+                                day.productiveSeconds > 0
+                                  ? "font-medium text-running"
+                                  : "text-muted-foreground/55",
+                              )}
+                            >
+                              {day.productiveSeconds > 0
+                                ? formatDuration(day.productiveSeconds)
+                                : "—"}
+                            </span>
+                            {s.firstTime && (
+                              <span
+                                className="flex items-center gap-1 font-mono text-[11px] leading-none text-muted-foreground tabular-nums"
+                                title={`First habit at ${s.firstTime}`}
+                              >
+                                <Sunrise className="size-3 shrink-0 opacity-75" aria-hidden />
+                                {s.firstTime}
+                              </span>
                             )}
-                          >
-                            {day.productiveSeconds > 0
-                              ? formatDuration(day.productiveSeconds)
-                              : "—"}
-                          </span>
+                          </div>
                         </button>
                       );
                     })}
@@ -647,7 +659,7 @@ function DayRowsList({
               onClick={() => onSelect(day.iso)}
               className="group flex min-h-14 w-full items-center justify-between gap-3 rounded-xl px-2.5 py-2.5 text-left transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:px-3"
             >
-              {/* Date */}
+              {/* Date + first habit time */}
               <div className="min-w-28 shrink-0">
                 <p className="text-label font-medium text-foreground">
                   {day.isToday
@@ -656,9 +668,23 @@ function DayRowsList({
                       ? "Yesterday"
                       : day.shortLabel}
                 </p>
-                {(day.isToday || day.isYesterday) && (
-                  <p className="text-micro text-muted-foreground">
-                    {day.shortLabel}
+                {(day.isToday || day.isYesterday || s.firstTime) && (
+                  <p className="flex items-center gap-1.5 text-micro text-muted-foreground">
+                    {(day.isToday || day.isYesterday) && (
+                      <span>{day.shortLabel}</span>
+                    )}
+                    {s.firstTime && (
+                      <span className="inline-flex items-center gap-1 font-mono tabular-nums">
+                        {(day.isToday || day.isYesterday) && (
+                          <span aria-hidden>·</span>
+                        )}
+                        <Sunrise
+                          className="size-3 shrink-0 opacity-75"
+                          aria-hidden
+                        />
+                        {s.firstTime}
+                      </span>
+                    )}
                   </p>
                 )}
               </div>

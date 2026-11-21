@@ -220,17 +220,19 @@ async function writeProgress(
   // state wait. This is the one gate for every path: the timer's
   // creditLoggedTime, the +1 buttons and the checkbox all converge here, so
   // none of them can mark the day done behind the note's back.
-  let noteOk = true;
-  if (bar.requiresFeedback) {
-    const existing = await prisma.taskOccurrence.findUnique({
-      where: { taskId_date: { taskId: bar.taskId, date } },
-      select: { note: true },
-    });
-    noteOk = Boolean(existing?.note?.trim());
-  }
+  const existing = await prisma.taskOccurrence.findUnique({
+    where: { taskId_date: { taskId: bar.taskId, date } },
+    select: { note: true, completedAt: true },
+  });
+
+  const noteOk = bar.requiresFeedback ? Boolean(existing?.note?.trim()) : true;
 
   const status = dayStatus(day, noteOk);
-  const completedAt = status === "DONE" ? new Date() : null;
+  // Keep the first check-off timestamp if the habit was already marked DONE
+  // today (e.g., logging extra minutes later shouldn't overwrite when you first
+  // checked it off). Unticking clears it back to null.
+  const completedAt =
+    status === "DONE" ? (existing?.completedAt ?? new Date()) : null;
 
   return prisma.taskOccurrence.upsert({
     where: { taskId_date: { taskId: bar.taskId, date } },
