@@ -431,7 +431,12 @@ function SlotCard({
           : "border-border/60 hover:border-primary/40 focus-within:border-primary/40 bg-background/50",
       )}
     >
-      <ExerciseDetailDialog exercise={slot.exercise}>
+      <ExerciseDetailDialog
+        exercise={slot.exercise}
+        canCheck={canCheck}
+        checked={checked}
+        onToggleCheck={onToggleCheck}
+      >
         {(open) => (
           <button
             type="button"

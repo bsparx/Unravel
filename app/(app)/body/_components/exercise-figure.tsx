@@ -2,6 +2,7 @@
 
 import { useMediaQuery } from "@/hooks/use-mobile";
 import { bodyPartLabel } from "@/lib/exercise-labels";
+import { cn } from "@/lib/utils";
 
 import { BodyPlate } from "./body-plate";
 import { MAPPED_PARTS } from "./body-map-paths";
@@ -28,9 +29,11 @@ const ANNOTATED_FROM = "(min-width: 28rem)";
 export function ExerciseFigure({
   name,
   parts,
+  className,
 }: {
   name: string;
   parts: string[];
+  className?: string;
 }) {
   // Below 28rem this swaps the names for a chip row. Radix keeps the dialog
   // unmounted until it opens, so the plate never renders on the server and
@@ -53,7 +56,12 @@ export function ExerciseFigure({
   const annotated = wide && !whole;
 
   return (
-    <div className="border-border bg-card overflow-visible rounded-lg border px-3 py-4">
+    <div
+      className={cn(
+        "border-border bg-card overflow-visible rounded-lg border px-3 py-4",
+        className,
+      )}
+    >
       <div
         role="img"
         aria-label={`${name} targets ${named.map(bodyPartLabel).join(", ")}`}
