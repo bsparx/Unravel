@@ -17,12 +17,14 @@ import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DayStrip } from "@/components/fasting/day-strip";
+import { FastDaysPicker } from "@/components/fasting/days-picker";
 import { FastRing } from "@/components/fasting/fast-ring";
 import { FastKindPicker } from "@/components/fasting/kind-picker";
 import { useNow } from "@/components/fasting/use-now";
 import { FastWindowPicker } from "@/components/fasting/window-picker";
 import { InfoTip } from "@/components/info-tip";
 import { ritualGhostClass, ritualPrimaryClass } from "@/components/ritual-frame";
+import { SceneCard } from "@/components/scenes/scene-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +33,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import type { FastingView, FastRow } from "@/lib/body-data";
 import { instantToLocalInput, minuteOfDayLocal } from "@/lib/dates";
 import {
+  describeFastDays,
   fastMinutes,
   fastProgress,
   formatClockIn,
@@ -50,13 +53,12 @@ import { FastEditDialog } from "./fast-edit-dialog";
 
 const PAGE_SIZE = 14;
 
-type Plan = { kind: FastKindId; window: FastWindow };
+type Plan = { kind: FastKindId; window: FastWindow; daysOfWeek: number[] };
 
 /**
  * Fasting: the plan (an eating window by the clock, or Islamic, Fajr to
- * Maghrib) and what really happened (fasts you start and break with a tap).
- * The ring is the fast in progress; the strip under it is the day as
- * planned; the bars and the log are the last weeks, read, not scored.
+ * Maghrib, plus which weekdays you fast on) and what really happened (fasts
+ * you start and break with a tap).
  */
 export function FastingPanel({ view }: { view: FastingView }) {
   const now = useNow(Date.parse(view.nowISO));
@@ -66,7 +68,11 @@ export function FastingPanel({ view }: { view: FastingView }) {
 
   // Local so the chip, ring and strip answer at once; the save is debounced,
   // the same way as the Mind template picker.
-  const initial: Plan = { kind: view.kind, window: view.window };
+  const initial: Plan = {
+    kind: view.kind,
+    window: view.window,
+    daysOfWeek: view.daysOfWeek,
+  };
   const [plan, setPlan] = useState<Plan>(initial);
   const [savingPlan, startPlanSave] = useTransition();
   const saved = useRef<Plan>(initial);
@@ -77,6 +83,7 @@ export function FastingPanel({ view }: { view: FastingView }) {
     formData.set("kind", next.kind);
     formData.set("eatStart", String(next.window.eatStart));
     formData.set("eatEnd", String(next.window.eatEnd));
+    formData.set("daysOfWeek", next.daysOfWeek.join(","));
     return setFastingPlan(formData);
   };
 
@@ -131,6 +138,8 @@ export function FastingPanel({ view }: { view: FastingView }) {
   const today = view.islamic.today;
   // The chip names the plan; the prayer and meal names add width a phone
   // doesn't have, so they show from sm up.
+  const scheduleSuffix =
+    plan.daysOfWeek.length < 7 ? ` · ${describeFastDays(plan.daysOfWeek)}` : "";
   const planLabel =
     plan.kind === "ISLAMIC" ? (
       today ? (
@@ -138,20 +147,30 @@ export function FastingPanel({ view }: { view: FastingView }) {
           Islamic · <span className="hidden sm:inline">Fajr </span>
           {today.fajrLabel} to <span className="hidden sm:inline">Maghrib </span>
           {today.maghribLabel}
+          {scheduleSuffix}
         </>
       ) : (
-        "Islamic · Fajr to Maghrib"
+        `Islamic · Fajr to Maghrib${scheduleSuffix}`
       )
     ) : (
       <>
         {windowRatio(plan.window)} · <span className="hidden sm:inline">eat </span>
         {formatMinuteOfDay(plan.window.eatStart)} to {formatMinuteOfDay(plan.window.eatEnd)}
+        {scheduleSuffix}
       </>
     );
   const target = plan.kind === "ISLAMIC" ? (today?.minutes ?? view.targetMinutes) : fastMinutes(plan.window);
 
   return (
     <div className="max-w-4xl space-y-10">
+      {view.sceneEnabled && (
+        <SceneCard
+          tab="fasting"
+          tending={view.tending}
+          note={(day) => view.dayNotes[day.dateISO] ?? null}
+        />
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1">
           <h2 className="font-display text-title">Fasting</h2>
@@ -167,7 +186,7 @@ export function FastingPanel({ view }: { view: FastingView }) {
               <ChevronDown className="size-3.5 opacity-60" aria-hidden />
             </Button>
           </PopoverTrigger>
-          <PopoverContent align="end" className="max-h-[min(40rem,80dvh)] w-[min(34rem,calc(100vw-2rem))] space-y-5 overflow-y-auto p-4">
+          <PopoverContent align="end" className="max-h-[min(44rem,80dvh)] w-[min(34rem,calc(100vw-2rem))] space-y-5 overflow-y-auto p-4">
             <FastKindPicker value={plan.kind} onChange={(kind) => choosePlan({ ...plan, kind })} />
             {plan.kind === "INTERMITTENT" ? (
               <div className="space-y-2">
@@ -196,6 +215,13 @@ export function FastingPanel({ view }: { view: FastingView }) {
                 </p>
               </div>
             )}
+            <div className="space-y-2">
+              <p className="text-label font-medium">Fasting days</p>
+              <FastDaysPicker
+                value={plan.daysOfWeek}
+                onChange={(daysOfWeek) => choosePlan({ ...plan, daysOfWeek })}
+              />
+            </div>
             <p aria-live="polite" className="text-muted-foreground text-micro">
               {savingPlan
                 ? "Saving…"

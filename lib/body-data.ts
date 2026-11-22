@@ -4,11 +4,14 @@ import { prisma } from "@/lib/db";
 import type { BodyEnabled } from "@/lib/body-tabs";
 import {
   dailyTotals,
+  fastDoneDays,
   fastMinutes,
   formatClockIn,
   formatDayIn,
+  formatHM,
   islamicDayFor,
   islamicMinutes,
+  normalizeFastDays,
   normalizeWindow,
   protocolOf,
   type FastDay,
@@ -18,6 +21,7 @@ import {
   type IslamicDay,
 } from "@/lib/fasting";
 import { getUserTimings } from "@/lib/prayers";
+import { historySince, scheduledByWeekdays, tend, type Tending } from "@/lib/tending";
 
 /** How far back the fasting log reaches. */
 const HISTORY_DAYS = 90;
@@ -86,6 +90,14 @@ export type FastingView = {
   /** The intermittent plan. Kept even while Islamic is chosen. */
   window: FastWindow;
   protocol: FastProtocolId;
+  /** Scheduled fasting weekdays (0 = Sunday .. 6 = Saturday). */
+  daysOfWeek: number[];
+  /** Whether the Olive Orchard scene is switched on in Settings. */
+  sceneEnabled: boolean;
+  /** The orchard: +1 on fasted days, -1 on missed scheduled days, 0 on off-days. */
+  tending: Tending;
+  /** Tooltip notes for the scene's 14-day strip ("16h 10m"). */
+  dayNotes: Record<string, string>;
   /** The planned fast for the current window, in minutes. */
   targetMinutes: number;
   /** Prayer-time fasting: today's and tomorrow's days, and the city. */
@@ -119,10 +131,15 @@ export async function getFasting(user: User, now: Date = new Date()): Promise<Fa
 
   // Prayer times are always read, so switching to Islamic answers at once.
   // They're cached per city and day, so this is a database read, not a call.
-  const [fasts, islamic] = await Promise.all([
+  const [fasts, allFasts, islamic] = await Promise.all([
     prisma.fast.findMany({
       where: { userId: user.id, OR: [{ endedAt: null }, { endedAt: { gte: since } }] },
       orderBy: { startedAt: "desc" },
+    }),
+    // Every fast ever logged, for the scene: it's kept by all of them (lib/tending.ts).
+    prisma.fast.findMany({
+      where: { userId: user.id },
+      select: { id: true, startedAt: true, endedAt: true, targetMinutes: true },
     }),
     islamicDays(user, islamicSpan(timeZone, now)),
   ]);
@@ -131,6 +148,14 @@ export async function getFasting(user: User, now: Date = new Date()): Promise<Fa
   const today = todayLocal(timeZone, now);
   const todayISO = toISODate(today);
   const tomorrowISO = toISODate(addDays(today, 1));
+  const daysOfWeek = normalizeFastDays(user.fastDaysOfWeek);
+
+  const dayLabel = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "UTC",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
 
   const dayView = (day: IslamicDay | undefined): IslamicDayView | null =>
     day
@@ -171,13 +196,21 @@ export async function getFasting(user: User, now: Date = new Date()): Promise<Fa
 
   const days = dailyTotals(fasts, today, BAR_DAYS, timeZone, now).map((day) => ({
     ...day,
-    label: new Intl.DateTimeFormat("en-GB", {
-      timeZone: "UTC",
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-    }).format(new Date(`${day.dateISO}T00:00:00.000Z`)),
+    label: dayLabel.format(new Date(`${day.dateISO}T00:00:00.000Z`)),
   }));
+
+  const dayNotes = Object.fromEntries(
+    days.filter((day) => day.minutes > 0).map((day) => [day.dateISO, formatHM(day.minutes)]),
+  );
+
+  const tending = tend(
+    historySince(
+      todayISO,
+      fastDoneDays(allFasts, timeZone, now),
+      (date) => dayLabel.format(date),
+      scheduledByWeekdays(daysOfWeek),
+    ),
+  );
 
   const todayIslamic = dayView(islamic.days.find((day) => day.dateISO === todayISO));
 
@@ -185,6 +218,10 @@ export async function getFasting(user: User, now: Date = new Date()): Promise<Fa
     kind: user.fastKind,
     window,
     protocol: protocolOf(window),
+    daysOfWeek,
+    sceneEnabled: user.bodyFastingSceneEnabled,
+    tending,
+    dayNotes,
     targetMinutes:
       user.fastKind === "ISLAMIC" && todayIslamic ? todayIslamic.minutes : fastMinutes(window),
     islamic: {

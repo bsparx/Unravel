@@ -3,9 +3,11 @@
 import { revalidatePath } from "next/cache";
 
 import { requireUser } from "@/lib/auth";
+import { todayLocal } from "@/lib/dates";
 import { prisma } from "@/lib/db";
 import {
   type ActionState,
+  exerciseCheckoffSchema,
   fieldErrorsFrom,
   formValues,
   routineDaysSchema,
@@ -308,4 +310,47 @@ export async function deleteRoutine(
 
   revalidateExercises();
   return { status: "success", message: "Routine removed." };
+}
+
+/**
+ * Toggle today's check-off for one exercise. Checking off at least one
+ * exercise from your selected list marks today as done for the Exercises scene.
+ * The day is always resolved server-side in the user's own timezone.
+ */
+export async function toggleExerciseCheckoff(
+  exerciseId: string,
+): Promise<ActionState & { checked?: boolean }> {
+  const user = await requireUser();
+  const parsed = exerciseCheckoffSchema.safeParse({ exerciseId });
+  if (!parsed.success) {
+    return { status: "error", message: "That exercise no longer exists." };
+  }
+
+  const exercise = await prisma.exercise.findFirst({
+    where: { id: parsed.data.exerciseId, active: true },
+    select: { id: true },
+  });
+  if (!exercise) {
+    return { status: "error", message: "That exercise no longer exists." };
+  }
+
+  const date = todayLocal(user.timezone);
+  const key = { userId: user.id, exerciseId: exercise.id, date };
+
+  const existing = await prisma.exerciseCheckoff.findUnique({
+    where: { userId_exerciseId_date: key },
+    select: { id: true },
+  });
+
+  let checked: boolean;
+  if (existing) {
+    await prisma.exerciseCheckoff.delete({ where: { id: existing.id } });
+    checked = false;
+  } else {
+    await prisma.exerciseCheckoff.create({ data: key });
+    checked = true;
+  }
+
+  revalidateExercises();
+  return { status: "success", checked };
 }

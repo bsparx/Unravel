@@ -49,7 +49,11 @@ export function BodyBoard({
           <div role="tablist" aria-label="Body sections" className="border-border bg-muted/40 inline-flex rounded-full border p-1">
             {tabs.map((value) => {
               const selected = tab === value;
-              const fasting_ = value === "fasting" && fasting?.open;
+              const fastingRunning = value === "fasting" && Boolean(fasting?.open);
+              const doneToday =
+                value === "exercises"
+                  ? Boolean(exercises?.tending.today)
+                  : Boolean(fasting?.tending.today);
               return (
                 <button
                   key={value}
@@ -64,7 +68,7 @@ export function BodyBoard({
                   )}
                 >
                   {LABELS[value]}
-                  {fasting_ && (
+                  {fastingRunning ? (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className="fast-pulse size-1.5 rounded-full bg-[var(--fast-ring)]">
@@ -73,7 +77,27 @@ export function BodyBoard({
                       </TooltipTrigger>
                       <TooltipContent side="bottom">A fast is running</TooltipContent>
                     </Tooltip>
-                  )}
+                  ) : doneToday ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span
+                          className={cn(
+                            "size-1.5 rounded-full",
+                            value === "exercises"
+                              ? "bg-[var(--grove-dot)]"
+                              : "bg-[var(--orchard-dot)]",
+                          )}
+                        >
+                          <span className="sr-only">(done today)</span>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        {value === "exercises"
+                          ? "Exercise checked off today"
+                          : "Fasted today"}
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : null}
                 </button>
               );
             })}

@@ -3,6 +3,7 @@
 import { startTransition, useActionState, useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { FastDaysPicker } from "@/components/fasting/days-picker";
 import { FastKindPicker } from "@/components/fasting/kind-picker";
 import { FastWindowPicker } from "@/components/fasting/window-picker";
 import { Button } from "@/components/ui/button";
@@ -57,9 +58,12 @@ export type SettingsValues = {
   duaCount: number;
   bodyExercisesEnabled: boolean;
   bodyFastingEnabled: boolean;
+  bodyExercisesSceneEnabled: boolean;
+  bodyFastingSceneEnabled: boolean;
   fastKind: FastKindId;
   fastEatStart: number;
   fastEatEnd: number;
+  fastDaysOfWeek: number[];
 };
 
 export function SettingsForm({
@@ -92,12 +96,20 @@ export function SettingsForm({
     count: values.duaCount,
   });
 
+  const [exercisesOn, setExercisesOn] = useState(values.bodyExercisesEnabled);
+  const [exercisesSceneOn, setExercisesSceneOn] = useState(
+    values.bodyExercisesSceneEnabled,
+  );
   const [fastingOn, setFastingOn] = useState(values.bodyFastingEnabled);
+  const [fastingSceneOn, setFastingSceneOn] = useState(
+    values.bodyFastingSceneEnabled,
+  );
   const [fastKind, setFastKind] = useState<FastKindId>(values.fastKind);
   const [fastWindow, setFastWindow] = useState<FastWindow>({
     eatStart: values.fastEatStart,
     eatEnd: values.fastEatEnd,
   });
+  const [fastDays, setFastDays] = useState<number[]>(values.fastDaysOfWeek);
 
   const error = (field: string) =>
     state.status === "error" ? state.fieldErrors?.[field] : undefined;
@@ -411,12 +423,32 @@ export function SettingsForm({
           </div>
 
           <div className="space-y-5">
-            <CheckboxField
-              id="bodyExercisesEnabled"
-              label="Exercises"
-              hint="Your corrective week of yoga and dumbbells, and the body-map catalog."
-              defaultChecked={values.bodyExercisesEnabled}
-            />
+            <div className="space-y-3">
+              <CheckboxField
+                id="bodyExercisesEnabled"
+                label="Exercises"
+                hint="Your corrective week of yoga and dumbbells, and the body-map catalog. Checking off even one exercise counts the day."
+                checked={exercisesOn}
+                onCheckedChange={setExercisesOn}
+              />
+              {exercisesOn ? (
+                <div className="sm:pl-7">
+                  <CheckboxField
+                    id="bodyExercisesSceneEnabled"
+                    label="Show scene (The waterfall grove)"
+                    hint="A 14-stage scene that grows by one on each training day you check off at least one exercise, and holds steady on rest days."
+                    checked={exercisesSceneOn}
+                    onCheckedChange={setExercisesSceneOn}
+                  />
+                </div>
+              ) : (
+                <input
+                  type="hidden"
+                  name="bodyExercisesSceneEnabled"
+                  value={String(exercisesSceneOn)}
+                />
+              )}
+            </div>
 
             <div className="space-y-3">
               <CheckboxField
@@ -426,8 +458,15 @@ export function SettingsForm({
                 checked={fastingOn}
                 onCheckedChange={setFastingOn}
               />
-              {fastingOn && (
+              {fastingOn ? (
                 <div className="space-y-4 sm:pl-7">
+                  <CheckboxField
+                    id="bodyFastingSceneEnabled"
+                    label="Show scene (The olive orchard)"
+                    hint="A 14-stage scene that grows by one on each fasting day you complete a fast, and holds steady on off-schedule days."
+                    checked={fastingSceneOn}
+                    onCheckedChange={setFastingSceneOn}
+                  />
                   <FastKindPicker value={fastKind} onChange={setFastKind} />
                   {fastKind === "INTERMITTENT" ? (
                     <div className="space-y-2">
@@ -442,16 +481,32 @@ export function SettingsForm({
                       the fast follows the sun through the year.
                     </p>
                   )}
+                  <div className="space-y-2">
+                    <p className="text-label font-medium">Fasting days</p>
+                    <FastDaysPicker value={fastDays} onChange={setFastDays} />
+                    {error("fastDaysOfWeek") && (
+                      <p role="alert" className="text-destructive text-label">
+                        {error("fastDaysOfWeek")}
+                      </p>
+                    )}
+                  </div>
                   {error("fastEatEnd") && (
                     <p role="alert" className="text-destructive text-label">
                       {error("fastEatEnd")}
                     </p>
                   )}
                 </div>
+              ) : (
+                <input
+                  type="hidden"
+                  name="bodyFastingSceneEnabled"
+                  value={String(fastingSceneOn)}
+                />
               )}
               <input type="hidden" name="fastKind" value={fastKind} />
               <input type="hidden" name="fastEatStart" value={fastWindow.eatStart} />
               <input type="hidden" name="fastEatEnd" value={fastWindow.eatEnd} />
+              <input type="hidden" name="fastDaysOfWeek" value={fastDays.join(",")} />
             </div>
           </div>
         </section>

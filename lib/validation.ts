@@ -653,9 +653,33 @@ export const settingsSchema = z.object({
   duaCount: practiceCount.default(3),
   bodyExercisesEnabled: z.coerce.boolean().default(true),
   bodyFastingEnabled: z.coerce.boolean().default(true),
+  bodyExercisesSceneEnabled: z.coerce.boolean().default(true),
+  bodyFastingSceneEnabled: z.coerce.boolean().default(true),
   fastKind: z.enum(["INTERMITTENT", "ISLAMIC"]).default("INTERMITTENT"),
   fastEatStart: windowMinute.default(720),
   fastEatEnd: windowMinute.default(1200),
+  fastDaysOfWeek: z
+    .union([
+      z.string().transform((raw) =>
+        raw
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .map(Number),
+      ),
+      z.array(z.coerce.number()),
+    ])
+    .optional()
+    .transform((list) => {
+      if (!list) return [0, 1, 2, 3, 4, 5, 6];
+      return [...new Set(list)].sort((a, b) => a - b);
+    })
+    .pipe(
+      z
+        .array(z.number().int().min(0).max(6))
+        .min(1, "Pick at least one fasting day.")
+        .max(7),
+    ),
 });
 
 // ---------------------------------------------------------------- budget
@@ -1227,12 +1251,40 @@ export const fastUpdateSchema = z.object({
   endedAt: emptyToUndefined(localDateTime),
 });
 
+const fastDaysList = z
+  .union([
+    z.string().transform((raw) =>
+      raw
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map(Number),
+    ),
+    z.array(z.coerce.number()),
+  ])
+  .transform((list) => [...new Set(list)].sort((a, b) => a - b))
+  .pipe(
+    z
+      .array(z.number().int().min(0).max(6))
+      .min(1, "Pick at least one fasting day.")
+      .max(7),
+  );
+
 export const fastPlanSchema = z
-  .object({ kind: fastKind.default("INTERMITTENT"), eatStart: windowMinute, eatEnd: windowMinute })
+  .object({
+    kind: fastKind.default("INTERMITTENT"),
+    eatStart: windowMinute,
+    eatEnd: windowMinute,
+    daysOfWeek: fastDaysList.optional(),
+  })
   .refine((value) => value.eatStart !== value.eatEnd, {
     message: "The window needs to open and close at different times.",
     path: ["eatEnd"],
   });
+
+export const exerciseCheckoffSchema = z.object({
+  exerciseId: cuid,
+});
 
 // ---------------------------------------------------------------- exercises
 

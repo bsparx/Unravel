@@ -2211,6 +2211,135 @@
   --oasis-rays: 0.16;
 }
 
+/* Body scenes: The waterfall grove (Exercises) and The olive orchard (Fasting). */
+:root {
+  --grove-dot: #269175;
+  --grove-sky-1: #cce7f0;
+  --grove-sky-2: #e2f2ea;
+  --grove-sky-3: #fef2de;
+  --grove-far: #9ec5be;
+  --grove-mid: #7ea89f;
+  --grove-cliff: #8e989b;
+  --grove-cliff-shade: #6c777c;
+  --grove-cliff-edge: #bcc7ca;
+  --grove-bank: #6b9a72;
+  --grove-water-light: #ccf7f2;
+  --grove-water: #48b8aa;
+  --grove-water-deep: #1f7b7a;
+  --grove-foam: #f7fffe;
+  --grove-stone: #8f9699;
+  --grove-stone-lit: #bcc4c7;
+  --grove-moss: #5c9e59;
+  --grove-fern: #3e7e50;
+  --grove-fern-lit: #63aa6c;
+  --grove-cedar: #366956;
+  --grove-cedar-lit: #528d73;
+  --grove-trunk: #5c4538;
+  --grove-birch-bark: #efe9de;
+  --grove-birch-leaf: #88be66;
+  --grove-birch-leaf-lit: #b8dc7e;
+  --grove-wood: #8c5e3c;
+  --grove-wood-lit: #bc8a5f;
+  --grove-flower-1: #f07b95;
+  --grove-flower-2: #ffcf63;
+  --grove-butterfly: #ffbe6b;
+  --grove-bird: #3d5563;
+  --grove-sun: #ffe8a8;
+
+  --orchard-dot: #b5681c;
+  --orchard-sky-1: #9a8dc9;
+  --orchard-sky-2: #d4a6c2;
+  --orchard-sky-3: #ffd4b0;
+  --orchard-amber: #ffac66;
+  --orchard-moon: #fff6dc;
+  --orchard-star: #ffffff;
+  --orchard-far: #9a8ab8;
+  --orchard-mid: #8073a3;
+  --orchard-hill: #6e7d62;
+  --orchard-near: #55664b;
+  --orchard-cypress: #3e5246;
+  --orchard-trunk: #63493a;
+  --orchard-leaf: #7d9676;
+  --orchard-leaf-lit: #a7be9d;
+  --orchard-leaf-shade: #5d7558;
+  --orchard-stone: #c7b59e;
+  --orchard-stone-lit: #e5d6c0;
+  --orchard-lantern: #ffbe5c;
+  --orchard-lantern-core: #fff6d6;
+  --orchard-wood: #6f4934;
+  --orchard-wood-lit: #9b6b4c;
+  --orchard-linen: #faf1e2;
+  --orchard-clay: #c46e48;
+  --orchard-date: #6a2f1d;
+  --orchard-water: #b9e3ea;
+  --orchard-lavender: #9b7cc2;
+  --orchard-thyme: #789a6e;
+}
+
+.dark {
+  --grove-dot: #62dbb8;
+  --grove-sky-1: #091826;
+  --grove-sky-2: #122b3a;
+  --grove-sky-3: #22444d;
+  --grove-far: #17333e;
+  --grove-mid: #1d4045;
+  --grove-cliff: #2c3c47;
+  --grove-cliff-shade: #1c2833;
+  --grove-cliff-edge: #4c6270;
+  --grove-bank: #1e3d35;
+  --grove-water-light: #89e5df;
+  --grove-water: #2b8a8b;
+  --grove-water-deep: #134a57;
+  --grove-foam: #d9fbf8;
+  --grove-stone: #384954;
+  --grove-stone-lit: #566b78;
+  --grove-moss: #2f6b53;
+  --grove-fern: #235946;
+  --grove-fern-lit: #3e8767;
+  --grove-cedar: #163737;
+  --grove-cedar-lit: #285751;
+  --grove-trunk: #2b211f;
+  --grove-birch-bark: #a9b2b8;
+  --grove-birch-leaf: #3b6b59;
+  --grove-birch-leaf-lit: #5d9478;
+  --grove-wood: #4f3628;
+  --grove-wood-lit: #7a5740;
+  --grove-flower-1: #df7293;
+  --grove-flower-2: #f0c265;
+  --grove-butterfly: #ffd085;
+  --grove-bird: #cde8ec;
+  --grove-sun: #ffe09e;
+
+  --orchard-dot: #ffc66b;
+  --orchard-sky-1: #070b26;
+  --orchard-sky-2: #1a1b4a;
+  --orchard-sky-3: #4a2f59;
+  --orchard-amber: #d97c4a;
+  --orchard-moon: #fff1c9;
+  --orchard-star: #ffffff;
+  --orchard-far: #1c1f45;
+  --orchard-mid: #24264e;
+  --orchard-hill: #24333a;
+  --orchard-near: #18252c;
+  --orchard-cypress: #132128;
+  --orchard-trunk: #2d2128;
+  --orchard-leaf: #38504d;
+  --orchard-leaf-lit: #557069;
+  --orchard-leaf-shade: #253839;
+  --orchard-stone: #4c4a63;
+  --orchard-stone-lit: #706c8a;
+  --orchard-lantern: #ffc468;
+  --orchard-lantern-core: #fff4cf;
+  --orchard-wood: #3e2827;
+  --orchard-wood-lit: #61413a;
+  --orchard-linen: #c9bfd4;
+  --orchard-clay: #9e5540;
+  --orchard-date: #471d18;
+  --orchard-water: #7db4c7;
+  --orchard-lavender: #886cb0;
+  --orchard-thyme: #4e6b58;
+}
+
 /* Daily recitation: the cards on the Heart page and the full-screen reader.
    The reader's sky brightens with --dawn (0 to 1) as the set goes on: rose
    before sunrise to warm day in light, deep night to violet first light in

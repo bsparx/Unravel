@@ -1,12 +1,13 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Dumbbell, Pin, RefreshCw, Shuffle, Sparkles, Star, Trash2 } from "lucide-react";
+import { Check, Dumbbell, Pin, Plus, RefreshCw, Shuffle, Sparkles, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { WEEKDAYS } from "@/lib/dates";
 import {
   ROUTINE_DAY_TYPE_LABELS,
@@ -17,7 +18,12 @@ import type { RoutineDayType, RoutineDifficulty } from "@/lib/exercise-routine";
 import { idleState } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 
-import { deleteRoutine, regenerateRoutine, unpinRoutineExercise } from "../actions";
+import {
+  deleteRoutine,
+  regenerateRoutine,
+  toggleExerciseCheckoff,
+  unpinRoutineExercise,
+} from "../actions";
 import type { HoveredExercise } from "./body-map";
 import {
   ExerciseDetailDialog,
@@ -54,6 +60,8 @@ export function RoutineWeek({
   slots,
   catalog,
   todayDow,
+  checkedTodayIds,
+  sceneEnabled,
   onHover,
 }: {
   routineId: string;
@@ -66,11 +74,63 @@ export function RoutineWeek({
   catalog: SwapCatalogExercise[];
   /** Today's weekday (0–6, Sunday first) — the chip on the grid. */
   todayDow: number;
+  /** Exercise ids already checked off today in the user's timezone. */
+  checkedTodayIds: string[];
+  /** Whether the Exercises scene is turned on, for toast copy. */
+  sceneEnabled: boolean;
   /** Lights the parts this exercise works on the figures below. */
   onHover: (hovered: HoveredExercise) => void;
 }) {
   const [swapping, setSwapping] = useState<RoutineSlot | null>(null);
+  const [overrides, setOverrides] = useState<Record<string, boolean>>({});
+  const [, startToggle] = useTransition();
   const router = useRouter();
+
+  const checkedServerSet = new Set(checkedTodayIds);
+  const isCheckedToday = (exerciseId: string) =>
+    Object.hasOwn(overrides, exerciseId)
+      ? overrides[exerciseId]
+      : checkedServerSet.has(exerciseId);
+
+  const uniqueRoutineExercises = Array.from(
+    new Map(slots.map((slot) => [slot.exercise.id, slot.exercise])).values(),
+  );
+
+  const totalCheckedToday = new Set([
+    ...checkedTodayIds.filter((id) => overrides[id] !== false),
+    ...Object.entries(overrides)
+      .filter(([, on]) => on)
+      .map(([id]) => id),
+  ]).size;
+
+  const handleToggleCheckoff = (exerciseId: string) => {
+    const next = !isCheckedToday(exerciseId);
+    const wasDoneToday = totalCheckedToday > 0;
+    setOverrides((prev) => ({ ...prev, [exerciseId]: next }));
+
+    startToggle(async () => {
+      try {
+        const state = await toggleExerciseCheckoff(exerciseId);
+        if (state.status === "error") {
+          toast.error(state.message);
+        } else if (state.checked && !wasDoneToday) {
+          toast.success(
+            sceneEnabled
+              ? "Checked off — today counts for the grove."
+              : "Checked off for today.",
+          );
+        }
+      } catch {
+        toast.error("Couldn't save that check-off. Try again.");
+      } finally {
+        setOverrides((prev) => {
+          const rest = { ...prev };
+          delete rest[exerciseId];
+          return rest;
+        });
+      }
+    });
+  };
 
   // Regenerate and unpin are submitted as real forms, so Next folds the
   // revalidated week straight back into the tree. Delete is fired from a
@@ -156,22 +216,108 @@ export function RoutineWeek({
               </div>
 
               {training ? (
-                <ol className="flex-1 space-y-1.5 px-1.5 pb-1.5">
-                  {daySlots.map((slot) => (
-                    <SlotCard
-                      key={slot.position}
-                      slot={slot}
-                      routineId={routineId}
-                      unpinAction={unpinAction}
-                      onSwap={() => setSwapping(slot)}
-                      onHover={onHover}
-                    />
-                  ))}
-                </ol>
+                <div className="flex flex-1 flex-col">
+                  {isToday && (
+                    <div className="px-2.5 pb-1.5">
+                      {totalCheckedToday > 0 ? (
+                        <span className="bg-flow-muted text-flow inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums">
+                          <Check className="size-3 stroke-[2.5]" aria-hidden />
+                          Done · {daySlots.filter((s) => isCheckedToday(s.exercise.id)).length}/{daySlots.length}
+                        </span>
+                      ) : (
+                        <p className="text-muted-foreground text-[11px]">
+                          Check off 1+ to count today
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  <ol className="flex-1 space-y-1.5 px-1.5 pb-1.5">
+                    {daySlots.map((slot) => (
+                      <SlotCard
+                        key={slot.position}
+                        slot={slot}
+                        routineId={routineId}
+                        unpinAction={unpinAction}
+                        canCheck={isToday}
+                        checked={isToday && isCheckedToday(slot.exercise.id)}
+                        onToggleCheck={() => handleToggleCheckoff(slot.exercise.id)}
+                        onSwap={() => setSwapping(slot)}
+                        onHover={onHover}
+                      />
+                    ))}
+                  </ol>
+                </div>
               ) : (
-                <p className="text-muted-foreground px-2.5 pb-3 text-label">
-                  Rest
-                </p>
+                <div className="flex flex-1 flex-col justify-between gap-2 px-2.5 pb-3">
+                  <div className="space-y-1">
+                    <p className="text-muted-foreground text-label">Rest</p>
+                    {isToday && totalCheckedToday > 0 && (
+                      <span className="bg-flow-muted text-flow inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums">
+                        <Check className="size-3 stroke-[2.5]" aria-hidden />
+                        Bonus · {totalCheckedToday} done
+                      </span>
+                    )}
+                    {isToday && totalCheckedToday === 0 && sceneEnabled && (
+                      <p className="text-muted-foreground text-[11px] leading-snug">
+                        Scene holds steady
+                      </p>
+                    )}
+                  </div>
+                  {isToday && uniqueRoutineExercises.length > 0 && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex items-center gap-1 self-start rounded-full text-[11px] font-medium underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-none"
+                        >
+                          <Plus className="size-3" aria-hidden />
+                          {totalCheckedToday > 0 ? "Edit bonus" : "Did one anyway?"}
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="w-64 space-y-2 p-3">
+                        <p className="text-micro font-medium">
+                          Check off an exercise today
+                        </p>
+                        <p className="text-muted-foreground text-[11px]">
+                          Rest days never cost a stage — checking one off adds a bonus stage.
+                        </p>
+                        <ul className="max-h-56 space-y-1 overflow-y-auto pt-1">
+                          {uniqueRoutineExercises.map((ex) => {
+                            const checked = isCheckedToday(ex.id);
+                            return (
+                              <li key={ex.id}>
+                                <button
+                                  type="button"
+                                  aria-pressed={checked}
+                                  onClick={() => handleToggleCheckoff(ex.id)}
+                                  className={cn(
+                                    "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-label transition-colors",
+                                    checked
+                                      ? "bg-flow-muted/70 text-foreground font-medium"
+                                      : "hover:bg-muted text-muted-foreground hover:text-foreground",
+                                  )}
+                                >
+                                  <span
+                                    className={cn(
+                                      "grid size-4 shrink-0 place-items-center rounded-full border",
+                                      checked
+                                        ? "border-flow bg-flow text-flow-foreground"
+                                        : "border-border",
+                                    )}
+                                    aria-hidden
+                                  >
+                                    {checked && <Check className="size-2.5 stroke-[3]" />}
+                                  </span>
+                                  <span className="truncate">{ex.name}</span>
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </div>
               )}
             </div>
           );
@@ -255,12 +401,18 @@ function SlotCard({
   slot,
   routineId,
   unpinAction,
+  canCheck,
+  checked,
+  onToggleCheck,
   onSwap,
   onHover,
 }: {
   slot: RoutineSlot;
   routineId: string;
   unpinAction: (formData: FormData) => void;
+  canCheck: boolean;
+  checked: boolean;
+  onToggleCheck: () => void;
   onSwap: () => void;
   onHover: (hovered: HoveredExercise) => void;
 }) {
@@ -271,7 +423,14 @@ function SlotCard({
     });
 
   return (
-    <li className="border-border/60 hover:border-primary/40 focus-within:border-primary/40 rounded-md border bg-background/50 transition-colors">
+    <li
+      className={cn(
+        "rounded-md border transition-colors",
+        checked
+          ? "border-flow/45 bg-flow-muted/35"
+          : "border-border/60 hover:border-primary/40 focus-within:border-primary/40 bg-background/50",
+      )}
+    >
       <ExerciseDetailDialog exercise={slot.exercise}>
         {(open) => (
           <button
@@ -293,7 +452,12 @@ function SlotCard({
                 >
                   {slot.position + 1}
                 </span>
-                <span className="hover:text-primary truncate text-label leading-4 font-medium">
+                <span
+                  className={cn(
+                    "hover:text-primary truncate text-label leading-4 font-medium",
+                    checked && "text-foreground/75 line-through decoration-flow/60",
+                  )}
+                >
                   {slot.exercise.name}
                 </span>
               </span>
@@ -310,34 +474,55 @@ function SlotCard({
         )}
       </ExerciseDetailDialog>
 
-      <div className="flex items-center justify-end gap-0.5 pb-1 pr-1">
-        {slot.swapped && (
-          <form action={unpinAction}>
-            <input type="hidden" name="routineId" value={routineId} />
-            <input type="hidden" name="dayOfWeek" value={slot.dayOfWeek} />
-            <input type="hidden" name="position" value={slot.position} />
-            <Button
-              type="submit"
-              variant="ghost"
-              size="icon"
-              className="text-primary size-6"
-              title="Pinned — Regenerate leaves this one alone. Click to release it."
-            >
-              <span className="sr-only">Unpin {slot.exercise.name}</span>
-              <Pin className="size-3 fill-current" aria-hidden />
-            </Button>
-          </form>
+      <div className="flex items-center justify-between gap-1 px-1.5 pb-1.5">
+        {canCheck ? (
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={checked}
+            onClick={onToggleCheck}
+            className={cn(
+              "focus-visible:ring-ring inline-flex min-h-7 items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none",
+              checked
+                ? "border-flow/40 bg-flow text-flow-foreground"
+                : "border-border bg-background/70 text-muted-foreground hover:border-flow/45 hover:text-foreground",
+            )}
+          >
+            <Check className={cn("size-3", checked ? "stroke-[2.75]" : "opacity-55")} aria-hidden />
+            <span>{checked ? "Done" : "Check off"}</span>
+          </button>
+        ) : (
+          <span />
         )}
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="text-muted-foreground hover:text-foreground size-6"
-          onClick={onSwap}
-        >
-          <Shuffle className="size-3" aria-hidden />
-          <span className="sr-only">Swap {slot.exercise.name}</span>
-        </Button>
+        <div className="flex items-center gap-0.5">
+          {slot.swapped && (
+            <form action={unpinAction}>
+              <input type="hidden" name="routineId" value={routineId} />
+              <input type="hidden" name="dayOfWeek" value={slot.dayOfWeek} />
+              <input type="hidden" name="position" value={slot.position} />
+              <Button
+                type="submit"
+                variant="ghost"
+                size="icon"
+                className="text-primary size-6"
+                title="Pinned — Regenerate leaves this one alone. Click to release it."
+              >
+                <span className="sr-only">Unpin {slot.exercise.name}</span>
+                <Pin className="size-3 fill-current" aria-hidden />
+              </Button>
+            </form>
+          )}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground hover:text-foreground size-6"
+            onClick={onSwap}
+          >
+            <Shuffle className="size-3" aria-hidden />
+            <span className="sr-only">Swap {slot.exercise.name}</span>
+          </Button>
+        </div>
       </div>
     </li>
   );

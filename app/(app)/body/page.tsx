@@ -8,8 +8,9 @@ import { requireUser } from "@/lib/auth";
 import { bodyEnabled, getFasting } from "@/lib/body-data";
 import { enabledBodyTabs, type BodyEnabled, type BodyTab } from "@/lib/body-tabs";
 import { prisma } from "@/lib/db";
-import { todayLocal } from "@/lib/dates";
+import { toISODate, todayLocal } from "@/lib/dates";
 import type { User } from "@/lib/generated/prisma/client";
+import { historySince, scheduledByWeekdays, tend } from "@/lib/tending";
 
 import { BodyBoard } from "./_components/body-board";
 import { ExercisesView } from "./_components/exercises-view";
@@ -75,7 +76,7 @@ function intro(enabled: BodyEnabled): string {
 }
 
 async function loadExercises(user: User): Promise<ExercisesData> {
-  const [exercises, routine] = await Promise.all([
+  const [exercises, routine, checkoffs] = await Promise.all([
     prisma.exercise.findMany({
       where: { active: true },
       orderBy: { sortOrder: "asc" },
@@ -84,7 +85,49 @@ async function loadExercises(user: User): Promise<ExercisesData> {
       where: { userId: user.id },
       include: { exercises: { include: { exercise: true } } },
     }),
+    // Every check-off day ever logged, for the Exercises scene (lib/tending.ts).
+    prisma.exerciseCheckoff.findMany({
+      where: { userId: user.id },
+      select: { date: true, exerciseId: true },
+    }),
   ]);
+
+  const today = todayLocal(user.timezone);
+  const todayISO = toISODate(today);
+  const dayLabel = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "UTC",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+
+  const countsByDay = new Map<string, number>();
+  const checkedTodayIds: string[] = [];
+  for (const row of checkoffs) {
+    const iso = toISODate(row.date);
+    countsByDay.set(iso, (countsByDay.get(iso) ?? 0) + 1);
+    if (iso === todayISO) checkedTodayIds.push(row.exerciseId);
+  }
+
+  const daysOfWeek = routine?.daysOfWeek ?? [];
+  const isScheduled =
+    daysOfWeek.length > 0 ? scheduledByWeekdays(daysOfWeek) : () => false;
+
+  const tending = tend(
+    historySince(
+      todayISO,
+      countsByDay.keys(),
+      (date) => dayLabel.format(date),
+      isScheduled,
+    ),
+  );
+
+  const dayNotes = Object.fromEntries(
+    [...countsByDay].map(([iso, count]) => [
+      iso,
+      `${count} ${count === 1 ? "exercise" : "exercises"}`,
+    ]),
+  );
 
   const detail = (exercise: (typeof exercises)[number]) => ({
     id: exercise.id,
@@ -102,11 +145,15 @@ async function loadExercises(user: User): Promise<ExercisesData> {
   return {
     // The week's "today" chip. Server-computed because a weekday doesn't
     // change mid-session, so there's nothing to hydrate-mismatch.
-    todayDow: todayLocal(user.timezone).getUTCDay(),
+    todayDow: today.getUTCDay(),
+    sceneEnabled: user.bodyExercisesSceneEnabled,
+    tending,
+    dayNotes,
+    checkedTodayIds,
     routineId: routine?.id ?? null,
     equipment: routine?.equipment ?? "MIX",
     difficulty: routine?.difficulty ?? "CHALLENGING",
-    daysOfWeek: routine?.daysOfWeek ?? [],
+    daysOfWeek,
     dayTypes: routine?.dayTypes ?? [],
     slots:
       routine?.exercises.map((slot) => ({

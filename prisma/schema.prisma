@@ -396,15 +396,21 @@ model User {
 
   // Body. Exercises and intermittent fasting, each switchable; with both off
   // the page leaves the sidebar and the mobile bar.
-  bodyExercisesEnabled Boolean  @default(true)
-  bodyFastingEnabled   Boolean  @default(true)
+  bodyExercisesEnabled      Boolean  @default(true)
+  bodyFastingEnabled        Boolean  @default(true)
+  /// Whether the 14-stage tending scenes show on the Exercises and Fasting tabs.
+  bodyExercisesSceneEnabled Boolean  @default(true)
+  bodyFastingSceneEnabled   Boolean  @default(true)
   /// Which fast the plan is: an eating window by the clock, or Islamic
   /// (sawm), Fajr to Maghrib from the prayer city's timings.
-  fastKind             FastKind @default(INTERMITTENT)
+  fastKind                  FastKind @default(INTERMITTENT)
   /// The eating window, as minutes of the local day (0-1439). End may be
   /// earlier than start: a window that runs past midnight. 12:00-20:00 is 16:8.
-  fastEatStart         Int      @default(720)
-  fastEatEnd           Int      @default(1200)
+  fastEatStart              Int      @default(720)
+  fastEatEnd                Int      @default(1200)
+  /// Scheduled fasting weekdays (0 = Sunday .. 6 = Saturday). Unscheduled
+  /// days hold the Fasting scene steady instead of deducting a stage.
+  fastDaysOfWeek            Int[]    @default([0, 1, 2, 3, 4, 5, 6])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -417,6 +423,7 @@ model User {
   dayLogs             DayLog[]
   journal             JournalEntry[]
   fasts               Fast[]
+  exerciseCheckoffs   ExerciseCheckoff[]
   meditations         MeditationSession[]
   books               Book[]
   readingLogs         ReadingLog[]
@@ -1706,6 +1713,7 @@ model Exercise {
   updatedAt DateTime @updatedAt
 
   routineSlots RoutineExercise[]
+  checkoffs    ExerciseCheckoff[]
 
   @@unique([name])
   @@index([equipment, goal])
@@ -1776,6 +1784,27 @@ model RoutineExercise {
 
   @@unique([routineId, dayOfWeek, position])
   @@index([routineId, dayOfWeek])
+  @@index([exerciseId])
+}
+
+/// One exercise checked off on a local calendar day. Checking off at least one
+/// exercise from your selected list counts the day as trained for the
+/// Exercises scene. Keyed by Exercise (not RoutineExercise) so regenerating or
+/// rebuilding a routine never wipes past exercise history.
+model ExerciseCheckoff {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exerciseId String
+  exercise   Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  /// Local calendar date in User.timezone, as a UTC-midnight DATE.
+  date DateTime @db.Date
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, exerciseId, date])
+  @@index([userId, date])
   @@index([exerciseId])
 }
 

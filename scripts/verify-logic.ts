@@ -60,7 +60,14 @@ import {
 } from "@/lib/practice-time";
 import { SCENE_KEYS } from "@/lib/scenes";
 import { SCENES, sceneCaption, stageIdsAt } from "@/lib/scenes";
-import { TEND_DAYS, historySince, step as tendStep, tend, type TendDay } from "@/lib/tending";
+import {
+  TEND_DAYS,
+  historySince,
+  scheduledByWeekdays,
+  step as tendStep,
+  tend,
+  type TendDay,
+} from "@/lib/tending";
 import { bookSchema, brainDumpSchema, meditationSessionSchema, readingLogSchema } from "@/lib/validation";
 import { clock, dumpLines, isBedtime, suggestedKind, taskTitle, wordCount } from "@/lib/brain-dump";
 import {
@@ -109,7 +116,9 @@ import {
 import {
   FAST_PROTOCOLS,
   dailyTotals,
+  describeFastDays,
   eatMinutes,
+  fastDoneDays,
   fastMinutes,
   fastProgress,
   formatHM,
@@ -117,6 +126,7 @@ import {
   islamicEnd,
   islamicMinutes,
   islamicStripWindow,
+  normalizeFastDays,
   normalizeWindow,
   phaseAt,
   protocolOf,
@@ -124,7 +134,7 @@ import {
   windowFor,
   windowRatio,
 } from "@/lib/fasting";
-import { fastUpdateSchema, fastPlanSchema } from "@/lib/validation";
+import { exerciseCheckoffSchema, fastPlanSchema, fastUpdateSchema } from "@/lib/validation";
 
 import { nextFreeSlot, stageFor } from "@/lib/identity-look";
 import { reviewWeekStart } from "@/lib/review-week";
@@ -4394,8 +4404,8 @@ check("gratitude and du'a moved to Heart; Mind keeps the other five", () => {
   assert.ok(!(MIND_TABS as readonly string[]).includes("dua"));
   assert.equal(MIND_TABS.length, 5);
   assert.deepEqual(enabledHeartTabs({ gratitude: false, dua: true, recitation: true }), ["dua", "recitation"]);
-  // Every practice still has its scene, the oasis included.
-  assert.equal(new Set(SCENE_KEYS).size, 8);
+  // Every practice still has its scene — Heart (3), Mind (5), and Body (2).
+  assert.equal(new Set(SCENE_KEYS).size, 10);
   assert.equal(SCENES.recitation.stages[0].id, "spring");
   assert.equal(sceneCaption(SCENES.recitation, tend(days("xxxxxxxxxxxxxxx"))).title, "The oasis is in full light.");
   assert.equal(sceneCaption(SCENES.recitation, tend(days("..............."))).line, "Recite today's set to bring a spring welling up.");
@@ -4963,6 +4973,160 @@ check("mind & heart practice durations add directly into daily and window produc
   // Deselecting WOOP removes its 10 minutes from the day's total cleanly.
   const withoutWoop = new Set(["h1", "mind:meditate", "mind:reading", "heart:recitation"]);
   assert.equal(summarizeDay(day1, withoutWoop).totalProductiveSeconds, 3300);
+});
+
+console.log("\nbody scenes — schedule-aware tending for exercises & fasting");
+
+check("rest / off-schedule days hold a scene steady (0) while bonus days add +1", () => {
+  // step(level, done, scheduled)
+  assert.equal(tendStep(4, false, false), 4, "skipping a rest day costs 0");
+  assert.equal(tendStep(4, true, false), 5, "doing a bonus day still adds +1");
+  assert.equal(tendStep(4, false, true), 3, "missing a scheduled day costs -1");
+  assert.equal(tendStep(4, true, true), 5, "keeping a scheduled day adds +1");
+  assert.equal(tendStep(14, true, false), 14, "capped at 14");
+
+  // Mon/Wed/Fri schedule (1, 3, 5) over 2+ weeks:
+  // 2026-11-09 (Mon) .. 2026-11-22 (Sun — rest day!).
+  const mwf = scheduledByWeekdays([1, 3, 5]);
+  const label = (d: Date) => d.toISOString().slice(5, 10);
+  // Done on Mon 9, Wed 11, Fri 13, Mon 16, (missed Wed 18!), Fri 20.
+  const history = historySince(
+    "2026-11-22",
+    ["2026-11-09", "2026-11-11", "2026-11-13", "2026-11-16", "2026-11-20"],
+    label,
+    mwf,
+  );
+  // Mon 9 (+1=1), Tue rest (1), Wed 11 (+1=2), Thu rest (2), Fri 13 (+1=3),
+  // Sat/Sun rest (3), Mon 16 (+1=4), Tue rest (4), Wed 18 MISSED (-1=3),
+  // Thu rest (3), Fri 20 (+1=4), Sat 21 rest (4), Sun 22 today rest (4).
+  const t = tend(history);
+  assert.equal(t.level, 4);
+  assert.equal(t.today, false);
+  assert.equal(t.todayScheduled, false);
+  assert.equal(t.ifSkipped, 4, "rest day today will not deduct tomorrow");
+  assert.equal(t.ifDone, 5, "bonus workout today still adds +1");
+
+  // Caption on a rest day reassures instead of nagging.
+  const restCap = sceneCaption(SCENES.exercises, t);
+  assert.equal(restCap.title, "Stage 4 of 14");
+  assert.match(restCap.line, /Rest day/);
+
+  // Bonus workout on Sunday rest day raises level from 4 -> 5!
+  const withBonus = tend(
+    historySince(
+      "2026-11-22",
+      ["2026-11-09", "2026-11-11", "2026-11-13", "2026-11-16", "2026-11-20", "2026-11-22"],
+      label,
+      mwf,
+    ),
+  );
+  assert.equal(withBonus.level, 5);
+  assert.equal(withBonus.today, true);
+  assert.equal(sceneCaption(SCENES.exercises, withBonus).line, "Today brought a clear pool below.");
+});
+
+check("fasting schedule, done-day bucketing, and body scene settings validate cleanly", () => {
+  assert.deepEqual(normalizeFastDays([]), [0, 1, 2, 3, 4, 5, 6]);
+  assert.deepEqual(normalizeFastDays([4, 1, 4, 9]), [1, 4]);
+  assert.equal(describeFastDays([0, 1, 2, 3, 4, 5, 6]), "Every day");
+  assert.equal(describeFastDays([1, 4]), "Mon & Thu");
+  assert.equal(describeFastDays([1, 2, 3, 4, 5]), "Weekdays");
+
+  const tz = "Asia/Karachi"; // UTC+5
+  const now = new Date("2026-11-22T12:00:00Z"); // 17:00 PKT on Sun 22 Nov
+  const fasts = [
+    // Completed fast ending Thu 19 Nov 12:15 PKT -> counts 2026-11-19.
+    {
+      id: "f1",
+      startedAt: new Date("2026-11-18T15:00:00Z"),
+      endedAt: new Date("2026-11-19T07:15:00Z"),
+      targetMinutes: 960,
+    },
+    // Short ended fast on Mon 16 Nov -> still counts ("a shorter fast is still a fast").
+    {
+      id: "f2",
+      startedAt: new Date("2026-11-16T01:00:00Z"),
+      endedAt: new Date("2026-11-16T08:00:00Z"),
+      targetMinutes: 960,
+    },
+    // Open fast started only 2h ago (target 16h) -> does NOT count today yet.
+    {
+      id: "f3",
+      startedAt: new Date("2026-11-22T10:00:00Z"),
+      endedAt: null,
+      targetMinutes: 960,
+    },
+    // Future Suhoor intention for tomorrow -> does NOT count.
+    {
+      id: "f4",
+      startedAt: new Date("2026-11-23T00:15:00Z"),
+      endedAt: null,
+      targetMinutes: 720,
+    },
+  ];
+  assert.deepEqual(fastDoneDays(fasts, tz, now), ["2026-11-16", "2026-11-19"]);
+
+  // An open fast that HAS reached its goal counts today immediately.
+  const reachedOpen = [
+    ...fasts.slice(0, 2),
+    {
+      id: "f5",
+      startedAt: new Date("2026-11-21T19:00:00Z"),
+      endedAt: null,
+      targetMinutes: 960, // 17h elapsed >= 16h target
+    },
+  ];
+  assert.deepEqual(fastDoneDays(reachedOpen, tz, now), [
+    "2026-11-16",
+    "2026-11-19",
+    "2026-11-22",
+  ]);
+
+  // Mon & Thu schedule: Mon 16 done (+1), Tue/Wed rest (1), Thu 19 done (+1=2),
+  // Fri/Sat/Sun rest (2).
+  const sunnah = tend(
+    historySince(
+      "2026-11-22",
+      ["2026-11-16", "2026-11-19"],
+      (d) => d.toISOString().slice(5, 10),
+      scheduledByWeekdays([1, 4]),
+    ),
+  );
+  assert.equal(sunnah.level, 2);
+  assert.equal(sunnah.todayScheduled, false);
+  assert.match(sceneCaption(SCENES.fasting, sunnah).line, /Off-schedule day/);
+
+  // Schemas accept new scene switches, fastDaysOfWeek, and exercise checkoffs.
+  const planParsed = fastPlanSchema.parse({
+    kind: "ISLAMIC",
+    eatStart: "720",
+    eatEnd: "1200",
+    daysOfWeek: "4,1",
+  });
+  assert.deepEqual(planParsed.daysOfWeek, [1, 4]);
+  assert.equal(
+    fastPlanSchema.safeParse({ kind: "INTERMITTENT", eatStart: "720", eatEnd: "1200", daysOfWeek: "" }).success,
+    false,
+    "at least one fasting day required when supplied",
+  );
+  assert.equal(
+    exerciseCheckoffSchema.safeParse({ exerciseId: "cm1234567890abcdefgh" }).success,
+    true,
+  );
+  const s = settingsSchema.parse({
+    timezone: "Asia/Karachi",
+    weekStart: "1",
+    pomodoroMinutes: "25",
+    shortBreakMinutes: "5",
+    longBreakMinutes: "15",
+    longBreakEvery: "4",
+    bodyExercisesSceneEnabled: false,
+    bodyFastingSceneEnabled: true,
+    fastDaysOfWeek: "1,4",
+  });
+  assert.equal(s.bodyExercisesSceneEnabled, false);
+  assert.equal(s.bodyFastingSceneEnabled, true);
+  assert.deepEqual(s.fastDaysOfWeek, [1, 4]);
 });
 
 console.log(`\n${passed} checks passed.\n`);

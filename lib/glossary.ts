@@ -144,8 +144,8 @@ export const GLOSSARY = {
   },
   body: {
     title: "Body",
-    what: "Exercises and intermittent fasting on one page, each switchable in Settings. Exercises is your corrective week and the body-map catalog; Fasting is your eating window and a log of real fasts.",
-    why: "Moving and eating are the two daily things the body asks for. Keeping them together makes the day's plan for the body one glance.",
+    what: "Exercises and fasting on one page, each switchable (along with their scenes) in Settings. Exercises is your corrective week where checking off even one exercise counts the day; Fasting is your eating window, schedule and log of real fasts.",
+    why: "Moving and fasting are the two rhythms the body asks for. Rest and off-schedule days hold your scenes steady without penalty.",
   },
   fasting: {
     title: "Fasting",
@@ -179,8 +179,8 @@ export const GLOSSARY = {
   },
   scene: {
     title: "The scene",
-    what: "Each practice has a place of its own with fourteen things to come into it. Every day you do the practice brings the next one; every day you miss takes the newest one away. Fourteen and it's whole. Today counts the moment it's done, and isn't held against you while it's still open.",
-    why: "Consistency over everything else. There are no points and no totals, and nothing is banked: a missed day always costs one thing, and the next day you come back always earns it back. Every day you show up brings something, or keeps a whole scene whole.",
+    what: "Each practice has a place of its own with fourteen things to come into it. Every day you do the practice brings the next one; every scheduled day you miss takes the newest one away. Fourteen and it's whole. Today counts the moment it's done, and scheduled rest days hold steady without penalty.",
+    why: "Consistency over everything else. There are no points and no totals, and nothing is banked: a missed scheduled day always costs one thing, and the next day you come back always earns it back. Every day you show up brings something, or keeps a whole scene whole.",
   },
   reading: {
     title: "Reading",

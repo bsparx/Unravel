@@ -206,9 +206,11 @@ export async function setFastingPlan(formData: FormData): Promise<ActionState> {
       fastKind: parsed.data.kind,
       fastEatStart: parsed.data.eatStart,
       fastEatEnd: parsed.data.eatEnd,
+      ...(parsed.data.daysOfWeek ? { fastDaysOfWeek: parsed.data.daysOfWeek } : {}),
     },
   });
 
   revalidatePath("/body");
+  revalidatePath("/settings");
   return { status: "success" };
 }

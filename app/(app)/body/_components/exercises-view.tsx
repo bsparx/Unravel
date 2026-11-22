@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Plus, Sparkles } from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
+import { SceneCard } from "@/components/scenes/scene-card";
 import { Button } from "@/components/ui/button";
 import { WEEKDAYS } from "@/lib/dates";
 import {
@@ -15,6 +16,7 @@ import {
   type RoutineDayType,
   type RoutineDifficulty,
 } from "@/lib/exercise-routine";
+import type { Tending } from "@/lib/tending";
 
 import type { HoveredExercise } from "./body-map";
 import {
@@ -33,6 +35,10 @@ import { RoutineWeek, type RoutineSlot } from "./routine-week";
  * figures.
  */
 export function ExercisesView({
+  sceneEnabled,
+  tending,
+  dayNotes,
+  checkedTodayIds,
   routineId,
   equipment,
   difficulty,
@@ -42,6 +48,10 @@ export function ExercisesView({
   catalog,
   todayDow,
 }: {
+  sceneEnabled: boolean;
+  tending: Tending;
+  dayNotes: Record<string, string>;
+  checkedTodayIds: string[];
   routineId: string | null;
   equipment: "YOGA" | "DUMBBELL" | "MIX";
   difficulty: RoutineDifficulty;
@@ -72,6 +82,16 @@ export function ExercisesView({
   return (
     <div>
       <div className="space-y-12">
+        {sceneEnabled && (
+          <div className="max-w-4xl">
+            <SceneCard
+              tab="exercises"
+              tending={tending}
+              note={(day) => dayNotes[day.dateISO] ?? null}
+            />
+          </div>
+        )}
+
         <header className="space-y-2">
           <p className="text-micro text-muted-foreground font-medium tracking-wider uppercase">
             Undoing the desk
@@ -103,6 +123,8 @@ export function ExercisesView({
             slots={slots}
             catalog={catalog}
             todayDow={todayDow}
+            checkedTodayIds={checkedTodayIds}
+            sceneEnabled={sceneEnabled}
             onHover={setHovered}
           />
         ) : (

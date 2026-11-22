@@ -37,6 +37,8 @@ export async function updateSettings(
     "heartRecitationEnabled",
     "bodyExercisesEnabled",
     "bodyFastingEnabled",
+    "bodyExercisesSceneEnabled",
+    "bodyFastingSceneEnabled",
   ]) {
     values[key] = values[key] === "on" || values[key] === "true";
   }
@@ -107,9 +109,12 @@ export async function updateSettings(
       duaCount: input.duaCount,
       bodyExercisesEnabled: input.bodyExercisesEnabled,
       bodyFastingEnabled: input.bodyFastingEnabled,
+      bodyExercisesSceneEnabled: input.bodyExercisesSceneEnabled,
+      bodyFastingSceneEnabled: input.bodyFastingSceneEnabled,
       fastKind: input.fastKind,
       fastEatStart: input.fastEatStart,
       fastEatEnd: input.fastEatEnd,
+      fastDaysOfWeek: input.fastDaysOfWeek,
     },
   });
 

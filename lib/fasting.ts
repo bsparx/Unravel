@@ -8,13 +8,74 @@
  * is just a shorter fast.
  */
 
-import { addDays, toISODate, toLocalDate } from "@/lib/dates";
+import { EVERY_DAY, WEEKDAYS, addDays, toISODate, toLocalDate } from "@/lib/dates";
 
 export const MINUTES_PER_DAY = 1440;
 /** Longer than this isn't something the log is for. */
 export const MAX_FAST_MINUTES = 72 * 60;
 /** Clocks drift; a fast may end up to this far "in the future". */
 const FUTURE_GRACE_MS = 5 * 60_000;
+
+/** Default fasting schedule: every day of the week (0 = Sunday .. 6 = Saturday). */
+export const DEFAULT_FAST_DAYS: readonly number[] = EVERY_DAY;
+
+export const FAST_DAY_PRESETS: readonly { id: string; label: string; days: readonly number[] }[] = [
+  { id: "every-day", label: "Every day", days: [0, 1, 2, 3, 4, 5, 6] },
+  { id: "mon-thu", label: "Mon & Thu", days: [1, 4] },
+  { id: "weekdays", label: "Weekdays", days: [1, 2, 3, 4, 5] },
+  { id: "mwf", label: "Mon, Wed, Fri", days: [1, 3, 5] },
+];
+
+/** Clean a stored weekday list (0..6, unique, sorted). Falls back to every day. */
+export function normalizeFastDays(raw: readonly number[] | null | undefined): number[] {
+  if (!raw || raw.length === 0) return [...DEFAULT_FAST_DAYS];
+  const valid = [...new Set(raw.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort((a, b) => a - b);
+  return valid.length > 0 ? valid : [...DEFAULT_FAST_DAYS];
+}
+
+/** Compact prose for the fasting schedule ("Every day", "Mon & Thu", "Weekdays", etc.). */
+export function describeFastDays(days: readonly number[]): string {
+  const clean = normalizeFastDays(days);
+  if (clean.length === 7) return "Every day";
+  if (clean.length === 5 && clean.every((d, i) => d === i + 1)) return "Weekdays";
+  if (clean.length === 2 && clean[0] === 0 && clean[1] === 6) return "Weekends";
+  const names = clean.map((d) => WEEKDAYS[d]?.short ?? "");
+  if (names.length === 2) return `${names[0]} & ${names[1]}`;
+  return names.join(", ");
+}
+
+/**
+ * Local calendar dates (YYYY-MM-DD) that count as fasted for the Fasting scene:
+ *   - Any completed fast (`endedAt !== null && endedAt > startedAt`) counts on
+ *     the local day it ended on ("a shorter fast is still a fast").
+ *   - An open fast (`endedAt === null`) that has already started and reached
+ *     its target counts for today immediately (starting tonight's fast for
+ *     tomorrow, or a future Suhoor intention, does not count prematurely).
+ */
+export function fastDoneDays(
+  fasts: readonly (FastSpan & { targetMinutes: number })[],
+  timeZone: string,
+  now: Date,
+): string[] {
+  const done = new Set<string>();
+  const todayISO = toISODate(toLocalDate(now, timeZone));
+
+  for (const fast of fasts) {
+    if (fast.endedAt) {
+      if (fast.endedAt.getTime() > fast.startedAt.getTime()) {
+        done.add(toISODate(toLocalDate(fast.endedAt, timeZone)));
+      }
+      continue;
+    }
+    if (fast.startedAt.getTime() > now.getTime()) continue;
+    const elapsedMinutes = Math.floor((now.getTime() - fast.startedAt.getTime()) / 60_000);
+    if (elapsedMinutes >= Math.max(1, fast.targetMinutes)) {
+      done.add(todayISO);
+    }
+  }
+
+  return [...done].sort();
+}
 
 export type FastWindow = { eatStart: number; eatEnd: number };
 

@@ -1,6 +1,6 @@
 import { requireUser } from "@/lib/auth";
 import { supportedTimeZones } from "@/lib/dates";
-import { normalizeWindow } from "@/lib/fasting";
+import { normalizeFastDays, normalizeWindow } from "@/lib/fasting";
 import { clampCount, templateOrDefault } from "@/lib/practices";
 
 import { SettingsForm } from "./_components/settings-form";
@@ -59,9 +59,12 @@ export default async function SettingsPage() {
           duaCount: clampCount(user.duaCount),
           bodyExercisesEnabled: user.bodyExercisesEnabled,
           bodyFastingEnabled: user.bodyFastingEnabled,
+          bodyExercisesSceneEnabled: user.bodyExercisesSceneEnabled,
+          bodyFastingSceneEnabled: user.bodyFastingSceneEnabled,
           fastKind: user.fastKind,
           fastEatStart: window.eatStart,
           fastEatEnd: window.eatEnd,
+          fastDaysOfWeek: normalizeFastDays(user.fastDaysOfWeek),
         }}
       />
     </div>

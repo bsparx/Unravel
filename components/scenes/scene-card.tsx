@@ -11,9 +11,11 @@ import { cn } from "@/lib/utils";
 
 import { BalloonScene } from "./balloon-scene";
 import { CourtyardScene } from "./courtyard-scene";
+import { GroveScene } from "./grove-scene";
 import { HarbourScene } from "./harbour-scene";
 import { NookScene } from "./nook-scene";
 import { OasisScene } from "./oasis-scene";
+import { OrchardScene } from "./orchard-scene";
 import type { SceneProps } from "./scene-frame";
 import { SummitScene } from "./summit-scene";
 import { TerraceScene } from "./terrace-scene";
@@ -27,6 +29,8 @@ export const SCENE_ART: Record<SceneKey, ComponentType<SceneProps>> = {
   reading: NookScene,
   wishes: SummitScene,
   disputations: HarbourScene,
+  exercises: GroveScene,
+  fasting: OrchardScene,
 };
 
 /** Each practice's own colour for a day kept, as on its tab. */
@@ -39,6 +43,8 @@ const DAY_DOT: Record<SceneKey, string> = {
   reading: "bg-[var(--reading-dot)]",
   wishes: "bg-[var(--woop-wish)]",
   disputations: "bg-[var(--abcde-energization)]",
+  exercises: "bg-[var(--grove-dot)]",
+  fasting: "bg-[var(--orchard-dot)]",
 };
 
 /**
@@ -107,7 +113,10 @@ function DayStrip({
   const days = tending.today ? tending.window : [...tending.window, tending.todayDay];
   const text = (day: TendDay, isToday: boolean) => {
     const when = isToday ? "Today" : day.label;
-    if (!day.done) return isToday ? "Today · still open" : `${when} · missed`;
+    if (!day.done) {
+      if (day.scheduled === false) return isToday ? "Today · rest day" : `${when} · rest day`;
+      return isToday ? "Today · still open" : `${when} · missed`;
+    }
     const extra = note?.(day);
     return extra ? `${when} · ${extra}` : `${when} · kept`;
   };
@@ -116,6 +125,7 @@ function DayStrip({
     <ol aria-label="The last two weeks" className="flex flex-wrap items-center gap-[3px] sm:gap-1.5">
       {days.map((day) => {
         const isToday = day.dateISO === tending.todayDay.dateISO;
+        const isRest = !day.done && day.scheduled === false;
         const label = text(day, isToday);
         return (
           <li key={day.dateISO}>
@@ -128,9 +138,11 @@ function DayStrip({
                     "focus-visible:ring-ring block size-3 rounded-full transition-colors focus-visible:ring-2 focus-visible:outline-none sm:size-4",
                     day.done
                       ? DAY_DOT[tab]
-                      : isToday
-                        ? "border-foreground/50 border border-dashed"
-                        : "border-border border bg-transparent",
+                      : isRest
+                        ? "bg-muted-foreground/25 border-transparent"
+                        : isToday
+                          ? "border-foreground/50 border border-dashed"
+                          : "border-border border bg-transparent",
                     isToday && "ring-foreground/30 ring-2 ring-offset-2 ring-offset-[var(--background)]",
                   )}
                 />

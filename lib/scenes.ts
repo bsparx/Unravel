@@ -1,17 +1,19 @@
+import { BODY_TABS, type BodyTab } from "@/lib/body-tabs";
 import { HEART_TABS, type HeartTab } from "@/lib/heart-tabs";
 import { MIND_TABS, type MindTab } from "@/lib/mind-tabs";
 import { TEND_DAYS, type Tending } from "@/lib/tending";
 
-/** Every practice that keeps a scene: Mind's and Heart's. */
-export type SceneKey = MindTab | HeartTab;
-export const SCENE_KEYS: readonly SceneKey[] = [...HEART_TABS, ...MIND_TABS];
+/** Every practice that keeps a scene: Heart's, Mind's, and Body's. */
+export type SceneKey = MindTab | HeartTab | BodyTab;
+export const SCENE_KEYS: readonly SceneKey[] = [...HEART_TABS, ...MIND_TABS, ...BODY_TABS];
 
 /**
- * The scenes, one per practice on Mind and Heart: what each one is, and the fourteen things that come
- * into it, one more for each day you keep the practice and one fewer for each day you
- * don't.
+ * The scenes, one per practice on Heart, Mind and Body: what each one is,
+ * and the fourteen things that come into it, one more for each day you keep
+ * the practice and one fewer for each scheduled day you miss (off-schedule
+ * rest days hold steady).
  * Stages appear in order and leave in reverse: the newest is the first to
- * go when a day is missed. See lib/tending.ts for the rule.
+ * go when a scheduled day is missed. See lib/tending.ts for the rule.
  *
  * Names are written to read in a sentence: "Today brought {name}", "Sit
  * today to bring {name}", "Read today to keep {name}".
@@ -31,6 +33,8 @@ export type Scene = {
   stages: readonly SceneStage[];
   /** The day's act, as an imperative: "Sit today". */
   act: string;
+  /** Line shown on an off-schedule rest day when nothing is owed. */
+  restLine?: string;
 };
 
 const stages = (list: [string, string][]): SceneStage[] => list.map(([id, name]) => ({ id, name }));
@@ -214,6 +218,54 @@ export const SCENES: Record<SceneKey, Scene> = {
       ["clear", "a clear sky"],
     ]),
   },
+  exercises: {
+    title: "The waterfall grove",
+    noun: "grove",
+    whole: "The grove is in full flow.",
+    base: "quiet stones in a misty glen",
+    act: "Check off an exercise today",
+    restLine: "Rest day — the grove holds steady until your next workout.",
+    stages: stages([
+      ["stream", "a clear stream"],
+      ["ferns", "ferns along the bank"],
+      ["stones", "river stepping stones"],
+      ["cascade", "the waterfall, flowing"],
+      ["pool", "a clear pool below"],
+      ["cedars", "tall cedars on the ridge"],
+      ["moss", "moss on the boulders"],
+      ["bridge", "a timber footbridge"],
+      ["wildflowers", "wildflowers by the bank"],
+      ["birches", "silver birches in leaf"],
+      ["butterflies", "butterflies over the water"],
+      ["sunbeams", "sunbeams through the canopy"],
+      ["swallows", "swallows across the falls"],
+      ["rainbow", "a rainbow in the mist"],
+    ]),
+  },
+  fasting: {
+    title: "The olive orchard",
+    noun: "orchard",
+    whole: "The orchard is full.",
+    base: "a quiet hillside at twilight",
+    act: "Complete a fast today",
+    restLine: "Off-schedule day — the orchard holds steady until your next fast.",
+    stages: stages([
+      ["wall", "a low stone wall"],
+      ["tree", "the first olive tree"],
+      ["path", "a winding stone path"],
+      ["lantern", "a gate lantern, lit"],
+      ["grove", "a grove of olives"],
+      ["cypress", "cypresses on the ridge"],
+      ["table", "a table beneath the tree"],
+      ["dates", "dates and a pitcher of water"],
+      ["herbs", "thyme and lavender"],
+      ["string-lights", "lanterns in the branches"],
+      ["fireflies", "fireflies in the grass"],
+      ["crescent", "the crescent moon"],
+      ["stars", "bright stars overhead"],
+      ["glow", "the amber light of dusk"],
+    ]),
+  },
 };
 
 /** The stage ids showing at a level, in order. */
@@ -244,7 +296,7 @@ const upper = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
  * about today. Plain, and never a scolding: a missed day is just a day.
  */
 export function sceneCaption(scene: Scene, tending: Tending): { title: string; line: string } {
-  const { level, today, before, ifDone, ifSkipped } = tending;
+  const { level, today, todayScheduled, before, ifDone, ifSkipped } = tending;
   const title =
     level === TEND_DAYS ? wholeLine(scene) : level === 0 ? upper(scene.base) : stageLine(level);
 
@@ -255,6 +307,13 @@ export function sceneCaption(scene: Scene, tending: Tending): { title: string; l
     }
     const kept = stageAt(scene, level);
     return { title, line: kept ? `Today kept ${kept.name}.` : "Today counted." };
+  }
+
+  if (!todayScheduled) {
+    return {
+      title,
+      line: scene.restLine ?? `Rest day — the ${scene.noun} holds steady.`,
+    };
   }
 
   if (ifDone > level) {
