@@ -303,6 +303,37 @@ export function DayDetailSheet({
                       </p>
                     </div>
                   )}
+
+                  {day.endingSummary.missedNotes.length > 0 && (
+                    <div
+                      className={
+                        day.endingSummary.keepDoing?.trim() ||
+                        day.endingSummary.tryTomorrow?.trim() ||
+                        day.endingSummary.avoid?.trim()
+                          ? "border-t border-border/50 pt-2.5"
+                          : undefined
+                      }
+                    >
+                      <p className="flex items-center gap-1.5 text-micro font-semibold text-muted-foreground">
+                        <Circle className="size-3 shrink-0" aria-hidden />
+                        Why habits slipped
+                      </p>
+                      <ul className="mt-1.5 space-y-1.5">
+                        {day.endingSummary.missedNotes.map((note) => (
+                          <li
+                            key={note.itemId}
+                            className="text-label leading-relaxed text-foreground/90"
+                          >
+                            <span className="font-medium text-foreground">
+                              {note.title}
+                            </span>
+                            <span className="text-muted-foreground"> — </span>
+                            <span>{note.reason}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <p className="rounded-2xl border border-border/60 bg-muted/35 px-4 py-3 text-label text-muted-foreground">

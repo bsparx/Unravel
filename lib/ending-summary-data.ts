@@ -2,6 +2,7 @@ import "server-only";
 
 import { addDays, formatFullDate, toISODate, todayLocal } from "@/lib/dates";
 import { prisma } from "@/lib/db";
+import { parseMissedNotes } from "@/lib/ending-summary";
 import type { User } from "@/lib/generated/prisma/client";
 import type { EndingSummaryReport } from "@/lib/stats-summary";
 
@@ -35,6 +36,7 @@ export async function getYesterdayEndingSummary(
     keepDoing: row.keepDoing,
     tryTomorrow: row.tryTomorrow,
     avoid: row.avoid,
+    missedNotes: parseMissedNotes(row.missedNotes),
     habitsDone: row.habitsDone,
     habitsTotal: row.habitsTotal,
     productiveSeconds: row.productiveSeconds,

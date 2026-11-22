@@ -146,6 +146,9 @@ import {
   formatDeltaDuration,
   formatDeltaPercent,
   hasEndingSummaryNotes,
+  incompleteTodayItems,
+  parseMissedNotes,
+  trackableItemHref,
 } from "@/lib/ending-summary";
 import { ENDING_SUMMARY_ITEM_ID } from "@/lib/stats-summary";
 
@@ -4964,6 +4967,79 @@ check("ending summary notes helpers and validation treat all reflection fields a
     endingSummaryEnabled: true,
   });
   assert.equal(enabledSettings.endingSummaryEnabled, true);
+});
+
+check("close lists only still-open selected habits with deep links and parses missed reasons", () => {
+  const catalog = [
+    { id: "h1", group: "habit" as const, title: "Morning walk", scheduleLabel: "Every day" },
+    { id: "h2", group: "habit" as const, title: "Read", scheduleLabel: "Mon, Wed" },
+    { id: "h3", group: "habit" as const, title: "Stretch", scheduleLabel: "Every day" },
+    { id: ENDING_SUMMARY_ITEM_ID, group: "habit" as const, title: "Ending summary", scheduleLabel: "Every evening" },
+    { id: "mind:meditate", group: "mind" as const, title: "Meditation", scheduleLabel: "Mind" },
+    { id: "heart:gratitude", group: "heart" as const, title: "Gratitude", scheduleLabel: "Heart" },
+  ];
+
+  const today = mkStatsDay(
+    "2026-11-22",
+    0,
+    0,
+    {
+      h1: { itemId: "h1", status: "done" },
+      h2: { itemId: "h2", status: "inactive" }, // off-day -> must not show as open
+      h3: { itemId: "h3", status: "open" },
+      [ENDING_SUMMARY_ITEM_ID]: { itemId: ENDING_SUMMARY_ITEM_ID, status: "open" },
+      "mind:meditate": { itemId: "mind:meditate", status: "open" },
+      "heart:gratitude": { itemId: "heart:gratitude", status: "skipped" },
+    },
+    { isToday: true },
+  );
+
+  const selected = new Set(catalog.map((i) => i.id));
+  const open = incompleteTodayItems(catalog, today, selected);
+
+  // Only h3 and mind:meditate remain open (done, inactive, skipped, and ending summary itself are excluded).
+  assert.deepEqual(
+    open.map((entry) => [entry.item.id, entry.href]),
+    [
+      ["h3", "/habits#habit-h3"],
+      ["mind:meditate", "/mind?tab=meditate"],
+    ],
+  );
+  assert.equal(trackableItemHref(catalog[5]), "/heart?tab=gratitude");
+
+  // Missed notes parser drops blank entries, deduplicates, and integrates into schema & note counts.
+  const parsedNotes = parseMissedNotes([
+    { itemId: "h3", title: "Stretch", reason: "  Got home late  " },
+    { itemId: "h3", title: "Stretch", reason: "Duplicate ignored" },
+    { itemId: "mind:meditate", title: "Meditation", reason: "   " },
+    { bad: true },
+  ]);
+  assert.deepEqual(parsedNotes, [
+    { itemId: "h3", title: "Stretch", reason: "Got home late" },
+  ]);
+
+  const validated = endingSummarySchema.parse({
+    missedNotes: JSON.stringify(parsedNotes),
+  });
+  assert.deepEqual(validated.missedNotes, parsedNotes);
+  assert.equal(
+    hasEndingSummaryNotes({
+      keepDoing: null,
+      tryTomorrow: null,
+      avoid: null,
+      missedNotes: parsedNotes,
+    }),
+    true,
+  );
+  assert.equal(
+    countEndingSummaryNotes({
+      keepDoing: "Walk",
+      tryTomorrow: null,
+      avoid: null,
+      missedNotes: parsedNotes,
+    }),
+    2,
+  );
 });
 
 console.log(`\n${passed} checks passed.\n`);

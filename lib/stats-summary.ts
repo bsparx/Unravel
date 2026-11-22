@@ -119,12 +119,19 @@ export type DaySessionEntry = {
   timeLabel: string | null;
 };
 
+export type MissedHabitNote = {
+  itemId: string;
+  title: string;
+  reason: string;
+};
+
 export type EndingSummaryReport = {
   dateISO: string;
   dateLabel: string;
   keepDoing: string | null;
   tryTomorrow: string | null;
   avoid: string | null;
+  missedNotes: MissedHabitNote[];
   habitsDone: number | null;
   habitsTotal: number | null;
   productiveSeconds: number | null;

@@ -10,7 +10,7 @@ import {
   todayLocal,
 } from "@/lib/dates";
 import type { User } from "@/lib/generated/prisma/client";
-import { countEndingSummaryNotes } from "@/lib/ending-summary";
+import { countEndingSummaryNotes, parseMissedNotes } from "@/lib/ending-summary";
 import { heartEnabled } from "@/lib/heart-data";
 import { enabledHeartTabs } from "@/lib/heart-tabs";
 import { mindEnabled } from "@/lib/mind-data";
@@ -237,6 +237,7 @@ export async function getStatsRange(
         keepDoing: true,
         tryTomorrow: true,
         avoid: true,
+        missedNotes: true,
         habitsDone: true,
         habitsTotal: true,
         productiveSeconds: true,
@@ -514,6 +515,7 @@ export async function getStatsRange(
         keepDoing: row.keepDoing,
         tryTomorrow: row.tryTomorrow,
         avoid: row.avoid,
+        missedNotes: parseMissedNotes(row.missedNotes),
         habitsDone: row.habitsDone,
         habitsTotal: row.habitsTotal,
         productiveSeconds: row.productiveSeconds,

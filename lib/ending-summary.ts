@@ -21,18 +21,86 @@ import {
   ENDING_SUMMARY_ITEM_ID,
   summarizeDay,
   type EndingSummaryReport,
+  type MissedHabitNote,
   type StatsDayRecord,
+  type TrackableItem,
 } from "@/lib/stats-summary";
 
 /** 8 weeks of history gives up to 8 same-weekday samples and a full 30-day baseline. */
 export const ENDING_SUMMARY_LOOKBACK_DAYS = 56;
 export const ENDING_SUMMARY_MONTH_DAYS = 30;
 export const ENDING_SUMMARY_MAX_CHARS = 1000;
+export const MISSED_NOTE_MAX_CHARS = 300;
+export const MISSED_NOTES_MAX = 30;
 
 export type EndingSummaryDaySlice = Pick<
   StatsDayRecord,
   "iso" | "weekday" | "productiveSeconds" | "items"
 >;
+
+export type OpenHabitItem = {
+  item: TrackableItem;
+  href: string;
+};
+
+/** Safe parser for `EndingSummary.missedNotes` JSON stored in Postgres. */
+export function parseMissedNotes(raw: unknown): MissedHabitNote[] {
+  if (!Array.isArray(raw)) return [];
+  const out: MissedHabitNote[] = [];
+  const seen = new Set<string>();
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    const obj = entry as Record<string, unknown>;
+    const itemId = typeof obj.itemId === "string" ? obj.itemId.trim() : "";
+    const title = typeof obj.title === "string" ? obj.title.trim() : "";
+    const reason = typeof obj.reason === "string" ? obj.reason.trim() : "";
+    if (!itemId || !title || !reason || seen.has(itemId)) continue;
+    seen.add(itemId);
+    out.push({
+      itemId: itemId.slice(0, 80),
+      title: title.slice(0, 200),
+      reason: reason.slice(0, MISSED_NOTE_MAX_CHARS),
+    });
+    if (out.length >= MISSED_NOTES_MAX) break;
+  }
+  return out;
+}
+
+/** Direct link to go complete a trackable habit or Mind/Heart practice. */
+export function trackableItemHref(item: Pick<TrackableItem, "id" | "group">): string {
+  if (item.group === "mind" && item.id.startsWith("mind:")) {
+    return `/mind?tab=${item.id.slice("mind:".length)}`;
+  }
+  if (item.group === "heart" && item.id.startsWith("heart:")) {
+    return `/heart?tab=${item.id.slice("heart:".length)}`;
+  }
+  if (item.id === ENDING_SUMMARY_ITEM_ID) {
+    return "/close?step=summary";
+  }
+  return `/habits#habit-${item.id}`;
+}
+
+/**
+ * Selected habits and Mind/Heart practices that are scheduled today and still
+ * incomplete (excludes off-days, skipped items, and Ending Summary itself).
+ */
+export function incompleteTodayItems(
+  items: readonly TrackableItem[],
+  today: Pick<StatsDayRecord, "items"> | null | undefined,
+  selectedIds: ReadonlySet<string>,
+): OpenHabitItem[] {
+  if (!today) return [];
+  const open: OpenHabitItem[] = [];
+  for (const item of items) {
+    if (item.id === ENDING_SUMMARY_ITEM_ID) continue;
+    if (!selectedIds.has(item.id)) continue;
+    const status = today.items[item.id]?.status;
+    if (status === "open" || status === "missed") {
+      open.push({ item, href: trackableItemHref(item) });
+    }
+  }
+  return open;
+}
 
 export type AverageBaseline = {
   /** Prior days included in this baseline (0 when there is no history yet). */
@@ -67,25 +135,39 @@ export type EndingSummaryComparison = {
 };
 
 export function hasEndingSummaryNotes(
-  report: Pick<EndingSummaryReport, "keepDoing" | "tryTomorrow" | "avoid"> | null | undefined,
+  report:
+    | Pick<EndingSummaryReport, "keepDoing" | "tryTomorrow" | "avoid"> & {
+        missedNotes?: readonly MissedHabitNote[];
+      }
+    | null
+    | undefined,
 ): boolean {
   if (!report) return false;
   return Boolean(
     report.keepDoing?.trim() ||
       report.tryTomorrow?.trim() ||
-      report.avoid?.trim(),
+      report.avoid?.trim() ||
+      (report.missedNotes && report.missedNotes.length > 0),
   );
 }
 
 /** Count how many optional reflection sections have non-empty text. */
 export function countEndingSummaryNotes(
-  report: Pick<EndingSummaryReport, "keepDoing" | "tryTomorrow" | "avoid"> | null | undefined,
+  report:
+    | Pick<EndingSummaryReport, "keepDoing" | "tryTomorrow" | "avoid"> & {
+        missedNotes?: readonly MissedHabitNote[];
+      }
+    | null
+    | undefined,
 ): number {
   if (!report) return 0;
   let count = 0;
   if (report.keepDoing?.trim()) count += 1;
   if (report.tryTomorrow?.trim()) count += 1;
   if (report.avoid?.trim()) count += 1;
+  if (report.missedNotes && report.missedNotes.length > 0) {
+    count += report.missedNotes.length;
+  }
   return count;
 }
 

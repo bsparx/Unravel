@@ -27,7 +27,12 @@ import {
 import { MAX_REMIND_DAYS } from "@/lib/subscriptions";
 import { DISPUTATION_MAX } from "@/lib/disputation";
 import { DUMP_KINDS, DUMP_MAX_CHARS, DUMP_MAX_TASKS, DUMP_TASK_CHARS } from "@/lib/brain-dump";
-import { ENDING_SUMMARY_MAX_CHARS } from "@/lib/ending-summary";
+import {
+  ENDING_SUMMARY_MAX_CHARS,
+  MISSED_NOTES_MAX,
+  MISSED_NOTE_MAX_CHARS,
+  parseMissedNotes,
+} from "@/lib/ending-summary";
 import { WOOP_MAX } from "@/lib/woop";
 import {
   PRACTICE_MAX_COUNT,
@@ -284,6 +289,22 @@ const optionalEndingNote = z.preprocess(
   z.string().max(ENDING_SUMMARY_MAX_CHARS).optional(),
 );
 
+const missedNoteItemSchema = z.object({
+  itemId: z.string().trim().min(1).max(80),
+  title: z.string().trim().min(1).max(200),
+  reason: z.string().trim().min(1).max(MISSED_NOTE_MAX_CHARS),
+});
+
+const missedNotesField = z.preprocess((value) => {
+  if (Array.isArray(value)) return parseMissedNotes(value);
+  if (typeof value !== "string" || value.trim() === "") return [];
+  try {
+    return parseMissedNotes(JSON.parse(value));
+  } catch {
+    return [];
+  }
+}, z.array(missedNoteItemSchema).max(MISSED_NOTES_MAX).default([]));
+
 /**
  * End-of-day summary written on /close. Every reflection field is optional —
  * reviewing the day and saving is the habit, even on quiet nights.
@@ -292,6 +313,7 @@ export const endingSummarySchema = z.object({
   keepDoing: optionalEndingNote,
   tryTomorrow: optionalEndingNote,
   avoid: optionalEndingNote,
+  missedNotes: missedNotesField,
   habitsDone: emptyToUndefined(z.coerce.number().int().min(0).max(500)),
   habitsTotal: emptyToUndefined(z.coerce.number().int().min(0).max(500)),
   productiveSeconds: emptyToUndefined(

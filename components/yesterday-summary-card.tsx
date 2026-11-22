@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   BookmarkCheck,
   ChevronDown,
+  CircleDashed,
   Compass,
   Moon,
   ShieldAlert,
@@ -140,6 +141,29 @@ export function YesterdaySummaryCard({
               <p className="text-foreground/90 mt-1 whitespace-pre-line text-label leading-relaxed">
                 {report.avoid}
               </p>
+            </div>
+          )}
+
+          {report.missedNotes.length > 0 && (
+            <div className="border-border/60 bg-muted/35 rounded-xl border px-3.5 py-3">
+              <p className="text-muted-foreground flex items-center gap-1.5 text-micro font-semibold">
+                <CircleDashed className="size-3.5 shrink-0" aria-hidden />
+                What got in the way yesterday
+              </p>
+              <ul className="mt-1.5 space-y-1">
+                {report.missedNotes.map((note) => (
+                  <li
+                    key={note.itemId}
+                    className="text-foreground/90 text-label leading-relaxed"
+                  >
+                    <span className="font-medium text-foreground">
+                      {note.title}
+                    </span>
+                    <span className="text-muted-foreground"> — </span>
+                    <span>{note.reason}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </div>

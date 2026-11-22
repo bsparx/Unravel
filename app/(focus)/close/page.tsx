@@ -12,7 +12,10 @@ import {
 } from "@/lib/dates";
 import { getDayLog } from "@/lib/day-log";
 import { prisma } from "@/lib/db";
-import { ENDING_SUMMARY_LOOKBACK_DAYS } from "@/lib/ending-summary";
+import {
+  ENDING_SUMMARY_LOOKBACK_DAYS,
+  parseMissedNotes,
+} from "@/lib/ending-summary";
 
 import { StepEndingSummary } from "./_components/step-ending-summary";
 import {
@@ -42,6 +45,7 @@ export default async function ClosePage({
 
   const today = todayLocal(user.timezone);
   const tomorrow = addDays(today, 1);
+  const todayLabel = formatFullDate(today);
 
   if (step === "summary") {
     const from = addDays(today, -(ENDING_SUMMARY_LOOKBACK_DAYS - 1));
@@ -49,14 +53,19 @@ export default async function ClosePage({
       getStatsRange(user, from, today),
       prisma.endingSummary.findUnique({
         where: { userId_date: { userId: user.id, date: today } },
-        select: { keepDoing: true, tryTomorrow: true, avoid: true },
+        select: {
+          keepDoing: true,
+          tryTomorrow: true,
+          avoid: true,
+          missedNotes: true,
+        },
       }),
     ]);
 
     return (
       <StepEndingSummary
         todayISO={toISODate(today)}
-        todayLabel={formatFullDate(today)}
+        todayLabel={todayLabel}
         items={range.items}
         days={range.days.map((day) => ({
           iso: day.iso,
@@ -68,6 +77,7 @@ export default async function ClosePage({
           keepDoing: existing?.keepDoing ?? "",
           tryTomorrow: existing?.tryTomorrow ?? "",
           avoid: existing?.avoid ?? "",
+          missedNotes: parseMissedNotes(existing?.missedNotes),
         }}
         alreadySaved={Boolean(existing)}
       />
@@ -75,10 +85,28 @@ export default async function ClosePage({
   }
 
   if (step === "one-thing") {
+    // When Ending Summary is off, still show unfinished habits on /close so the
+    // user can jump back or note why they slipped.
+    const [options, todayRange, existing] = await Promise.all([
+      candidates(user),
+      includeSummary ? Promise.resolve(null) : getStatsRange(user, today, today),
+      includeSummary
+        ? Promise.resolve(null)
+        : prisma.endingSummary.findUnique({
+            where: { userId_date: { userId: user.id, date: today } },
+            select: { missedNotes: true },
+          }),
+    ]);
+
     return (
       <StepOneThing
-        options={await candidates(user)}
+        options={options}
         dateISO={toISODate(tomorrow)}
+        dateLabel={todayLabel}
+        includeSummary={includeSummary}
+        todayItems={todayRange?.items}
+        todayRecord={todayRange?.days[0] ?? null}
+        initialMissedNotes={parseMissedNotes(existing?.missedNotes)}
       />
     );
   }
@@ -90,11 +118,23 @@ export default async function ClosePage({
       },
       select: { body: true },
     });
-    return <StepWorry initial={existing?.body ?? ""} />;
+    return (
+      <StepWorry
+        initial={existing?.body ?? ""}
+        dateLabel={todayLabel}
+        includeSummary={includeSummary}
+      />
+    );
   }
 
   const tomorrowLog = await getDayLog(user, tomorrow);
-  return <StepHandoff oneThing={tomorrowLog?.selectedTask?.title ?? null} />;
+  return (
+    <StepHandoff
+      oneThing={tomorrowLog?.selectedTask?.title ?? null}
+      dateLabel={todayLabel}
+      includeSummary={includeSummary}
+    />
+  );
 }
 
 async function candidates(

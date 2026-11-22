@@ -16,7 +16,7 @@ import {
   journalSchema,
   selectOneThingSchema,
 } from "@/lib/validation";
-import type { JournalKind } from "@/lib/generated/prisma/client";
+import { Prisma, type JournalKind } from "@/lib/generated/prisma/client";
 
 /**
  * The close.
@@ -35,6 +35,8 @@ export async function saveEndingSummary(formData: FormData): Promise<void> {
   if (parsed.success) {
     const date = todayLocal(user.timezone);
     const data = parsed.data;
+    const missedNotes =
+      data.missedNotes.length > 0 ? data.missedNotes : Prisma.DbNull;
 
     await prisma.endingSummary.upsert({
       where: { userId_date: { userId: user.id, date } },
@@ -44,6 +46,7 @@ export async function saveEndingSummary(formData: FormData): Promise<void> {
         keepDoing: data.keepDoing ?? null,
         tryTomorrow: data.tryTomorrow ?? null,
         avoid: data.avoid ?? null,
+        missedNotes,
         habitsDone: data.habitsDone ?? null,
         habitsTotal: data.habitsTotal ?? null,
         productiveSeconds: data.productiveSeconds ?? null,
@@ -52,6 +55,7 @@ export async function saveEndingSummary(formData: FormData): Promise<void> {
         keepDoing: data.keepDoing ?? null,
         tryTomorrow: data.tryTomorrow ?? null,
         avoid: data.avoid ?? null,
+        missedNotes,
         habitsDone: data.habitsDone ?? null,
         habitsTotal: data.habitsTotal ?? null,
         productiveSeconds: data.productiveSeconds ?? null,
@@ -65,6 +69,40 @@ export async function saveEndingSummary(formData: FormData): Promise<void> {
   }
 
   advance("summary", user.endingSummaryEnabled);
+}
+
+/**
+ * Save only missed-habit reasons (used inline when Ending Summary is toggled
+ * off so users on `/close` can still document why an open habit slipped).
+ */
+export async function saveMissedNotes(
+  formData: FormData,
+): Promise<{ ok: boolean }> {
+  const user = await requireUser();
+  const parsed = endingSummarySchema.safeParse({
+    missedNotes: formData.get("missedNotes") ?? "[]",
+  });
+  if (!parsed.success) return { ok: false };
+
+  const date = todayLocal(user.timezone);
+  const notes = parsed.data.missedNotes;
+
+  if (notes.length === 0) {
+    await prisma.endingSummary.updateMany({
+      where: { userId: user.id, date },
+      data: { missedNotes: Prisma.DbNull },
+    });
+  } else {
+    await prisma.endingSummary.upsert({
+      where: { userId_date: { userId: user.id, date } },
+      create: { userId: user.id, date, missedNotes: notes },
+      update: { missedNotes: notes },
+    });
+  }
+
+  revalidatePath("/stats");
+  revalidatePath("/close");
+  return { ok: true };
 }
 
 /** Step 1 — tomorrow's one thing. Closes the loop with the morning pass. */

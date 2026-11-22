@@ -986,6 +986,10 @@ model EndingSummary {
   tryTomorrow String?
   /// Things to watch out for / avoid tomorrow.
   avoid       String?
+  /// Optional reasons recorded for habits still open when closing the day:
+  /// `[{ itemId, title, reason }]`. Snapshotted with titles so archiving a
+  /// habit later keeps past reports readable.
+  missedNotes Json?
 
   /// Snapshot of the day's numbers when the summary was saved, so yesterday's
   /// card on / and /day renders in a single row lookup.
