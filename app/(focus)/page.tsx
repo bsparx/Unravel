@@ -3,14 +3,12 @@ import { CalendarDays, MoonStar, NotebookPen, type LucideIcon } from "lucide-rea
 
 import { Landing } from "@/app/_components/landing";
 import { BrandMark } from "@/components/brand-mark";
-import { IdentityChip } from "@/components/identity-sigil";
 import { ensureUser, type requireUser } from "@/lib/auth";
 import { getRawCaptures } from "@/lib/captures";
 import { formatFullDate, minuteOfDayLocal, toISODate, todayLocal } from "@/lib/dates";
 import { getDayLog } from "@/lib/day-log";
 import { prisma } from "@/lib/db";
 import { formatMinutes } from "@/lib/dates";
-import { getLeadLook } from "@/lib/identity-votes";
 import { getProjects } from "@/lib/tasks";
 
 import {
@@ -30,8 +28,7 @@ export default async function HomePage() {
 
   const today = todayLocal(user.timezone);
   const dateISO = toISODate(today);
-  // The lead is only a greeting detail, so it rides along with the day log.
-  const [dayLog, lead] = await Promise.all([getDayLog(user, today), getLeadLook(user)]);
+  const dayLog = await getDayLog(user, today);
   // Only the pass needs these, and they don't depend on each other.
   const [options, projects] = dayLog?.selectedTask
     ? [[], []]
@@ -50,12 +47,6 @@ export default async function HomePage() {
           {greeting(minuteOfDayLocal(user.timezone))}
           {firstName ? `, ${firstName}` : ""}.
         </p>
-        {lead && (
-          <p className="text-muted-foreground mt-2 flex flex-wrap items-center gap-1.5 text-label">
-            <IdentityChip name={lead.short} sigil={lead.sigil} slot={lead.colorSlot} />
-            leads today.
-          </p>
-        )}
       </header>
 
       {/* One frosted panel, so the choice has a place to land on the field. */}

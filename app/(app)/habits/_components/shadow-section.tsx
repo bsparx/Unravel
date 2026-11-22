@@ -1,8 +1,6 @@
 import { Check, Eye, Moon } from "lucide-react";
 
-import { IdentityChip } from "@/components/identity-sigil";
 import { InfoTip } from "@/components/info-tip";
-import { prisma } from "@/lib/db";
 import type { User } from "@/lib/generated/prisma/client";
 import { getShadowWeek } from "@/lib/shadows";
 import { cn } from "@/lib/utils";
@@ -14,17 +12,10 @@ const times = (n: number) => (n === 1 ? "once" : n === 2 ? "twice" : `${n} times
 
 /**
  * The shadow side: patterns being broken. Habitica's negative habits without
- * the damage — noticing is information, choosing otherwise is a vote.
+ * the damage — noticing is information, choosing otherwise is a quiet win.
  */
 export async function ShadowSection({ user }: { user: User }) {
-  const [patterns, identities] = await Promise.all([
-    getShadowWeek(user),
-    prisma.identity.findMany({
-      where: { userId: user.id },
-      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-      select: { id: true, name: true },
-    }),
-  ]);
+  const patterns = await getShadowWeek(user);
 
   return (
     <section aria-labelledby="shadow-title" className="mt-12">
@@ -35,15 +26,15 @@ export async function ShadowSection({ user }: { user: User }) {
           </h2>
           <p className="text-muted-foreground mt-1 max-w-prose text-label">
             Patterns you&apos;re working with. Noticing one is useful information, never a failure.
-            Choosing otherwise is a vote.
+            Choosing otherwise is a quiet win.
           </p>
         </div>
-        <AddShadowDialog identities={identities} />
+        <AddShadowDialog />
       </div>
 
       {patterns.length === 0 ? (
         <p className="text-muted-foreground bg-muted rounded-2xl p-5 text-label">
-          Nothing here yet. Name one pattern you&apos;d like to see more clearly, and the self it pulls against.
+          Nothing here yet. Name one pattern you&apos;d like to see more clearly, and the plan that makes it harder.
         </p>
       ) : (
         <ul className="grid gap-5 md:grid-cols-2">
@@ -59,12 +50,6 @@ export async function ShadowSection({ user }: { user: User }) {
                   </span>
                   <div className="min-w-0">
                     <h3 className="text-title font-semibold break-words">{pattern.name}</h3>
-                    {pattern.against && (
-                      <p className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-micro">
-                        Pulls against
-                        <IdentityChip name={pattern.against.short} sigil={pattern.against.sigil} slot={pattern.against.colorSlot} />
-                      </p>
-                    )}
                   </div>
                 </div>
 
@@ -83,11 +68,10 @@ export async function ShadowSection({ user }: { user: User }) {
                   {pattern.week.map((day) => (
                     <span key={day.dateISO} className={cn("text-muted-foreground flex flex-col items-center gap-1 text-micro", day.isToday && "text-foreground font-semibold")}>
                       <span
-                        style={pattern.against ? ({ "--hue": `var(--id-${pattern.against.colorSlot})` } as React.CSSProperties) : undefined}
                         className={cn(
                           "border-border bg-input-surface grid size-8 place-items-center rounded-md border",
                           day.mark === "NOTICED" && "border-input bg-secondary text-foreground",
-                          day.mark === "CHOSE" && "border-[color-mix(in_srgb,var(--hue,var(--primary))_55%,transparent)] bg-[color-mix(in_srgb,var(--hue,var(--primary))_16%,var(--input-surface))] text-[var(--hue,var(--primary))]",
+                          day.mark === "CHOSE" && "border-[color-mix(in_srgb,var(--primary)_55%,transparent)] bg-[color-mix(in_srgb,var(--primary)_16%,var(--input-surface))] text-primary",
                           day.isFuture && "border-dashed bg-transparent",
                         )}
                       >
@@ -98,7 +82,7 @@ export async function ShadowSection({ user }: { user: User }) {
                   ))}
                 </div>
 
-                <ShadowMarkButtons patternId={pattern.id} today={pattern.today} against={pattern.against?.short ?? null} />
+                <ShadowMarkButtons patternId={pattern.id} today={pattern.today} />
 
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-muted-foreground text-micro">

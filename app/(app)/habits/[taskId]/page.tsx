@@ -106,7 +106,6 @@ export default async function EditHabitPage({
           requiresFeedback: habit.requiresFeedback,
           feedbackPrompt: habit.feedbackPrompt,
           pairing: habit.pairing,
-          identityIds: habit.identities.map((link) => link.identityId),
         }}
       />
 

@@ -17,7 +17,7 @@ export function ResetProgressButton() {
   return (
     <ConfirmDialog
       title="Reset all progress?"
-      description="Deletes every logged day and every focus session. Missed days, streaks, identity votes and feedback notes go to zero. Habits, identities, schedules and quotas stay. There is no undo."
+      description="Deletes every logged day and every focus session. Missed days, streaks and feedback notes go to zero. Habits, schedules and settings stay. There is no undo."
       confirmPhrase="RESET"
       confirmLabel="Wipe progress"
       pendingLabel="Wiping…"
@@ -28,7 +28,7 @@ export function ResetProgressButton() {
           toast.error(result.message);
           return;
         }
-        toast.success("Progress wiped — habits and identities are untouched.");
+        toast.success("Progress wiped — your habits and settings are untouched.");
       }}
       trigger={(open) => (
         <Button type="button" variant="destructive" onClick={open}>

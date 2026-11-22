@@ -135,8 +135,6 @@ type BlockCreate = {
   startMinute: number;
   endMinute: number;
   kind: "WORK" | "RECOVERY" | "BUFFER" | "DAYDREAM";
-  /** The self this time is for, already checked against the user. */
-  identityId?: string | null;
   /** Interval mode, already narrowed to WORK blocks. */
   beatMinutes?: number | null;
 };
@@ -285,19 +283,6 @@ async function reflowCue(
 }
 
 /**
- * An identity id off the wire, checked against the user. A stale or foreign
- * id finds nothing and the block simply belongs to nobody in particular.
- */
-async function resolveIdentityId(userId: string, identityId: string | undefined): Promise<string | null> {
-  if (!identityId) return null;
-  const identity = await prisma.identity.findFirst({
-    where: { id: identityId, userId },
-    select: { id: true },
-  });
-  return identity?.id ?? null;
-}
-
-/**
  * Intervals are a way of spending work time. Recovery, buffer and daydream
  * blocks are already the rest half, so the cadence is dropped for them rather
  * than refused — switching a block's kind shouldn't fail on a hidden field.
@@ -333,10 +318,7 @@ export async function createBlock(
   if (!date) return { status: "error", message: "That date didn't parse." };
 
   const span = clampSpan(input.startMinute, input.endMinute);
-  const [taskIds, identityId] = await Promise.all([
-    resolveTaskIds(user.id, input.taskIds),
-    resolveIdentityId(user.id, input.identityId),
-  ]);
+  const taskIds = await resolveTaskIds(user.id, input.taskIds);
   const cue = await plannedCueForAny(user.id, taskIds, input.includeCue);
 
   await createBlockWithCue(
@@ -348,7 +330,6 @@ export async function createBlock(
       date,
       ...span,
       kind: input.kind,
-      identityId,
       beatMinutes: beatMinutesFor(input.kind, input.beatMinutes),
     },
     cue,
@@ -378,10 +359,7 @@ export async function updateBlock(
   if (!date) return { status: "error", message: "That date didn't parse." };
 
   const span = clampSpan(input.startMinute, input.endMinute);
-  const [taskIds, identityId] = await Promise.all([
-    resolveTaskIds(user.id, input.taskIds),
-    resolveIdentityId(user.id, input.identityId),
-  ]);
+  const taskIds = await resolveTaskIds(user.id, input.taskIds);
 
   const beatMinutes = beatMinutesFor(input.kind, input.beatMinutes);
 
@@ -405,7 +383,6 @@ export async function updateBlock(
       date,
       ...span,
       kind: input.kind,
-      identityId,
       beatMinutes,
     },
   });

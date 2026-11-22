@@ -309,15 +309,6 @@
   /* The rest, when one category is picked out: recessive, not gone. */
   --money-quiet: color-mix(in oklab, var(--muted-foreground) 28%, transparent);
 
-  /* Identity hues, assigned in this order and checked for contrast and
-     colour-blind separation on every light surface. Marks only, never text. */
-  --id-1: #009390;
-  --id-2: #c16302;
-  --id-3: #9065d0;
-  --id-4: #ce5057;
-  --id-5: #088cb9;
-  --id-6: #a27900;
-
   --sidebar: rgba(255, 255, 255, 0.6);
   --sidebar-foreground: #3a2f52;
   --sidebar-primary: #c23d82;
@@ -428,14 +419,6 @@
   --money-in: #6d86e6;
   --money-out: #e8607a;
   --money-quiet: color-mix(in oklab, var(--muted-foreground) 30%, transparent);
-
-  /* The same six hues, stepped for dark surfaces. */
-  --id-1: #08a4a0;
-  --id-2: #d76f04;
-  --id-3: #9f75e1;
-  --id-4: #e06065;
-  --id-5: #0a9cce;
-  --id-6: #b48701;
 
   --sidebar: rgba(8, 16, 40, 0.64);
   --sidebar-foreground: #dfe5fa;

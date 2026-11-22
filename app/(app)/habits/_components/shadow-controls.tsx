@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SHADOW_LAWS } from "@/lib/identity-look";
+import { SHADOW_LAWS } from "@/lib/shadow-laws";
 
 type Mark = "NOTICED" | "CHOSE" | null;
 
@@ -32,12 +32,9 @@ type Mark = "NOTICED" | "CHOSE" | null;
 export function ShadowMarkButtons({
   patternId,
   today,
-  against,
 }: {
   patternId: string;
   today: Mark;
-  /** The identity choosing otherwise votes for, for the toast. */
-  against: string | null;
 }) {
   const router = useRouter();
   const [mark, setMark] = useOptimistic<Mark>(today);
@@ -52,7 +49,7 @@ export function ShadowMarkButtons({
         toast.error(result.message);
         return;
       }
-      if (value === "CHOSE") toast.success(against ? `Chose otherwise. That's a vote for ${against}.` : "Chose otherwise.");
+      if (value === "CHOSE") toast.success("Chose otherwise.");
       else if (value === "NOTICED") toast("Noticed. That's useful to know, nothing more.");
       router.refresh();
     });
@@ -98,8 +95,8 @@ export function LetGoButton({ patternId, name }: { patternId: string; name: stri
   );
 }
 
-/** Name a pattern, the self it pulls against, and the plan that makes it harder. */
-export function AddShadowDialog({ identities }: { identities: { id: string; name: string }[] }) {
+/** Name a pattern and the plan that makes it harder. */
+export function AddShadowDialog() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -119,7 +116,6 @@ export function AddShadowDialog({ identities }: { identities: { id: string; name
         name,
         law: String(form.get("law") ?? "") || null,
         plan: String(form.get("plan") ?? "") || null,
-        identityId: String(form.get("identityId") ?? "") || null,
       });
       if (!result.ok) {
         setError(result.message);
@@ -152,16 +148,6 @@ export function AddShadowDialog({ identities }: { identities: { id: string; name
           <div className="space-y-2">
             <Label htmlFor="shadow-name">Pattern</Label>
             <Input id="shadow-name" name="name" maxLength={80} placeholder="Scrolling in bed" className="min-h-11" aria-invalid={!!error} aria-describedby={error ? "shadow-error" : undefined} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="shadow-identity">Pulls against</Label>
-            <select id="shadow-identity" name="identityId" className={selectClass} defaultValue="">
-              <option value="">No identity</option>
-              {identities.map((identity) => (
-                <option key={identity.id} value={identity.id}>{identity.name}</option>
-              ))}
-            </select>
-            <p className="text-muted-foreground text-label">Choosing otherwise becomes a vote for this self.</p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="shadow-law">Approach</Label>

@@ -11,12 +11,7 @@ import { z } from "zod";
 import { MINUTES_PER_DAY, MIN_BLOCK_MINUTES } from "@/lib/block-math";
 import { BEAT_MINUTES } from "@/lib/block-beats";
 import { CALENDAR_COLOR_NAMES } from "@/lib/calendar-colors";
-import {
-  ARCHETYPE_NAMES,
-  HUE_COUNT,
-  SHADOW_LAWS,
-  SIGIL_NAMES,
-} from "@/lib/identity-look";
+import { SHADOW_LAWS } from "@/lib/shadow-laws";
 import { MAX_FEEDBACK_LENGTH } from "@/lib/feedback";
 import type { HabitSlot } from "@/lib/generated/prisma/client";
 import { MONEY_COLOR_NAMES } from "@/lib/money-palette";
@@ -90,11 +85,6 @@ const emptyToUndefined = <T extends z.ZodTypeAny>(schema: T) =>
 
 /** The most steps a task can have. Past this it isn't a task, it's a project. */
 export const MAX_STEPS = 20;
-
-/** The most selves one habit can plausibly be evidence for. */
-export const MAX_IDENTITIES_PER_HABIT = 6;
-/** The most habits one identity can draw votes from. */
-export const MAX_HABITS_PER_IDENTITY = 50;
 
 const stepInput = z.object({
   /**
@@ -235,14 +225,6 @@ export const createHabitSchema = createTodoSchema
     cueTaskId: emptyToUndefined(cuid),
     cueLabel: emptyToUndefined(z.string().trim().min(1).max(120)),
     cueMinutes: z.coerce.number().int().min(1).max(240).default(5),
-
-    /**
-     * Who this habit is a vote for. Links only — a habit can serve several
-     * selves and a self is served by several habits, so this is the `HabitIdentity`
-     * join table's business, not a column. Absent reads as "no identities yet"
-     * rather than an error: an unlinked habit is a normal habit.
-     */
-    identityIds: z.array(cuid).max(MAX_IDENTITIES_PER_HABIT).default([]),
   })
   .refine((value) => value.cueMode !== "habit" || Boolean(value.cueTaskId), {
     message: "Pick the habit this one comes after.",
@@ -258,51 +240,12 @@ export const createHabitSchema = createTodoSchema
 export const updateTodoSchema = createTodoSchema.extend({ id: cuid });
 export const updateHabitSchema = createHabitSchema.extend({ id: cuid });
 
-// ---------------------------------------------------------------- identities
-
-/**
- * Who you are becoming. The name is the noun ("Writer") and the statement is
- * the sentence the habits are evidence for ("I am someone who writes every
- * day") — the reinforcement reads the statement back at you, so it is capped
- * short enough to actually be worth reading aloud. `characteristics` is the
- * archetype's portrait and can run long: look, movement, what it does that
- * none of the others do.
- */
-export const identitySchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(1, "Name it — a character, or a noun like \"Writer\".")
-    .max(40, "Keep the name to a few words."),
-  statement: emptyToUndefined(z.string().trim().max(200)),
-  characteristics: emptyToUndefined(z.string().trim().max(5000)),
-  /** Who this self is modelled on: someone real or a character from a story. */
-  kind: z.enum(["REAL", "FICTIONAL"]).nullish(),
-  archetype: z.enum(ARCHETYPE_NAMES as [string, ...string[]]).nullish(),
-  /** The one question this self asks before starting. */
-  question: emptyToUndefined(z.string().trim().max(140)),
-  colorSlot: z.coerce.number().int().min(1).max(HUE_COUNT).optional(),
-  sigil: z.enum(SIGIL_NAMES as [string, ...string[]]).nullish(),
-});
-
-export const updateIdentitySchema = identitySchema.extend({ id: cuid });
-
-/** The identity-side setter: which habits vote for this identity. */
-export const setIdentityHabitsSchema = z.object({
-  identityId: cuid,
-  taskIds: z.array(cuid).max(MAX_HABITS_PER_IDENTITY),
-});
-
-// ---------------------------------------------------------------- the identity game
-
-/** Who leads today. Null clears the day's choice back to the week's. */
-export const setLeadSchema = z.object({ identityId: cuid.nullable() });
+// ---------------------------------------------------------------- shadow patterns
 
 export const shadowPatternSchema = z.object({
   name: z.string().trim().min(1, "Name the pattern.").max(80),
   law: z.enum(SHADOW_LAWS).nullish(),
   plan: emptyToUndefined(z.string().trim().max(200)),
-  identityId: cuid.nullish(),
 });
 export const updateShadowPatternSchema = shadowPatternSchema.extend({ id: cuid });
 
@@ -310,14 +253,6 @@ export const updateShadowPatternSchema = shadowPatternSchema.extend({ id: cuid }
 export const markShadowSchema = z.object({
   patternId: cuid,
   mark: z.enum(["NOTICED", "CHOSE"]).nullable(),
-});
-
-export const weeklyReviewSchema = z.object({
-  leadIdentityId: cuid.nullable(),
-  statement: emptyToUndefined(z.string().trim().max(200)),
-  /** The quiet habit and its new, smaller minimum. Both or neither. */
-  habitId: cuid.nullish(),
-  newMinimum: emptyToUndefined(z.string().trim().max(120)),
 });
 
 /** The dump box. Text plus the tag that names the moment — both required. */
@@ -475,8 +410,6 @@ const blockShape = {
   startMinute: minuteOfDay,
   endMinute: minuteOfDay,
   kind: z.enum(["WORK", "RECOVERY", "BUFFER", "DAYDREAM"]).default("WORK"),
-  /** The self this time is for. Empty means nobody in particular. */
-  identityId: emptyToUndefined(cuid),
   includeCue,
   /**
    * Interval mode. Empty is an ordinary block; otherwise 15 or 30 and nothing

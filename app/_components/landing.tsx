@@ -1,9 +1,13 @@
 import Link from "next/link";
 import {
   ArrowRight,
+  Brain,
   Feather,
+  HandHeart,
+  HeartPulse,
   Layers,
   MoonStar,
+  Repeat,
   Sprout,
   type LucideIcon,
 } from "lucide-react";
@@ -11,19 +15,12 @@ import {
 import { FrogPondLazy } from "@/app/(focus)/_components/frog-pond-lazy";
 import { Frog } from "@/app/(focus)/_components/frog";
 import { BrandMark } from "@/components/brand-mark";
-import { IdentitySigil, hueStyle } from "@/components/identity-sigil";
 import { Button } from "@/components/ui/button";
-import { STARTER_SELVES, starterById } from "@/lib/starter-selves";
 import { cn } from "@/lib/utils";
 
 /** The frosted panel every surface on this page sits on. */
 const GLASS =
   "bg-card rounded-[28px] border border-[var(--card-edge)] shadow-[var(--card-shadow)]";
-
-/** Six of the starters, in an order that alternates hues across the row. */
-const CAST = ["sherlock", "samwise", "leonardo", "amelia", "marcus", "mary"]
-  .map((id) => starterById(id))
-  .filter((starter) => starter !== undefined);
 
 /**
  * The signed-out front door.
@@ -60,7 +57,7 @@ export function Landing() {
       <main className="flex-1">
         <Hero />
         <DayInThree />
-        <Selves />
+        <Practices />
         <Promises />
         <Closing />
       </main>
@@ -81,7 +78,7 @@ function Hero() {
     <section className="mx-auto grid w-full max-w-6xl items-center gap-12 px-4 pt-12 pb-16 sm:px-8 sm:pt-20 lg:grid-cols-[1.05fr_1fr] lg:gap-16 lg:pb-24">
       <div className="stagger [--stagger-step:80ms]">
         <p className="text-accent-foreground text-label font-semibold">
-          Habits, calendar and a timer, in one quiet place
+          Tasks, habits, practices and a timer, in one quiet place
         </p>
         <h1 className="mt-4 text-[2.625rem] leading-[1.08] tracking-[-0.025em] text-balance sm:text-[3.5rem] lg:text-[4rem]">
           A calmer day, <em className="text-primary dark:text-accent-foreground">one small thing</em> at a
@@ -89,8 +86,8 @@ function Hero() {
         </h1>
         <p className="text-muted-foreground mt-6 max-w-[34rem] text-[1.125rem] leading-8 text-pretty">
           Each morning Unravel asks one question: what&apos;s the one thing? Then it
-          keeps everything else out of the way. Your habits count as votes for the
-          person you&apos;re becoming, and rest counts too.
+          keeps everything else out of the way — pairing small daily habits,
+          switchable Mind, Heart and Body practices, and a timer where rest counts too.
         </p>
         <div className="mt-9 flex flex-wrap items-center gap-3">
           <Button asChild size="lg" className="h-12 px-6 text-body">
@@ -104,7 +101,7 @@ function Hero() {
           </Button>
         </div>
         <p className="text-muted-foreground mt-5 text-label">
-          No setup marathon. Pick a character and their first habits come with them.
+          No setup marathon. Start with one thing today, and switch on only the practices you want.
         </p>
       </div>
 
@@ -115,17 +112,15 @@ function Hero() {
 
 /**
  * A still picture of the signed-in home screen, built from the app's own
- * pieces: the pond, a chosen frog, the day's lead, and the timer ring. It is
- * illustration, so screen readers get one sentence instead of the parts.
+ * pieces: the pond, a chosen frog, a kept habit rhythm, and the timer ring. It
+ * is illustration, so screen readers get one sentence instead of the parts.
  */
 function Glimpse() {
-  const samwise = starterById("samwise");
-
   return (
     <figure className="animate-rise relative mx-auto w-full max-w-md [animation-delay:200ms] lg:mr-6 lg:mb-16">
       <figcaption className="sr-only">
-        A preview of the home screen: today&apos;s one task on a lilypad, who
-        leads today, and the time left on the timer.
+        A preview of the home screen: today&apos;s one task on a lilypad, a
+        habit kept through the week, and the time left on the timer.
       </figcaption>
 
       {/* A still wash behind the stack, so the glass has something to hold. */}
@@ -160,35 +155,35 @@ function Glimpse() {
       {/* The two small cards drift outside the panel on wide screens and sit
           beneath it on narrow ones, where there's no room to overlap. */}
       <div aria-hidden className="mt-4 grid grid-cols-2 gap-3 lg:mt-0">
-        {samwise && (
-          <div
-            className={cn(
-              GLASS,
-              "rounded-2xl p-4 lg:absolute lg:-bottom-24 lg:-left-16 lg:w-56",
-            )}
-          >
-            <div className="flex items-center gap-2.5">
-              <IdentitySigil sigil={samwise.sigil} slot={samwise.colorSlot} size="sm" />
-              <div className="min-w-0">
-                <p className="truncate text-label font-semibold">Samwise</p>
-                <p className="text-muted-foreground text-micro">leads today</p>
-              </div>
+        <div
+          className={cn(
+            GLASS,
+            "rounded-2xl p-4 lg:absolute lg:-bottom-24 lg:-left-16 lg:w-56",
+          )}
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="bg-accent text-accent-foreground inline-grid size-8 shrink-0 place-items-center rounded-xl">
+              <Sprout className="size-4" aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-label font-semibold">Read one page</p>
+              <p className="text-muted-foreground text-micro">minimum done</p>
             </div>
-            <VoteDots slot={samwise.colorSlot} days={[1, 1, 0, 1, 1, 0, 1]} />
-            <p className="text-muted-foreground mt-2 text-micro">5 votes this week</p>
           </div>
-        )}
+          <WeekDots days={[1, 1, 0, 1, 1, 0, 1]} />
+          <p className="text-muted-foreground mt-2 text-micro">5 days kept this week</p>
+        </div>
 
         <div
           className={cn(
             GLASS,
-            "flex items-center gap-3 rounded-2xl p-4 lg:absolute lg:-top-8 lg:-right-12 lg:w-48",
+            "flex items-center gap-3 rounded-2xl p-4 lg:absolute lg:-top-8 lg:-right-12 lg:w-52",
           )}
         >
           <TimerRing remaining={0.64} className="size-12 shrink-0" />
           <div>
             <p className="font-mono text-title tabular-nums">16:02</p>
-            <p className="text-muted-foreground text-micro">left of 25m</p>
+            <p className="text-muted-foreground text-micro">Pomodoro Flow · 25/5</p>
           </div>
         </div>
       </div>
@@ -196,18 +191,18 @@ function Glimpse() {
   );
 }
 
-/** A week of votes as dots: filled in the identity's hue, empty as a ring. */
-function VoteDots({ slot, days }: { slot: number; days: number[] }) {
+/** Seven gentle habit dots: filled on kept days, ringed on rest days. */
+function WeekDots({ days }: { days: number[] }) {
   return (
-    <div style={hueStyle(slot)} className="mt-3 flex gap-1.5">
-      {days.map((voted, index) => (
+    <div className="mt-3 flex gap-1.5">
+      {days.map((kept, index) => (
         <span
           key={index}
           className={cn(
             "size-3.5 rounded-full",
-            voted
-              ? "bg-[var(--hue)]"
-              : "shadow-[inset_0_0_0_1.5px_color-mix(in_srgb,var(--hue)_40%,transparent)]",
+            kept
+              ? "bg-primary"
+              : "shadow-[inset_0_0_0_1.5px_color-mix(in_srgb,var(--primary)_38%,transparent)]",
           )}
         />
       ))}
@@ -249,7 +244,7 @@ const DAY: { time: string; title: string; body: string; art: React.ReactNode }[]
   {
     time: "Through the day",
     title: "See the time go",
-    body: "Tap a task and land on a timer that drains as you work. Pomodoro, a plain countdown, or flow that runs until you stop.",
+    body: "Tap a task and land on a timer that drains as you work. Pomodoro Flow lets you keep flowing past your baseline until you're ready to pause.",
     art: <TimerRing remaining={0.4} className="size-11" />,
   },
   {
@@ -288,52 +283,87 @@ function DayInThree() {
   );
 }
 
-function Selves() {
+const SPACES: {
+  icon: LucideIcon;
+  name: string;
+  tagline: string;
+  body: string;
+  detail: string;
+}[] = [
+  {
+    icon: Repeat,
+    name: "Habits",
+    tagline: "One minimum, never two",
+    body: "Set the smallest version that counts on your worst day, stack it onto a cue, and notice shadow patterns without penalties.",
+    detail: "Optional extra logged quietly",
+  },
+  {
+    icon: Brain,
+    name: "Mind",
+    tagline: "Clear, still and focused",
+    body: "Brain dumps to empty your head, guided breathing and dhikr meditations, a reading shelf, WOOP plans and ABCDE disputations.",
+    detail: "Five switchable practices",
+  },
+  {
+    icon: HandHeart,
+    name: "Heart",
+    tagline: "Thanks, asking and remembrance",
+    body: "Daily gratitude pages, du'a templates from quick lists to full adab, and daily Quran & sunnah recitations with a tap counter.",
+    detail: "Three quiet daily pages",
+  },
+  {
+    icon: HeartPulse,
+    name: "Body",
+    tagline: "Movement and fasting",
+    body: "Corrective yoga and dumbbell routines with guided form videos, alongside intermittent or Islamic fasting on your own schedule.",
+    detail: "Rest days hold scenes steady",
+  },
+];
+
+function Practices() {
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-8 sm:py-20">
       <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:gap-14">
         <div className="lg:pt-2">
           <SectionHeading
-            eyebrow="Who you're becoming"
-            title="Every small habit is a vote for someone."
+            eyebrow="Beyond the to-do list"
+            title="Tend to your mind, heart and body, too."
           />
           <p className="text-muted-foreground mt-5 max-w-md text-body text-pretty">
-            Choose a character to grow into, real or fictional. Sherlock reads a
-            page. Samwise checks on a friend. Each check-in is a vote, and the
-            votes slowly add up to who you are.
+            A good day is more than crossing off tasks. Unravel brings your
+            habits, reflections, exercises and fasts together into the same calm
+            space.
           </p>
           <p className="text-muted-foreground mt-4 max-w-md text-body text-pretty">
-            Pick one when you sign up. Their first two habits come with them,
-            already small enough to do today.
+            Every practice is switchable in Settings — keep only what serves
+            you, and watch each quiet illustrated scene grow as you return to it.
           </p>
           <p className="text-muted-foreground mt-6 text-label">
-            {STARTER_SELVES.length} characters to begin with, or make your own.
+            All of it rolls into one clear daily statistics view.
           </p>
         </div>
 
         <ul className="grid gap-3 sm:grid-cols-2">
-          {CAST.map((starter) => (
+          {SPACES.map(({ icon: Icon, name, tagline, body, detail }) => (
             <li
-              key={starter.id}
-              style={hueStyle(starter.colorSlot)}
-              className={cn(GLASS, "relative overflow-hidden rounded-2xl p-5")}
+              key={name}
+              className={cn(GLASS, "relative flex flex-col overflow-hidden rounded-2xl p-5")}
             >
-              <span aria-hidden className="absolute inset-y-0 left-0 w-1 bg-[var(--hue)]" />
               <div className="flex items-center gap-3">
-                <IdentitySigil sigil={starter.sigil} slot={starter.colorSlot} />
+                <span className="bg-accent text-accent-foreground inline-grid size-10 shrink-0 place-items-center rounded-xl">
+                  <Icon className="size-5" aria-hidden />
+                </span>
                 <div className="min-w-0">
-                  <p className="text-title font-semibold">{starter.name}</p>
-                  <p className="text-muted-foreground text-micro">
-                    {starter.kind === "REAL" ? "Real" : "Fictional"} · {starter.archetype}
-                  </p>
+                  <p className="text-title font-semibold">{name}</p>
+                  <p className="text-muted-foreground text-micro">{tagline}</p>
                 </div>
               </div>
-              <p className="font-display mt-4 text-[1.0625rem] leading-6 italic">
-                &ldquo;{starter.statement}&rdquo;
+              <p className="text-muted-foreground mt-4 flex-1 text-label leading-6 text-pretty">
+                {body}
               </p>
-              <p className="text-muted-foreground mt-3 flex items-center gap-2 text-label">
-                <Sprout className="size-4 shrink-0 text-[var(--hue)]" aria-hidden />
-                {starter.habits[0].minimalTask}
+              <p className="text-foreground/80 mt-4 flex items-center gap-2 text-micro font-medium">
+                <Sprout className="text-primary size-3.5 shrink-0" aria-hidden />
+                {detail}
               </p>
             </li>
           ))}
@@ -347,7 +377,7 @@ const PROMISES: { icon: LucideIcon; title: string; body: string }[] = [
   {
     icon: Feather,
     title: "Small counts",
-    body: "Every habit has a minimum, like one page or one push-up. Doing the minimum is a whole vote.",
+    body: "Every habit has a minimum, like one page or one push-up. Doing the minimum completes the day.",
   },
   {
     icon: MoonStar,
@@ -357,12 +387,12 @@ const PROMISES: { icon: LucideIcon; title: string; body: string }[] = [
   {
     icon: Sprout,
     title: "Nothing to lose",
-    body: "Votes only add up. Miss a day and nothing breaks: no warnings, no penalties.",
+    body: "Miss a day and nothing shatters. Scheduled rest days hold steady, with no warnings or penalties.",
   },
   {
     icon: Layers,
     title: "One place",
-    body: "Todos, habits, calendar blocks and the timer share one day, so nothing lives in a second app.",
+    body: "Tasks, habits, calendar blocks, practices and your timer share one calm home — switch off anything you don't use.",
   },
 ];
 

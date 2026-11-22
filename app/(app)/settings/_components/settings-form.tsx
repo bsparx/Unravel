@@ -523,8 +523,8 @@ export function SettingsForm({
           <h2 className="font-display text-title">Danger zone</h2>
           <p className="text-muted-foreground text-label">
             Wipes every day you have logged and every minute on the clock —
-            done days, missed days, feedback notes, streaks, identity votes.
-            Habits, identities, schedules and quotas stay exactly as they are.
+            done days, missed days, feedback notes and streaks. Habits,
+            schedules and settings stay exactly as they are.
           </p>
         </div>
         <ResetProgressButton />

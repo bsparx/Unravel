@@ -3,14 +3,12 @@ import "server-only";
 import { addDays, startOfWeek, toISODate, todayLocal } from "@/lib/dates";
 import { prisma } from "@/lib/db";
 import type { ShadowMark, User } from "@/lib/generated/prisma/client";
-import { clampSlot, shortName, sigilFor, type Sigil } from "@/lib/identity-look";
 
 export type ShadowCardData = {
   id: string;
   name: string;
   law: string | null;
   plan: string | null;
-  against: { id: string; short: string; sigil: Sigil; colorSlot: number } | null;
   /** One entry per day of the current week, first day first. */
   week: { dateISO: string; mark: ShadowMark | null; isToday: boolean; isFuture: boolean }[];
   today: ShadowMark | null;
@@ -35,9 +33,6 @@ export async function getShadowWeek(user: User): Promise<ShadowCardData[]> {
         name: true,
         law: true,
         plan: true,
-        identity: {
-          select: { id: true, name: true, sigil: true, archetype: true, colorSlot: true },
-        },
       },
     }),
     prisma.shadowLog.findMany({
@@ -54,14 +49,6 @@ export async function getShadowWeek(user: User): Promise<ShadowCardData[]> {
     name: pattern.name,
     law: pattern.law,
     plan: pattern.plan,
-    against: pattern.identity
-      ? {
-          id: pattern.identity.id,
-          short: shortName(pattern.identity.name),
-          sigil: sigilFor(pattern.identity.sigil, pattern.identity.archetype),
-          colorSlot: clampSlot(pattern.identity.colorSlot),
-        }
-      : null,
     week: days.map((dateISO) => ({
       dateISO,
       mark: marks.get(`${pattern.id}:${dateISO}`) ?? null,

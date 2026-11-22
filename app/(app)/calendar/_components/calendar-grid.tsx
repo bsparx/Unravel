@@ -90,7 +90,6 @@ export type DraftPreview = {
   endMinute: number;
   title: string;
   kind: "WORK" | "RECOVERY" | "BUFFER" | "DAYDREAM";
-  identityColorSlot: number | null;
   taskColor: CalendarColor | null;
 };
 
@@ -264,16 +263,6 @@ function liveBeatIndex(
   }
   return beatIndexAt(block, block.beatMinutes, nowMinute);
 }
-
-/**
- * A block's tint from the self it is for: the same 12% fill and 45% edge the
- * task hues use, mixed from the identity token so each theme's own step
- * applies.
- */
-const identityChipStyle = (slot: number) => ({
-  backgroundColor: `color-mix(in srgb, var(--id-${slot}) 12%, transparent)`,
-  borderColor: `color-mix(in srgb, var(--id-${slot}) 45%, transparent)`,
-});
 
 type DragState = {
   id: string;
@@ -1769,12 +1758,9 @@ function DraftPreviewBlock({ preview }: { preview: DraftPreview }) {
   const heightPx = Math.max(BLOCK_MIN_HEIGHT_PX, minutes * MINUTE_PX - 2);
   const compact = minutes < COMPACT_MINUTES;
 
-  const tint =
-    preview.kind === "WORK" && preview.identityColorSlot !== null
-      ? identityChipStyle(preview.identityColorSlot)
-      : preview.taskColor
-        ? calendarChipStyle(preview.taskColor)
-        : null;
+  const tint = preview.taskColor
+    ? calendarChipStyle(preview.taskColor)
+    : null;
 
   return (
     <div
@@ -2124,11 +2110,9 @@ const BlockChip = memo(function BlockChip({
    */
   const tint = isCue
     ? null
-    : block.identity
-      ? identityChipStyle(block.identity.colorSlot)
-      : block.tasks.length === 1 && isCalendarColor(block.tasks[0].color)
-        ? calendarChipStyle(block.tasks[0].color)
-        : null;
+    : block.tasks.length === 1 && isCalendarColor(block.tasks[0].color)
+      ? calendarChipStyle(block.tasks[0].color)
+      : null;
 
   // How much of the body fits at this height, decided in one place. Drawn from
   // the block's real pixel height, because the grid's scale is the only thing

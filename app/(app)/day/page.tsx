@@ -11,14 +11,12 @@ import {
   toISODate,
   todayLocal,
 } from "@/lib/dates";
-import { getIdentityVotes, getLeadIdentityId } from "@/lib/identity-votes";
 import { getPrayerCycle } from "@/lib/prayers";
 import { getRenewingSoon } from "@/lib/subscriptions-data";
 import { getTodayView } from "@/lib/tasks";
 import { getBlocks } from "@/lib/time-blocks";
 
 import { DayList } from "./_components/day-list";
-import { LeadPanel } from "./_components/lead-panel";
 import { PrayerSection } from "./_components/prayer-section";
 import { QuestHero } from "./_components/quest-hero";
 import { QuestLog } from "./_components/quest-log";
@@ -31,12 +29,10 @@ export default async function TodayPage() {
   // Every section only needs today's date, so the whole page loads in one
   // parallel round rather than one waterfall step per section.
   const today = todayLocal(user.timezone);
-  const [view, blocks, prayers, votes, leadId, renewals] = await Promise.all([
+  const [view, blocks, prayers, renewals] = await Promise.all([
     getTodayView(user),
     getBlocks(user, today, 1),
     user.prayerRemindersEnabled ? getPrayerCycle(user) : null,
-    getIdentityVotes(user),
-    getLeadIdentityId(user),
     getRenewingSoon(user),
   ]);
   // Daydream blocks live on /calendar only — /day never sees them.
@@ -75,8 +71,6 @@ export default async function TodayPage() {
       </header>
 
       <RenewalsAlert rows={renewals.rows} today={renewals.today} />
-
-      <LeadPanel identities={votes.identities} leadId={leadId} habits={view.habits} />
 
       {/* One obvious quest, then the day's shape. Everything below is
           optional. The hero reads the calendar's blocks and the anchored

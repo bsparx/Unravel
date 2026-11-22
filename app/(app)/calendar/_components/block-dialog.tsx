@@ -23,7 +23,6 @@ import {
   Pause,
   Plus,
   Search,
-  Sparkles,
   Timer,
   Trash2,
   X,
@@ -35,16 +34,8 @@ import {
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { hueStyle } from "@/components/identity-sigil";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   CALENDAR_COLOR_NAMES,
   CALENDAR_COLORS,
@@ -63,7 +54,6 @@ import {
 } from "@/lib/block-math";
 import { BEAT_MINUTES, beatCount } from "@/lib/block-beats";
 import { formatDate, parseLocalDate, WEEKDAYS } from "@/lib/dates";
-import { hueVar } from "@/lib/identity-look";
 import { idleState, MAX_BLOCK_TASKS } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 
@@ -110,8 +100,6 @@ export type BlockDraft = {
   kind: "WORK" | "RECOVERY" | "BUFFER" | "DAYDREAM";
   /** This block already has a cue in front of it, so don't offer to add one. */
   hasCue: boolean;
-  /** The self this time is for, if any. */
-  identityId: string | null;
   /** Interval mode: one thing every this many minutes. Null is off. */
   beatMinutes: number | null;
 };
@@ -159,7 +147,6 @@ const PACES: { value: number | null; label: string }[] = [
 const CARD_WIDTH_DESKTOP = 432;
 const CARD_ESTIMATED_HEIGHT = 480;
 const DESKTOP_BREAKPOINT = 640;
-const NONE_IDENTITY = "__none__";
 
 function formatShortDateLabel(dateISO: string): string {
   const date = parseLocalDate(dateISO);
@@ -177,14 +164,12 @@ export function BlockDialog({
   draft,
   anchorRect = null,
   tasks,
-  identities,
   onPreviewChange,
   onClose,
 }: {
   draft: BlockDraft;
   anchorRect?: AnchorRect | null;
   tasks: { id: string; title: string; cueTitle: string | null; color: string }[];
-  identities: { id: string; name: string; colorSlot: number }[];
   onPreviewChange?: (preview: DraftPreview | null) => void;
   onClose: () => void;
 }) {
@@ -202,7 +187,6 @@ export function BlockDialog({
   const [end, setEnd] = useState(draft.endMinute);
   const [kind, setKind] = useState<BlockDraft["kind"]>(draft.kind);
   const [title, setTitle] = useState(draft.title);
-  const [identityId, setIdentityId] = useState<string>(draft.identityId ?? "");
   const [taskIds, setTaskIds] = useState<string[]>(draft.taskIds);
   const [taskColor, setTaskColor] = useState<CalendarColor>(
     draft.taskColor ?? "teal",
@@ -308,22 +292,17 @@ export function BlockDialog({
 
   const soleTask = taskIds.length === 1 ? linked[0] : null;
   const namedOrStaffed = title.trim().length > 0 || taskIds.length > 0;
-  const selectedIdentity = useMemo(
-    () => identities.find((identity) => identity.id === identityId) ?? null,
-    [identities, identityId],
-  );
 
   // Live accent colour driving the top edge bar, status dot, and focus underline.
   const accentColor = useMemo(() => {
     if (kind === "RECOVERY") return "var(--rest)";
     if (kind === "BUFFER") return "var(--muted-foreground)";
     if (kind === "DAYDREAM") return "#a78bfa";
-    if (selectedIdentity) return hueVar(selectedIdentity.colorSlot);
     if (soleTask && isCalendarColor(taskColor)) {
       return CALENDAR_COLORS[taskColor];
     }
     return "var(--primary)";
-  }, [kind, selectedIdentity, soleTask, taskColor]);
+  }, [kind, soleTask, taskColor]);
 
   // Sync live ghost preview block on the grid while creating a new block.
   useEffect(() => {
@@ -334,8 +313,6 @@ export function BlockDialog({
       endMinute: end,
       title: title.trim() ? title : (soleTask?.title ?? ""),
       kind,
-      identityColorSlot:
-        kind === "WORK" ? (selectedIdentity?.colorSlot ?? null) : null,
       taskColor: soleTask && isCalendarColor(taskColor) ? taskColor : null,
     });
   }, [
@@ -347,7 +324,6 @@ export function BlockDialog({
     title,
     soleTask,
     kind,
-    selectedIdentity,
     taskColor,
   ]);
 
@@ -581,11 +557,6 @@ export function BlockDialog({
               <input type="hidden" name="startMinute" value={start} />
               <input type="hidden" name="endMinute" value={end} />
               <input type="hidden" name="kind" value={kind} />
-              <input
-                type="hidden"
-                name="identityId"
-                value={kind === "WORK" ? identityId : ""}
-              />
               <input
                 type="hidden"
                 name="beatMinutes"
@@ -1046,48 +1017,7 @@ export function BlockDialog({
                     </div>
                   </div>
 
-                  {/* Row 3: Identity ("Time for") — styled Radix Select with hue dots */}
-                  {kind === "WORK" && identities.length > 0 && (
-                    <div className="grid grid-cols-[1.25rem_minmax(0,1fr)] items-center gap-3">
-                      <Sparkles
-                        className="text-muted-foreground size-4"
-                        aria-hidden
-                      />
-                      <Select
-                        value={identityId || NONE_IDENTITY}
-                        onValueChange={(value) =>
-                          setIdentityId(value === NONE_IDENTITY ? "" : value)
-                        }
-                      >
-                        <SelectTrigger
-                          id="block-identity"
-                          aria-label="Time for identity"
-                          className="bg-muted/45 hover:bg-muted h-9 min-h-9 w-full rounded-[10px] border-transparent text-label shadow-none hover:border-border/60"
-                        >
-                          <SelectValue placeholder="Time for nobody in particular" />
-                        </SelectTrigger>
-                        <SelectContent position="popper">
-                          <SelectItem value={NONE_IDENTITY}>
-                            <span className="text-muted-foreground">
-                              No specific identity
-                            </span>
-                          </SelectItem>
-                          {identities.map((identity) => (
-                            <SelectItem key={identity.id} value={identity.id}>
-                              <span
-                                aria-hidden
-                                style={hueStyle(identity.colorSlot)}
-                                className="size-2.5 shrink-0 rounded-full bg-[var(--hue)]"
-                              />
-                              <span>{identity.name}</span>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-
-                  {/* Row 4: Interval Cadence ("One thing every") */}
+                  {/* Row 3: Interval Cadence ("One thing every") */}
                   {kind === "WORK" && (
                     <div className="grid grid-cols-[1.25rem_minmax(0,1fr)] items-center gap-3">
                       <Timer

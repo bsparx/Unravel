@@ -1162,7 +1162,6 @@ async function main() {
   await prisma.focusSession.deleteMany({ where: { userId: user.id } });
   await prisma.taskOccurrence.deleteMany({ where: { userId: user.id } });
   await prisma.task.deleteMany({ where: { userId: user.id } });
-  await prisma.identity.deleteMany({ where: { userId: user.id } });
   await prisma.project.deleteMany({ where: { userId: user.id } });
   await prisma.moneyBudget.deleteMany({ where: { userId: user.id } });
   await prisma.moneyTransaction.deleteMany({ where: { userId: user.id } });
@@ -1424,63 +1423,6 @@ async function main() {
       return { task, ...habit };
     }),
   );
-
-  // ---- identities -----------------------------------------------------------
-  // Who the demo user is becoming, and which habits are the votes. "Morning
-  // pages" votes for two selves at once (the multi-link case), and "Stretch"
-  // runs at 50% reliability — so /identities opens with one identity thriving
-  // and one sitting in needs-focus, which is the interesting state.
-  const [writer, calm, athlete] = await Promise.all([
-    prisma.identity.create({
-      data: {
-        userId: user.id,
-        name: "Writer",
-        statement: "I am someone who writes every day.",
-        characteristics:
-          "Sits down before the day has opinions. Slow, exact, unhurried by the blank page. Finishes sentences. Reaches for the specific noun instead of the easy one. Protects the morning hour the way other people protect a meeting.",
-        sortOrder: 0,
-      },
-    }),
-    prisma.identity.create({
-      data: {
-        userId: user.id,
-        name: "Someone calm",
-        statement: "I am someone who starts the day quietly.",
-        characteristics:
-          "Moves at half speed before nine. Does not reach for the phone. Lets a question hang instead of snatching at it. Voice drops a register when the room tightens. Leaves the table quieter than it found it.",
-        sortOrder: 1,
-      },
-    }),
-    prisma.identity.create({
-      data: {
-        userId: user.id,
-        name: "Athlete",
-        statement: "I am someone who moves.",
-        characteristics:
-          "Trains on the days it is inconvenient. Treats rest as part of the program, not a lapse. Chooses the stairs without making it a story. Recovers fast. Is recognisable by the shoes by the door.",
-        sortOrder: 2,
-      },
-    }),
-  ]);
-
-  const idOf = (title: string): string => {
-    const found = habits.find((habit) => habit.title === title);
-    if (!found) throw new Error(`Seed habit missing: ${title}`);
-    return found.task.id;
-  };
-
-  await prisma.habitIdentity.createMany({
-    data: [
-      // The multi-link case: one habit, two selves.
-      { taskId: idOf("Morning pages"), identityId: writer.id },
-      { taskId: idOf("Morning pages"), identityId: calm.id },
-      { taskId: idOf("Read something long"), identityId: writer.id },
-      { taskId: idOf("Inbox to zero"), identityId: calm.id },
-      // The unreliable one — Athlete lands in needs-focus on purpose.
-      { taskId: idOf("Stretch"), identityId: athlete.id },
-    ],
-    skipDuplicates: true,
-  });
 
   // ---- back-dated history ------------------------------------------------
 

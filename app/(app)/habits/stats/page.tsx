@@ -11,15 +11,10 @@ import {
   RANGE_DAYS,
   type StatsRange,
 } from "@/lib/habit-stats";
-import { getIdentityReinforcements } from "@/lib/identity-stats";
 import { describeBar, formatLogged } from "@/lib/habit-bar";
 import { describeRecurrence } from "@/lib/recurrence";
 import { cn } from "@/lib/utils";
 
-import {
-  IdentitiesPanel,
-  NeedsFocusPanel,
-} from "./_components/identity-panels";
 import {
   AdherenceChart,
   OutcomesChart,
@@ -46,18 +41,7 @@ export default async function HabitStatsPage({
       ? [rawHabits]
       : [];
 
-  // The identity tally over the same selection: the filters govern the whole
-  // page, identity rows included. Its query runs alongside the stats read,
-  // and only its arithmetic waits for them.
-  const statsRead = getHabitStats(user, range, selected);
-  const [stats, identityStats] = await Promise.all([
-    statsRead,
-    getIdentityReinforcements(
-      user,
-      statsRead.then((read) => read.habits),
-      range,
-    ),
-  ]);
+  const stats = await getHabitStats(user, range, selected);
   // A single habit means the y-axis has one unit, which is the only case where
   // plotting raw progress makes sense.
   const single = stats.habits.length === 1 ? stats.habits[0] : null;
@@ -128,15 +112,6 @@ export default async function HabitStatsPage({
           detail={`over ${RANGE_DAYS[range]} days`}
         />
       </section>
-
-      {identityStats.identities.some(
-        (identity) => identity.linked.length > 0,
-      ) && (
-        <section className="mb-10 space-y-10">
-          <IdentitiesPanel identities={identityStats.identities} />
-          <NeedsFocusPanel focus={identityStats.focus} />
-        </section>
-      )}
 
       <div className="space-y-10">
         <Panel

@@ -136,12 +136,8 @@ import {
 } from "@/lib/fasting";
 import { exerciseCheckoffSchema, fastPlanSchema, fastUpdateSchema } from "@/lib/validation";
 
-import { nextFreeSlot, stageFor } from "@/lib/identity-look";
-import { reviewWeekStart } from "@/lib/review-week";
 import { activePalette, isEveningHour } from "@/lib/theme";
-import { shadowSource, tallyVotes } from "@/lib/vote-tally";
-import { STARTER_SELVES, isTaken } from "@/lib/starter-selves";
-import { identitySchema, subscriptionSchema } from "@/lib/validation";
+import { subscriptionSchema } from "@/lib/validation";
 import {
   isRenewingSoon,
   monthlyCostCents,
@@ -215,13 +211,6 @@ import {
   type RoutineDayType,
 } from "@/lib/exercise-routine";
 import { parseQuickAdd } from "@/lib/quick-parse";
-import {
-  needsFocus,
-  reinforceIdentities,
-  type IdentitySeed,
-  type VoteDay,
-  type VoteHabit,
-} from "@/lib/identity-reinforcement";
 import {
   parseTimings,
   prayerWindows,
@@ -2969,7 +2958,6 @@ const questBlock = (
   completedAt: overrides.completedAt ?? null,
   cueForId: overrides.cueForId ?? null,
   hasCue: overrides.hasCue ?? false,
-  identity: null,
   beatMinutes: overrides.beatMinutes ?? null,
   beats: overrides.beats ?? [],
   tasks: overrides.tasks ?? [],
@@ -3221,310 +3209,7 @@ check("a day of completed quests reads as all done, not as nothing planned", () 
   }
 });
 
-console.log("\nidentity reinforcement — votes, misses and cold identities");
-
-// Fixtures speak `VoteHabit`'s shape: due days only, in date order, the way
-// getHabitStats hands them to the tally. The shared range is one Mon..Sun week
-// with "today" the last day.
-const identitySeed = (id: string, name: string): IdentitySeed => ({
-  id,
-  name,
-  statement: null,
-  characteristics: null,
-});
-
-const voteHabit = (
-  id: string,
-  title: string,
-  days: [string, VoteDay["outcome"], boolean?][],
-): VoteHabit => ({
-  id,
-  title,
-  days: days.map(([dateISO, outcome, keptGoing = false]) => ({
-    dateISO,
-    outcome,
-    wentBeyond: keptGoing,
-  })),
-});
-
-const week = {
-  fromISO: "2026-03-02",
-  toISO: "2026-03-08",
-  todayISO: "2026-03-08",
-};
-
-check("a kept habit-day is one full vote for every identity it serves", () => {
-  // One day kept the plain way, one that kept going. Each day is a single
-  // vote for each self — split votes would show 1 here.
-  const walk = voteHabit("walk", "Walk", [
-    ["2026-03-02", "DONE"],
-    ["2026-03-03", "DONE", true],
-  ]);
-  const tallies = reinforceIdentities(
-    [identitySeed("a", "Athlete"), identitySeed("b", "Someone calm")],
-    [
-      { identityId: "a", taskId: "walk" },
-      { identityId: "b", taskId: "walk" },
-    ],
-    [walk],
-    week,
-  );
-
-  assert.equal(tallies.length, 2);
-  for (const tally of tallies) {
-    // A vote is for *each* self.
-    assert.equal(tally.expected, 2);
-    assert.equal(tally.votes, 2);
-    // LOAD-BEARING: the log never doubles the vote. Kept going is one quiet
-    // number beside the votes — two days kept, two votes, one kept-going.
-    // A second vote for the good day is how the tally starts lying.
-    assert.equal(tally.wentBeyondVotes, 1);
-    assert.equal(tally.reinforcement, 100);
-  }
-});
-
-check("a miss is a missed opportunity; a skip is neither vote nor miss", () => {
-  const pages = voteHabit("pages", "Pages", [
-    ["2026-03-02", "MISSED"],
-    ["2026-03-03", "SKIPPED"],
-    ["2026-03-04", "DONE"],
-  ]);
-  const [tally] = reinforceIdentities(
-    [identitySeed("w", "Writer")],
-    [{ identityId: "w", taskId: "pages" }],
-    [pages],
-    week,
-  );
-
-  assert.equal(tally.expected, 3);
-  // A DONE day is one vote. A MISSED day is not one.
-  assert.equal(tally.votes, 1);
-  assert.equal(tally.missed, 1);
-  // SKIPPED is a decision to rest: neither vote nor miss, its own number.
-  assert.equal(tally.skipped, 1);
-  // And a plain DONE day adds no kept-going beside its vote.
-  assert.equal(tally.wentBeyondVotes, 0);
-  assert.equal(tally.starving.length, 1);
-  assert.equal(tally.starving[0].title, "Pages");
-  assert.equal(tally.starving[0].missed, 1);
-});
-
-check("today is pending and never cold — the day is still in progress", () => {
-  const pages = voteHabit("pages", "Pages", [
-    ["2026-03-06", "MISSED"],
-    ["2026-03-08", "PENDING"],
-  ]);
-  const [tally] = reinforceIdentities(
-    [identitySeed("w", "Writer")],
-    [{ identityId: "w", taskId: "pages" }],
-    [pages],
-    week,
-  );
-
-  assert.equal(tally.missed, 1);
-  assert.equal(tally.pending, 1);
-  // Friday missed, but today's opportunity is unspent, not lapsed: one due
-  // day behind, not two.
-  assert.equal(tally.coldDueDays, 1);
-});
-
-check("a Friday-only habit is not going cold all week", () => {
-  // Due Monday (kept) and Friday (missed) only. The four empty days between
-  // are schedule gaps, not a four-day cold spell.
-  const stretch = voteHabit("stretch", "Stretch", [
-    ["2026-03-02", "DONE"],
-    ["2026-03-06", "MISSED"],
-  ]);
-  const [tally] = reinforceIdentities(
-    [identitySeed("a", "Athlete")],
-    [{ identityId: "a", taskId: "stretch" }],
-    [stretch],
-    week,
-  );
-
-  assert.equal(tally.coldDueDays, 1);
-});
-
-check("a vote today ends the cold spell", () => {
-  const stretch = voteHabit("stretch", "Stretch", [
-    ["2026-03-06", "MISSED"],
-    ["2026-03-08", "DONE"],
-  ]);
-  const [tally] = reinforceIdentities(
-    [identitySeed("a", "Athlete")],
-    [{ identityId: "a", taskId: "stretch" }],
-    [stretch],
-    week,
-  );
-
-  assert.equal(tally.coldDueDays, 0);
-});
-
-check("needs focus lists the hungry, sorts worst first, skips the thriving", () => {
-  const walk = voteHabit("walk", "Walk", [
-    ["2026-03-02", "MISSED"],
-    ["2026-03-03", "MISSED"],
-    ["2026-03-04", "DONE"],
-  ]);
-  const pages = voteHabit("pages", "Pages", [
-    ["2026-03-02", "DONE"],
-    ["2026-03-03", "DONE"],
-  ]);
-  const meditate = voteHabit("meditate", "Meditate", []);
-
-  const tallies = reinforceIdentities(
-    [
-      identitySeed("a", "Athlete"),
-      identitySeed("w", "Writer"),
-      identitySeed("c", "Someone calm"),
-    ],
-    [
-      { identityId: "a", taskId: "walk" },
-      { identityId: "w", taskId: "pages" },
-      { identityId: "c", taskId: "meditate" },
-    ],
-    [walk, pages, meditate],
-    week,
-  );
-
-  const focus = needsFocus(tallies);
-  // Writer is thriving (2 of 2); calm has a link but nothing due — neither
-  // belongs on a list of things to worry about.
-  assert.equal(focus.length, 1);
-  assert.equal(focus[0].name, "Athlete");
-  assert.equal(focus[0].reinforcement, 33);
-});
-
-check("an identity nobody votes for still exists — and is not 'starved'", () => {
-  const tallies = reinforceIdentities(
-    [identitySeed("d", "Dreamer")],
-    [],
-    [],
-    week,
-  );
-
-  assert.equal(tallies.length, 1);
-  assert.equal(tallies[0].expected, 0);
-  assert.equal(tallies[0].reinforcement, 0);
-  // "No evidence yet" and "going hungry" are different sentences.
-  assert.equal(needsFocus(tallies).length, 0);
-});
-
-check("the daily strip keeps its columns even on days nothing is due", () => {
-  const pages = voteHabit("pages", "Pages", [["2026-03-03", "DONE"]]);
-  const [tally] = reinforceIdentities(
-    [identitySeed("w", "Writer")],
-    [{ identityId: "w", taskId: "pages" }],
-    [pages],
-    week,
-  );
-
-  assert.equal(tally.daily.length, 7); // the whole week, not just due days
-  const voted = tally.daily.find((day) => day.dateISO === "2026-03-03");
-  assert.equal(voted?.touched, true);
-  assert.equal(voted?.due, 1);
-  const gap = tally.daily.find((day) => day.dateISO === "2026-03-07");
-  assert.equal(gap?.due, 0);
-  assert.equal(gap?.touched, false);
-});
-
-
-// ---------------------------------------------------------------- the identity game
-
-console.log("\nidentity votes — the cumulative tally");
-
-check("a habit linked to two identities votes once for each, every count", () => {
-  const tallies = tallyVotes({
-    identityIds: ["sherlock", "musashi"],
-    sources: new Map([["walk", ["sherlock", "musashi"]]]),
-    allTime: new Map([["walk", 40]]),
-    recent: [
-      { source: "walk", dateISO: "2026-10-03" },
-      { source: "walk", dateISO: "2026-09-29" },
-    ],
-    todayISO: "2026-10-03",
-    weekStartISO: "2026-09-28",
-  });
-  for (const id of ["sherlock", "musashi"]) {
-    const tally = tallies.get(id)!;
-    assert.equal(tally.total, 40);
-    assert.equal(tally.month, 2);
-    assert.equal(tally.week, 2);
-    assert.equal(tally.last7, 2);
-    assert.equal(tally.today, 1);
-    assert.equal(tally.quietDays, 0);
-  }
-});
-
-check("a chose-otherwise mark votes for the identity its pattern pulls against", () => {
-  const source = shadowSource("scroll");
-  const tally = tallyVotes({
-    identityIds: ["marcus"],
-    sources: new Map([[source, ["marcus"]]]),
-    allTime: new Map([[source, 3]]),
-    recent: [{ source, dateISO: "2026-10-01" }],
-    todayISO: "2026-10-03",
-    weekStartISO: "2026-09-28",
-  }).get("marcus")!;
-  assert.equal(tally.total, 3);
-  assert.equal(tally.week, 1);
-  assert.equal(tally.today, 0);
-});
-
-check("quiet days count back from yesterday; today never counts against anyone", () => {
-  const tally = tallyVotes({
-    identityIds: ["marcus"],
-    sources: new Map([["notes", ["marcus"]]]),
-    allTime: new Map([["notes", 1]]),
-    recent: [{ source: "notes", dateISO: "2026-09-27" }],
-    todayISO: "2026-10-03",
-    weekStartISO: "2026-09-28",
-  }).get("marcus")!;
-  assert.equal(tally.quietDays, 5); // Sep 28 .. Oct 2
-  assert.equal(tally.strip.length, 14);
-  assert.equal(tally.strip.at(-1), false); // today, still open
-  assert.equal(tally.strip.filter(Boolean).length, 1);
-});
-
-check("unlinked sources and out-of-window rows vote for nobody", () => {
-  const tally = tallyVotes({
-    identityIds: ["leo"],
-    sources: new Map([["sketch", ["leo"]]]),
-    allTime: new Map([["todo-1", 9]]),
-    recent: [
-      { source: "todo-1", dateISO: "2026-10-03" },
-      { source: "sketch", dateISO: "2026-08-01" },
-    ],
-    todayISO: "2026-10-03",
-    weekStartISO: "2026-09-28",
-  }).get("leo")!;
-  assert.deepEqual([tally.total, tally.month, tally.today], [0, 0, 0]);
-});
-
-console.log("\nidentity look — stages, hues, the review week, the evening shift");
-
-check("stages never skip and the last one is final", () => {
-  assert.deepEqual(stageFor(0), { number: 1, name: "Trying it on", next: { name: "Practising", votesToGo: 10 }, progress: 0 });
-  assert.equal(stageFor(64).name, "Dependable");
-  assert.equal(stageFor(64).next?.votesToGo, 36);
-  assert.equal(stageFor(64).progress, 10);
-  assert.equal(stageFor(250).next, null);
-  assert.equal(stageFor(250).progress, 100);
-});
-
-check("a new identity takes the first free hue", () => {
-  assert.equal(nextFreeSlot([]), 1);
-  assert.equal(nextFreeSlot([1, 2, 4]), 3);
-  assert.equal(nextFreeSlot([1, 2, 3, 4, 5, 6]), 1);
-});
-
-check("a review held on the first day plans that week, otherwise the next", () => {
-  const monday = parseLocalDate("2026-09-28")!;
-  const saturday = parseLocalDate("2026-10-03")!;
-  assert.equal(toISODate(reviewWeekStart(monday, 1)), "2026-09-28");
-  assert.equal(toISODate(reviewWeekStart(saturday, 1)), "2026-10-05");
-  assert.equal(toISODate(reviewWeekStart(saturday, 0)), "2026-10-04");
-});
+console.log("\nthe evening shift");
 
 check("the evening shift wraps past midnight and ends at five", () => {
   assert.equal(isEveningHour(21, 21), true);
@@ -3536,23 +3221,6 @@ check("the evening shift wraps past midnight and ends at five", () => {
   assert.equal(activePalette("light", { on: true, from: 21 }, 22), "dark");
   assert.equal(activePalette("light", { on: false, from: 21 }, 22), "light");
   assert.equal(activePalette("light", { on: true, from: 21 }, 9), "light");
-});
-
-check("every starter character passes the identity form's own rules", () => {
-  const names = STARTER_SELVES.map((starter) => starter.name.toLowerCase());
-  assert.equal(new Set(names).size, names.length, "starter names are unique");
-  assert.equal(new Set(STARTER_SELVES.map((starter) => starter.id)).size, STARTER_SELVES.length);
-  for (const starter of STARTER_SELVES) {
-    const parsed = identitySchema.safeParse({ ...starter });
-    assert.ok(parsed.success, `${starter.name}: ${parsed.error?.message}`);
-    assert.ok(starter.habits.length > 0, `${starter.name} brings a habit`);
-    for (const habit of starter.habits) {
-      assert.ok(habit.minimalTask.length > 0 && habit.minimalTask.length <= 120, habit.title);
-      assert.ok(habit.cue.length > 0 && habit.cue.length <= 120, habit.title);
-    }
-  }
-  assert.equal(isTaken(STARTER_SELVES[0], [STARTER_SELVES[0].name.toUpperCase()]), true);
-  assert.equal(isTaken(STARTER_SELVES[0], ["Writer"]), false);
 });
 
 check("interval blocks split into whole-or-short intervals", () => {

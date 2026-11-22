@@ -25,7 +25,6 @@ import {
   todayLocal,
   WEEKDAYS,
 } from "@/lib/dates";
-import { prisma } from "@/lib/db";
 import { getBlockedDays, getBlocks, getSchedulableItems } from "@/lib/time-blocks";
 import { getPrayerBands } from "@/lib/prayers";
 import { tightCount, transitionsForDay } from "@/lib/transitions";
@@ -89,13 +88,8 @@ export default async function CalendarPage({
   const weekStart = startOfWeek(anchor, user.weekStart);
   // One read of blocks for both views: the anchor's week always contains the
   // anchor, so a day is that week filtered rather than a second query.
-  const [weekBlocks, identities, schedulable, blockedDays, prayerBands] = await Promise.all([
+  const [weekBlocks, schedulable, blockedDays, prayerBands] = await Promise.all([
     getBlocks(user, weekStart, 7),
-    prisma.identity.findMany({
-      where: { userId: user.id },
-      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-      select: { id: true, name: true, colorSlot: true },
-    }),
     getSchedulableItems(user, anchor),
     // The mini-month navigator's dots: which days in the anchor's month
     // already carry a block.
@@ -337,7 +331,6 @@ export default async function CalendarPage({
               cueTitle: task.cueTitle,
               color: task.color,
             }))}
-            identities={identities}
           />
         }
         panel={
@@ -375,7 +368,6 @@ export default async function CalendarPage({
 
       <WeekInsights
         blocks={weekBlocks}
-        identities={identities}
         rangeLabel={`${formatDate(weekStart)} - ${formatDate(addDays(weekStart, 6))}`}
       />
 

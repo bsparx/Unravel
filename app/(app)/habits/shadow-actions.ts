@@ -9,28 +9,15 @@ import { cuid, markShadowSchema, shadowPatternSchema } from "@/lib/validation";
 
 type Result = { ok: true } | { ok: false; message: string };
 
-/** A chosen-otherwise mark is a vote, so every vote surface hears about it. */
 function revalidateShadowViews() {
   revalidatePath("/habits");
-  revalidatePath("/identities");
   revalidatePath("/day");
-  revalidatePath("/review");
-}
-
-async function ownedIdentity(userId: string, identityId: string | null | undefined) {
-  if (!identityId) return null;
-  const identity = await prisma.identity.findFirst({
-    where: { id: identityId, userId },
-    select: { id: true },
-  });
-  return identity?.id ?? null;
 }
 
 export async function createShadowPattern(input: {
   name: string;
   law?: string | null;
   plan?: string | null;
-  identityId?: string | null;
 }): Promise<Result> {
   const user = await requireUser();
   const parsed = shadowPatternSchema.safeParse(input);
@@ -44,7 +31,6 @@ export async function createShadowPattern(input: {
       name: parsed.data.name,
       law: parsed.data.law ?? null,
       plan: parsed.data.plan ?? null,
-      identityId: await ownedIdentity(user.id, parsed.data.identityId),
       sortOrder: Date.now(),
     },
   });
@@ -52,7 +38,7 @@ export async function createShadowPattern(input: {
   return { ok: true };
 }
 
-/** Let a pattern go. Archived, not deleted: its past choices stay votes. */
+/** Let a pattern go. Archived, not deleted: its past choices stay in history. */
 export async function archiveShadowPattern(patternId: string): Promise<Result> {
   const user = await requireUser();
   if (!cuid.safeParse(patternId).success) return { ok: false, message: "That didn't look right." };

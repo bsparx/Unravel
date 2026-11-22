@@ -56,8 +56,6 @@ export type CalendarBlock = {
   cueForId: string | null;
   /** This block has a cue in front of it — so moving it has to move two things. */
   hasCue: boolean;
-  /** The self this time is for. Its hue tints the block ahead of any task colour. */
-  identity: { id: string; name: string; colorSlot: number } | null;
   /** Interval mode: one thing every this many minutes. Null is an ordinary block. */
   beatMinutes: number | null;
   /** The intervals hit, sparse. May hold indices past a shortened block's end. */
@@ -81,7 +79,6 @@ const blockSelect = {
   completedAt: true,
   cueForId: true,
   cue: { select: { id: true } },
-  identity: { select: { id: true, name: true, colorSlot: true } },
   beatMinutes: true,
   beats: {
     orderBy: { index: "asc" },
@@ -117,7 +114,6 @@ type BlockRow = {
   completedAt: Date | null;
   cueForId: string | null;
   cue: { id: string } | null;
-  identity: { id: string; name: string; colorSlot: number } | null;
   beatMinutes: number | null;
   beats: BlockBeat[];
   /** The join row's own tick, plus the task it points at. */
@@ -135,7 +131,6 @@ const toCalendarBlock = (row: BlockRow): CalendarBlock => ({
   completedAt: row.completedAt,
   cueForId: row.cueForId,
   hasCue: row.cue !== null,
-  identity: row.identity,
   beatMinutes: row.beatMinutes,
   beats: row.beats,
   tasks: row.tasks.map((link) => ({ ...link.task, doneAt: link.doneAt })),

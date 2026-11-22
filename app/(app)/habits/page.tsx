@@ -11,7 +11,6 @@ import {
 import { ConfirmDelete } from "@/components/confirm-delete";
 import { EmptyState } from "@/components/empty-state";
 import { HabitDayControl } from "@/components/habit-day";
-import { IdentityChip } from "@/components/identity-sigil";
 import { MissedYesterdayBadge } from "@/components/missed-yesterday-badge";
 import { Button } from "@/components/ui/button";
 import { InfoTip } from "@/components/info-tip";
@@ -26,7 +25,6 @@ import {
 import { chainOf, cueEdges } from "@/lib/habit-cue";
 import { describeSlots } from "@/lib/habit-slots";
 import { describeBar, showedUp } from "@/lib/habit-bar";
-import { shortName, sigilFor } from "@/lib/identity-look";
 import { getHabits } from "@/lib/tasks";
 import {
   describeRecurrence,
@@ -203,7 +201,6 @@ export default async function HabitsPage() {
                                 progress={habit.today.progress}
                                 done={habit.history.get(toISODate(today)) === "DONE"}
                                 label={habit.title}
-                                identities={habit.identities.map((identity) => identity.name)}
                               />
                               {habit.requiresFeedback &&
                                 isDueOn(habit.rule, today) &&
@@ -233,14 +230,6 @@ export default async function HabitsPage() {
                                 </Button>
                               </div>
                               <p className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-label">
-                                {habit.identities.map((identity) => (
-                                  <IdentityChip
-                                    key={identity.id}
-                                    name={shortName(identity.name)}
-                                    sigil={sigilFor(identity.sigil, identity.archetype)}
-                                    slot={identity.colorSlot}
-                                  />
-                                ))}
                                 {habit.pairing && <span>With {habit.pairing}</span>}
                                 <span>{describeRecurrence(habit.daysOfWeek)}</span>
                                 <span>{describeSlots(habit.slots)}</span>

@@ -21,15 +21,13 @@ import { cn } from "@/lib/utils";
  * Before, it leads with the minimal task and says out loud that this is the
  * whole requirement: the line *is* the call to action. After, it settles into
  * the past tense with the optional log beside it ("Did the warmup · 25m
- * extra") and the identity vote lands at the end — the reinforcement loop,
- * said once and without ceremony. Nothing animates here beyond the checkbox's
- * pop: a met day settles rather than celebrates.
+ * extra"). Nothing animates here beyond the checkbox's pop: a met day settles
+ * rather than celebrates.
  */
 export function HabitDayLine({
   bar,
   progress,
   done,
-  identities,
   className,
   prominent = false,
 }: {
@@ -38,8 +36,6 @@ export function HabitDayLine({
   progress: number;
   /** The day is DONE — accepted, note and all. */
   done: boolean;
-  /** Names of the identities this habit is a vote for. */
-  identities?: string[];
   className?: string;
   /** Give the minimum promise the first read on a habit's own card. */
   prominent?: boolean;
@@ -82,12 +78,6 @@ export function HabitDayLine({
           {done ? " extra" : " logged"}
         </span>
       )}
-
-      {done && identities && identities.length > 0 && (
-        <span className="text-muted-foreground shrink-0 text-micro">
-          That&apos;s a vote for {identities.join(" · ")}.
-        </span>
-      )}
     </span>
   );
 }
@@ -107,7 +97,6 @@ export function HabitDayControl({
   progress,
   done,
   label,
-  identities,
   onLogTime,
   prominent = false,
 }: {
@@ -118,7 +107,6 @@ export function HabitDayControl({
   done: boolean;
   /** Plain-text habit name, for the checkbox's accessible name. */
   label: string;
-  identities?: string[];
   /**
    * Open a manual time log. Only offered for MINUTES habits, and only where a
    * dialog lives (the day list). Elsewhere the named Start action opens the timer.
@@ -159,7 +147,7 @@ export function HabitDayControl({
       <div className="space-y-4" aria-busy={pending}>
         <div className="flex items-start gap-3 py-1">
           <TaskCheckbox done={done} label={label} onToggle={toggle} className="mt-1.5" />
-          <HabitDayLine bar={bar} progress={shown} done={done} identities={identities} prominent />
+          <HabitDayLine bar={bar} progress={shown} done={done} prominent />
         </div>
         <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 pl-8 text-label">
           <span className="min-w-0 flex-1" aria-live="polite">
@@ -199,7 +187,6 @@ export function HabitDayControl({
           bar={bar}
           progress={shown}
           done={done}
-          identities={identities}
         />
       </div>
 

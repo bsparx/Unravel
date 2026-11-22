@@ -7,50 +7,15 @@
  * reminder, not a manual.
  */
 export const GLOSSARY = {
-  identity: {
-    title: "Identities",
-    what: "A self you want to become, named after someone real or fictional, like Sherlock Holmes or Marcus Aurelius. You can also use a role, like Writer.",
-    why: "Link habits to an identity and every habit you keep becomes a vote for that person. Up to six.",
-  },
-  starter: {
-    title: "Starter characters",
-    what: "A ready-made identity with two small habits, already linked.",
-    why: "One tap and your day has something to check off. You can rename, edit or delete any of it later.",
-  },
-  vote: {
-    title: "Votes",
-    what: "Each time you do a habit's minimum, every identity linked to that habit gets one vote.",
-    why: "Votes are the evidence that you're becoming that person. They never go down.",
-  },
-  stage: {
-    title: "Stages",
-    what: "Five stages, reached by an identity's all-time votes: Trying it on, Practising (10), Showing up (30), Dependable (60) and Second nature (100).",
-    why: "They show how far a self has come. You can't lose a stage once you reach it.",
-  },
-  lead: {
-    title: "Today's lead",
-    what: "The one identity you focus on today. Its next habit is suggested first, and its question shows when you start the timer.",
-    why: "One self at a time keeps the day simple. The weekly review picks a lead for the week, and you can switch on any day.",
-  },
-  question: {
-    title: "Their question",
-    what: "The one question this identity asks before starting, like “Is this mine to control?”",
-    why: "Read it once before you begin. Looking through their eyes makes starting easier.",
-  },
   minimum: {
     title: "The minimum",
     what: "The smallest version of a habit that still counts, like “Read one page”. Doing it completes the habit for the day.",
     why: "A bar you can clear on your worst day is the one that survives a worst day. Anything extra is a bonus, never required.",
   },
-  unlinked: {
-    title: "Habits without an identity",
-    what: "Habits that don't vote for anyone yet.",
-    why: "Link each one to an identity so keeping it counts as a vote.",
-  },
   dailies: {
     title: "Dailies",
     what: "Habits due today. Check one off once you've done its minimum.",
-    why: "Each one you check off is a vote for the identities it serves.",
+    why: "Showing up for the smallest version is enough to keep the habit alive.",
   },
   quests: {
     title: "Quests",
@@ -69,13 +34,8 @@ export const GLOSSARY = {
   },
   shadow: {
     title: "The shadow side",
-    what: "Habits you're trying to break, like scrolling in bed. Each one names the identity it pulls against and a plan that makes it harder.",
-    why: "Tap Noticed when you catch it. That's useful information, not a failure. Tap Chose otherwise when you resist, and that identity gets a vote.",
-  },
-  council: {
-    title: "The weekly council",
-    what: "A ten-minute review once a week. You look back at each identity's votes, make one struggling habit smaller or easier, and choose who leads next week.",
-    why: "Small weekly adjustments keep habits doable, so they don't quietly fall away.",
+    what: "Habits you're trying to break, like scrolling in bed. Each one names a plan that makes the pattern harder to slip into.",
+    why: "Tap Noticed when you catch it. That's useful information, not a failure. Tap Chose otherwise when you resist.",
   },
   blocks: {
     title: "Time blocks",

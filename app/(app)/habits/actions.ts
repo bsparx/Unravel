@@ -29,7 +29,6 @@ function revalidateHabitViews() {
   revalidatePath("/calendar");
   revalidatePath("/habits/stats");
   revalidatePath("/stats");
-  revalidatePath("/identities");
 }
 
 const isEveryDay = (days: number[]) =>
@@ -152,7 +151,7 @@ export async function createHabit(
   ]);
   if (!cue.ok) return cue.state;
 
-  const created = await prisma.task.create({
+  await prisma.task.create({
     data: {
       userId: user.id,
       type: "HABIT",
@@ -189,9 +188,6 @@ export async function createHabit(
     },
     select: { id: true },
   });
-
-  // After the task exists — a link needs both ends.
-  await syncHabitIdentities(user.id, created.id, input.identityIds);
 
   revalidateHabitViews();
   return { status: "success", message: "Habit added." };
@@ -292,11 +288,7 @@ export async function updateHabit(
     },
   });
 
-  // Different tables, no shared rows: side by side.
-  await Promise.all([
-    syncSteps(user.id, owned.id, input.steps),
-    syncHabitIdentities(user.id, owned.id, input.identityIds),
-  ]);
+  await syncSteps(user.id, owned.id, input.steps);
 
   revalidateHabitViews();
   return { status: "success", message: "Saved." };
@@ -403,37 +395,6 @@ async function resolveProjectId(
   });
 
   return project?.id ?? null;
-}
-
-/**
- * The habit-side setter: this habit votes for exactly these identities.
- *
- * Set semantics, same posture as `resolveProjectId` — ids that aren't this
- * user's identities quietly drop out rather than failing the save, because a
- * stale chip is not worth losing the habit over. Called after the task write
- * so `taskId` is known on create.
- */
-async function syncHabitIdentities(
-  userId: string,
-  taskId: string,
-  identityIds: string[],
-): Promise<void> {
-  const wanted = [...new Set(identityIds)];
-  const owned = await prisma.identity.findMany({
-    where: { id: { in: wanted }, userId },
-    select: { id: true },
-  });
-  const kept = owned.map((identity) => identity.id);
-
-  await prisma.$transaction([
-    prisma.habitIdentity.deleteMany({
-      where: { taskId, identityId: { notIn: kept } },
-    }),
-    prisma.habitIdentity.createMany({
-      data: kept.map((identityId) => ({ taskId, identityId })),
-      skipDuplicates: true,
-    }),
-  ]);
 }
 
 // ---------------------------------------------------------------- the log

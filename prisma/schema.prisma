@@ -14,15 +14,8 @@ datasource db {
 
 // ---------------------------------------------------------------- enums
 
-/// Who an identity is modelled on. A real person or a character from a story;
-/// the distinction only changes how the card describes them.
-enum IdentityKind {
-  REAL
-  FICTIONAL
-}
-
 /// One day of one shadow pattern. Noticing is information; choosing otherwise
-/// is a vote for the identity the pattern pulls against.
+/// is a deliberate win.
 enum ShadowMark {
   NOTICED
   CHOSE
@@ -335,12 +328,6 @@ model User {
 
   tags Tag[]
 
-  /// Who this user is becoming — the aspirational identities, below. Not to be
-  /// confused with this model: `User` is the auth identity (who is signed in);
-  /// `Identity` is who they are trying to become. Two different questions that
-  /// unfortunately share a word.
-  identities Identity[]
-
   // Timer defaults. Inlined rather than a 1-1 Settings model because they are
   // always read together with the user.
   pomodoroSeconds     Int     @default(1500)
@@ -440,7 +427,6 @@ model User {
   prayerChecks        PrayerCheck[]
   shadowPatterns      ShadowPattern[]
   shadowLogs          ShadowLog[]
-  weeklyReviews       WeeklyReview[]
   wishes              Wish[]
   disputations        Disputation[]
   wishRehearsals      WishRehearsal[]
@@ -544,12 +530,6 @@ model Task {
   /// the habits stacked on top of this one.
   cue    HabitCue?  @relation("HabitCueOwner")
   cuedBy HabitCue[] @relation("HabitCueAnchor")
-
-  /// The identities this habit is a vote for. A join table: one habit can
-  /// serve several selves ("the walk" is both Athlete and Someone calm), and
-  /// one self is served by several habits. Habits only — a todo is a one-off
-  /// and casts no standing vote.
-  identities HabitIdentity[]
 
   @@index([userId, type, completedAt, archivedAt, dueDate])
   @@index([userId, projectId, sortOrder])
@@ -666,92 +646,6 @@ model HabitCue {
   /// "Which habits are stacked on this one" — the chain walk, and the cycle
   /// check's edge map.
   @@index([anchorTaskId])
-}
-
-// ---------------------------------------------------------------- identities
-
-/// Who you are becoming.
-///
-/// The identity loop this exists to feed: every habit kept is a vote for the
-/// type of person you want to become, and an identity is the name of that
-/// person. `name` is the noun you'd put after "I am a…" ("Writer");
-/// `statement` is the full sentence the habits are evidence for ("I am someone
-/// who writes every day") — it is what the reinforcement reads back at you, so
-/// it is worth the user's own words. `characteristics` is the archetype's
-/// portrait: what it looks like, how it moves, what it does that none of the
-/// others do.
-///
-/// User-owned, unlike behavior Tags: there is no universal set of identities,
-/// so nothing here is `userId = null` and everything can be edited or deleted.
-/// Deleting one takes only its links (HabitIdentity cascades) — the habits and
-/// their history stand, exactly like deleting a custom behavior tag keeps the
-/// entries it labelled.
-model Identity {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  name            String
-  statement       String?
-  /// What this one looks like. How it moves, speaks, decides. What it does
-  /// that none of the others do. Optional, and fine empty.
-  characteristics String?
-
-  /// Real or fictional. Null for identities made before characters existed,
-  /// which read as plain roles ("Writer").
-  kind      IdentityKind?
-  /// A Jungian archetype name from lib/identity-look.ts ("Sage", "Hero").
-  /// Free text in the database so the list can grow without a migration.
-  archetype String?
-  /// The one question this self asks before starting. Shown on the timer.
-  question  String?
-  /// 1..6, an index into the identity hues (`--id-1` .. `--id-6`). Assigned in
-  /// order so neighbours stay distinguishable in charts and on the calendar.
-  colorSlot Int           @default(1)
-  /// A lucide icon name from the sigil set in lib/identity-look.ts.
-  sigil     String?
-
-  sortOrder Float @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  habits   HabitIdentity[]
-  blocks   TimeBlock[]
-  shadows  ShadowPattern[]
-  ledDays  DayLog[]        @relation("DayLogLead")
-  ledWeeks WeeklyReview[]
-
-  /// One name per user. Two "Writer"s would each hold half the votes and both
-  /// would read as neglected — a worse failure than refusing the second name.
-  @@unique([userId, name])
-  @@index([userId])
-}
-
-/// The vote: which identities a habit is evidence for.
-///
-/// A join table in the `TimeBlockTask` mould — both directions are real reads
-/// ("what does this habit vote for" on the habit form; "what votes for this
-/// identity" on the identity page and in every tally), and both FKs cascade,
-/// so deleting either side takes the link and only the link.
-///
-/// Links are deliberately NOT snapshotted per day. Identity statistics read
-/// history through the links as they stand today: relinking is almost always a
-/// correction ("this always counted"), and a per-day link snapshot would turn
-/// corrections into rewrites. This is the opposite of `TaskOccurrence.tier`,
-/// and on purpose — a tier is a measurement of a day, a link is an opinion
-/// about a habit.
-model HabitIdentity {
-  taskId     String
-  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  identityId String
-  identity   Identity @relation(fields: [identityId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-  @@id([taskId, identityId])
-  /// The tally read: "every habit voting for this identity".
-  @@index([identityId, taskId])
 }
 
 /// SPARSE. One row per (task, local calendar day) that the user actually
@@ -1061,11 +955,6 @@ model DayLog {
   /// finished" means.
   closedAt DateTime?
 
-  /// Who leads today: the identity whose habits come first. Null falls back
-  /// to the lead the weekly review chose for this week, then to nobody.
-  leadIdentityId String?
-  leadIdentity   Identity? @relation("DayLogLead", fields: [leadIdentityId], references: [id], onDelete: SetNull)
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1111,11 +1000,6 @@ model TimeBlock {
 
   kind BlockKind @default(WORK)
 
-  /// The self this time is for. When set it decides the block's colour, ahead
-  /// of the task colour; it never casts a vote (a plan is not a log).
-  identityId String?
-  identity   Identity? @relation(fields: [identityId], references: [id], onDelete: SetNull)
-
   /// Ticked off from the calendar. Distinct from Task.completedAt: finishing
   /// the 9am block on a task is not finishing the task. Ticking it also ticks
   /// every task inside it, because "the whole stretch is done" can't leave a
@@ -1153,7 +1037,6 @@ model TimeBlock {
   /// Serves both "one day's blocks in order" and the week fetch (a date range
   /// scan), which are the only two reads.
   @@index([userId, date, startMinute])
-  @@index([identityId])
 }
 
 /// One task on one block. The block is the time; these are the things the time
@@ -1808,11 +1691,11 @@ model ExerciseCheckoff {
   @@index([exerciseId])
 }
 
-// ---------------------------------------------------------------- the identity game
+// ---------------------------------------------------------------- shadow patterns
 
-/// A pattern being broken: Jung's shadow, Habitica's negative habit, without
-/// the damage. It names what pulls against an identity and the plan that makes
-/// it harder (Atomic Habits' four laws, inverted).
+/// A pattern being broken: Habitica's negative habits without the damage.
+/// Names the pattern and the plan that makes it harder (Atomic Habits' four
+/// laws, inverted).
 model ShadowPattern {
   id     String @id @default(cuid())
   userId String
@@ -1822,10 +1705,6 @@ model ShadowPattern {
   /// Which inverted law the plan uses ("Make it invisible").
   law  String?
   plan String?
-
-  /// The self this pattern pulls against. Choosing otherwise is a vote for it.
-  identityId String?
-  identity   Identity? @relation(fields: [identityId], references: [id], onDelete: SetNull)
 
   sortOrder  Float     @default(0)
   archivedAt DateTime?
@@ -1855,27 +1734,6 @@ model ShadowLog {
 
   @@unique([patternId, date])
   @@index([userId, date])
-}
-
-/// The weekly council: one per week planned. `weekStart` is the first day of
-/// the week the review is *for*, so the lead it chooses applies from then.
-model WeeklyReview {
-  id     String @id @default(cuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  weekStart      DateTime  @db.Date
-  leadIdentityId String?
-  leadIdentity   Identity? @relation(fields: [leadIdentityId], references: [id], onDelete: SetNull)
-  /// The lead's sentence for the week.
-  statement      String?
-  /// A plain record of what changed ("Evening notes: minimum is now …").
-  adjustment     String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([userId, weekStart])
 }
 
 /// One fast, from the last bite to the first. Instants in UTC; shown and

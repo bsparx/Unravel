@@ -144,12 +144,12 @@ type ResetResult = { ok: true } | { ok: false; message: string };
 
 /**
  * Reset all progress: every logged day and every minute on the clock, and
- * nothing else. Habits, identities, schedules, quotas, projects, tags, money
- * and the rest of the structure stand exactly as they are.
+ * nothing else. Habits, schedules, projects, tags, money and the rest of the
+ * structure stand exactly as they are.
  *
- * The blast radius is exactly two tables. Every tally, streak, identity vote
- * and "missed day" is derived from these rows at read time — there are no
- * counters anywhere to rewrite — so deleting the history zeroes the numbers.
+ * The blast radius is exactly two tables. Every tally, streak and "missed day"
+ * is derived from these rows at read time — there are no counters anywhere to
+ * rewrite — so deleting the history zeroes the numbers.
  *
  * FocusSession goes first on purpose: its `occurrenceId` is SetNull, so
  * deleting occurrences alone would orphan sessions that still bill time on
