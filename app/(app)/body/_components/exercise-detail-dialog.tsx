@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Dumbbell, Sparkles } from "lucide-react";
+import { Dumbbell, ExternalLink, Sparkles } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -128,14 +128,29 @@ export function ExerciseDetailDialog({
 
           {embed && (
             <div>
-              <p className="text-micro text-muted-foreground mb-2 tracking-wide uppercase">
-                Watch it
-              </p>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-micro text-muted-foreground tracking-wide uppercase">
+                  Watch it
+                </p>
+                {exercise.videoUrl && (
+                  <a
+                    href={exercise.videoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-micro transition-colors"
+                  >
+                    YouTube
+                    <ExternalLink className="size-3" aria-hidden />
+                  </a>
+                )}
+              </div>
               <div className="aspect-video overflow-hidden rounded-lg border">
                 <iframe
                   src={embed}
                   title={`${exercise.name} — video`}
                   className="size-full"
+                  loading="lazy"
+                  referrerPolicy="strict-origin-when-cross-origin"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
                 />

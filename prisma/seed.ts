@@ -90,6 +90,7 @@ const EXERCISES: Array<{
   bodyParts: BodyPart[];
   instructions: string[];
   prescription: string;
+  videoUrl: string;
 }> = [
   // ------------------------------------------------ yoga — anterior pelvic tilt
   {
@@ -106,6 +107,7 @@ const EXERCISES: Array<{
       "Hold for two counts, then lower slowly with control. Drag your heels toward your shoulders to feel it in the glutes, not the lower back.",
     ],
     prescription: "Hold 30–60s · 3 rounds",
+    videoUrl: "https://www.youtube.com/watch?v=g78vfuC4QBI",
   },
   {
     name: "Low Lunge (Anjaneyasana)",
@@ -121,6 +123,7 @@ const EXERCISES: Array<{
       "Lift your ribs out of your waist and keep the spine tall; roll the shoulders down and back.",
     ],
     prescription: "Hold 60–90s per side",
+    videoUrl: "https://www.youtube.com/watch?v=6w_W1iXwF94",
   },
   {
     name: "Pelvic Tilts",
@@ -136,6 +139,7 @@ const EXERCISES: Array<{
       "This is motor control: you're learning to find and hold the neutral point, not lifting anything.",
     ],
     prescription: "10–15 slow reps",
+    videoUrl: "https://www.youtube.com/watch?v=ZIQjHtghzqw",
   },
   {
     name: "Cat–Cow",
@@ -151,6 +155,7 @@ const EXERCISES: Array<{
       "Move with your breath, building awareness of pelvic and spinal mobility.",
     ],
     prescription: "8–10 breath rounds",
+    videoUrl: "https://www.youtube.com/watch?v=1Y0YjXS9sKI",
   },
   {
     name: "Bird Dog",
@@ -166,6 +171,7 @@ const EXERCISES: Array<{
       "Lower, switch sides, and continue alternating.",
     ],
     prescription: "10 reps per side · 5–10s hold",
+    videoUrl: "https://www.youtube.com/watch?v=xEDnlOxeJH4",
   },
   {
     name: "Locust Pose",
@@ -181,6 +187,7 @@ const EXERCISES: Array<{
       "Hold, breathe, lower with control. Only come as high as you can without compressing the lumbar spine.",
     ],
     prescription: "Hold 30s · 3 rounds",
+    videoUrl: "https://www.youtube.com/watch?v=qqdBKqe_WfI",
   },
   {
     name: "Boat Pose",
@@ -196,6 +203,7 @@ const EXERCISES: Array<{
       "Straighten the legs only if you can keep the pelvis stable; keep breathing.",
     ],
     prescription: "Hold 20–30s · 3 rounds",
+    videoUrl: "https://www.youtube.com/watch?v=8KsyQvwi85Q",
   },
   {
     name: "Reclined Spinal Twist",
@@ -211,6 +219,7 @@ const EXERCISES: Array<{
       "Keep the shoulders down — don't force the knees; let gravity do the work.",
     ],
     prescription: "Hold 45–60s per side",
+    videoUrl: "https://www.youtube.com/watch?v=mNdJti7ZwKI",
   },
   {
     name: "Child's Pose",
@@ -226,6 +235,7 @@ const EXERCISES: Array<{
       "Wider knees are fine if the hips are tight.",
     ],
     prescription: "Hold 60–90s",
+    videoUrl: "https://www.youtube.com/watch?v=LZgABs0IggM",
   },
   {
     name: "Standing Forward Fold",
@@ -241,6 +251,7 @@ const EXERCISES: Array<{
       "Let the arms dangle; on each exhale, soften a little deeper.",
     ],
     prescription: "Hold 45–60s",
+    videoUrl: "https://www.youtube.com/watch?v=0kOOvLPN23Q",
   },
   {
     name: "Downward-Facing Dog",
@@ -256,6 +267,7 @@ const EXERCISES: Array<{
       "Keep the shoulders rolling open and the neck long; hold for several breaths.",
     ],
     prescription: "Hold 45–60s",
+    videoUrl: "https://www.youtube.com/watch?v=Y0GDgQqt-bA",
   },
   {
     name: "Cobra Pose",
@@ -271,6 +283,7 @@ const EXERCISES: Array<{
       "Tuck the chin slightly to keep the neck long, then lower slowly.",
     ],
     prescription: "Hold 15–30s · 3 rounds",
+    videoUrl: "https://www.youtube.com/watch?v=Y8UNFem5qHc",
   },
 
   // --------------------------------------------- yoga — posture (upper body)
@@ -288,6 +301,7 @@ const EXERCISES: Array<{
       "Release slowly, return to tabletop, and switch sides.",
     ],
     prescription: "Hold 30–45s per side",
+    videoUrl: "https://www.youtube.com/watch?v=SkQhKf74nZk",
   },
   {
     name: "Puppy Pose",
@@ -303,6 +317,7 @@ const EXERCISES: Array<{
       "A powerful counter to a day of rounding forward; breathe into the chest.",
     ],
     prescription: "Hold 60s",
+    videoUrl: "https://www.youtube.com/watch?v=mytWLo8fHbw",
   },
   {
     name: "Cow Face Arms",
@@ -318,6 +333,7 @@ const EXERCISES: Array<{
       "Hold, breathe, and switch sides.",
     ],
     prescription: "Hold 30s per side",
+    videoUrl: "https://www.youtube.com/watch?v=r_sLhT9RAJo",
   },
   {
     name: "Eagle Arms",
@@ -333,6 +349,7 @@ const EXERCISES: Array<{
       "Hold, then unwind and repeat with the left arm crossed over.",
     ],
     prescription: "Hold 20–30s · 2 rounds per side",
+    videoUrl: "https://www.youtube.com/watch?v=vYWSiBnkUPg",
   },
 
   // ----------------------------------------------- dumbbells — anterior pelvic tilt
@@ -350,6 +367,7 @@ const EXERCISES: Array<{
       "Lower under control without letting the lower back arch.",
     ],
     prescription: "3 × 12–15",
+    videoUrl: "https://www.youtube.com/watch?v=E6VLOEz7tWE",
   },
   {
     name: "Single-Leg Dumbbell Glute Bridge",
@@ -365,6 +383,7 @@ const EXERCISES: Array<{
       "Squeeze the glute at the top, lower slowly, and finish all reps on one side before switching.",
     ],
     prescription: "3 × 10–12 per side",
+    videoUrl: "https://www.youtube.com/watch?v=-NT8jrURSt0",
   },
   {
     name: "Dumbbell Hip Thrust",
@@ -380,6 +399,7 @@ const EXERCISES: Array<{
       "Finish by squeezing the glutes — never by leaning back into the lower back. Pause, lower under control.",
     ],
     prescription: "3 × 12",
+    videoUrl: "https://www.youtube.com/watch?v=29OfN4ztW_g",
   },
   {
     name: "Dumbbell Romanian Deadlift",
@@ -395,6 +415,7 @@ const EXERCISES: Array<{
       "This is a hinge, not a squat: go slow, back flat, chest proud.",
     ],
     prescription: "3 × 10–12",
+    videoUrl: "https://www.youtube.com/watch?v=hQgFixeXdZo",
   },
   {
     name: "Goblet Squat",
@@ -410,6 +431,7 @@ const EXERCISES: Array<{
       "Depth matters less than position: squat only as low as you can hold neutral, then push up through the heels.",
     ],
     prescription: "3 × 10–12",
+    videoUrl: "https://www.youtube.com/watch?v=gCESNsDsbqk",
   },
   {
     name: "Weighted Dead Bug",
@@ -425,6 +447,7 @@ const EXERCISES: Array<{
       "Return, alternate sides. The load makes the core work harder against arching — go slow.",
     ],
     prescription: "3 × 8–10 per side",
+    videoUrl: "https://www.youtube.com/watch?v=QNQROfbTlQ0",
   },
   {
     name: "Standing Dumbbell Hip Extension",
@@ -440,6 +463,7 @@ const EXERCISES: Array<{
       "Lower with control, finish the set, switch sides.",
     ],
     prescription: "3 × 12 per side",
+    videoUrl: "https://www.youtube.com/watch?v=lXwScTazT34",
   },
   {
     name: "Dumbbell Reverse Lunge",
@@ -455,6 +479,7 @@ const EXERCISES: Array<{
       "Alternate legs, moving slowly enough that balance isn't the limiting factor.",
     ],
     prescription: "3 × 10 per side",
+    videoUrl: "https://www.youtube.com/watch?v=RZKXLMxPF_I",
   },
   {
     name: "Farmer's Carry",
@@ -470,6 +495,7 @@ const EXERCISES: Array<{
       "Walk for the time prescribed, then rest.",
     ],
     prescription: "3 × 30–45s",
+    videoUrl: "https://www.youtube.com/watch?v=NH7Xv-7NQNQ",
   },
 
   // ------------------------------------------------ dumbbells — posture (upper body)
@@ -487,6 +513,7 @@ const EXERCISES: Array<{
       "This builds the upper back muscles that pull the shoulders back and support the spine.",
     ],
     prescription: "3 × 10–12",
+    videoUrl: "https://www.youtube.com/watch?v=c-gt-zzoa_A",
   },
   {
     name: "Single-Arm Dumbbell Row",
@@ -502,6 +529,7 @@ const EXERCISES: Array<{
       "Lower slowly and finish all reps before switching sides. Working one side at a time also challenges the core to keep you stable.",
     ],
     prescription: "3 × 10–12 per side",
+    videoUrl: "https://www.youtube.com/watch?v=dFzUjzfih7k",
   },
   {
     name: "Dumbbell Reverse Fly",
@@ -517,6 +545,7 @@ const EXERCISES: Array<{
       "Light weights only — if you swing or shrug, it's too heavy.",
     ],
     prescription: "3 × 12–15",
+    videoUrl: "https://www.youtube.com/watch?v=evXOlgLTPCw",
   },
   {
     name: "Prone Y Raise",
@@ -532,6 +561,7 @@ const EXERCISES: Array<{
       "This targets the lower traps, the muscle that keeps the shoulder blades anchored down.",
     ],
     prescription: "3 × 10",
+    videoUrl: "https://www.youtube.com/watch?v=sKeDycVnuRk",
   },
   {
     name: "Prone T Raise",
@@ -547,6 +577,7 @@ const EXERCISES: Array<{
       "Hold a beat at the top, lower slowly, repeat.",
     ],
     prescription: "3 × 10",
+    videoUrl: "https://www.youtube.com/watch?v=jv_Qu4KLRp4",
   },
   {
     name: "Dumbbell YTW",
@@ -562,6 +593,7 @@ const EXERCISES: Array<{
       "W: bend the elbows and pull the weights to your ribs, then rotate the hands up to a W. One Y, T, W counts as one rep — this is precision work, keep it light and slow.",
     ],
     prescription: "3 × 8–10 per letter",
+    videoUrl: "https://www.youtube.com/watch?v=7uWErOPb54g",
   },
   {
     name: "Dumbbell Pullover",
@@ -577,6 +609,7 @@ const EXERCISES: Array<{
       "Pull back up to the start, keeping the movement controlled throughout.",
     ],
     prescription: "3 × 10–12",
+    videoUrl: "https://www.youtube.com/watch?v=FK4rHfWKEac",
   },
 
   // ------------------------------------------------------ yoga — neck (forward head)
@@ -594,6 +627,7 @@ const EXERCISES: Array<{
       "The head should glide back over the spine; if it tilts up or down, make it smaller.",
     ],
     prescription: "10 slow reps · hold 5s",
+    videoUrl: "https://www.youtube.com/watch?v=7rnlAVhAK-8",
   },
   {
     name: "Deep Neck Flexor Hold",
@@ -609,6 +643,7 @@ const EXERCISES: Array<{
       "Lower slowly. Build time gradually; a long neck beats a high head.",
     ],
     prescription: "Hold 10–20s · 5 reps",
+    videoUrl: "https://www.youtube.com/watch?v=UaIheiSGXHE",
   },
   {
     name: "Upper Trapezius Stretch",
@@ -624,6 +659,7 @@ const EXERCISES: Array<{
       "Hold, breathe into the side of the neck, and switch sides.",
     ],
     prescription: "Hold 30s per side",
+    videoUrl: "https://www.youtube.com/watch?v=-r0eoFS7_5Q",
   },
   {
     name: "Levator Scapulae Stretch",
@@ -639,6 +675,7 @@ const EXERCISES: Array<{
       "Hold, then release slowly and switch sides.",
     ],
     prescription: "Hold 30s per side",
+    videoUrl: "https://www.youtube.com/watch?v=GSoXPJRnR6E",
   },
 
   // ------------------------------------------------------ yoga — calves & forearms
@@ -656,6 +693,7 @@ const EXERCISES: Array<{
       "Switch legs.",
     ],
     prescription: "Hold 45–60s per side",
+    videoUrl: "https://www.youtube.com/watch?v=3_ZrG8PHKrk",
   },
   {
     name: "Wall Soleus Stretch",
@@ -671,6 +709,7 @@ const EXERCISES: Array<{
       "Hold, breathe, switch sides.",
     ],
     prescription: "Hold 45–60s per side",
+    videoUrl: "https://www.youtube.com/watch?v=kTnS4Sxnt0E",
   },
   {
     name: "Wrist Extensor Stretch",
@@ -686,6 +725,7 @@ const EXERCISES: Array<{
       "Hold, then switch arms.",
     ],
     prescription: "Hold 30–45s per side",
+    videoUrl: "https://www.youtube.com/watch?v=_uINTR_7X-g",
   },
   {
     name: "Wrist Flexor Stretch",
@@ -701,6 +741,7 @@ const EXERCISES: Array<{
       "Hold, then switch arms.",
     ],
     prescription: "Hold 30–45s per side",
+    videoUrl: "https://www.youtube.com/watch?v=i-JV2PsFzWA",
   },
 
   // ------------------------------------------------------ yoga — leg strength
@@ -718,6 +759,7 @@ const EXERCISES: Array<{
       "Reach the arms forward or overhead, shoulders down. Breathe steadily — the legs should be burning by the end.",
     ],
     prescription: "Hold 45–60s · 3 rounds",
+    videoUrl: "https://www.youtube.com/watch?v=4xyTmX_OMiM",
   },
   {
     name: "Warrior II",
@@ -733,6 +775,7 @@ const EXERCISES: Array<{
       "Extend the arms parallel to the floor, gaze over the front hand. Actively press the back foot's outer edge into the mat.",
     ],
     prescription: "Hold 45–60s per side",
+    videoUrl: "https://www.youtube.com/watch?v=hAY_NXOxzkk",
   },
   {
     name: "High Lunge",
@@ -748,6 +791,7 @@ const EXERCISES: Array<{
       "Reach the arms overhead or keep hands at the hips. Hold with the legs working, not by resting into the joints.",
     ],
     prescription: "Hold 30–45s per side · 2 rounds",
+    videoUrl: "https://www.youtube.com/watch?v=Uuq_r6SW1qM",
   },
   {
     name: "Garland Pose (Malasana)",
@@ -763,6 +807,7 @@ const EXERCISES: Array<{
       "Lift the chest and lengthen the spine. This is the deep squat position most desk-bound people lose entirely.",
     ],
     prescription: "Hold 60–90s",
+    videoUrl: "https://www.youtube.com/watch?v=R1My3J2ujDY",
   },
 
   // ----------------------------------------------------- yoga — push strength
@@ -780,6 +825,7 @@ const EXERCISES: Array<{
       "Breathe normally throughout. Drop to the knees the moment the lower back starts to dip — a shorter clean hold beats a long sagging one.",
     ],
     prescription: "Hold 45–60s · 3 rounds",
+    videoUrl: "https://www.youtube.com/watch?v=A2b2EmIg0dA",
   },
   {
     name: "Side Plank",
@@ -795,6 +841,7 @@ const EXERCISES: Array<{
       "Drop the bottom knee to the mat for an easier version. This trains the side of the core, which nothing else in your library covers.",
     ],
     prescription: "Hold 30–45s per side · 2 rounds",
+    videoUrl: "https://www.youtube.com/watch?v=9dNL_mtObGQ",
   },
   {
     name: "Chaturanga Hold",
@@ -810,6 +857,7 @@ const EXERCISES: Array<{
       "Knees down is a legitimate version and better than a collapsed full one. Lower to the mat with control when the hold ends.",
     ],
     prescription: "Hold 10–20s · 4 rounds",
+    videoUrl: "https://www.youtube.com/watch?v=EpXmHyO5uRk",
   },
   {
     name: "Dolphin Pose",
@@ -825,6 +873,7 @@ const EXERCISES: Array<{
       "Keep the knees bent if the hamstrings pull the spine round. Wrist-friendly alternative to Downward Dog, and far stronger for the shoulders.",
     ],
     prescription: "Hold 30–45s · 3 rounds",
+    videoUrl: "https://www.youtube.com/watch?v=W9qEcTjmA78",
   },
 
   // ------------------------------------------------------------- yoga — balance
@@ -842,6 +891,7 @@ const EXERCISES: Array<{
       "Hands at the chest or overhead. Fix the gaze on a still point. Wobbling is the work, not a failure.",
     ],
     prescription: "Hold 45–60s per side",
+    videoUrl: "https://www.youtube.com/watch?v=uELr6MPi7pI",
   },
   {
     name: "Warrior III",
@@ -857,6 +907,7 @@ const EXERCISES: Array<{
       "Flex the lifted foot and press back through the heel. Squeeze the standing glute hard; that muscle is holding you up.",
     ],
     prescription: "Hold 20–30s per side · 2 rounds",
+    videoUrl: "https://www.youtube.com/watch?v=j423eDJ5mQg",
   },
 
   // -------------------------------------------------- yoga — hips (side & deep)
@@ -874,6 +925,7 @@ const EXERCISES: Array<{
       "Lower slowly over three counts. Small and precise beats high and swinging.",
     ],
     prescription: "12–15 reps per side · 2 rounds",
+    videoUrl: "https://www.youtube.com/watch?v=g9FtnmsIYgI",
   },
   {
     name: "Wide-Legged Forward Fold",
@@ -889,6 +941,7 @@ const EXERCISES: Array<{
       "Let the head hang heavy and soften a little more on each exhale.",
     ],
     prescription: "Hold 60s",
+    videoUrl: "https://www.youtube.com/watch?v=vB5GtHh9l2Y",
   },
 
   // -------------------------------------------------- yoga — calves & cardio
@@ -906,6 +959,7 @@ const EXERCISES: Array<{
       "Progress by moving to one leg at a time once 20 slow reps feel easy.",
     ],
     prescription: "15–20 slow reps · 3 rounds",
+    videoUrl: "https://www.youtube.com/watch?v=aZh9tCFh46o",
   },
   {
     name: "Sun Salutation Flow",
@@ -921,6 +975,7 @@ const EXERCISES: Array<{
       "This is the only genuinely aerobic item in the library. Build from 8 minutes toward 15.",
     ],
     prescription: "10–15 min continuous",
+    videoUrl: "https://www.youtube.com/watch?v=1xRX1MuoImw",
   },
   {
     name: "Bridge March",
@@ -936,6 +991,7 @@ const EXERCISES: Array<{
       "Keep the ribs down and breathe. Progression from the static Bridge you already have.",
     ],
     prescription: "8–10 per side · 2 rounds",
+    videoUrl: "https://www.youtube.com/watch?v=KsYwYl13IDc",
   },
 
   // ------------------------------------------ yoga — the gentle week's floor
@@ -956,6 +1012,7 @@ const EXERCISES: Array<{
       "Stay quiet and breathe. This is decompression, not a stretch to push.",
     ],
     prescription: "Hold 2–5 min",
+    videoUrl: "https://www.youtube.com/watch?v=xmcDj4Bf--0",
   },
   {
     name: "Supine Figure-4 Stretch",
@@ -971,6 +1028,7 @@ const EXERCISES: Array<{
       "Hold and breathe, then switch sides.",
     ],
     prescription: "Hold 45–60s per side",
+    videoUrl: "https://www.youtube.com/watch?v=-g0nuyTHMrI",
   },
   {
     name: "Happy Baby",
@@ -986,6 +1044,7 @@ const EXERCISES: Array<{
       "Rock gently side to side if it feels good. Effortless is the point.",
     ],
     prescription: "Hold 60–90s",
+    videoUrl: "https://www.youtube.com/watch?v=DsuQQMzFU-4",
   },
   {
     name: "Wall Angels",
@@ -1001,6 +1060,7 @@ const EXERCISES: Array<{
       "Contact matters more than range — where the arms leave the wall is the tight spot. Keep the ribs down; don't arch the lower back to fake it.",
     ],
     prescription: "8–10 slow reps",
+    videoUrl: "https://www.youtube.com/watch?v=1UU4VvklQ44",
   },
   {
     name: "Ankle Circles & Pumps",
@@ -1016,6 +1076,7 @@ const EXERCISES: Array<{
       "Keep the knees still the whole time; all the movement is at the ankle. Sitting steals this range quietly.",
     ],
     prescription: "10 circles each direction · 10 pumps per foot",
+    videoUrl: "https://www.youtube.com/watch?v=7l_r2LBD2t4",
   },
   {
     name: "Wall Push-Up",
@@ -1031,6 +1092,7 @@ const EXERCISES: Array<{
       "Press away until the arms are straight. Deliberately easier than a floor push-up; step the feet further back when it stops being work.",
     ],
     prescription: "2 × 10–12",
+    videoUrl: "https://www.youtube.com/watch?v=wIPJvBQs7RA",
   },
   {
     name: "Gentle Morning Flow",
@@ -1046,6 +1108,7 @@ const EXERCISES: Array<{
       "Continue without pausing for the time prescribed. Continuity, not intensity.",
     ],
     prescription: "5–10 min continuous",
+    videoUrl: "https://www.youtube.com/watch?v=uUyyr65pcVU",
   },
   {
     name: "Standing Dumbbell Chest Opener",
@@ -1061,6 +1124,7 @@ const EXERCISES: Array<{
       "Hold for two slow breaths, then lower with control. The light weight makes the opening easier to hold, not harder.",
     ],
     prescription: "2 × 10 slow reps · hold 5s at the top",
+    videoUrl: "https://www.youtube.com/watch?v=16qCwSMGqx4",
   },
 ];
 
