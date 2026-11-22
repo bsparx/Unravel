@@ -10,7 +10,12 @@ import { addDays, parseLocalDate, todayLocal } from "@/lib/dates";
 import { markDayClosed, setSelectedTask } from "@/lib/day-log";
 import { prisma } from "@/lib/db";
 import { parseQuickAdd } from "@/lib/quick-parse";
-import { journalSchema, selectOneThingSchema } from "@/lib/validation";
+import {
+  endingSummarySchema,
+  formValues,
+  journalSchema,
+  selectOneThingSchema,
+} from "@/lib/validation";
 import type { JournalKind } from "@/lib/generated/prisma/client";
 
 /**
@@ -18,9 +23,49 @@ import type { JournalKind } from "@/lib/generated/prisma/client";
  *
  * Every step writes on advance rather than at the end. Bailing out halfway
  * keeps everything you already entered — there is no final submit holding the
- * three hostage, because a ritual you can only complete perfectly is a ritual
+ * ritual hostage, because a ritual you can only complete perfectly is a ritual
  * you stop doing.
  */
+
+/** Optional Step 0 — end-of-day summary & reflections (when toggled on in Settings). */
+export async function saveEndingSummary(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const parsed = endingSummarySchema.safeParse(formValues(formData));
+
+  if (parsed.success) {
+    const date = todayLocal(user.timezone);
+    const data = parsed.data;
+
+    await prisma.endingSummary.upsert({
+      where: { userId_date: { userId: user.id, date } },
+      create: {
+        userId: user.id,
+        date,
+        keepDoing: data.keepDoing ?? null,
+        tryTomorrow: data.tryTomorrow ?? null,
+        avoid: data.avoid ?? null,
+        habitsDone: data.habitsDone ?? null,
+        habitsTotal: data.habitsTotal ?? null,
+        productiveSeconds: data.productiveSeconds ?? null,
+      },
+      update: {
+        keepDoing: data.keepDoing ?? null,
+        tryTomorrow: data.tryTomorrow ?? null,
+        avoid: data.avoid ?? null,
+        habitsDone: data.habitsDone ?? null,
+        habitsTotal: data.habitsTotal ?? null,
+        productiveSeconds: data.productiveSeconds ?? null,
+      },
+    });
+
+    revalidatePath("/");
+    revalidatePath("/day");
+    revalidatePath("/days");
+    revalidatePath("/stats");
+  }
+
+  advance("summary", user.endingSummaryEnabled);
+}
 
 /** Step 1 — tomorrow's one thing. Closes the loop with the morning pass. */
 export async function setTomorrowOneThing(formData: FormData): Promise<void> {
@@ -40,13 +85,14 @@ export async function setTomorrowOneThing(formData: FormData): Promise<void> {
     if (taskId) await setSelectedTask(user.id, date, taskId);
   }
 
-  advance("one-thing");
+  advance("one-thing", user.endingSummaryEnabled);
 }
 
 /** Step 2 — the worry dump. */
 export async function saveWorry(formData: FormData): Promise<void> {
-  await saveJournal(formData, "WORRY");
-  advance("worry");
+  const user = await requireUser();
+  await saveJournal(user, formData, "WORRY");
+  advance("worry", user.endingSummaryEnabled);
 }
 
 /**
@@ -75,17 +121,20 @@ export async function bailOut(): Promise<void> {
 
 // ---------------------------------------------------------------- internals
 
-function advance(from: Parameters<typeof nextCloseStep>[0]) {
-  const next = nextCloseStep(from);
+function advance(
+  from: Parameters<typeof nextCloseStep>[0],
+  includeSummary: boolean,
+) {
+  const next = nextCloseStep(from, includeSummary);
   revalidatePath("/close");
   redirect(next ? closeStepHref(next) : "/");
 }
 
 async function saveJournal(
+  user: Awaited<ReturnType<typeof requireUser>>,
   formData: FormData,
   kind: JournalKind,
 ): Promise<void> {
-  const user = await requireUser();
   const parsed = journalSchema.safeParse({ body: formData.get("body") ?? "" });
   if (!parsed.success) return;
 

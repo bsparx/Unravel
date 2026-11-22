@@ -30,6 +30,8 @@ import { READING_DEFAULT_MINUTES } from "@/lib/reading";
 export const WOOP_SECONDS = 10 * 60;
 export const DISPUTATION_SECONDS = 10 * 60;
 export const RECITATION_SECONDS = 5 * 60;
+export const ENDING_SUMMARY_SECONDS = 5 * 60;
+export const ENDING_SUMMARY_TIME_HINT = "5m";
 
 export const BRAIN_DUMP_MIN_SECONDS = 60;
 export const BRAIN_DUMP_MAX_SECONDS = 10 * 60;

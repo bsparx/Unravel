@@ -399,6 +399,11 @@ model User {
   /// days hold the Fasting scene steady instead of deducting a stage.
   fastDaysOfWeek            Int[]    @default([0, 1, 2, 3, 4, 5, 6])
 
+  // Close the day. When on, /close starts with an Ending Summary comparing
+  // today's habits & hours against monthly and weekday averages, with optional
+  // reflection prompts — and completing it counts as a daily habit in /stats.
+  endingSummaryEnabled      Boolean  @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -408,6 +413,7 @@ model User {
   sessions            FocusSession[]
   captures            Capture[]
   dayLogs             DayLog[]
+  endingSummaries     EndingSummary[]
   journal             JournalEntry[]
   fasts               Fast[]
   exerciseCheckoffs   ExerciseCheckoff[]
@@ -961,6 +967,37 @@ model DayLog {
   /// "One day, one thing" is the feature. It also makes every write a single
   /// upsert with no read-modify-write race.
   @@unique([userId, date])
+}
+
+/// End-of-day reflection written while closing the day. SPARSE: one row per
+/// user per local day when saved on /close. Completing the summary step counts
+/// as a daily habit in /stats when `User.endingSummaryEnabled` is on.
+model EndingSummary {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Local calendar date in User.timezone, stored as UTC-midnight DATE.
+  date DateTime @db.Date
+
+  /// Things done today worth remembering and focusing on again.
+  keepDoing   String?
+  /// Things to try implementing tomorrow to improve the routine.
+  tryTomorrow String?
+  /// Things to watch out for / avoid tomorrow.
+  avoid       String?
+
+  /// Snapshot of the day's numbers when the summary was saved, so yesterday's
+  /// card on / and /day renders in a single row lookup.
+  habitsDone        Int?
+  habitsTotal       Int?
+  productiveSeconds Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId, date])
 }
 
 // ---------------------------------------------------------------- calendar

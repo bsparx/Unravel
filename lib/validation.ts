@@ -27,6 +27,7 @@ import {
 import { MAX_REMIND_DAYS } from "@/lib/subscriptions";
 import { DISPUTATION_MAX } from "@/lib/disputation";
 import { DUMP_KINDS, DUMP_MAX_CHARS, DUMP_MAX_TASKS, DUMP_TASK_CHARS } from "@/lib/brain-dump";
+import { ENDING_SUMMARY_MAX_CHARS } from "@/lib/ending-summary";
 import { WOOP_MAX } from "@/lib/woop";
 import {
   PRACTICE_MAX_COUNT,
@@ -272,6 +273,30 @@ export const behaviorTagSchema = z.object({
  */
 export const journalSchema = z.object({
   body: z.string().trim().max(5000),
+});
+
+const optionalEndingNote = z.preprocess(
+  (value) => {
+    if (typeof value !== "string") return value === null ? undefined : value;
+    const trimmed = value.trim();
+    return trimmed.length === 0 ? undefined : trimmed;
+  },
+  z.string().max(ENDING_SUMMARY_MAX_CHARS).optional(),
+);
+
+/**
+ * End-of-day summary written on /close. Every reflection field is optional —
+ * reviewing the day and saving is the habit, even on quiet nights.
+ */
+export const endingSummarySchema = z.object({
+  keepDoing: optionalEndingNote,
+  tryTomorrow: optionalEndingNote,
+  avoid: optionalEndingNote,
+  habitsDone: emptyToUndefined(z.coerce.number().int().min(0).max(500)),
+  habitsTotal: emptyToUndefined(z.coerce.number().int().min(0).max(500)),
+  productiveSeconds: emptyToUndefined(
+    z.coerce.number().int().min(0).max(MAX_LOGGED_SECONDS),
+  ),
 });
 
 export const selectOneThingSchema = z
@@ -588,6 +613,7 @@ export const settingsSchema = z.object({
   bodyFastingEnabled: z.coerce.boolean().default(true),
   bodyExercisesSceneEnabled: z.coerce.boolean().default(true),
   bodyFastingSceneEnabled: z.coerce.boolean().default(true),
+  endingSummaryEnabled: z.coerce.boolean().default(false),
   fastKind: z.enum(["INTERMITTENT", "ISLAMIC"]).default("INTERMITTENT"),
   fastEatStart: windowMinute.default(720),
   fastEatEnd: windowMinute.default(1200),

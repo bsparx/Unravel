@@ -39,6 +39,7 @@ export async function updateSettings(
     "bodyFastingEnabled",
     "bodyExercisesSceneEnabled",
     "bodyFastingSceneEnabled",
+    "endingSummaryEnabled",
   ]) {
     values[key] = values[key] === "on" || values[key] === "true";
   }
@@ -111,6 +112,7 @@ export async function updateSettings(
       bodyFastingEnabled: input.bodyFastingEnabled,
       bodyExercisesSceneEnabled: input.bodyExercisesSceneEnabled,
       bodyFastingSceneEnabled: input.bodyFastingSceneEnabled,
+      endingSummaryEnabled: input.endingSummaryEnabled,
       fastKind: input.fastKind,
       fastEatStart: input.fastEatStart,
       fastEatEnd: input.fastEatEnd,

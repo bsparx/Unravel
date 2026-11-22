@@ -7,6 +7,7 @@
  */
 
 export const CLOSE_STEPS = [
+  "summary",
   "one-thing",
   "worry",
   "handoff",
@@ -14,19 +15,32 @@ export const CLOSE_STEPS = [
 
 export type CloseStep = (typeof CLOSE_STEPS)[number];
 
+/** Active steps for the user: `summary` leads when Ending Summary is enabled. */
+export function closeSteps(includeSummary = false): readonly CloseStep[] {
+  return includeSummary
+    ? CLOSE_STEPS
+    : ["one-thing", "worry", "handoff"];
+}
+
 /** Never throws. A malformed ?step= starts the ritual rather than breaking it. */
-export function parseCloseStep(raw: unknown): CloseStep {
-  return typeof raw === "string" && CLOSE_STEPS.includes(raw as CloseStep)
+export function parseCloseStep(
+  raw: unknown,
+  includeSummary = false,
+): CloseStep {
+  const steps = closeSteps(includeSummary);
+  return typeof raw === "string" && steps.includes(raw as CloseStep)
     ? (raw as CloseStep)
-    : CLOSE_STEPS[0];
+    : steps[0];
 }
 
 /** The next step, or null at the end. */
-export function nextCloseStep(step: CloseStep): CloseStep | null {
-  const index = CLOSE_STEPS.indexOf(step);
-  return index >= 0 && index < CLOSE_STEPS.length - 1
-    ? CLOSE_STEPS[index + 1]
-    : null;
+export function nextCloseStep(
+  step: CloseStep,
+  includeSummary = false,
+): CloseStep | null {
+  const steps = closeSteps(includeSummary);
+  const index = steps.indexOf(step);
+  return index >= 0 && index < steps.length - 1 ? steps[index + 1] : null;
 }
 
 export function closeStepHref(step: CloseStep): string {

@@ -4,16 +4,20 @@ import { prisma } from "@/lib/db";
 import {
   addDays,
   dayOfWeek,
+  diffInDays,
   formatDuration,
   toISODate,
   todayLocal,
 } from "@/lib/dates";
 import type { User } from "@/lib/generated/prisma/client";
+import { countEndingSummaryNotes } from "@/lib/ending-summary";
 import { heartEnabled } from "@/lib/heart-data";
 import { enabledHeartTabs } from "@/lib/heart-tabs";
 import { mindEnabled } from "@/lib/mind-data";
 import { MIND_TABS } from "@/lib/mind-tabs";
 import {
+  ENDING_SUMMARY_SECONDS,
+  ENDING_SUMMARY_TIME_HINT,
   HEART_TIME_HINTS,
   MIND_TIME_HINTS,
   brainDumpDaySeconds,
@@ -27,14 +31,15 @@ import {
 import { pagesRead } from "@/lib/reading";
 import { describeRecurrence, isDueOn } from "@/lib/recurrence";
 import {
+  ENDING_SUMMARY_ITEM_ID,
   HEART_PRACTICE_LABELS,
   MIND_PRACTICE_LABELS,
-  WINDOW_DAYS,
   heartItemId,
   mindItemId,
   resolveStatsWindow,
   type DayItemEntry,
   type DaySessionEntry,
+  type EndingSummaryReport,
   type StatsDayRecord,
   type StatsOverview,
   type TrackableItem,
@@ -42,23 +47,24 @@ import {
 import type { TimerMode } from "@/lib/timer-math";
 
 /**
- * Everything /stats needs for one 2-week (14-day) window, in one round trip:
- *  - Every active (non-archived) habit and its recurrence rule
- *  - Every Settings-enabled Mind and Heart practice
- *  - Every day's completion status (strictly honouring each habit's active days)
- *  - Every day's productive time (timer work sessions + manual task/habit logs,
- *    with breaks and recovery cleanly excluded and zero double-counting)
- *  - Per-day session breakdown for the Day Details sheet
+ * Shared statistics read over any inclusive `[from, to]` local-date range.
+ * Powers both `/stats` (14 days) and `/close` Ending Summary (56-day lookback
+ * for monthly and weekday averages) so both surfaces use identical logic.
  */
-export async function getStatsOverview(
+export async function getStatsRange(
   user: User,
-  endParam?: string | null,
-): Promise<StatsOverview> {
+  from: Date,
+  to: Date,
+): Promise<{
+  today: Date;
+  todayISO: string;
+  items: TrackableItem[];
+  days: StatsDayRecord[];
+}> {
   const today = todayLocal(user.timezone);
-  const win = resolveStatsWindow(today, endParam);
-  const { from, to } = win;
   const todayISO = toISODate(today);
   const yesterdayISO = toISODate(addDays(today, -1));
+  const dayCount = Math.max(1, diffInDays(to, from) + 1);
 
   // 1-day cushion on both ends when querying UTC timestamps so timezone offsets
   // near midnight never drop an entry belonging to `from` or `to`.
@@ -86,6 +92,7 @@ export async function getStatsOverview(
     disputationRevisits,
     journalEntries,
     recitationLogs,
+    endingSummaries,
   ] = await Promise.all([
     prisma.task.findMany({
       where: { userId: user.id, type: "HABIT", archivedAt: null },
@@ -222,6 +229,20 @@ export async function getStatsOverview(
           select: { date: true, createdAt: true },
         })
       : Promise.resolve([]),
+
+    prisma.endingSummary.findMany({
+      where: { userId: user.id, date: { gte: from, lte: to } },
+      select: {
+        date: true,
+        keepDoing: true,
+        tryTomorrow: true,
+        avoid: true,
+        habitsDone: true,
+        habitsTotal: true,
+        productiveSeconds: true,
+        createdAt: true,
+      },
+    }),
   ]);
 
   // ---- formatters ----------------------------------------------------------
@@ -259,19 +280,6 @@ export async function getStatsOverview(
     timeZone: "UTC",
   });
 
-  const dayMonthFmt = new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-  });
-
-  const sameYear =
-    from.getUTCFullYear() === today.getUTCFullYear() &&
-    to.getUTCFullYear() === today.getUTCFullYear();
-  const windowLabel = sameYear
-    ? `${dayMonthFmt.format(from)} – ${dayMonthFmt.format(to)}`
-    : `${dayMonthFmt.format(from)} ${from.getUTCFullYear()} – ${dayMonthFmt.format(to)} ${to.getUTCFullYear()}`;
-
   // ---- catalog of trackable items -----------------------------------------
 
   const activeHabits = habits.filter((h) => h.recurrence !== null);
@@ -284,6 +292,18 @@ export async function getStatsOverview(
       scheduleLabel: describeRecurrence(h.recurrence!.daysOfWeek),
       minimalTask: h.recurrence!.minimalTask || null,
     })),
+    ...(user.endingSummaryEnabled
+      ? [
+          {
+            id: ENDING_SUMMARY_ITEM_ID,
+            group: "habit" as const,
+            title: "Ending summary",
+            scheduleLabel: "Every evening",
+            minimalTask: "Review your day on Close the day",
+            timeHint: ENDING_SUMMARY_TIME_HINT,
+          },
+        ]
+      : []),
     ...enabledMind.map((tab) => ({
       id: mindItemId(tab),
       group: "mind" as const,
@@ -479,6 +499,29 @@ export async function getStatsOverview(
     );
   }
 
+  const endingSummaryByDay = new Map<
+    string,
+    { report: EndingSummaryReport; createdAt: Date | null }
+  >();
+  for (const row of endingSummaries) {
+    const iso = toISODate(row.date);
+    const stamp = pickEarliest(null, row.createdAt, iso);
+    endingSummaryByDay.set(iso, {
+      createdAt: stamp,
+      report: {
+        dateISO: iso,
+        dateLabel: fullDateFmt.format(row.date),
+        keepDoing: row.keepDoing,
+        tryTomorrow: row.tryTomorrow,
+        avoid: row.avoid,
+        habitsDone: row.habitsDone,
+        habitsTotal: row.habitsTotal,
+        productiveSeconds: row.productiveSeconds,
+        completedTime: stamp ? localTime.format(stamp) : null,
+      },
+    });
+  }
+
   // ---- index productive sessions & manual logged time by day --------------
 
   const workSecondsByDay = new Map<string, number>();
@@ -547,9 +590,9 @@ export async function getStatsOverview(
     sessionsByDay.set(iso, list);
   }
 
-  // ---- assemble 14 dense day records --------------------------------------
+  // ---- assemble dense day records -----------------------------------------
 
-  const days: StatsDayRecord[] = Array.from({ length: WINDOW_DAYS }, (_, offset) => {
+  const days: StatsDayRecord[] = Array.from({ length: dayCount }, (_, offset) => {
     const date = addDays(from, offset);
     const iso = toISODate(date);
     const isToday = iso === todayISO;
@@ -726,6 +769,30 @@ export async function getStatsOverview(
       };
     }
 
+    // 4. Ending summary habit (when toggled on in Settings)
+    const summaryEntry = endingSummaryByDay.get(iso);
+    if (user.endingSummaryEnabled) {
+      if (summaryEntry) {
+        const noteCount = countEndingSummaryNotes(summaryEntry.report);
+        dayItems[ENDING_SUMMARY_ITEM_ID] = {
+          itemId: ENDING_SUMMARY_ITEM_ID,
+          status: "done",
+          detail:
+            noteCount > 0
+              ? `${noteCount} ${noteCount === 1 ? "note" : "notes"}`
+              : "Day reviewed",
+          ...timeFields(summaryEntry.createdAt),
+          practiceSeconds: ENDING_SUMMARY_SECONDS,
+        };
+      } else {
+        dayItems[ENDING_SUMMARY_ITEM_ID] = {
+          itemId: ENDING_SUMMARY_ITEM_ID,
+          status: isToday ? "open" : "missed",
+          detail: null,
+        };
+      }
+    }
+
     return {
       iso,
       shortLabel: shortDateFmt.format(date),
@@ -739,8 +806,36 @@ export async function getStatsOverview(
       recoverySeconds: recoverySecondsByDay.get(iso) ?? 0,
       items: dayItems,
       sessions: sessionsByDay.get(iso) ?? [],
+      endingSummary: summaryEntry?.report ?? null,
     };
   });
+
+  return { today, todayISO, items, days };
+}
+
+/**
+ * Everything /stats needs for one 2-week (14-day) window, in one round trip.
+ */
+export async function getStatsOverview(
+  user: User,
+  endParam?: string | null,
+): Promise<StatsOverview> {
+  const today = todayLocal(user.timezone);
+  const win = resolveStatsWindow(today, endParam);
+  const { items, days, todayISO } = await getStatsRange(user, win.from, win.to);
+
+  const dayMonthFmt = new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+
+  const sameYear =
+    win.from.getUTCFullYear() === today.getUTCFullYear() &&
+    win.to.getUTCFullYear() === today.getUTCFullYear();
+  const windowLabel = sameYear
+    ? `${dayMonthFmt.format(win.from)} – ${dayMonthFmt.format(win.to)}`
+    : `${dayMonthFmt.format(win.from)} ${win.from.getUTCFullYear()} – ${dayMonthFmt.format(win.to)} ${win.to.getUTCFullYear()}`;
 
   return {
     endISO: win.endISO,
@@ -750,6 +845,7 @@ export async function getStatsOverview(
     nextEndISO: win.nextEndISO,
     weekStart: user.weekStart,
     todayISO,
+    endingSummaryEnabled: user.endingSummaryEnabled,
     items,
     days,
   };

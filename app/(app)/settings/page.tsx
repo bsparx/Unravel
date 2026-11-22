@@ -61,6 +61,7 @@ export default async function SettingsPage() {
           bodyFastingEnabled: user.bodyFastingEnabled,
           bodyExercisesSceneEnabled: user.bodyExercisesSceneEnabled,
           bodyFastingSceneEnabled: user.bodyFastingSceneEnabled,
+          endingSummaryEnabled: user.endingSummaryEnabled,
           fastKind: user.fastKind,
           fastEatStart: window.eatStart,
           fastEatEnd: window.eatEnd,

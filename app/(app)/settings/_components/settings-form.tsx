@@ -60,6 +60,7 @@ export type SettingsValues = {
   bodyFastingEnabled: boolean;
   bodyExercisesSceneEnabled: boolean;
   bodyFastingSceneEnabled: boolean;
+  endingSummaryEnabled: boolean;
   fastKind: FastKindId;
   fastEatStart: number;
   fastEatEnd: number;
@@ -509,6 +510,26 @@ export function SettingsForm({
               <input type="hidden" name="fastDaysOfWeek" value={fastDays.join(",")} />
             </div>
           </div>
+        </section>
+
+        <section id="close" className="scroll-mt-8 space-y-4">
+          <div>
+            <h2 className="font-display text-title flex items-center gap-1">
+              Close the day <InfoTip term="endingSummary" />
+            </h2>
+            <p className="text-muted-foreground text-label">
+              Review how the day went before setting it down. Everything you
+              write stays in Statistics and shows up the next day on Today and
+              Day.
+            </p>
+          </div>
+
+          <CheckboxField
+            id="endingSummaryEnabled"
+            label="Ending summary"
+            hint="When closing the day, compare today's habits and hours against your monthly and weekday averages, note what worked, what to try tomorrow, and what to avoid — and count the summary itself as a daily habit in Statistics."
+            defaultChecked={values.endingSummaryEnabled}
+          />
         </section>
 
         <div className="border-border border-t pt-6">

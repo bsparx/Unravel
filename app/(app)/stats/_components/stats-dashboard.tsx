@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -13,12 +13,14 @@ import {
   Clock,
   HandHeart,
   List,
+  NotebookText,
   Repeat,
   RotateCcw,
   SlidersHorizontal,
   Sunrise,
 } from "lucide-react";
 
+import { useExcludedItems } from "@/components/use-stats-selection";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -26,6 +28,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { formatDuration } from "@/lib/dates";
+import { hasEndingSummaryNotes } from "@/lib/ending-summary";
 import {
   calendarWeeks,
   completionLevel,
@@ -41,93 +44,6 @@ import {
 import { cn } from "@/lib/utils";
 
 import { DayDetailSheet } from "./day-detail-sheet";
-
-// ---------------------------------------------------------------- selection store
-
-const STORAGE_KEY = "unravel-stats-excluded";
-const EMPTY_EXCLUDED: readonly string[] = [];
-
-const listeners = new Set<() => void>();
-let cachedRaw: string | null | undefined;
-let cachedParsed: readonly string[] = EMPTY_EXCLUDED;
-
-function readExcluded(): readonly string[] {
-  if (typeof window === "undefined") return EMPTY_EXCLUDED;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw === cachedRaw) return cachedParsed;
-    cachedRaw = raw;
-    if (!raw) {
-      cachedParsed = EMPTY_EXCLUDED;
-      return cachedParsed;
-    }
-    const parsed: unknown = JSON.parse(raw);
-    cachedParsed = Array.isArray(parsed)
-      ? parsed.filter((v): v is string => typeof v === "string")
-      : EMPTY_EXCLUDED;
-    return cachedParsed;
-  } catch {
-    return EMPTY_EXCLUDED;
-  }
-}
-
-function writeExcluded(ids: readonly string[]) {
-  const unique = [...new Set(ids)];
-  const raw = JSON.stringify(unique);
-  cachedRaw = raw;
-  cachedParsed = unique;
-  try {
-    if (unique.length === 0) window.localStorage.removeItem(STORAGE_KEY);
-    else window.localStorage.setItem(STORAGE_KEY, raw);
-  } catch {
-    // Storage unavailable — selection still updates in memory for this visit.
-  }
-  for (const listener of listeners) listener();
-}
-
-function subscribeExcluded(listener: () => void) {
-  listeners.add(listener);
-  const onStorage = (event: StorageEvent) => {
-    if (event.key === STORAGE_KEY) {
-      cachedRaw = undefined;
-      listener();
-    }
-  };
-  window.addEventListener("storage", onStorage);
-  return () => {
-    listeners.delete(listener);
-    window.removeEventListener("storage", onStorage);
-  };
-}
-
-function useExcludedItems() {
-  const excludedList = useSyncExternalStore(
-    subscribeExcluded,
-    readExcluded,
-    () => EMPTY_EXCLUDED,
-  );
-  const excludedSet = useMemo(() => new Set(excludedList), [excludedList]);
-
-  const toggleItem = (id: string) => {
-    const next = new Set(excludedSet);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    writeExcluded([...next]);
-  };
-
-  const setGroupIncluded = (ids: string[], include: boolean) => {
-    const next = new Set(excludedSet);
-    for (const id of ids) {
-      if (include) next.delete(id);
-      else next.add(id);
-    }
-    writeExcluded([...next]);
-  };
-
-  const resetAll = () => writeExcluded([]);
-
-  return { excludedSet, toggleItem, setGroupIncluded, resetAll };
-}
 
 // ---------------------------------------------------------------- dashboard
 
@@ -479,17 +395,30 @@ export function StatsDashboard({ data }: { data: StatsOverview }) {
                                 </span>
                               )}
                             </span>
-                            {day.isToday && (
-                              <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-accent-foreground max-sm:hidden">
-                                Today
-                              </span>
-                            )}
-                            {day.isToday && (
-                              <span
-                                className="size-1.5 rounded-full bg-primary sm:hidden"
-                                aria-hidden
-                              />
-                            )}
+                            <div className="flex items-center gap-1">
+                              {day.endingSummary && (
+                                <NotebookText
+                                  className={cn(
+                                    "size-3 shrink-0",
+                                    hasEndingSummaryNotes(day.endingSummary)
+                                      ? "text-accent-foreground"
+                                      : "text-muted-foreground/70",
+                                  )}
+                                  aria-hidden
+                                />
+                              )}
+                              {day.isToday && (
+                                <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-accent-foreground max-sm:hidden">
+                                  Today
+                                </span>
+                              )}
+                              {day.isToday && (
+                                <span
+                                  className="size-1.5 rounded-full bg-primary sm:hidden"
+                                  aria-hidden
+                                />
+                              )}
+                            </div>
                           </div>
 
                           {/* Middle: done/active + slim bar */}
@@ -628,6 +557,7 @@ export function StatsDashboard({ data }: { data: StatsOverview }) {
         day={selectedDay}
         items={data.items}
         selectedIds={selectedIds}
+        endingSummaryEnabled={data.endingSummaryEnabled}
         canPrev={selectedIndex > 0}
         canNext={selectedIndex >= 0 && selectedIndex < data.days.length - 1}
         onPrev={() => {
@@ -670,12 +600,25 @@ function DayRowsList({
             >
               {/* Date + first habit time */}
               <div className="min-w-28 shrink-0">
-                <p className="text-label font-medium text-foreground">
-                  {day.isToday
-                    ? "Today"
-                    : day.isYesterday
-                      ? "Yesterday"
-                      : day.shortLabel}
+                <p className="flex items-center gap-1.5 text-label font-medium text-foreground">
+                  <span>
+                    {day.isToday
+                      ? "Today"
+                      : day.isYesterday
+                        ? "Yesterday"
+                        : day.shortLabel}
+                  </span>
+                  {day.endingSummary && (
+                    <NotebookText
+                      className={cn(
+                        "size-3.5 shrink-0",
+                        hasEndingSummaryNotes(day.endingSummary)
+                          ? "text-accent-foreground"
+                          : "text-muted-foreground/70",
+                      )}
+                      aria-label="Ending summary saved"
+                    />
+                  )}
                 </p>
                 {(day.isToday || day.isYesterday || s.firstTime) && (
                   <p className="flex items-center gap-1.5 text-micro text-muted-foreground">
@@ -930,13 +873,13 @@ function ItemSelectorPopover({
                               {item.title}
                             </span>
                           </span>
-                          {item.group === "habit" ? (
-                            <span className="shrink-0 text-micro text-muted-foreground">
-                              {item.scheduleLabel}
-                            </span>
-                          ) : item.timeHint ? (
+                          {item.timeHint ? (
                             <span className="shrink-0 font-mono text-micro text-muted-foreground tabular-nums">
                               {item.timeHint}
+                            </span>
+                          ) : item.group === "habit" ? (
+                            <span className="shrink-0 text-micro text-muted-foreground">
+                              {item.scheduleLabel}
                             </span>
                           ) : null}
                         </button>

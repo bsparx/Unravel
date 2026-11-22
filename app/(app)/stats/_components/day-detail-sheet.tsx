@@ -2,16 +2,20 @@
 
 import Link from "next/link";
 import {
+  BookmarkCheck,
   Brain,
   Check,
   ChevronLeft,
   ChevronRight,
   Circle,
   Clock,
+  Compass,
   HandHeart,
   Minus,
   Moon,
+  NotebookText,
   Repeat,
+  ShieldAlert,
   Sparkles,
   Sunrise,
   Waves,
@@ -26,6 +30,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { formatDuration } from "@/lib/dates";
+import { hasEndingSummaryNotes } from "@/lib/ending-summary";
 import {
   summarizeDay,
   type DayItemEntry,
@@ -39,6 +44,7 @@ export function DayDetailSheet({
   day,
   items,
   selectedIds,
+  endingSummaryEnabled,
   canPrev,
   canNext,
   onPrev,
@@ -48,6 +54,7 @@ export function DayDetailSheet({
   day: StatsDayRecord | null;
   items: readonly TrackableItem[];
   selectedIds: ReadonlySet<string>;
+  endingSummaryEnabled: boolean;
   canPrev: boolean;
   canNext: boolean;
   onPrev: () => void;
@@ -72,7 +79,7 @@ export function DayDetailSheet({
   const mindItems = selectedItems.filter((item) => item.group === "mind");
   const heartItems = selectedItems.filter((item) => item.group === "heart");
 
-  const practiceTimeEntries = [...mindItems, ...heartItems]
+  const practiceTimeEntries = selectedItems
     .map((item) => ({ item, entry: day.items[item.id] }))
     .filter(
       ({ entry }) =>
@@ -84,11 +91,11 @@ export function DayDetailSheet({
 
   const productiveSubtitle =
     day.sessions.length > 0 && practiceTimeEntries.length > 0
-      ? `${day.sessions.length} focus · ${practiceTimeEntries.length} mind/heart`
+      ? `${day.sessions.length} focus · ${practiceTimeEntries.length} ${practiceTimeEntries.length === 1 ? "practice" : "practices"}`
       : day.sessions.length > 0
         ? `${day.sessions.length} ${day.sessions.length === 1 ? "entry" : "entries"}`
         : practiceTimeEntries.length > 0
-          ? `${practiceTimeEntries.length} mind & heart`
+          ? `${practiceTimeEntries.length} ${practiceTimeEntries.length === 1 ? "practice" : "practices"}`
           : "Nothing tracked";
 
   const activeHabits = habitItems.filter((item) => {
@@ -239,6 +246,71 @@ export function DayDetailSheet({
               </div>
             )}
           </div>
+
+          {/* Ending summary report */}
+          {day.endingSummary && (
+            <section className="space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <SectionHeading icon={NotebookText} label="Ending summary" />
+                {day.endingSummary.completedTime && (
+                  <span className="font-mono text-micro text-muted-foreground tabular-nums">
+                    {day.endingSummary.completedTime}
+                  </span>
+                )}
+              </div>
+
+              {hasEndingSummaryNotes(day.endingSummary) ? (
+                <div className="space-y-2.5 rounded-2xl border border-border/60 bg-card/70 p-4">
+                  {day.endingSummary.keepDoing?.trim() && (
+                    <div>
+                      <p className="flex items-center gap-1.5 text-micro font-semibold text-foreground/85">
+                        <BookmarkCheck className="size-3.5 shrink-0 text-flow" aria-hidden />
+                        Remember &amp; focus on again
+                      </p>
+                      <p className="mt-1 whitespace-pre-line text-label leading-relaxed text-foreground/90">
+                        {day.endingSummary.keepDoing}
+                      </p>
+                    </div>
+                  )}
+
+                  {day.endingSummary.tryTomorrow?.trim() && (
+                    <div className={day.endingSummary.keepDoing?.trim() ? "border-t border-border/50 pt-2.5" : undefined}>
+                      <p className="flex items-center gap-1.5 text-micro font-semibold text-accent-foreground">
+                        <Compass className="size-3.5 shrink-0" aria-hidden />
+                        Try next day
+                      </p>
+                      <p className="mt-1 whitespace-pre-line text-label leading-relaxed text-foreground/90">
+                        {day.endingSummary.tryTomorrow}
+                      </p>
+                    </div>
+                  )}
+
+                  {day.endingSummary.avoid?.trim() && (
+                    <div
+                      className={
+                        day.endingSummary.keepDoing?.trim() ||
+                        day.endingSummary.tryTomorrow?.trim()
+                          ? "border-t border-border/50 pt-2.5"
+                          : undefined
+                      }
+                    >
+                      <p className="flex items-center gap-1.5 text-micro font-semibold text-muted-foreground">
+                        <ShieldAlert className="size-3.5 shrink-0" aria-hidden />
+                        Avoid
+                      </p>
+                      <p className="mt-1 whitespace-pre-line text-label leading-relaxed text-foreground/90">
+                        {day.endingSummary.avoid}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="rounded-2xl border border-border/60 bg-muted/35 px-4 py-3 text-label text-muted-foreground">
+                  Day reviewed on Close the day — no optional notes written.
+                </p>
+              )}
+            </section>
+          )}
 
           {/* Habits section */}
           {habitItems.length > 0 && (
@@ -409,7 +481,14 @@ export function DayDetailSheet({
           </section>
 
           {day.isToday && (
-            <div className="pt-1">
+            <div className="flex flex-col gap-2 pt-1">
+              {endingSummaryEnabled && !day.endingSummary && (
+                <Button asChild className="w-full rounded-xl">
+                  <Link href="/close?step=summary">
+                    Write today&apos;s ending summary
+                  </Link>
+                </Button>
+              )}
               <Button asChild variant="outline" className="w-full rounded-xl">
                 <Link href="/day">Open today&apos;s plan</Link>
               </Button>

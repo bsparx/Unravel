@@ -119,6 +119,18 @@ export type DaySessionEntry = {
   timeLabel: string | null;
 };
 
+export type EndingSummaryReport = {
+  dateISO: string;
+  dateLabel: string;
+  keepDoing: string | null;
+  tryTomorrow: string | null;
+  avoid: string | null;
+  habitsDone: number | null;
+  habitsTotal: number | null;
+  productiveSeconds: number | null;
+  completedTime: string | null;
+};
+
 export type StatsDayRecord = {
   iso: string;
   /** e.g. "Thu 19 Nov" */
@@ -139,6 +151,8 @@ export type StatsDayRecord = {
   items: Record<string, DayItemEntry>;
   /** Productive sessions & manual logs on this day. */
   sessions: DaySessionEntry[];
+  /** Ending summary written on /close for this day, if any. */
+  endingSummary: EndingSummaryReport | null;
 };
 
 export type StatsOverview = {
@@ -149,6 +163,8 @@ export type StatsOverview = {
   nextEndISO: string | null;
   weekStart: number;
   todayISO: string;
+  /** Whether the user currently has Ending Summary enabled in Settings. */
+  endingSummaryEnabled: boolean;
   /** All active habits + Settings-enabled Mind & Heart practices, in display order. */
   items: TrackableItem[];
   /** Dense 14-day series, oldest first. */
@@ -171,6 +187,7 @@ export const HEART_PRACTICE_LABELS: Record<HeartTab, string> = {
 
 export const mindItemId = (tab: MindTab): string => `mind:${tab}`;
 export const heartItemId = (tab: HeartTab): string => `heart:${tab}`;
+export const ENDING_SUMMARY_ITEM_ID = "habit:ending-summary";
 
 export type DaySummary = {
   done: number;

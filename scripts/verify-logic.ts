@@ -134,7 +134,20 @@ import {
   windowFor,
   windowRatio,
 } from "@/lib/fasting";
-import { exerciseCheckoffSchema, fastPlanSchema, fastUpdateSchema } from "@/lib/validation";
+import {
+  endingSummarySchema,
+  exerciseCheckoffSchema,
+  fastPlanSchema,
+  fastUpdateSchema,
+} from "@/lib/validation";
+import {
+  computeEndingSummaryComparison,
+  countEndingSummaryNotes,
+  formatDeltaDuration,
+  formatDeltaPercent,
+  hasEndingSummaryNotes,
+} from "@/lib/ending-summary";
+import { ENDING_SUMMARY_ITEM_ID } from "@/lib/stats-summary";
 
 import { activePalette, isEveningHour } from "@/lib/theme";
 import { subscriptionSchema } from "@/lib/validation";
@@ -216,6 +229,7 @@ import {
   prayerWindows,
 } from "@/lib/prayer-math";
 import {
+  closeSteps,
   nextCloseStep,
   parseCloseStep,
 } from "@/lib/close-ritual";
@@ -4287,6 +4301,7 @@ const mkStatsDay = (
   recoverySeconds: 0,
   items,
   sessions: [],
+  endingSummary: null,
   ...extra,
 });
 
@@ -4794,7 +4809,161 @@ check("fasting schedule, done-day bucketing, and body scene settings validate cl
   });
   assert.equal(s.bodyExercisesSceneEnabled, false);
   assert.equal(s.bodyFastingSceneEnabled, true);
+  assert.equal(s.endingSummaryEnabled, false, "endingSummaryEnabled defaults to false");
   assert.deepEqual(s.fastDaysOfWeek, [1, 4]);
+});
+
+console.log("\nending summary — close flow, averages, and validation");
+
+check("close ritual inserts ending summary first only when toggled on", () => {
+  assert.deepEqual(closeSteps(false), ["one-thing", "worry", "handoff"]);
+  assert.deepEqual(closeSteps(true), ["summary", "one-thing", "worry", "handoff"]);
+
+  // Off: deep-linking to summary gracefully starts at one-thing.
+  assert.equal(parseCloseStep("summary", false), "one-thing");
+  assert.equal(parseCloseStep(undefined, false), "one-thing");
+
+  // On: starts at summary and advances straight to one-thing -> worry -> handoff.
+  assert.equal(parseCloseStep(undefined, true), "summary");
+  assert.equal(parseCloseStep("summary", true), "summary");
+  assert.equal(nextCloseStep("summary", true), "one-thing");
+  assert.equal(nextCloseStep("one-thing", true), "worry");
+  assert.equal(nextCloseStep("worry", true), "handoff");
+  assert.equal(nextCloseStep("handoff", true), null);
+});
+
+check("ending summary compares today fairly against monthly and weekday averages", () => {
+  const selected = new Set(["h1", "h2", "mind:meditate", ENDING_SUMMARY_ITEM_ID]);
+
+  // Lookback leading up to Sunday 2026-11-22:
+  // - Empty days before first active day (2026-11-01) must NOT dilute averages.
+  // - Two prior Sundays (2026-11-08 and 2026-11-15) + one Saturday (2026-11-21).
+  // - Today (2026-11-22) has 3/3 of non-summary habits done, 2h 30m (9000s) total,
+  //   with ENDING_SUMMARY_ITEM_ID still "open" — must NOT penalize today before save!
+  const days = [
+    mkStatsDay("2026-11-01", 0, 0, {
+      h1: { itemId: "h1", status: "missed" },
+      h2: { itemId: "h2", status: "missed" },
+      "mind:meditate": { itemId: "mind:meditate", status: "missed" },
+      [ENDING_SUMMARY_ITEM_ID]: { itemId: ENDING_SUMMARY_ITEM_ID, status: "missed" },
+    }),
+    // First active day: Sun Nov 8 -> 1/3 habits (33%), 1h (3600s)
+    mkStatsDay("2026-11-08", 0, 3000, {
+      h1: { itemId: "h1", status: "done" },
+      h2: { itemId: "h2", status: "missed" },
+      "mind:meditate": { itemId: "mind:meditate", status: "done", practiceSeconds: 600 },
+      [ENDING_SUMMARY_ITEM_ID]: { itemId: ENDING_SUMMARY_ITEM_ID, status: "done", practiceSeconds: 300 },
+    }),
+    // Sun Nov 15 -> 1/3 habits (33%), 1h (3600s)
+    mkStatsDay("2026-11-15", 0, 3600, {
+      h1: { itemId: "h1", status: "done" },
+      h2: { itemId: "h2", status: "missed" },
+      "mind:meditate": { itemId: "mind:meditate", status: "missed" },
+      [ENDING_SUMMARY_ITEM_ID]: { itemId: ENDING_SUMMARY_ITEM_ID, status: "missed" },
+    }),
+    // Sat Nov 21 -> 3/3 habits (100%), 3h (10800s)
+    mkStatsDay("2026-11-21", 6, 9600, {
+      h1: { itemId: "h1", status: "done" },
+      h2: { itemId: "h2", status: "done" },
+      "mind:meditate": { itemId: "mind:meditate", status: "done", practiceSeconds: 1200 },
+      [ENDING_SUMMARY_ITEM_ID]: { itemId: ENDING_SUMMARY_ITEM_ID, status: "done", practiceSeconds: 300 },
+    }),
+    // Today: Sun Nov 22 -> 3/3 habits (100%), 2h 30m (8400 focus + 600 meditate = 9000s)
+    mkStatsDay(
+      "2026-11-22",
+      0,
+      8400,
+      {
+        h1: { itemId: "h1", status: "done" },
+        h2: { itemId: "h2", status: "done" },
+        "mind:meditate": { itemId: "mind:meditate", status: "done", practiceSeconds: 600 },
+        [ENDING_SUMMARY_ITEM_ID]: { itemId: ENDING_SUMMARY_ITEM_ID, status: "open" },
+      },
+      { isToday: true },
+    ),
+  ];
+
+  const cmp = computeEndingSummaryComparison(days, selected, "2026-11-22");
+  assert.equal(cmp.today.weekdayName, "Sunday");
+  assert.equal(cmp.today.habitsDone, 3);
+  assert.equal(cmp.today.habitsActive, 3, "ending summary itself does not penalize today on /close");
+  assert.equal(cmp.today.habitsPercent, 100);
+  assert.equal(cmp.today.productiveSeconds, 9000);
+  assert.equal(cmp.today.practiceSeconds, 600);
+
+  // Monthly baseline excludes empty Nov 1 and today Nov 22 -> 3 days (Nov 8, Nov 15, Nov 21):
+  // done = 2 + 1 + 3 = 6 out of 9 active => 67%, avg done = 2.0/day
+  // time = (3600 + 3600 + 10800) / 3 = 6000s (1h 40m)
+  assert.equal(cmp.monthAvg.sampleDays, 3);
+  assert.equal(cmp.monthAvg.avgHabitsPercent, 67);
+  assert.equal(cmp.monthAvg.avgHabitsDone, 2);
+  assert.equal(cmp.monthAvg.avgProductiveSeconds, 6000);
+  assert.equal(cmp.deltas.vsMonthPercent, 33);
+  assert.equal(cmp.deltas.vsMonthSeconds, 3000);
+
+  // Sunday baseline -> 2 prior Sundays (Nov 8 and Nov 15):
+  // done = 2 + 1 = 3 out of 6 active => 50%, avg done = 1.5/day
+  // time = (3600 + 3600) / 2 = 3600s (1h)
+  assert.equal(cmp.weekdayAvg.sampleDays, 2);
+  assert.equal(cmp.weekdayAvg.avgHabitsPercent, 50);
+  assert.equal(cmp.weekdayAvg.avgHabitsDone, 1.5);
+  assert.equal(cmp.weekdayAvg.avgProductiveSeconds, 3600);
+  assert.equal(cmp.deltas.vsWeekdayPercent, 50);
+  assert.equal(cmp.deltas.vsWeekdaySeconds, 5400);
+
+  // Delta formatting stays calm and clear.
+  assert.equal(formatDeltaPercent(33), "+33%");
+  assert.equal(formatDeltaPercent(-8), "-8%");
+  assert.equal(formatDeltaPercent(0), "On avg");
+  assert.equal(formatDeltaDuration(3000), "+50m");
+  assert.equal(formatDeltaDuration(-5400), "-1h 30m");
+  assert.equal(formatDeltaDuration(30), "On avg");
+
+  // Brand-new user with no prior active days gets clean empty baselines.
+  const firstDayOnly = computeEndingSummaryComparison(
+    [days[4]],
+    selected,
+    "2026-11-22",
+  );
+  assert.equal(firstDayOnly.monthAvg.sampleDays, 0);
+  assert.equal(firstDayOnly.weekdayAvg.sampleDays, 0);
+  assert.equal(firstDayOnly.deltas.vsMonthPercent, null);
+  assert.equal(firstDayOnly.deltas.vsMonthSeconds, null);
+});
+
+check("ending summary notes helpers and validation treat all reflection fields as optional", () => {
+  assert.equal(hasEndingSummaryNotes({ keepDoing: null, tryTomorrow: null, avoid: null }), false);
+  assert.equal(hasEndingSummaryNotes({ keepDoing: "   ", tryTomorrow: "", avoid: null }), false);
+  assert.equal(hasEndingSummaryNotes({ keepDoing: "Morning walk first", tryTomorrow: null, avoid: null }), true);
+  assert.equal(countEndingSummaryNotes({ keepDoing: "Walk", tryTomorrow: "Phone outside", avoid: "" }), 2);
+
+  // Empty form still passes so reviewing the day counts as the habit even without notes.
+  const emptyParsed = endingSummarySchema.parse({
+    keepDoing: "",
+    tryTomorrow: "   ",
+    avoid: "",
+    habitsDone: "5",
+    habitsTotal: "6",
+    productiveSeconds: "7200",
+  });
+  assert.equal(emptyParsed.keepDoing, undefined);
+  assert.equal(emptyParsed.tryTomorrow, undefined);
+  assert.equal(emptyParsed.avoid, undefined);
+  assert.equal(emptyParsed.habitsDone, 5);
+  assert.equal(emptyParsed.habitsTotal, 6);
+  assert.equal(emptyParsed.productiveSeconds, 7200);
+
+  // Settings schema enables endingSummaryEnabled when checked.
+  const enabledSettings = settingsSchema.parse({
+    timezone: "Asia/Karachi",
+    weekStart: "1",
+    pomodoroMinutes: "25",
+    shortBreakMinutes: "5",
+    longBreakMinutes: "15",
+    longBreakEvery: "4",
+    endingSummaryEnabled: true,
+  });
+  assert.equal(enabledSettings.endingSummaryEnabled, true);
 });
 
 console.log(`\n${passed} checks passed.\n`);

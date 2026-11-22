@@ -59,8 +59,13 @@ export const GLOSSARY = {
   },
   close: {
     title: "Closing the day",
-    what: "Two short steps at night: pick tomorrow's frog and empty what's still on your mind. Then the day hands off to rest. Gratitude lives on the Heart page.",
+    what: "A short evening ritual: optionally review your ending summary, pick tomorrow's frog, and empty what's still on your mind. Then the day hands off to rest.",
     why: "Tomorrow starts already decided, and the day ends instead of trailing off.",
+  },
+  endingSummary: {
+    title: "Ending summary",
+    what: "An optional first step when closing the day. It compares today's habits and hours against your monthly and weekday averages, and lets you note what worked, what to try tomorrow, and what to avoid.",
+    why: "Completing it becomes a daily habit in Statistics, and yesterday's notes show up on Today and Day so each day improves on the last.",
   },
   mind: {
     title: "Mind",

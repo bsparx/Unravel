@@ -3,12 +3,14 @@ import { CalendarDays, MoonStar, NotebookPen, type LucideIcon } from "lucide-rea
 
 import { Landing } from "@/app/_components/landing";
 import { BrandMark } from "@/components/brand-mark";
+import { YesterdaySummaryCard } from "@/components/yesterday-summary-card";
 import { ensureUser, type requireUser } from "@/lib/auth";
 import { getRawCaptures } from "@/lib/captures";
 import { formatFullDate, minuteOfDayLocal, toISODate, todayLocal } from "@/lib/dates";
 import { getDayLog } from "@/lib/day-log";
 import { prisma } from "@/lib/db";
 import { formatMinutes } from "@/lib/dates";
+import { getYesterdayEndingSummary } from "@/lib/ending-summary-data";
 import { getProjects } from "@/lib/tasks";
 
 import {
@@ -28,7 +30,10 @@ export default async function HomePage() {
 
   const today = todayLocal(user.timezone);
   const dateISO = toISODate(today);
-  const dayLog = await getDayLog(user, today);
+  const [dayLog, yesterdaySummary] = await Promise.all([
+    getDayLog(user, today),
+    getYesterdayEndingSummary(user),
+  ]);
   // Only the pass needs these, and they don't depend on each other.
   const [options, projects] = dayLog?.selectedTask
     ? [[], []]
@@ -61,6 +66,13 @@ export default async function HomePage() {
           />
         )}
       </section>
+
+      {yesterdaySummary && (
+        <YesterdaySummaryCard
+          report={yesterdaySummary}
+          className="animate-rise mt-5 [animation-delay:110ms]"
+        />
+      )}
 
       {/* The only way out of this screen, and it's quiet on purpose. */}
       <nav aria-label="Elsewhere" className="mt-8 flex flex-wrap gap-2 px-1">

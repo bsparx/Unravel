@@ -1,11 +1,20 @@
 import type { PassOption } from "@/app/(focus)/_components/morning-pass";
+import { getStatsRange } from "@/app/(app)/stats/_lib/queries";
 import { requireUser } from "@/lib/auth";
 import { getRawCaptures } from "@/lib/captures";
 import { parseCloseStep } from "@/lib/close-ritual";
-import { addDays, formatMinutes, toISODate, todayLocal } from "@/lib/dates";
+import {
+  addDays,
+  formatFullDate,
+  formatMinutes,
+  toISODate,
+  todayLocal,
+} from "@/lib/dates";
 import { getDayLog } from "@/lib/day-log";
 import { prisma } from "@/lib/db";
+import { ENDING_SUMMARY_LOOKBACK_DAYS } from "@/lib/ending-summary";
 
+import { StepEndingSummary } from "./_components/step-ending-summary";
 import {
   StepHandoff,
   StepOneThing,
@@ -25,12 +34,45 @@ export default async function ClosePage({
   // state so the back button works, a refresh doesn't restart the ritual, and
   // a notification can deep-link straight to a step.
   const params = await searchParams;
+  const includeSummary = user.endingSummaryEnabled;
   const step = parseCloseStep(
     Array.isArray(params.step) ? params.step[0] : params.step,
+    includeSummary,
   );
 
   const today = todayLocal(user.timezone);
   const tomorrow = addDays(today, 1);
+
+  if (step === "summary") {
+    const from = addDays(today, -(ENDING_SUMMARY_LOOKBACK_DAYS - 1));
+    const [range, existing] = await Promise.all([
+      getStatsRange(user, from, today),
+      prisma.endingSummary.findUnique({
+        where: { userId_date: { userId: user.id, date: today } },
+        select: { keepDoing: true, tryTomorrow: true, avoid: true },
+      }),
+    ]);
+
+    return (
+      <StepEndingSummary
+        todayISO={toISODate(today)}
+        todayLabel={formatFullDate(today)}
+        items={range.items}
+        days={range.days.map((day) => ({
+          iso: day.iso,
+          weekday: day.weekday,
+          productiveSeconds: day.productiveSeconds,
+          items: day.items,
+        }))}
+        initial={{
+          keepDoing: existing?.keepDoing ?? "",
+          tryTomorrow: existing?.tryTomorrow ?? "",
+          avoid: existing?.avoid ?? "",
+        }}
+        alreadySaved={Boolean(existing)}
+      />
+    );
+  }
 
   if (step === "one-thing") {
     return (
