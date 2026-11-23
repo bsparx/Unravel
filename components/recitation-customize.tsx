@@ -17,8 +17,9 @@ import {
   SET_MAX_ITEMS,
   TIME_LABEL,
   findRecitation,
+  recitationMatchesQuery,
   sessionItem,
-  type Recitation,
+  type RecitationGroup,
   type SetItem,
 } from "@/lib/recitations";
 import { cn } from "@/lib/utils";
@@ -49,6 +50,7 @@ export default function RecitationCustomize({
 }) {
   const [set, setSet] = useState<SetItem[]>(initial);
   const [query, setQuery] = useState("");
+  const [activeGroup, setActiveGroup] = useState<"all" | RecitationGroup>("all");
   const [open, setOpen] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -78,13 +80,12 @@ export default function RecitationCustomize({
       return next;
     });
 
-  const needle = query.trim().toLowerCase();
-  const matches = (item: Recitation) =>
-    !needle ||
-    item.title.toLowerCase().includes(needle) ||
-    item.arabicTitle.includes(query.trim()) ||
-    item.ref.toLowerCase().includes(needle) ||
-    TIME_LABEL[item.when].toLowerCase().includes(needle);
+  const visibleGroups = RECITATION_GROUPS.filter((g) => activeGroup === "all" || g.id === activeGroup)
+    .map((group) => ({
+      group,
+      list: RECITATIONS.filter((item) => item.group === group.id && recitationMatchesQuery(item, query)),
+    }))
+    .filter(({ list }) => list.length > 0);
 
   const save = async () => {
     setSaving(true);
@@ -211,20 +212,58 @@ export default function RecitationCustomize({
                   type="search"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search"
+                  placeholder="Search title, words or reference"
                   aria-label="Search recitations"
                   className="min-h-10 pl-9"
                 />
               </div>
             </div>
+            <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Catalogue categories">
+              {(
+                [
+                  { id: "all", label: "All", count: RECITATIONS.length },
+                  ...RECITATION_GROUPS.map((g) => ({
+                    id: g.id,
+                    label: g.shortTitle,
+                    count: RECITATIONS.filter((item) => item.group === g.id).length,
+                  })),
+                ] as const
+              ).map((tab) => {
+                const selected = activeGroup === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    onClick={() => setActiveGroup(tab.id)}
+                    className={cn(
+                      "focus-visible:ring-ring inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition focus-visible:ring-2 focus-visible:outline-none",
+                      selected
+                        ? "border-foreground bg-foreground text-background"
+                        : "border-border bg-card text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {tab.label}
+                    <span className={cn("font-mono text-[0.7rem] tabular-nums", selected ? "opacity-80" : "opacity-65")}>
+                      {tab.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
             {full && <p className="text-muted-foreground text-label">A set holds up to {SET_MAX_ITEMS}. Take one out to add another.</p>}
 
-            {RECITATION_GROUPS.map((group) => {
-              const list = RECITATIONS.filter((item) => item.group === group.id && matches(item));
-              if (list.length === 0) return null;
-              return (
+            {visibleGroups.length === 0 ? (
+              <p className="text-muted-foreground border-border rounded-xl border border-dashed px-4 py-8 text-center text-label">
+                No recitations match “{query.trim()}”.
+              </p>
+            ) : (
+              visibleGroups.map(({ group, list }) => (
                 <div key={group.id} className="space-y-2">
-                  <h4 className="text-muted-foreground text-micro font-medium tracking-wide uppercase">{group.title}</h4>
+                  <h4 className="text-muted-foreground text-micro font-medium tracking-wide uppercase">
+                    {group.title} · {list.length}
+                  </h4>
                   <ul className="space-y-2">
                     {list.map((item) => {
                       const added = inSet.has(item.id);
@@ -293,8 +332,8 @@ export default function RecitationCustomize({
                     })}
                   </ul>
                 </div>
-              );
-            })}
+              ))
+            )}
           </section>
 
           {/* Your own. */}

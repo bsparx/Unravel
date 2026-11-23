@@ -36,7 +36,7 @@ import {
 export type { Hadith, TextSource, Verse } from "./recitation-texts";
 export { BISMILLAH } from "./recitation-texts";
 
-export type RecitationGroup = "quran" | "adhkar" | "salawat";
+export type RecitationGroup = "quran" | "adhkar" | "dua" | "salawat";
 
 /** When its hadith places it. A tag, never a rule. */
 export type RecitationTime = "morning" | "evening" | "both" | "night" | "prayer" | "any";
@@ -276,6 +276,238 @@ export const RECITATIONS: readonly Recitation[] = [
     ],
   },
 
+  // ---------------------------------------------------------------- Prophetic du'as
+  {
+    id: "unbeneficial-knowledge",
+    title: "Refuge from unbeneficial knowledge, sloth & purifying the soul",
+    arabicTitle: "",
+    group: "dua",
+    when: "any",
+    defaultCount: 1,
+    ref: "Sahih Muslim 2722",
+    parts: one("unbeneficial-knowledge"),
+  },
+  {
+    id: "worry-and-grief",
+    title: "Refuge from worry, grief, laziness & debt",
+    arabicTitle: "",
+    group: "dua",
+    when: "any",
+    defaultCount: 1,
+    ref: "Sahih al-Bukhari 6369",
+    parts: one("worry-and-grief"),
+  },
+  {
+    id: "guidance-piety-chastity",
+    title: "Asking for guidance, piety, chastity & freedom from want",
+    arabicTitle: "",
+    group: "dua",
+    when: "any",
+    defaultCount: 1,
+    ref: "Sahih Muslim 2721",
+    parts: one("guidance-piety-chastity"),
+  },
+  {
+    id: "set-right-religion",
+    title: "Setting right religion, worldly life & the Hereafter",
+    arabicTitle: "",
+    group: "dua",
+    when: "any",
+    defaultCount: 1,
+    ref: "Sahih Muslim 2720",
+    parts: one("set-right-religion"),
+  },
+  {
+    id: "steadfast-heart",
+    title: "Steadfastness of the heart upon Your religion",
+    arabicTitle: "",
+    group: "dua",
+    when: "any",
+    defaultCount: 1,
+    ref: "Jami' at-Tirmidhi 3522",
+    parts: one("steadfast-heart"),
+  },
+  {
+    id: "turn-hearts-obedience",
+    title: "Turning our hearts to Your obedience",
+    arabicTitle: "",
+    group: "dua",
+    when: "any",
+    defaultCount: 1,
+    ref: "Sahih Muslim 2655",
+    parts: one("turn-hearts-obedience"),
+  },
+  {
+    id: "dhikr-shukr-ibadah",
+    title: "Help in remembrance, thanks & good worship",
+    arabicTitle: "",
+    group: "dua",
+    when: "prayer",
+    defaultCount: 1,
+    ref: "Sunan Abi Dawud 1522",
+    parts: one("dhikr-shukr-ibadah"),
+  },
+  {
+    id: "good-in-both-worlds",
+    title: "Good in this world and the Hereafter",
+    arabicTitle: "",
+    group: "dua",
+    when: "any",
+    defaultCount: 1,
+    ref: "Sahih al-Bukhari 6389 · Sahih Muslim 2690",
+    parts: one("good-in-both-worlds"),
+  },
+  {
+    id: "withdrawal-of-blessing",
+    title: "Refuge from the withdrawal of blessing & protection",
+    arabicTitle: "",
+    group: "dua",
+    when: "any",
+    defaultCount: 1,
+    ref: "Sahih Muslim 2739",
+    parts: one("withdrawal-of-blessing"),
+  },
+  {
+    id: "all-good-and-refuge",
+    title: "Asking for all good & refuge from all evil",
+    arabicTitle: "",
+    group: "dua",
+    when: "any",
+    defaultCount: 1,
+    ref: "Sunan Ibn Majah 3846",
+    parts: one("all-good-and-refuge"),
+  },
+  {
+    id: "pardon-mercy-sustenance",
+    title: "Pardon, mercy, guidance, protection & sustenance",
+    arabicTitle: "",
+    group: "dua",
+    when: "any",
+    defaultCount: 1,
+    ref: "Sahih Muslim 2697",
+    parts: one("pardon-mercy-sustenance"),
+  },
+  {
+    id: "abu-bakr-forgiveness",
+    title: "Abu Bakr's du'a for forgiveness & mercy",
+    arabicTitle: "",
+    group: "dua",
+    when: "prayer",
+    defaultCount: 1,
+    ref: "Sahih al-Bukhari 834 · Sahih Muslim 2705",
+    parts: one("abu-bakr-forgiveness"),
+  },
+  {
+    id: "forgive-all-sins",
+    title: "Forgiveness of all faults, private & public",
+    arabicTitle: "",
+    group: "dua",
+    when: "any",
+    defaultCount: 1,
+    ref: "Sahih Muslim 2719 · Sahih al-Bukhari 6398",
+    parts: one("forgive-all-sins"),
+  },
+  {
+    id: "guidance-and-straightness",
+    title: "Guidance & adhering to the straight path",
+    arabicTitle: "",
+    group: "dua",
+    when: "any",
+    defaultCount: 1,
+    ref: "Sahih Muslim 2725",
+    parts: one("guidance-and-straightness"),
+  },
+  {
+    id: "evil-done-and-undone",
+    title: "Refuge from the evil of what I have done & not done",
+    arabicTitle: "",
+    group: "dua",
+    when: "any",
+    defaultCount: 1,
+    ref: "Sahih Muslim 2716",
+    parts: one("evil-done-and-undone"),
+  },
+  {
+    id: "evil-character-desires",
+    title: "Refuge from evil character, actions & desires",
+    arabicTitle: "",
+    group: "dua",
+    when: "any",
+    defaultCount: 1,
+    ref: "Jami' at-Tirmidhi 3591",
+    parts: one("evil-character-desires"),
+  },
+  {
+    id: "poverty-and-wrong",
+    title: "Refuge from poverty, lack, abasement & wronging",
+    arabicTitle: "",
+    group: "dua",
+    when: "any",
+    defaultCount: 1,
+    ref: "Sunan Abi Dawud 1544",
+    parts: one("poverty-and-wrong"),
+  },
+  {
+    id: "refuge-four-trials",
+    title: "Refuge from Hell, the grave, life, death & the Dajjal",
+    arabicTitle: "",
+    group: "dua",
+    when: "prayer",
+    defaultCount: 1,
+    ref: "Sahih Muslim 588 · Sahih al-Bukhari 1377",
+    parts: one("refuge-four-trials"),
+  },
+  {
+    id: "dua-of-distress",
+    title: "Supplication at a time of distress",
+    arabicTitle: "",
+    group: "dua",
+    when: "any",
+    defaultCount: 1,
+    ref: "Sahih Muslim 2730 · Sahih al-Bukhari 6346",
+    parts: one("dua-of-distress"),
+  },
+  {
+    id: "dua-of-yunus",
+    title: "Supplication of Dhun-Nun (Prophet Yunus)",
+    arabicTitle: "",
+    group: "dua",
+    when: "any",
+    defaultCount: 1,
+    ref: "Jami' at-Tirmidhi 3505",
+    parts: one("dua-of-yunus"),
+  },
+  {
+    id: "beneficial-knowledge-provision",
+    title: "Beneficial knowledge, goodly provision & acceptable deeds",
+    arabicTitle: "",
+    group: "dua",
+    when: "morning",
+    defaultCount: 1,
+    ref: "Sunan Ibn Majah 925",
+    parts: one("beneficial-knowledge-provision"),
+  },
+  {
+    id: "light-in-heart",
+    title: "Asking for light in the heart and every direction",
+    arabicTitle: "",
+    group: "dua",
+    when: "night",
+    defaultCount: 1,
+    ref: "Sahih Muslim 763",
+    parts: one("light-in-heart"),
+  },
+  {
+    id: "asking-for-pardon",
+    title: "Asking Allah for forgiveness (al-'Afuww)",
+    arabicTitle: "",
+    group: "dua",
+    when: "night",
+    defaultCount: 1,
+    ref: "Sunan Ibn Majah 3850",
+    parts: one("asking-for-pardon"),
+  },
+
   // ---------------------------------------------------------------- salawat
   {
     id: "salat-ibrahimiyya",
@@ -299,10 +531,11 @@ export function sourcesFor(text: TextKey): TextSource {
   return TEXT_SOURCES[text];
 }
 
-export const RECITATION_GROUPS: readonly { id: RecitationGroup; title: string }[] = [
-  { id: "quran", title: "From the Quran" },
-  { id: "adhkar", title: "Remembrance" },
-  { id: "salawat", title: "Blessings on the Prophet ﷺ" },
+export const RECITATION_GROUPS: readonly { id: RecitationGroup; title: string; shortTitle: string }[] = [
+  { id: "quran", title: "From the Quran", shortTitle: "Quran" },
+  { id: "adhkar", title: "Remembrance", shortTitle: "Remembrance" },
+  { id: "dua", title: "Prophetic du'as", shortTitle: "Prophetic du'as" },
+  { id: "salawat", title: "Blessings on the Prophet ﷺ", shortTitle: "Blessings" },
 ];
 
 export const TIME_LABEL: Record<RecitationTime, string> = {
@@ -313,6 +546,33 @@ export const TIME_LABEL: Record<RecitationTime, string> = {
   prayer: "After prayer",
   any: "Any time",
 };
+
+/**
+ * Does a catalogue entry match a search string? Checks title, reference, time
+ * tag, and the actual Arabic, transliteration and verbatim English translation
+ * so searching a phrase from any du'a finds it immediately.
+ */
+export function recitationMatchesQuery(item: Recitation, query: string): boolean {
+  const raw = query.trim();
+  if (!raw) return true;
+  const needle = raw.toLowerCase();
+  if (
+    item.title.toLowerCase().includes(needle) ||
+    item.arabicTitle.includes(raw) ||
+    item.ref.toLowerCase().includes(needle) ||
+    TIME_LABEL[item.when].toLowerCase().includes(needle)
+  ) {
+    return true;
+  }
+  return item.parts.some((part) =>
+    TEXTS[part.text].some(
+      (verse) =>
+        verse.en.toLowerCase().includes(needle) ||
+        verse.tr.toLowerCase().includes(needle) ||
+        verse.ar.includes(raw),
+    ),
+  );
+}
 
 const BY_ID = new Map<string, Recitation>(RECITATIONS.map((item) => [item.id, item]));
 

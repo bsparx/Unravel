@@ -163,10 +163,10 @@ export function RecitationPanel({
         <p className="mx-auto mt-2 max-w-prose text-center text-xs leading-relaxed">
           Quran: the IndoPak script, ayah by ayah, from the Quranic Universal Library (Tarteel), drawn in the Digital
           Khatt IndoPak font; the word-by-word transliteration and the Saheeh International translation from
-          quran.com. Remembrance and blessings are not in the Quran, so their Arabic is taken from the hadith that
-          teaches them, with the transliteration and translation from the hadith&apos;s own English or Hisn
-          al-Muslim. Every recitation carries its hadith, Sahih only, verbatim, with a link to it on sunnah.com.
-          Learn the recitation from a teacher where you can; this is a companion, not a substitute.
+          quran.com. Remembrance, Prophetic du&apos;as and blessings are not in the Quran, so their Arabic and English
+          translation are taken verbatim from the Sahih hadith on sunnah.com that teaches them (or Hisn al-Muslim where
+          noted), never paraphrased. Every recitation carries its hadith, Sahih only, verbatim, with a link to it on
+          sunnah.com. Learn the recitation from a teacher where you can; this is a companion, not a substitute.
         </p>
       </details>
     </div>

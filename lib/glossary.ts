@@ -79,7 +79,7 @@ export const GLOSSARY = {
   },
   recitation: {
     title: "Daily recitation",
-    what: "A set you choose of Quran and remembrance, each shown in Arabic with transliteration and translation, and said as many times as you set: the three Quls, Ayat al-Kursi, the end of al-Baqarah and more. Tap the counter for each time. The day counts once the whole set is said. Each one carries its Sahih hadith.",
+    what: "A set you choose of Quran, remembrance and Prophetic du'as, each shown in Arabic with transliteration and translation, and said as many times as you set: the three Quls, Ayat al-Kursi, the end of al-Baqarah, Sahih Prophetic supplications and more. Tap the counter for each time. The day counts once the whole set is said. Each one carries its Sahih hadith.",
     why: "Small, fixed recitations kept every day add up, and the counter keeps your place so the mind can stay on the words.",
   },
   woop: {

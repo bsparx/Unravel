@@ -62,7 +62,9 @@ function intro(enabled: HeartEnabled): string {
   const pages = [enabled.gratitude && "what was good", enabled.dua && "what you're asking for"].filter(Boolean);
   return [
     pages.length ? `A page a day for ${pages.join(" and ")}.` : "",
-    enabled.recitation ? "A daily set of Quran and remembrance, said with a counter, that grows an oasis." : "",
+    enabled.recitation
+      ? "A daily set of Quran, remembrance and Prophetic du'as, said with a counter, that grows an oasis."
+      : "",
   ]
     .filter(Boolean)
     .join(" ");

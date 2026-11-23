@@ -36,6 +36,7 @@ import {
   itemTotal,
   positionIn,
   readSet,
+  recitationMatchesQuery,
   sessionItem,
 } from "@/lib/recitations";
 import { BISMILLAH, TEXTS } from "@/lib/recitation-texts";
@@ -4145,6 +4146,37 @@ check("Sahih only: every recitation carries a graded hadith and a sunnah.com lin
     readSet([{ key: "quls", count: 3 }, { key: "rabbana-atina", count: 1 }, { key: "fatiha", count: 1 }]).map((i) => i.key),
     ["quls", "fatiha"],
   );
+});
+
+check("Prophetic du'as from Sahih hadith are verbatim, clean UTF-8, and searchable by words", () => {
+  const duas = RECITATIONS.filter((item) => item.group === "dua");
+  assert.ok(duas.length >= 20, "catalogue includes a rich set of Sahih Prophetic du'as");
+  for (const item of RECITATIONS) {
+    for (const part of item.parts) {
+      for (const verse of TEXTS[part.text]) {
+        assert.ok(!verse.ar.includes("\uFFFD"), `${item.id}: Arabic has no replacement char`);
+        assert.ok(!verse.tr.includes("\uFFFD"), `${item.id}: transliteration has no replacement char`);
+        assert.ok(!verse.en.includes("\uFFFD"), `${item.id}: English has no replacement char`);
+      }
+    }
+    for (const h of hadithFor(item.id)) {
+      assert.ok(!h.text.includes("\uFFFD"), `${h.ref}: hadith text has no replacement char`);
+    }
+  }
+  const knowledge = findRecitation("unbeneficial-knowledge");
+  assert.ok(knowledge && knowledge.group === "dua", "Sahih Muslim 2722 du'a is in Prophetic du'as");
+  assert.equal(knowledge.ref, "Sahih Muslim 2722");
+  assert.equal(hadithFor(knowledge.id)[0]?.url, "https://sunnah.com/muslim:2722");
+  assert.equal(
+    TEXTS["unbeneficial-knowledge"][2]?.en,
+    "O Allah, I seek refuge in Thee from the knowledge which does not benefit, from the heart that does not entertain the fear (of Allah), from the soul that does not feel contented and the supplication that is not responded.",
+  );
+  assert.ok(recitationMatchesQuery(knowledge, "does not entertain the fear"), "search matches verbatim English");
+  assert.ok(recitationMatchesQuery(knowledge, "muslim 2722"), "search matches hadith reference");
+  assert.ok(recitationMatchesQuery(knowledge, "لاَ يَنْفَعُ"), "search matches Arabic words");
+  const heart = findRecitation("steadfast-heart")!;
+  assert.ok(recitationMatchesQuery(heart, "muqallibal-qulūb"), "search matches transliteration");
+  assert.equal(recitationMatchesQuery(heart, "nonexistent phrase xyz"), false);
 });
 
 check("the three Quls: three rounds of Ikhlas, Falaq and Nas is nine readings", () => {

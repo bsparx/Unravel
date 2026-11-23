@@ -405,7 +405,7 @@ export function SettingsForm({
             <CheckboxField
               id="heartRecitationEnabled"
               label="Daily recitation"
-              hint="A set you choose of Quran and remembrance (the three Quls, Ayat al-Kursi, the end of al-Baqarah and more) in Arabic with transliteration and translation, said with a counter. Each day you finish it keeps an oasis."
+              hint="A set you choose of Quran, remembrance and Prophetic du'as (the three Quls, Ayat al-Kursi, the end of al-Baqarah, Sahih supplications and more) in Arabic with transliteration and translation, said with a counter. Each day you finish it keeps an oasis."
               defaultChecked={values.heartRecitationEnabled}
             />
           </div>

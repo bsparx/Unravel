@@ -9,10 +9,13 @@
  * - Quran transliteration: quran.com, word by word, joined in order.
  * - Quran translation: quran.com, Saheeh International (translation 20),
  *   with its footnote markers removed.
- * - Adhkar: the Arabic is cut from the hadith itself; the transliteration and
- *   translation come from the hadith's own English where it gives them, or
- *   from Hisn al-Muslim where its Arabic is the same wording (checked).
- *   'Ayn and hamza are written ʿ and ʾ, as quran.com writes them.
+ * - Adhkar and Prophetic du'as: the Arabic is cut verbatim from the hadith
+ *   itself on sunnah.com; the English translation is verbatim from the
+ *   hadith's own English on sunnah.com (or Hisn al-Muslim for earlier adhkar
+ *   where noted), never paraphrased; transliteration is from the hadith's own
+ *   English where given, Hisn al-Muslim, or transliterated directly from the
+ *   hadith's Arabic. 'Ayn and hamza are written ʿ and ʾ, as quran.com writes
+ *   them.
  * - Hadith: the English of the sunnah.com collections, verbatim, with their
  *   gradings. Only Sahih: al-Bukhari, Muslim, or graded Sahih by al-Albani
  *   (the other graders are listed too).
@@ -414,6 +417,197 @@ export const TEXTS = {
       "tr": "Allahumma salli ʿala Muhammad, wa-ʿala ali Muhammad, kama sallayta ʿala Ibraheema wa-ʿala ali Ibraheem, innaka Hameedun Majeed, allahumma barik ʿala Muhammad, wa-ʿala ali Muhammad, kama barakta ʿala Ibraheema wa-ʿala ali Ibraheem, innaka Hameedun Majeed.",
       "en": "O Allah! Send Your Mercy on Muhammad and on the family of Muhammad, as You sent Your Mercy on Abraham and on the family of Abraham, for You are the Most Praise-worthy, the Most Glorious. O Allah! Send Your Blessings on Muhammad and the family of Muhammad, as You sent your Blessings on Abraham and on the family of Abraham, for You are the Most Praise-worthy, the Most Glorious"
     }
+  ],
+  "unbeneficial-knowledge": [
+    {
+      "ar": "اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْعَجْزِ وَالْكَسَلِ وَالْجُبْنِ وَالْبُخْلِ وَالْهَرَمِ وَعَذَابِ الْقَبْرِ",
+      "tr": "Allāhumma innī aʿūdhu bika mina l-ʿajzi wal-kasali wal-jubni wal-bukhli wal-harami wa ʿadhābi l-qabr.",
+      "en": "O Allah, I seek refuge in Thee from incapacity, from sloth, from cowardice, from miserliness, decrepitude and from torment of the grave."
+    },
+    {
+      "ar": "اللَّهُمَّ آتِ نَفْسِي تَقْوَاهَا وَزَكِّهَا أَنْتَ خَيْرُ مَنْ زَكَّاهَا أَنْتَ وَلِيُّهَا وَمَوْلاَهَا",
+      "tr": "Allāhumma āti nafsī taqwāhā wa zakkihā anta khayru man zakkāhā anta waliyyuhā wa mawlāhā.",
+      "en": "O Allah, grant to my soul the sense of righteousness and purify it, for Thou art the Best Purifier thereof. Thou art the Protecting Friend thereof, and Guardian thereof."
+    },
+    {
+      "ar": "اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنْ عِلْمٍ لاَ يَنْفَعُ وَمِنْ قَلْبٍ لاَ يَخْشَعُ وَمِنْ نَفْسٍ لاَ تَشْبَعُ وَمِنْ دَعْوَةٍ لاَ يُسْتَجَابُ لَهَا",
+      "tr": "Allāhumma innī aʿūdhu bika min ʿilmin lā yanfaʿu wa min qalbin lā yakhshaʿu wa min nafsin lā tashbaʿu wa min daʿwatin lā yustajābu lahā.",
+      "en": "O Allah, I seek refuge in Thee from the knowledge which does not benefit, from the heart that does not entertain the fear (of Allah), from the soul that does not feel contented and the supplication that is not responded."
+    }
+  ],
+  "worry-and-grief": [
+    {
+      "ar": "اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْهَمِّ وَالْحَزَنِ، وَالْعَجْزِ وَالْكَسَلِ، وَالْجُبْنِ وَالْبُخْلِ، وَضَلَعِ الدَّيْنِ، وَغَلَبَةِ الرِّجَالِ",
+      "tr": "Allāhumma innī aʿūdhu bika mina l-hammi wal-ḥazani, wal-ʿajzi wal-kasali, wal-jubni wal-bukhli, wa ḍalaʿi d-dayni, wa ghalabati r-rijāl.",
+      "en": "O Allah! I seek refuge with You from worry and grief, from incapacity and laziness, from cowardice and miserliness, from being heavily in debt and from being overpowered by (other) men."
+    }
+  ],
+  "guidance-piety-chastity": [
+    {
+      "ar": "اللَّهُمَّ إِنِّي أَسْأَلُكَ الْهُدَى وَالتُّقَى وَالْعَفَافَ وَالْغِنَى",
+      "tr": "Allāhumma innī asʾaluka l-hudā wat-tuqā wal-ʿafāfa wal-ghinā.",
+      "en": "O Allah, I beg of Thee the right guidance, safeguard against evils, chastity and freedom from want."
+    }
+  ],
+  "set-right-religion": [
+    {
+      "ar": "اللَّهُمَّ أَصْلِحْ لِي دِينِيَ الَّذِي هُوَ عِصْمَةُ أَمْرِي وَأَصْلِحْ لِي دُنْيَاىَ الَّتِي فِيهَا مَعَاشِي وَأَصْلِحْ لِي آخِرَتِي الَّتِي فِيهَا مَعَادِي وَاجْعَلِ الْحَيَاةَ زِيَادَةً لِي فِي كُلِّ خَيْرٍ وَاجْعَلِ الْمَوْتَ رَاحَةً لِي مِنْ كُلِّ شَرٍّ",
+      "tr": "Allāhumma aṣliḥ lī dīniya lladhī huwa ʿiṣmatu amrī, wa aṣliḥ lī dunyāya llatī fīhā maʿāshī, wa aṣliḥ lī ākhiratī llatī fīhā maʿādī, wajʿali l-ḥayāta ziyādatan lī fī kulli khayr, wajʿali l-mawta rāḥatan lī min kulli sharr.",
+      "en": "O Allah, set right for me my religion which is the safeguard of my affairs. And set right for me the affairs of my world wherein is my living. And set right for me my Hereafter on which depends my after-life. And make the life for me (a source) of abundance for every good and make my death a source of comfort for me protecting me against every evil."
+    }
+  ],
+  "steadfast-heart": [
+    {
+      "ar": "يَا مُقَلِّبَ الْقُلُوبِ ثَبِّتْ قَلْبِي عَلَى دِينِكَ",
+      "tr": "Yā Muqallibal-qulūb, thabbit qalbī ʿalā dīnik.",
+      "en": "O Changer of the hearts, make my heart firm upon Your religion."
+    }
+  ],
+  "turn-hearts-obedience": [
+    {
+      "ar": "اللَّهُمَّ مُصَرِّفَ الْقُلُوبِ صَرِّفْ قُلُوبَنَا عَلَى طَاعَتِكَ",
+      "tr": "Allāhumma muṣarrifa l-qulūbi ṣarrif qulūbanā ʿalā ṭāʿatik.",
+      "en": "O Allah, the Turner of the hearts, turn our hearts to Thine obedience."
+    }
+  ],
+  "dhikr-shukr-ibadah": [
+    {
+      "ar": "اللَّهُمَّ أَعِنِّي عَلَى ذِكْرِكَ وَشُكْرِكَ وَحُسْنِ عِبَادَتِكَ",
+      "tr": "Allāhumma aʿinnī ʿalā dhikrika wa shukrika wa ḥusni ʿibādatik.",
+      "en": "O Allah, help me in remembering You, in giving You thanks, and worshipping You well."
+    }
+  ],
+  "good-in-both-worlds": [
+    {
+      "ar": "اللَّهُمَّ رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً، وَفِي الآخِرَةِ حَسَنَةً، وَقِنَا عَذَابَ النَّارِ",
+      "tr": "Allāhumma rabbanā ātinā fī d-dunyā ḥasanatan, wa fī l-ākhirati ḥasanatan, wa qinā ʿadhāba n-nār.",
+      "en": "O Allah! Give to us in the world that which is good and in the Hereafter that which is good, and save us from the torment of the Fire."
+    }
+  ],
+  "withdrawal-of-blessing": [
+    {
+      "ar": "اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنْ زَوَالِ نِعْمَتِكَ وَتَحَوُّلِ عَافِيَتِكَ وَفُجَاءَةِ نِقْمَتِكَ وَجَمِيعِ سَخَطِكَ",
+      "tr": "Allāhumma innī aʿūdhu bika min zawāli niʿmatika, wa taḥawwuli ʿāfiyatika, wa fujāʾati niqmatika, wa jamīʿi sakhaṭik.",
+      "en": "O Allah, I seek refuge in Thee from the withdrawal of Thine blessing and the change of Thine protection (from me) and from the sudden wrath of Thine, and from every displeasure of Thine."
+    }
+  ],
+  "all-good-and-refuge": [
+    {
+      "ar": "اللَّهُمَّ إِنِّي أَسْأَلُكَ مِنَ الْخَيْرِ كُلِّهِ عَاجِلِهِ وَآجِلِهِ مَا عَلِمْتُ مِنْهُ وَمَا لَمْ أَعْلَمْ وَأَعُوذُ بِكَ مِنَ الشَّرِّ كُلِّهِ عَاجِلِهِ وَآجِلِهِ مَا عَلِمْتُ مِنْهُ وَمَا لَمْ أَعْلَمْ",
+      "tr": "Allahumma inni asʾaluka minal-khayri kullihi, ʿajilihi wa ajilihi, ma ʿalimtu minhu wa ma la aʿlam. Wa aʿudhu bika minash-sharri kullihi, ʿajilihi wa ajilihi, ma ʿalimtu minhu wa ma la aʿlam.",
+      "en": "O Allah, I ask You for all that is good, in this world and in the Hereafter, what I know and what I do not know. O Allah, I seek refuge with You from all evil, in this world and in the Hereafter, what I know and what I do not know."
+    },
+    {
+      "ar": "اللَّهُمَّ إِنِّي أَسْأَلُكَ مِنْ خَيْرِ مَا سَأَلَكَ عَبْدُكَ وَنَبِيُّكَ وَأَعُوذُ بِكَ مِنْ شَرِّ مَا عَاذَ بِهِ عَبْدُكَ وَنَبِيُّكَ",
+      "tr": "Allahumma inni asʾaluka min khayri ma saʾalaka ʿabduka wa nabiyyuka, wa aʿudhu bika min sharri ma ʿadha bihi ʿabduka wa nabiyyuka.",
+      "en": "O Allah, I ask You for the good that Your slave and Prophet has asked You for, and I seek refuge with You from the evil from which Your slave and Prophet sought refuge."
+    },
+    {
+      "ar": "اللَّهُمَّ إِنِّي أَسْأَلُكَ الْجَنَّةَ وَمَا قَرَّبَ إِلَيْهَا مِنْ قَوْلٍ أَوْ عَمَلٍ وَأَعُوذُ بِكَ مِنَ النَّارِ وَمَا قَرَّبَ إِلَيْهَا مِنْ قَوْلٍ أَوْ عَمَلٍ وَأَسْأَلُكَ أَنْ تَجْعَلَ كُلَّ قَضَاءٍ قَضَيْتَهُ لِي خَيْرًا",
+      "tr": "Allahumma inni asʾalukal-jannata wa ma qarraba ilayha min qawlin aw ʿamalin, wa aʿudhu bika minan-nari wa ma qarraba ilayha min qawlin aw ʿamalin, wa asʾaluka an tajʿala kulla qadaʾin qadaytahu li khayran.",
+      "en": "O Allah, I ask You for Paradise and for that which brings one closer to it, in word and deed, and I seek refuge in You from Hell and from that which brings one closer to it, in word and deed. And I ask You to make every decree that You decree concerning me good."
+    }
+  ],
+  "pardon-mercy-sustenance": [
+    {
+      "ar": "اللَّهُمَّ اغْفِرْ لِي وَارْحَمْنِي وَاهْدِنِي وَعَافِنِي وَارْزُقْنِي",
+      "tr": "Allāhumma ghfir lī warḥamnī wahdinī wa ʿāfinī warzuqnī.",
+      "en": "O Allah, grant me pardon, have mercy upon me, direct me to the path of righteousness, grant me protection and provide me sustenance."
+    }
+  ],
+  "abu-bakr-forgiveness": [
+    {
+      "ar": "اللَّهُمَّ إِنِّي ظَلَمْتُ نَفْسِي ظُلْمًا كَثِيرًا، وَلاَ يَغْفِرُ الذُّنُوبَ إِلاَّ أَنْتَ، فَاغْفِرْ لِي مَغْفِرَةً مِنْ عِنْدِكَ، وَارْحَمْنِي، إِنَّكَ أَنْتَ الْغَفُورُ الرَّحِيمُ",
+      "tr": "Allahumma inni zalamtu nafsi zulman kathiran, wala yaghfirudh-dhunuba illa anta, faghfir li maghfiratan min ʿindika, warhamni, innaka antal-ghafurur-rahim.",
+      "en": "O Allah! I have done great injustice to myself and none except You forgives sins, so bestow on me a forgiveness from You, and Have Mercy on me, You are the Forgiver, the Merciful."
+    }
+  ],
+  "forgive-all-sins": [
+    {
+      "ar": "اللَّهُمَّ اغْفِرْ لِي خَطِيئَتِي وَجَهْلِي وَإِسْرَافِي فِي أَمْرِي وَمَا أَنْتَ أَعْلَمُ بِهِ مِنِّي",
+      "tr": "Allāhumma ghfir lī khaṭīʾatī wa jahlī wa isrāfī fī amrī wa mā anta aʿlamu bihi minnī.",
+      "en": "O Allah, forgive me my faults, my ignorance, my immoderation in my concerns. And Thou art better aware (of my affairs) than myself."
+    },
+    {
+      "ar": "اللَّهُمَّ اغْفِرْ لِي جِدِّي وَهَزْلِي وَخَطَئِي وَعَمْدِي وَكُلُّ ذَلِكَ عِنْدِي",
+      "tr": "Allāhumma ghfir lī jiddī wa hazlī wa khaṭaʾī wa ʿamdī wa kullu dhālika ʿindī.",
+      "en": "O Allah, grant me forgiveness (of the faults which I committed) seriously or otherwise (and which I committed inadvertently and deliberately). All these (failings) are in me."
+    },
+    {
+      "ar": "اللَّهُمَّ اغْفِرْ لِي مَا قَدَّمْتُ وَمَا أَخَّرْتُ وَمَا أَسْرَرْتُ وَمَا أَعْلَنْتُ وَمَا أَنْتَ أَعْلَمُ بِهِ مِنِّي أَنْتَ الْمُقَدِّمُ وَأَنْتَ الْمُؤَخِّرُ وَأَنْتَ عَلَى كُلِّ شَىْءٍ قَدِيرٌ",
+      "tr": "Allāhumma ghfir lī mā qaddamtu wa mā akhkhartu wa mā asrartu wa mā aʿlantu wa mā anta aʿlamu bihi minnī, anta l-muqaddimu wa anta l-muʾakhkhiru wa anta ʿalā kulli shayʾin qadīr.",
+      "en": "O Allah, grant me forgiveness from the fault which I did in haste or deferred, which I committed in privacy or in public and Thou art better aware of (them) than myself. Thou art the First and the Last and over all things Thou art Omnipotent."
+    }
+  ],
+  "guidance-and-straightness": [
+    {
+      "ar": "اللَّهُمَّ اهْدِنِي وَسَدِّدْنِي",
+      "tr": "Allāhumma hdinī wa saddidnī.",
+      "en": "O Allah, direct me to the right path and make me adhere to the straight path."
+    }
+  ],
+  "evil-done-and-undone": [
+    {
+      "ar": "اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنْ شَرِّ مَا عَمِلْتُ وَمِنْ شَرِّ مَا لَمْ أَعْمَلْ",
+      "tr": "Allāhumma innī aʿūdhu bika min sharri mā ʿamiltu wa min sharri mā lam aʿmal.",
+      "en": "O Allah, I seek refuge in Thee from the evil of what I have done and from the evil of what I have not done."
+    }
+  ],
+  "evil-character-desires": [
+    {
+      "ar": "اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنْ مُنْكَرَاتِ الأَخْلاَقِ وَالأَعْمَالِ وَالأَهْوَاءِ",
+      "tr": "Allāhumma innī aʿūdhu bika min munkarātil-akhlāqi wal-aʿmāli wal-ahwāʾ.",
+      "en": "O Allah, I seek refuge in You from evil character, evil actions, and evil desires."
+    }
+  ],
+  "poverty-and-wrong": [
+    {
+      "ar": "اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْفَقْرِ وَالْقِلَّةِ وَالذِّلَّةِ وَأَعُوذُ بِكَ مِنْ أَنْ أَظْلِمَ أَوْ أُظْلَمَ",
+      "tr": "Allāhumma innī aʿūdhu bika mina l-faqri wal-qillati wadh-dhillati, wa aʿūdhu bika min an aẓlima aw uẓlam.",
+      "en": "O Allah, I seek refuge in Thee from poverty, lack and abasement, and I seek refuge in Thee lest I cause or suffer wrong."
+    }
+  ],
+  "refuge-four-trials": [
+    {
+      "ar": "اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنْ عَذَابِ جَهَنَّمَ وَمِنْ عَذَابِ الْقَبْرِ وَمِنْ فِتْنَةِ الْمَحْيَا وَالْمَمَاتِ وَمِنْ شَرِّ فِتْنَةِ الْمَسِيحِ الدَّجَّالِ",
+      "tr": "Allāhumma innī aʿūdhu bika min ʿadhābi jahannama, wa min ʿadhābi l-qabri, wa min fitnati l-maḥyā wal-mamāti, wa min sharri fitnati l-masīḥi d-dajjāl.",
+      "en": "O Allah! I seek refuge with Thee from the torment of the Hell, from the torment of the grave, from the trial of life and death and from the evil of the trial of Masih al-Dajjal."
+    }
+  ],
+  "dua-of-distress": [
+    {
+      "ar": "لاَ إِلَهَ إِلاَّ اللَّهُ الْعَظِيمُ الْحَلِيمُ لاَ إِلَهَ إِلاَّ اللَّهُ رَبُّ الْعَرْشِ الْعَظِيمِ لاَ إِلَهَ إِلاَّ اللَّهُ رَبُّ السَّمَوَاتِ وَرَبُّ الأَرْضِ وَرَبُّ الْعَرْشِ الْكَرِيمِ",
+      "tr": "Lā ilāha illā llāhu l-ʿaẓīmu l-ḥalīm, lā ilāha illā llāhu rabbu l-ʿarshi l-ʿaẓīm, lā ilāha illā llāhu rabbu s-samāwāti wa rabbu l-arḍi wa rabbu l-ʿarshi l-karīm.",
+      "en": "There is no god but Allah, the Great, the Tolerant, there is no god but Allah, the Lord of the Magnificent Throne. There is no god but Allah, the Lord of the Heaven and the earth, the Lord of the Edifying Throne."
+    }
+  ],
+  "dua-of-yunus": [
+    {
+      "ar": "لاَ إِلَهَ إِلاَّ أَنْتَ سُبْحَانَكَ إِنِّي كُنْتُ مِنَ الظَّالِمِينَ",
+      "tr": "Lā ilāha illā anta subḥānaka innī kuntu minaẓ-ẓālimīn.",
+      "en": "There is none worthy of worship except You, Glory to You, Indeed, I have been of the transgressors."
+    }
+  ],
+  "beneficial-knowledge-provision": [
+    {
+      "ar": "اللَّهُمَّ إِنِّي أَسْأَلُكَ عِلْمًا نَافِعًا، وَرِزْقًا طَيِّبًا، وَعَمَلاً مُتَقَبَّلاً",
+      "tr": "Allahumma inni asʾaluka ʿilman nafiʿan, wa rizqan tayyiban, wa ʿamalan mutaqabbalan.",
+      "en": "O Allah, I ask You for beneficial knowledge, goodly provision and acceptable deeds."
+    }
+  ],
+  "light-in-heart": [
+    {
+      "ar": "اللَّهُمَّ اجْعَلْ فِي قَلْبِي نُورًا وَفِي بَصَرِي نُورًا وَفِي سَمْعِي نُورًا وَعَنْ يَمِينِي نُورًا وَعَنْ يَسَارِي نُورًا وَفَوْقِي نُورًا وَتَحْتِي نُورًا وَأَمَامِي نُورًا وَخَلْفِي نُورًا وَعَظِّمْ لِي نُورًا",
+      "tr": "Allāhumma jʿal fī qalbī nūran, wa fī baṣarī nūran, wa fī samʿī nūran, wa ʿan yamīnī nūran, wa ʿan yasārī nūran, wa fawqī nūran, wa taḥtī nūran, wa amāmī nūran, wa khalfī nūran, wa ʿaẓẓim lī nūran.",
+      "en": "O Allah, place light in my heart, light in my sight, light in my hearing, light on my right hand, light on my left hand, light above me, light below me, light in front of me, light behind me, and enhance light for me."
+    }
+  ],
+  "asking-for-pardon": [
+    {
+      "ar": "اللَّهُمَّ إِنَّكَ عَفُوٌّ تُحِبُّ الْعَفْوَ فَاعْفُ عَنِّي",
+      "tr": "Allahumma innaka ʿafuwwun tuhibbul-ʿafwa, faʿfu ʿanni.",
+      "en": "O Allah, You are Forgiving and love forgiveness, so forgive me."
+    }
   ]
 } as const satisfies Record<string, readonly Verse[]>;
 
@@ -539,6 +733,121 @@ export const TEXT_SOURCES: Record<TextKey, TextSource> = {
     "arabic": "Sahih al-Bukhari 3370",
     "transliteration": "Hisn al-Muslim 53",
     "translation": "Sahih al-Bukhari 3370 (English)"
+  },
+  "unbeneficial-knowledge": {
+    "arabic": "Sahih Muslim 2722",
+    "transliteration": "Transliterated from Sahih Muslim 2722 (Arabic)",
+    "translation": "Sahih Muslim 2722 (English)"
+  },
+  "worry-and-grief": {
+    "arabic": "Sahih al-Bukhari 6369",
+    "transliteration": "Transliterated from Sahih al-Bukhari 6369 (Arabic)",
+    "translation": "Sahih al-Bukhari 6369 (English)"
+  },
+  "guidance-piety-chastity": {
+    "arabic": "Sahih Muslim 2721",
+    "transliteration": "Transliterated from Sahih Muslim 2721 (Arabic)",
+    "translation": "Sahih Muslim 2721 (English)"
+  },
+  "set-right-religion": {
+    "arabic": "Sahih Muslim 2720",
+    "transliteration": "Transliterated from Sahih Muslim 2720 (Arabic)",
+    "translation": "Sahih Muslim 2720 (English)"
+  },
+  "steadfast-heart": {
+    "arabic": "Jami' at-Tirmidhi 3522",
+    "transliteration": "Jami' at-Tirmidhi 3522 (English)",
+    "translation": "Jami' at-Tirmidhi 3522 (English)"
+  },
+  "turn-hearts-obedience": {
+    "arabic": "Sahih Muslim 2655",
+    "transliteration": "Transliterated from Sahih Muslim 2655 (Arabic)",
+    "translation": "Sahih Muslim 2655 (English)"
+  },
+  "dhikr-shukr-ibadah": {
+    "arabic": "Sunan Abi Dawud 1522",
+    "transliteration": "Transliterated from Sunan Abi Dawud 1522 (Arabic)",
+    "translation": "Sunan Abi Dawud 1522 (English)"
+  },
+  "good-in-both-worlds": {
+    "arabic": "Sahih al-Bukhari 6389",
+    "transliteration": "Transliterated from Sahih al-Bukhari 6389 (Arabic)",
+    "translation": "Sahih al-Bukhari 6389 (English)"
+  },
+  "withdrawal-of-blessing": {
+    "arabic": "Sahih Muslim 2739",
+    "transliteration": "Transliterated from Sahih Muslim 2739 (Arabic)",
+    "translation": "Sahih Muslim 2739 (English)"
+  },
+  "all-good-and-refuge": {
+    "arabic": "Sunan Ibn Majah 3846",
+    "transliteration": "Sunan Ibn Majah 3846 (English)",
+    "translation": "Sunan Ibn Majah 3846 (English)"
+  },
+  "pardon-mercy-sustenance": {
+    "arabic": "Sahih Muslim 2697",
+    "transliteration": "Transliterated from Sahih Muslim 2697 (Arabic)",
+    "translation": "Sahih Muslim 2697 (English)"
+  },
+  "abu-bakr-forgiveness": {
+    "arabic": "Sahih al-Bukhari 6326",
+    "transliteration": "Sahih al-Bukhari 834 (English)",
+    "translation": "Sahih al-Bukhari 834 (English)"
+  },
+  "forgive-all-sins": {
+    "arabic": "Sahih Muslim 2719",
+    "transliteration": "Transliterated from Sahih Muslim 2719 (Arabic)",
+    "translation": "Sahih Muslim 2719 (English)"
+  },
+  "guidance-and-straightness": {
+    "arabic": "Sahih Muslim 2725",
+    "transliteration": "Transliterated from Sahih Muslim 2725 (Arabic)",
+    "translation": "Sahih Muslim 2725 (English)"
+  },
+  "evil-done-and-undone": {
+    "arabic": "Sahih Muslim 2716",
+    "transliteration": "Transliterated from Sahih Muslim 2716 (Arabic)",
+    "translation": "Sahih Muslim 2716 (English)"
+  },
+  "evil-character-desires": {
+    "arabic": "Jami' at-Tirmidhi 3591",
+    "transliteration": "Jami' at-Tirmidhi 3591 (English)",
+    "translation": "Jami' at-Tirmidhi 3591 (English)"
+  },
+  "poverty-and-wrong": {
+    "arabic": "Sunan Abi Dawud 1544",
+    "transliteration": "Transliterated from Sunan Abi Dawud 1544 (Arabic)",
+    "translation": "Sunan Abi Dawud 1544 (English)"
+  },
+  "refuge-four-trials": {
+    "arabic": "Sahih Muslim 588",
+    "transliteration": "Transliterated from Sahih Muslim 588 (Arabic)",
+    "translation": "Sahih Muslim 588 (English)"
+  },
+  "dua-of-distress": {
+    "arabic": "Sahih Muslim 2730",
+    "transliteration": "Transliterated from Sahih Muslim 2730 (Arabic)",
+    "translation": "Sahih Muslim 2730 (English)"
+  },
+  "dua-of-yunus": {
+    "arabic": "Jami' at-Tirmidhi 3505",
+    "transliteration": "Jami' at-Tirmidhi 3505 (English)",
+    "translation": "Jami' at-Tirmidhi 3505 (English)"
+  },
+  "beneficial-knowledge-provision": {
+    "arabic": "Sunan Ibn Majah 925",
+    "transliteration": "Sunan Ibn Majah 925 (English)",
+    "translation": "Sunan Ibn Majah 925 (English)"
+  },
+  "light-in-heart": {
+    "arabic": "Sahih Muslim 763",
+    "transliteration": "Transliterated from Sahih Muslim 763 (Arabic)",
+    "translation": "Sahih Muslim 763 (English)"
+  },
+  "asking-for-pardon": {
+    "arabic": "Sunan Ibn Majah 3850",
+    "transliteration": "Sunan Ibn Majah 3850 (English)",
+    "translation": "Sunan Ibn Majah 3850 (English)"
   }
 };
 
@@ -969,6 +1278,440 @@ export const HADITH = {
         {
           "by": "Sahih Muslim",
           "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "unbeneficial-knowledge": [
+    {
+      "ref": "Sahih Muslim 2722",
+      "url": "https://sunnah.com/muslim:2722",
+      "text": "Zaid b. Arqam reported: I am not going to say anything but only that which Allah's Messenger (ﷺ) used to say. He used to supplicate: \"O Allah, I seek refuge in Thee from incapacity, from sloth, from cowardice, from miserliness, decrepitude and from torment of the grave. O Allah, grant to my soul the sense of righteousness and purify it, for Thou art the Best Purifier thereof. Thou art the Protecting Friend thereof, and Guardian thereof. O Allah, I seek refuge in Thee from the knowledge which does not benefit, from the heart that does not entertain the fear (of Allah), from the soul that does not feel contented and the supplication that is not responded.\"",
+      "grades": [
+        {
+          "by": "Sahih Muslim",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "worry-and-grief": [
+    {
+      "ref": "Sahih al-Bukhari 6369",
+      "url": "https://sunnah.com/bukhari:6369",
+      "text": "Narrated Anas bin Malik: The Prophet (ﷺ) used to say, \"O Allah! I seek refuge with You from worry and grief, from incapacity and laziness, from cowardice and miserliness, from being heavily in debt and from being overpowered by (other) men.\"",
+      "grades": [
+        {
+          "by": "Sahih al-Bukhari",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "guidance-piety-chastity": [
+    {
+      "ref": "Sahih Muslim 2721",
+      "url": "https://sunnah.com/muslim:2721",
+      "text": "Abdullah reported that Allah's Messenger (ﷺ) used to supplicate (in these words): \"O Allah, I beg of Thee the right guidance, safeguard against evils, chastity and freedom from want.\"",
+      "grades": [
+        {
+          "by": "Sahih Muslim",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "set-right-religion": [
+    {
+      "ref": "Sahih Muslim 2720",
+      "url": "https://sunnah.com/muslim:2720",
+      "text": "Abu Huraira reported that Allah's Messenger (ﷺ) used to supplicate (in these words): \"O Allah, set right for me my religion which is the safeguard of my affairs. And set right for me the affairs of my world wherein is my living. And set right for me my Hereafter on which depends my after-life. And make the life for me (a source) of abundance for every good and make my death a source of comfort for me protecting me against every evil.\"",
+      "grades": [
+        {
+          "by": "Sahih Muslim",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "steadfast-heart": [
+    {
+      "ref": "Jami' at-Tirmidhi 3522",
+      "url": "https://sunnah.com/tirmidhi:3522",
+      "text": "Shahr bin Hawshab said: “I said to Umm Salamah: ‘O Mother of the Believers! What was the supplication that the Messenger of Allah (ﷺ) said most frequently when he was with you?” She said: ‘The supplication he said most frequently was: “O Changer of the hearts, make my heart firm upon Your religion (Yā Muqallibal-qulūb, thabbit qalbī `alā dīnik).’” She said: ‘So I said: “O Messenger of Allah, why do you supplicate so frequently: ‘O Changer of the hearts, make my heart firm upon Your religion.’ He said: ‘O Umm Salamah! Verily, there is no human being except that his heart is between Two Fingers of the Fingers of Allah, so whomsoever He wills He makes steadfast, and whomever He wills He causes to deviate.’”",
+      "grades": [
+        {
+          "by": "Ahmad Muhammad Shakir",
+          "grade": "Sahih"
+        },
+        {
+          "by": "Al-Albani",
+          "grade": "Sahih"
+        },
+        {
+          "by": "Zubair Ali Zai",
+          "grade": "Isnaad Hasan"
+        }
+      ]
+    }
+  ],
+  "turn-hearts-obedience": [
+    {
+      "ref": "Sahih Muslim 2655",
+      "url": "https://sunnah.com/muslim:2655",
+      "text": "Abdullah b. Amr b. al-'As reported that he heard Allah's Messenger (ﷺ) as saying: Verily, the hearts of all the sons of Adam are between the two fingers out of the fingers of the Compassionate Lord as one heart. He turns that to any (direction) He likes. Then Allah's Messenger (ﷺ) said: \"O Allah, the Turner of the hearts, turn our hearts to Thine obedience.\"",
+      "grades": [
+        {
+          "by": "Sahih Muslim",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "dhikr-shukr-ibadah": [
+    {
+      "ref": "Sunan Abi Dawud 1522",
+      "url": "https://sunnah.com/abudawud:1522",
+      "text": "Mu'adh b. Jabal reported that the Messenger of Allah (ﷺ) caught his hand and said: By Allah, I love you, Mu'adh. I give some instruction to you. Never leave to recite this supplication after every (prescribed) prayer: \"O Allah, help me in remembering You, in giving You thanks, and worshipping You well.\" Mu'adh willed this supplication to the narrator al-Sunabihi and al-Sunabihi to Abu Abd al-Rahman.",
+      "grades": [
+        {
+          "by": "Al-Albani",
+          "grade": "Sahih"
+        },
+        {
+          "by": "Muhammad Muhyi Al-Din Abdul Hamid",
+          "grade": "Sahih"
+        },
+        {
+          "by": "Shuaib Al Arnaut",
+          "grade": "Sahih"
+        },
+        {
+          "by": "Zubair Ali Zai",
+          "grade": "Isnaad Sahih"
+        }
+      ]
+    }
+  ],
+  "good-in-both-worlds": [
+    {
+      "ref": "Sahih al-Bukhari 6389",
+      "url": "https://sunnah.com/bukhari:6389",
+      "text": "Narrated Anas: The most frequent invocation of The Prophet (ﷺ) was: \"O Allah! Give to us in the world that which is good and in the Hereafter that which is good, and save us from the torment of the Fire.\"",
+      "grades": [
+        {
+          "by": "Sahih al-Bukhari",
+          "grade": "Sahih"
+        }
+      ]
+    },
+    {
+      "ref": "Sahih Muslim 2690",
+      "url": "https://sunnah.com/muslim:2690",
+      "text": "Qatada asked Anas which supplication Allah's Apostle (ﷺ) frequently made. He said: The supplication that he (the Prophet) made very frequently is this: \"O Allah, grant us the good in this world and the good in the Hereafter and save us from the torment of Hell-Fire.\" He (Qatada) said that whenever Anas had to supplicate he made this very supplication, and whenever he (intended) to make another supplication he (inserted) this very supplication in that.",
+      "grades": [
+        {
+          "by": "Sahih Muslim",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "withdrawal-of-blessing": [
+    {
+      "ref": "Sahih Muslim 2739",
+      "url": "https://sunnah.com/muslim:2739",
+      "text": "Abdullah b. Umar reported that Allah's Messenger (ﷺ) supplicated in these words: \"O Allah, I seek refuge in Thee from the withdrawal of Thine blessing and the change of Thine protection (from me) and from the sudden wrath of Thine, and from every displeasure of Thine.\"",
+      "grades": [
+        {
+          "by": "Sahih Muslim",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "all-good-and-refuge": [
+    {
+      "ref": "Sunan Ibn Majah 3846",
+      "url": "https://sunnah.com/ibnmajah:3846",
+      "text": "It was narrated from 'Aishah that the Messenger of Allah (ﷺ) taught her this supplication: \"Allahumma inni as'aluka minal-khayri kullihi, 'ajilihi wa ajilihi, ma 'alimtu minhu wa ma la a'lam. Wa a'udhu bika minash-sharri kullihi, 'ajilihi wa ajilihi, ma 'alimtu minhu wa ma la a'lam. Allahumma inni as'aluka min khayri ma sa'alaka 'abduka wa nabiyyuka, wa a'udhu bika min sharri ma 'adha bihi 'abduka wa nabiyyuka. Allahumma inni as'alukal-jannatah wa ma qarraba ilayha min qawlin aw 'amalin, wa a'udhu bika minan-nari wa ma qarraba ilayha min qawlin aw 'amalin, wa as'aluka an taj'al kulla qada'in qadaytahu li khayran (O Allah, I ask You for all that is good, in this world and in the Hereafter, what I know and what I do not know. O Allah, I seek refuge with You from all evil, in this world and in the Hereafter, what I know and what I do not know. O Allah, I ask You for the good that Your slave and Prophet has asked You for, and I seek refuge with You from the evil from which Your slave and Prophet sought refuge. O Allah, I ask You for Paradise and for that which brings one closer to it, in word and deed, and I seek refuge in You from Hell and from that which brings one closer to it, in word and deed. And I ask You to make every decree that You decree concerning me good).\"",
+      "grades": [
+        {
+          "by": "Al-Albani",
+          "grade": "Sahih"
+        },
+        {
+          "by": "Muhammad Fouad Abd al-Baqi",
+          "grade": "Sahih"
+        },
+        {
+          "by": "Shuaib Al Arnaut",
+          "grade": "Sahih"
+        },
+        {
+          "by": "Zubair Ali Zai",
+          "grade": "Isnaad Sahih"
+        }
+      ]
+    }
+  ],
+  "pardon-mercy-sustenance": [
+    {
+      "ref": "Sahih Muslim 2697",
+      "url": "https://sunnah.com/muslim:2697",
+      "text": "Abu Malik reported on the authority of his father that when a person embraced Islam, Allah's Messenger (ﷺ) used to teach him how to observe prayer and then commanded him to supplicate in these words: \"O Allah, grant me pardon, have mercy upon me, direct me to the path of righteousness, grant me protection and provide me sustenance.\"",
+      "grades": [
+        {
+          "by": "Sahih Muslim",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "abu-bakr-forgiveness": [
+    {
+      "ref": "Sahih al-Bukhari 834",
+      "url": "https://sunnah.com/bukhari:834",
+      "text": "Narrated Abu Bakr As-Siddiq: I asked Allah's Messenger (ﷺ) to teach me an invocation so that I may invoke Allah with it in my prayer. He told me to say, \"Allahumma inni zalumtu nafsi zulman kathiran, Wala yaghfiru dh-dhunuba illa anta, fa ghfir li maghfiratan min `indika, wa r-hamni, innaka anta l-ghafuru r-rahim (O Allah! I have done great injustice to myself and none except You forgives sins, so bestow on me a forgiveness from You, and Have Mercy on me, You are the Forgiver, the Merciful).\"",
+      "grades": [
+        {
+          "by": "Sahih al-Bukhari",
+          "grade": "Sahih"
+        }
+      ]
+    },
+    {
+      "ref": "Sahih Muslim 2705",
+      "url": "https://sunnah.com/muslim:2705",
+      "text": "Abu Bakr reported that he said to Allah's Messenger (ﷺ): Teach me a supplication which I should recite in my prayer. Thereupon he (the Holy Prophet) said: Recite: \"O Allah, I have done great wrong to myself.\" According to Qutaiba (the words were:) much (wrong) — there is none to forgive the sins but Thou only, say: \"Grant me pardon from Thyself, have mercy upon me for Thou art much Forgiving and Compassionate.\"",
+      "grades": [
+        {
+          "by": "Sahih Muslim",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "forgive-all-sins": [
+    {
+      "ref": "Sahih Muslim 2719",
+      "url": "https://sunnah.com/muslim:2719",
+      "text": "Abu Musa Ash'ari reported on the authority of his father that Allah's Apostle (ﷺ) used to supplicate in these words: \"O Allah, forgive me my faults, my ignorance, my immoderation in my concerns. And Thou art better aware (of my affairs) than myself. O Allah, grant me forgiveness (of the faults which I committed) seriously or otherwise (and which I committed inadvertently and deliberately). All these (failings) are in me. O Allah, grant me forgiveness from the fault which I did in haste or deferred, which I committed in privacy or in public and Thou art better aware of (them) than myself. Thou art the First and the Last and over all things Thou art Omnipotent.\"",
+      "grades": [
+        {
+          "by": "Sahih Muslim",
+          "grade": "Sahih"
+        }
+      ]
+    },
+    {
+      "ref": "Sahih al-Bukhari 6398",
+      "url": "https://sunnah.com/bukhari:6398",
+      "text": "Narrated Abu Musa: The Prophet (ﷺ) used to invoke Allah with the following invocation: 'Rabbi-ghfir-li Khati 'ati wa jahli wa israfi fi `Amri kullihi, wa ma anta a'lamu bihi minni. Allahumma ighfirli khatayaya wa 'amdi, wa jahli wa jiddi, wa kullu dhalika 'indi. Allahumma ighfirli ma qaddamtu wa ma akhartu wa ma asrartu wa ma a'lantu. Anta-l-muqaddimu wa anta-l-mu'akh-khiru, wa anta 'ala kulli shai'in qadir.'",
+      "grades": [
+        {
+          "by": "Sahih al-Bukhari",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "guidance-and-straightness": [
+    {
+      "ref": "Sahih Muslim 2725",
+      "url": "https://sunnah.com/muslim:2725",
+      "text": "Ali reported that Allah's Messenger (ﷺ) said to him: Say, \"O Allah, direct me to the right path and make me adhere to the straight path,\" and when you make a mention of right guidance, keep in mind the right path and when you consider of the straight (path), keep in mind the straightness of the arrow.",
+      "grades": [
+        {
+          "by": "Sahih Muslim",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "evil-done-and-undone": [
+    {
+      "ref": "Sahih Muslim 2716",
+      "url": "https://sunnah.com/muslim:2716",
+      "text": "Farwa' b. Naufal reported: I asked 'A'isha about the supplication that Allah's Messenger (ﷺ) made. She said that he used to say: \"O Allah, I seek refuge in Thee from the evil of what I have done and from the evil of what I have not done.\"",
+      "grades": [
+        {
+          "by": "Sahih Muslim",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "evil-character-desires": [
+    {
+      "ref": "Jami' at-Tirmidhi 3591",
+      "url": "https://sunnah.com/tirmidhi:3591",
+      "text": "Ziyad bin `Ilaqah narrated from his uncle, that he said: “[The Prophet (ﷺ)] used to say: ‘O Allah, I seek refuge in You from evil character, evil actions, and evil desires (Allāhumma innī a`ūdhu bika min munkarātil-akhlāqi wal-a`māli wal-ahwā’).’”",
+      "grades": [
+        {
+          "by": "Ahmad Muhammad Shakir",
+          "grade": "Sahih"
+        },
+        {
+          "by": "Al-Albani",
+          "grade": "Sahih"
+        },
+        {
+          "by": "Zubair Ali Zai",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "poverty-and-wrong": [
+    {
+      "ref": "Sunan Abi Dawud 1544",
+      "url": "https://sunnah.com/abudawud:1544",
+      "text": "Narrated AbuHurayrah: The Prophet (ﷺ) used to say: \"O Allah, I seek refuge in Thee from poverty, lack and abasement, and I seek refuge in Thee lest I cause or suffer wrong.\"",
+      "grades": [
+        {
+          "by": "Al-Albani",
+          "grade": "Sahih"
+        },
+        {
+          "by": "Muhammad Muhyi Al-Din Abdul Hamid",
+          "grade": "Sahih"
+        },
+        {
+          "by": "Shuaib Al Arnaut",
+          "grade": "Sahih"
+        },
+        {
+          "by": "Zubair Ali Zai",
+          "grade": "Isnaad Sahih"
+        }
+      ]
+    }
+  ],
+  "refuge-four-trials": [
+    {
+      "ref": "Sahih Muslim 588",
+      "url": "https://sunnah.com/muslim:588",
+      "text": "Abu Huraira reported: The Messenger of Allah (ﷺ) said: When any one of you utters tashahhud (in prayer) he must seek refuge with Allah from four (trials) and should thus say: \"O Allah! I seek refuge with Thee from the torment of the Hell, from the torment of the grave, from the trial of life and death and from the evil of the trial of Masih al-Dajjal\" (Antichrist).",
+      "grades": [
+        {
+          "by": "Sahih Muslim",
+          "grade": "Sahih"
+        }
+      ]
+    },
+    {
+      "ref": "Sahih al-Bukhari 1377",
+      "url": "https://sunnah.com/bukhari:1377",
+      "text": "Narrated Abu Huraira: Allah's Messenger (ﷺ) used to invoke (Allah): \"Allahumma ini a`udhu bika min 'adhabi-l-Qabr, wa min 'adhabi-nnar, wa min fitnati-l-mahya wa-lmamat, wa min fitnati-l-masih ad-dajjal. (O Allah! I seek refuge with you from the punishment in the grave and from the punishment in the Hell fire and from the afflictions of life and death, and the afflictions of Al-Masih Ad-Dajjal).\"",
+      "grades": [
+        {
+          "by": "Sahih al-Bukhari",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "dua-of-distress": [
+    {
+      "ref": "Sahih Muslim 2730",
+      "url": "https://sunnah.com/muslim:2730",
+      "text": "Ibn 'Abbas reported that Allah's Apostle (ﷺ) used to supplicate during the time of trouble (in these words): \"There is no god but Allah, the Great, the Tolerant, there is no god but Allah, the Lord of the Magnificent Throne. There is no god but Allah, the Lord of the Heaven and the earth, the Lord of the Edifying Throne.\"",
+      "grades": [
+        {
+          "by": "Sahih Muslim",
+          "grade": "Sahih"
+        }
+      ]
+    },
+    {
+      "ref": "Sahih al-Bukhari 6346",
+      "url": "https://sunnah.com/bukhari:6346",
+      "text": "Narrated Ibn `Abbas: Allah's Messenger (ﷺ) used to say at a time of distress, \"La ilaha illal-lahu Rabbul-l-'arsh il-'azim, La ilaha illallahu Rabbu-s-samawati wa Rabbu-l-ard, Rabbu-l-'arsh-il-Karim.\"",
+      "grades": [
+        {
+          "by": "Sahih al-Bukhari",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "dua-of-yunus": [
+    {
+      "ref": "Jami' at-Tirmidhi 3505",
+      "url": "https://sunnah.com/tirmidhi:3505",
+      "text": "Ibrahim bin Muhammad bin Sa`d narrated from his father, from Sa`d that the Messenger of Allah (ﷺ) said: “The supplication of Dhun-Nun (Prophet Yunus) when he supplicated, while in the belly of the whale was: ‘There is none worthy of worship except You, Glory to You, Indeed, I have been of the transgressors. (Lā ilāha illā anta subḥānaka innī kuntu minaẓ-ẓālimīn)’ So indeed, no Muslim man supplicates with it for anything, ever, except Allah responds to him.”",
+      "grades": [
+        {
+          "by": "Ahmad Muhammad Shakir",
+          "grade": "Sahih"
+        },
+        {
+          "by": "Al-Albani",
+          "grade": "Sahih"
+        },
+        {
+          "by": "Zubair Ali Zai",
+          "grade": "Isnaad Sahih"
+        }
+      ]
+    }
+  ],
+  "beneficial-knowledge-provision": [
+    {
+      "ref": "Sunan Ibn Majah 925",
+      "url": "https://sunnah.com/ibnmajah:925",
+      "text": "It was narrated from Umm Salamah that when the Prophet (ﷺ) performed the Subh (morning prayer), while he said the Salam, he would say: ‘Allahumma inni as’aluka ‘ilman nafi’an, wa rizqan tayyiban, wa ‘amalan mutaqabbalan (O Allah, I ask You for beneficial knowledge, goodly provision and acceptable deeds).’",
+      "grades": [
+        {
+          "by": "Al-Albani",
+          "grade": "Sahih"
+        },
+        {
+          "by": "Muhammad Fouad Abd al-Baqi",
+          "grade": "Sahih"
+        },
+        {
+          "by": "Zubair Ali Zai",
+          "grade": "Daif"
+        }
+      ]
+    }
+  ],
+  "light-in-heart": [
+    {
+      "ref": "Sahih Muslim 763",
+      "url": "https://sunnah.com/muslim:763",
+      "text": "Ibn `Abbas reported: I spent a night with my maternal aunt (sister of my mother) Maimuna. The Apostle of Allah (ﷺ) got up during the night and relieved himself, then washed his face and hands and went to sleep. He then got up again, and came to the water skin and loosened its straps, then performed good ablution between the two extremes. He then stood up and observed prayer. I also stood up and stretched my body fearing that he might be under the impression that I was there to find out (what he did at night). So I also performed ablution and stood up to pray, but I stood on his left. He took hold of my hand and made me go around to his right side. The Messenger of Allah (ﷺ) completed thirteen rak`ahs of his night prayer. He then lay down and slept and snored (and it was his habit to snore while asleep). Then Bilal came and he informed him about the prayer. He (the Holy Prophet) then stood up for prayer and did not perform ablution, and his supplication included these words: \"O Allah, place light in my heart, light in my sight, light in my hearing, light on my right hand, light on my left hand, light above me, light below me, light in front of me, light behind me, and enhance light for me.\"",
+      "grades": [
+        {
+          "by": "Sahih Muslim",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "asking-for-pardon": [
+    {
+      "ref": "Sunan Ibn Majah 3850",
+      "url": "https://sunnah.com/ibnmajah:3850",
+      "text": "It was narrated from 'Aishah that she said: \"O Messenger of Allah, what do you think I should say in my supplication, if I come upon Laylatul-Qadr?\" He said: \"Say: 'Allahumma innaka 'afuwwun tuhibbul-'afwa, fa'fu 'anni (O Allah, You are Forgiving and love forgiveness, so forgive me).'\"",
+      "grades": [
+        {
+          "by": "Al-Albani",
+          "grade": "Sahih"
+        },
+        {
+          "by": "Muhammad Fouad Abd al-Baqi",
+          "grade": "Sahih"
+        },
+        {
+          "by": "Shuaib Al Arnaut",
+          "grade": "Hasan Sahih"
+        },
+        {
+          "by": "Zubair Ali Zai",
+          "grade": "Daif"
         }
       ]
     }
