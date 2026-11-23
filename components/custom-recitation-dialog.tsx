@@ -59,9 +59,14 @@ export function CustomRecitationDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && !saving && onClose()}>
-      <DialogContent sheetOnPhone className="max-sm:bg-background max-sm:content-start sm:max-w-lg">
+      <DialogContent
+        sheetOnPhone
+        className="max-sm:bg-background max-sm:content-start sm:max-w-xl sm:rounded-[26px] sm:p-6 lg:max-w-2xl"
+      >
         <DialogHeader>
-          <DialogTitle className="font-display">{initial ? "Edit your recitation" : "Write your own"}</DialogTitle>
+          <DialogTitle className="font-display text-2xl font-normal">
+            {initial ? "Edit your recitation" : "Write your own"}
+          </DialogTitle>
           <DialogDescription>A name, and the words in whichever of the three you have.</DialogDescription>
         </DialogHeader>
         <form
@@ -123,7 +128,7 @@ export function CustomRecitationDialog({
               {error}
             </p>
           )}
-          <DialogFooter className="gap-2">
+          <DialogFooter className="gap-2 sm:-mx-6 sm:-mb-6 sm:rounded-b-[26px] sm:px-6">
             <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>
               Cancel
             </Button>
