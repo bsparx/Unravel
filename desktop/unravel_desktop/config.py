@@ -14,6 +14,7 @@ CONFIG_DIR = Path.home() / ".config" / "unravel-desktop"
 CONFIG_PATH = CONFIG_DIR / "config.json"
 PENDING_PATH = CONFIG_DIR / "pending.json"
 CACHE_DIR = Path.home() / ".cache" / "unravel-desktop"
+CACHE_PATH = CACHE_DIR / "cache.json"
 AUTOSTART_PATH = Path.home() / ".config" / "autostart" / "unravel-desktop.desktop"
 
 
@@ -72,6 +73,28 @@ def save_config(cfg: AppConfig, path: Path = CONFIG_PATH) -> None:
     os.chmod(tmp, 0o600)
     tmp.replace(path)
     os.chmod(path, 0o600)
+
+
+def load_cache(path: Path = CACHE_PATH) -> dict:
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def save_cache(data: dict, path: Path = CACHE_PATH) -> None:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data, separators=(",", ":")), encoding="utf-8")
+        os.chmod(tmp, 0o600)
+        tmp.replace(path)
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
 
 
 def sync_autostart(enabled: bool, exec_path: str | None = None) -> None:

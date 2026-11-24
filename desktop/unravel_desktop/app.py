@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import threading
 import time
+import webbrowser
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +27,8 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 from . import APP_ID, APP_NAME
 from .api import ApiError, UnauthorizedError, UnravelApi
 from .audio import SoundPlayer
-from .config import AppConfig, load_config, save_config, sync_autostart
+from .backdrop_widget import AtmosphereBackdrop
+from .config import AppConfig, load_cache, load_config, save_cache, save_config, sync_autostart
 from .notifications import DesktopAlerts
 from .timer_engine import (
     INTERVAL_LABELS,
@@ -56,13 +58,18 @@ STATS_AUTO_REFRESH_SEC = 180.0
 
 
 class UnravelWindow(Adw.ApplicationWindow):
-    """Spacious Focus studio (Timer + Today) & Statistics window + Compact Mini Mode."""
+    """Spacious Focus studio (Timer + Today) & Statistics window over living Unravel atmosphere."""
 
     def __init__(self, app: UnravelApplication) -> None:
         super().__init__(application=app, title=APP_NAME)
         self._app = app
         self.add_css_class("unravel-window")
-        self.set_default_size(940, 680)
+        self.set_default_size(780, 700)
+
+        # Living Cairo atmosphere sits beneath the entire translucent glass UI
+        self._overlay = Gtk.Overlay()
+        self.backdrop = AtmosphereBackdrop(dark=False)
+        self._overlay.set_child(self.backdrop)
 
         self._toast_overlay = Adw.ToastOverlay()
         self._root_stack = Gtk.Stack()
@@ -77,6 +84,13 @@ class UnravelWindow(Adw.ApplicationWindow):
         connect_toolbar = Adw.ToolbarView()
         c_bar = Adw.HeaderBar()
         c_bar.add_css_class("unravel-header")
+        c_bar.set_title_widget(Gtk.Label(label=""))
+        self._connect_theme_btn = Gtk.Button.new_from_icon_name("weather-clear-night-symbolic")
+        self._connect_theme_btn.add_css_class("flat")
+        self._connect_theme_btn.add_css_class("unravel-header-btn")
+        self._connect_theme_btn.set_tooltip_text("Switch between Cotton candy & The night")
+        self._connect_theme_btn.connect("clicked", lambda _b: app.action_toggle_theme())
+        c_bar.pack_end(self._connect_theme_btn)
         connect_toolbar.add_top_bar(c_bar)
         connect_toolbar.set_content(self.connect_view)
         self._root_stack.add_named(connect_toolbar, "connect")
@@ -86,12 +100,21 @@ class UnravelWindow(Adw.ApplicationWindow):
         header = Adw.HeaderBar()
         header.add_css_class("unravel-header")
 
-        self._view_stack = Adw.ViewStack()
+        # Left brand mark
+        brand = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        brand.set_valign(Gtk.Align.CENTER)
+        if ICON_PATH.exists():
+            brand_img = Gtk.Image.new_from_file(str(ICON_PATH))
+            brand_img.set_pixel_size(24)
+            brand.append(brand_img)
+        brand_lbl = Gtk.Label(label="Unravel")
+        brand_lbl.add_css_class("unravel-wordmark")
+        brand.append(brand_lbl)
+        header.pack_start(brand)
 
-        # Side-by-side Focus studio: Timer Sanctuary on left, Today (/day) on right
-        focus_split = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-        focus_split.set_hexpand(True)
-        focus_split.set_vexpand(True)
+        self._view_stack = Gtk.Stack()
+        self._view_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+        self._view_stack.set_transition_duration(140)
 
         self.timer_view = TimerView(
             app.engine,
@@ -108,27 +131,17 @@ class UnravelWindow(Adw.ApplicationWindow):
             on_reset=app.action_reset,
             on_clear_task=app.action_clear_selected_task,
             on_check_selected_task=app.action_check_selected_task,
+            on_open_today=app.action_open_today,
             on_config_changed=app.refresh_ui,
         )
-        self.timer_view.set_size_request(430, -1)
-        self.timer_view.set_hexpand(True)
-
-        divider = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
-        divider.set_margin_top(16)
-        divider.set_margin_bottom(16)
 
         self.day_view = DayListView(
             on_select_item=app.action_select_day_item,
             on_start_timer_for_item=app.action_start_timer_for_day_item,
             on_toggle_item=app.action_toggle_day_item,
+            on_open_web_path=app.action_open_web_path,
             on_refresh=app.refresh_day_async,
         )
-        self.day_view.set_size_request(360, -1)
-        self.day_view.set_hexpand(True)
-
-        focus_split.append(self.timer_view)
-        focus_split.append(divider)
-        focus_split.append(self.day_view)
 
         self.stats_view = StatsView(
             excluded_ids=set(app.config.excluded_stats_items),
@@ -136,25 +149,57 @@ class UnravelWindow(Adw.ApplicationWindow):
             on_excluded_changed=app.on_stats_filter_changed,
         )
 
-        self._view_stack.add_titled_with_icon(
-            focus_split, "focus", "Focus & Today", "alarm-symbolic"
-        )
-        self._view_stack.add_titled_with_icon(
-            self.stats_view, "stats", "Statistics", "view-list-symbolic"
-        )
-        self._view_stack.connect("notify::visible-child-name", self._on_tab_changed)
+        self._view_stack.add_named(self.timer_view, "focus")
+        self._view_stack.add_named(self.day_view, "today")
+        self._view_stack.add_named(self.stats_view, "stats")
 
-        switcher = Adw.ViewSwitcher()
-        switcher.set_stack(self._view_stack)
-        switcher.set_policy(Adw.ViewSwitcherPolicy.WIDE)
-        header.set_title_widget(switcher)
+        # Center bespoke frosted pill navigation: Focus · Today · Statistics
+        nav_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=3)
+        nav_bar.add_css_class("unravel-nav-bar")
+        self._nav_focus_btn = Gtk.ToggleButton(label="Focus")
+        self._nav_focus_btn.add_css_class("flat")
+        self._nav_focus_btn.add_css_class("unravel-nav-btn")
+        self._nav_focus_btn.set_active(True)
+        self._nav_today_btn = Gtk.ToggleButton(label="Today")
+        self._nav_today_btn.add_css_class("flat")
+        self._nav_today_btn.add_css_class("unravel-nav-btn")
+        self._nav_today_btn.set_group(self._nav_focus_btn)
+        self._nav_stats_btn = Gtk.ToggleButton(label="Statistics")
+        self._nav_stats_btn.add_css_class("flat")
+        self._nav_stats_btn.add_css_class("unravel-nav-btn")
+        self._nav_stats_btn.set_group(self._nav_focus_btn)
+
+        self._nav_btns = {
+            "focus": self._nav_focus_btn,
+            "today": self._nav_today_btn,
+            "stats": self._nav_stats_btn,
+        }
+        self._nav_focus_btn.connect("toggled", self._on_nav_toggled, "focus")
+        self._nav_today_btn.connect("toggled", self._on_nav_toggled, "today")
+        self._nav_stats_btn.connect("toggled", self._on_nav_toggled, "stats")
+        nav_bar.append(self._nav_focus_btn)
+        nav_bar.append(self._nav_today_btn)
+        nav_bar.append(self._nav_stats_btn)
+        header.set_title_widget(nav_bar)
+
+        # Right utility buttons: Theme Toggle, Mini Mode, Settings
+        self._theme_btn = Gtk.Button.new_from_icon_name("weather-clear-night-symbolic")
+        self._theme_btn.add_css_class("flat")
+        self._theme_btn.add_css_class("unravel-header-btn")
+        self._theme_btn.set_tooltip_text("Switch between Cotton candy & The night")
+        self._theme_btn.connect("clicked", lambda _b: app.action_toggle_theme())
+        header.pack_end(self._theme_btn)
 
         mini_btn = Gtk.Button.new_from_icon_name("view-restore-symbolic")
+        mini_btn.add_css_class("flat")
+        mini_btn.add_css_class("unravel-header-btn")
         mini_btn.set_tooltip_text("Compact Mini Mode")
         mini_btn.connect("clicked", lambda _b: app.set_mini_mode(True))
         header.pack_end(mini_btn)
 
         settings_btn = Gtk.Button.new_from_icon_name("emblem-system-symbolic")
+        settings_btn.add_css_class("flat")
+        settings_btn.add_css_class("unravel-header-btn")
         settings_btn.set_tooltip_text("Settings")
         settings_btn.connect("clicked", lambda _b: app.open_settings())
         header.pack_end(settings_btn)
@@ -168,7 +213,9 @@ class UnravelWindow(Adw.ApplicationWindow):
         mini_bar = Adw.HeaderBar()
         mini_bar.add_css_class("unravel-header")
         mini_bar.set_show_end_title_buttons(True)
-        mini_bar.set_title_widget(Gtk.Label(label="Unravel"))
+        mini_title = Gtk.Label(label="Unravel")
+        mini_title.add_css_class("unravel-wordmark")
+        mini_bar.set_title_widget(mini_title)
         mini_toolbar.add_top_bar(mini_bar)
         self.mini_view = MiniTimerView(
             app.engine,
@@ -183,7 +230,8 @@ class UnravelWindow(Adw.ApplicationWindow):
         self._root_stack.add_named(mini_toolbar, "mini")
 
         self._toast_overlay.set_child(self._root_stack)
-        self.set_content(self._toast_overlay)
+        self._overlay.add_overlay(self._toast_overlay)
+        self.set_content(self._overlay)
 
         key_ctrl = Gtk.EventControllerKey()
         key_ctrl.connect("key-pressed", self._on_key_pressed)
@@ -196,9 +244,20 @@ class UnravelWindow(Adw.ApplicationWindow):
         if dark:
             self.remove_css_class("unravel-light")
             self.add_css_class("unravel-dark")
+            icon = "weather-clear-symbolic"
+            tip = "Switch to Cotton candy (Light)"
         else:
             self.remove_css_class("unravel-dark")
             self.add_css_class("unravel-light")
+            icon = "weather-clear-night-symbolic"
+            tip = "Switch to The night (Dark)"
+        self.backdrop.set_dark(dark)
+        self.day_view.set_dark(dark)
+        self.stats_view.set_dark(dark)
+        self._theme_btn.set_icon_name(icon)
+        self._theme_btn.set_tooltip_text(tip)
+        self._connect_theme_btn.set_icon_name(icon)
+        self._connect_theme_btn.set_tooltip_text(tip)
 
     def toast(self, message: str) -> None:
         self._toast_overlay.add_toast(Adw.Toast.new(message))
@@ -206,17 +265,24 @@ class UnravelWindow(Adw.ApplicationWindow):
     def show_page(self, name: str) -> None:
         self._root_stack.set_visible_child_name(name)
         if name == "mini":
-            self.set_size_request(330, 128)
-            self.set_default_size(368, 138)
+            self.set_size_request(350, 146)
+            self.set_default_size(390, 152)
             self._try_x11_pin(True)
         elif name == "connect":
-            self.set_size_request(440, 520)
-            self.set_default_size(520, 620)
+            self.set_size_request(460, 560)
+            self.set_default_size(540, 640)
             self._try_x11_pin(False)
         else:
-            self.set_size_request(820, 580)
-            self.set_default_size(940, 680)
+            self.set_size_request(560, 580)
+            self.set_default_size(780, 700)
             self._try_x11_pin(False)
+
+    def select_tab(self, tab_name: str) -> None:
+        btn = self._nav_btns.get(tab_name)
+        if btn and not btn.get_active():
+            btn.set_active(True)
+        else:
+            self._view_stack.set_visible_child_name(tab_name)
 
     def _try_x11_pin(self, pinned: bool) -> None:
         if not shutil.which("wmctrl"):
@@ -231,9 +297,14 @@ class UnravelWindow(Adw.ApplicationWindow):
         except OSError:
             pass
 
-    def _on_tab_changed(self, stack: Adw.ViewStack, _pspec) -> None:
-        if stack.get_visible_child_name() == "stats":
+    def _on_nav_toggled(self, btn: Gtk.ToggleButton, tab_name: str) -> None:
+        if not btn.get_active():
+            return
+        self._view_stack.set_visible_child_name(tab_name)
+        if tab_name == "stats":
             self._app.maybe_refresh_stats(force=False)
+        else:
+            self._app.refresh_ui()
 
     def _on_focus_changed(self, _win, _pspec) -> None:
         if self.is_active() and self._app.api is not None:
@@ -287,6 +358,7 @@ class UnravelApplication(Adw.Application):
         self.tray_active = False
 
         self._day_items_by_id: dict[str, dict[str, Any]] = {}
+        self._cache: dict[str, Any] = load_cache()
         self._last_heartbeat_at = 0.0
         self._last_stats_at = 0.0
         self._last_day_at = 0.0
@@ -305,23 +377,53 @@ class UnravelApplication(Adw.Application):
         if self.win is None:
             self.win = UnravelWindow(self)
             self.win.sync_theme_class(self._is_dark())
-            self.win.stats_view.set_dark(self._is_dark())
             self._start_tray()
-            self._tick_source = GLib.timeout_add(1000, self._on_second_tick)
 
             if self.config.is_connected and self.api is not None:
                 self.win.show_page("mini" if self.config.mini_mode else "main")
+                self._hydrate_from_cache()
                 self._bootstrap_async()
             else:
                 self.win.show_page("connect")
 
             if not self._start_minimized:
                 self.win.present()
-            self.update_tray()
+            self.refresh_ui()
         else:
             self.win.set_visible(True)
             self.win.present()
-            self.update_tray()
+            self.refresh_ui()
+
+    def _hydrate_from_cache(self) -> None:
+        """Render last cached day/settings/stats instantly (<20ms) before network sync completes."""
+        if self._cache.get("server_url") != self.config.normalized_server_url():
+            return
+        cached_settings = self._cache.get("settings")
+        if isinstance(cached_settings, dict):
+            self.engine.settings = TimerSettings.from_api(cached_settings)
+            if self.engine.phase == "IDLE":
+                self.engine.config = TimerConfig.from_settings(self.engine.settings, self.engine.config.mode)
+        cached_day = self._cache.get("day")
+        if isinstance(cached_day, dict):
+            self._apply_day(cached_day, persist_cache=False)
+        cached_stats = self._cache.get("stats")
+        if isinstance(cached_stats, dict) and self.win:
+            self.win.stats_view.set_data(cached_stats)
+        if self.win:
+            self.win.timer_view.sync_controls_from_engine()
+
+    def _persist_cache_async(self) -> None:
+        snap = dict(self._cache)
+        threading.Thread(target=save_cache, args=(snap,), daemon=True).start()
+
+    def _sync_tick_timer(self) -> None:
+        """Run the 1s GLib timer ONLY while a session is actively RUNNING (0% CPU when idle/paused)."""
+        should_run = self.engine.phase == "RUNNING"
+        if should_run and self._tick_source is None:
+            self._tick_source = GLib.timeout_add(1000, self._on_second_tick)
+        elif not should_run and self._tick_source is not None:
+            GLib.source_remove(self._tick_source)
+            self._tick_source = None
 
     def _load_css(self) -> None:
         if not CSS_PATH.exists():
@@ -343,15 +445,15 @@ class UnravelApplication(Adw.Application):
         else:
             mgr.set_color_scheme(Adw.ColorScheme.DEFAULT)
         if self.win:
-            dark = self._is_dark()
-            self.win.sync_theme_class(dark)
-            self.win.stats_view.set_dark(dark)
+            self.win.sync_theme_class(self._is_dark())
+
+    def action_toggle_theme(self) -> None:
+        next_theme = "light" if self._is_dark() else "dark"
+        self._change_theme(next_theme)
 
     def _on_system_dark_changed(self, _mgr, _pspec) -> None:
         if self.win:
-            dark = self._is_dark()
-            self.win.sync_theme_class(dark)
-            self.win.stats_view.set_dark(dark)
+            self.win.sync_theme_class(self._is_dark())
         self.refresh_ui()
 
     def _is_dark(self) -> bool:
@@ -375,10 +477,11 @@ class UnravelApplication(Adw.Application):
             return
         if self.win.is_visible() and self.win.is_active():
             self.win.set_visible(False)
+            self.update_tray()
         else:
             self.win.set_visible(True)
             self.win.present()
-        self.update_tray()
+            self.refresh_ui()
 
     def set_mini_mode(self, enabled: bool) -> None:
         if not self.config.is_connected or self.win is None:
@@ -407,8 +510,11 @@ class UnravelApplication(Adw.Application):
     def _handle_unauthorized(self, msg: str = "Session disconnected. Please sign in again.") -> None:
         self.config.token = ""
         save_config(self.config)
+        if self.api is not None:
+            self.api.close()
         self.api = None
         self.engine.reset()
+        self._sync_tick_timer()
         self.alerts.set_wake_lock(False)
         if self.win:
             self.win.connect_view.show_message(msg)
@@ -442,8 +548,11 @@ class UnravelApplication(Adw.Application):
         self.config.user_email = user.get("email") or self.config.user_email
         save_config(self.config)
 
-        settings = TimerSettings.from_api(data.get("settings") or {})
+        raw_settings = data.get("settings") or {}
+        settings = TimerSettings.from_api(raw_settings)
         self.engine.settings = settings
+        self._cache["server_url"] = self.config.normalized_server_url()
+        self._cache["settings"] = raw_settings
 
         active = data.get("activeSession")
         if active and self.engine.phase == "IDLE":
@@ -451,11 +560,13 @@ class UnravelApplication(Adw.Application):
             self._last_heartbeat_at = time.time()
         elif self.engine.phase == "IDLE":
             self.engine.config = TimerConfig.from_settings(settings, self.engine.config.mode)
+        self._sync_tick_timer()
 
         day = data.get("day")
         if isinstance(day, dict):
             self._apply_day(day)
         else:
+            self._persist_cache_async()
             self.refresh_day_async()
 
         if self.win:
@@ -470,12 +581,17 @@ class UnravelApplication(Adw.Application):
 
     # ---------------------------------------------------------------- Today (/day) actions
 
-    def _apply_day(self, day: dict[str, Any]) -> None:
+    def _apply_day(self, day: dict[str, Any], *, persist_cache: bool = True) -> None:
         self._last_day_at = time.time()
         self._day_items_by_id = {}
         for bucket in ("overdue", "dueToday", "habits", "undated", "completedToday"):
             for item in day.get(bucket) or []:
                 self._day_items_by_id[str(item["id"])] = item
+
+        if persist_cache:
+            self._cache["server_url"] = self.config.normalized_server_url()
+            self._cache["day"] = day
+            self._persist_cache_async()
 
         # If the selected task was completed externally while idle, clear selection cleanly.
         if self.engine.phase == "IDLE" and self.engine.task:
@@ -534,15 +650,19 @@ class UnravelApplication(Adw.Application):
             )
 
         item_id = str(item["id"])
+        selected_new = False
         if self.engine.task and self.engine.task.id == item_id:
             # Clicking the already-selected row toggles back to Free focus.
             self.engine.task = None
         else:
             self._apply_task_to_idle_timer(item)
+            selected_new = True
 
         if self.win:
             self.win.day_view.set_selected_id(self.engine.task.id if self.engine.task else None)
             self.win.timer_view.sync_controls_from_engine()
+            if selected_new:
+                self.win.select_tab("focus")
         self.refresh_ui()
 
     def action_start_timer_for_day_item(self, item: dict[str, Any]) -> None:
@@ -564,7 +684,21 @@ class UnravelApplication(Adw.Application):
         if self.win:
             self.win.day_view.set_selected_id(str(item["id"]))
             self.win.timer_view.sync_controls_from_engine()
+            self.win.select_tab("focus")
         self.action_start()
+
+    def action_open_today(self) -> None:
+        if self.win:
+            self.win.select_tab("today")
+
+    def action_open_web_path(self, path: str) -> None:
+        clean = path if path.startswith("/") else f"/{path}"
+        url = f"{self.config.normalized_server_url()}{clean}"
+        try:
+            webbrowser.open(url)
+        except Exception:
+            if self.win:
+                self.win.toast(f"Open {url} in your browser")
 
     def action_clear_selected_task(self) -> None:
         if self.engine.phase != "IDLE":
@@ -601,8 +735,14 @@ class UnravelApplication(Adw.Application):
             return
         item_id = str(item["id"])
         title = str(item.get("title") or "Item")
+        rollback: dict[str, Any] | None = None
         if self.win:
-            self.win.day_view.set_pending(item_id, True)
+            rollback = self.win.day_view.apply_optimistic_toggle(item_id, done)
+            if done and self.engine.phase == "IDLE" and self.engine.task and self.engine.task.id == item_id:
+                self.engine.task = None
+                self.win.day_view.set_selected_id(None)
+                self.refresh_ui()
+            self.win.toast(f"Crossed off “{title}”" if done else f"Reopened “{title}”")
         if done:
             self.sound.play("flow_baseline", self.engine.settings.sound_enabled)
 
@@ -611,25 +751,24 @@ class UnravelApplication(Adw.Application):
                 res = api.toggle_task(item_id, done, note=note)
                 day = res.get("day")
                 if isinstance(day, dict):
-                    GLib.idle_add(self._after_toggle_success, day, title, done)
+                    GLib.idle_add(self._after_toggle_success, day)
                 else:
                     GLib.idle_add(self.refresh_day_async)
             except UnauthorizedError as err:
                 GLib.idle_add(self._handle_unauthorized, str(err))
             except ApiError as err:
-                GLib.idle_add(self._after_toggle_error, item_id, str(err))
+                GLib.idle_add(self._after_toggle_error, rollback, str(err))
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def _after_toggle_success(self, day: dict[str, Any], title: str, done: bool) -> None:
+    def _after_toggle_success(self, day: dict[str, Any]) -> None:
         self._apply_day(day)
-        if self.win:
-            self.win.toast(f"Crossed off “{title}”" if done else f"Reopened “{title}”")
         self.maybe_refresh_stats(force=True)
 
-    def _after_toggle_error(self, item_id: str, message: str) -> None:
+    def _after_toggle_error(self, rollback: dict[str, Any] | None, message: str) -> None:
+        if rollback is not None:
+            self._apply_day(rollback, persist_cache=False)
         if self.win:
-            self.win.day_view.set_pending(item_id, False)
             self.win.toast(message)
 
     # ---------------------------------------------------------------- timer actions
@@ -651,6 +790,7 @@ class UnravelApplication(Adw.Application):
         self.engine.start()
         self._last_heartbeat_at = time.time()
         self.alerts.set_wake_lock(True)
+        self._sync_tick_timer()
         self.refresh_ui()
 
         cfg = self.engine.config
@@ -709,6 +849,7 @@ class UnravelApplication(Adw.Application):
             return
         self.engine.pause()
         self.alerts.set_wake_lock(False)
+        self._sync_tick_timer()
         self.refresh_ui()
         self._send_timer_mutation({"action": "pause"})
 
@@ -718,6 +859,7 @@ class UnravelApplication(Adw.Application):
         self.engine.resume()
         self._last_heartbeat_at = time.time()
         self.alerts.set_wake_lock(True)
+        self._sync_tick_timer()
         self.refresh_ui()
         self._send_timer_mutation({"action": "resume"})
 
@@ -729,11 +871,13 @@ class UnravelApplication(Adw.Application):
         if appends:
             ext = self.engine.append_flow_round_and_advance()
             if ext:
+                self._sync_tick_timer()
                 self.refresh_ui()
                 self._send_timer_mutation({"action": "appendFlowRound"})
         else:
             next_idx = self.engine.interval_index + 1
             self.engine.advance_interval(next_idx, resume=True)
+            self._sync_tick_timer()
             self.refresh_ui()
             self._send_timer_mutation(
                 {"action": "advance", "nextIndex": next_idx, "completed": True, "resume": True}
@@ -745,6 +889,7 @@ class UnravelApplication(Adw.Application):
         if next_idx >= len(plan):
             return
         self.engine.advance_interval(next_idx, resume=True)
+        self._sync_tick_timer()
         self.refresh_ui()
         self._send_timer_mutation(
             {"action": "advance", "nextIndex": next_idx, "completed": True, "resume": True}
@@ -769,6 +914,7 @@ class UnravelApplication(Adw.Application):
             return
         self.engine.end()
         self.alerts.set_wake_lock(False)
+        self._sync_tick_timer()
         self.refresh_ui()
 
         def after_end(_res: dict) -> None:
@@ -792,6 +938,7 @@ class UnravelApplication(Adw.Application):
             self.engine.task,
         )
         self.alerts.set_wake_lock(False)
+        self._sync_tick_timer()
         if self.win:
             self.win.timer_view.sync_controls_from_engine()
             self.win.toast("Session discarded")
@@ -837,17 +984,23 @@ class UnravelApplication(Adw.Application):
     # ---------------------------------------------------------------- 1s clock tick
 
     def _on_second_tick(self) -> bool:
-        if self.engine.phase == "RUNNING":
-            events = self.engine.evaluate_tick()
-            for ev in events:
-                self._handle_timer_event(ev)
+        if self.engine.phase != "RUNNING":
+            self._tick_source = None
+            return False
 
-            now = time.time()
-            if now - self._last_heartbeat_at >= HEARTBEAT_INTERVAL_SEC:
-                self._last_heartbeat_at = now
-                self._send_timer_mutation({"action": "heartbeat"})
+        events = self.engine.evaluate_tick()
+        for ev in events:
+            self._handle_timer_event(ev)
+
+        now = time.time()
+        if self.engine.phase == "RUNNING" and now - self._last_heartbeat_at >= HEARTBEAT_INTERVAL_SEC:
+            self._last_heartbeat_at = now
+            self._send_timer_mutation({"action": "heartbeat"})
 
         self.refresh_ui()
+        if self.engine.phase != "RUNNING":
+            self._tick_source = None
+            return False
         return True
 
     def _handle_timer_event(self, event: str) -> None:
@@ -914,9 +1067,12 @@ class UnravelApplication(Adw.Application):
 
     def refresh_ui(self) -> None:
         dark = self._is_dark()
-        if self.win and self.config.is_connected:
-            self.win.timer_view.refresh_tick(dark)
-            self.win.mini_view.refresh_tick(dark)
+        if self.win and self.config.is_connected and self.win.is_visible():
+            page = self.win._root_stack.get_visible_child_name()
+            if page == "mini":
+                self.win.mini_view.refresh_tick(dark)
+            elif page == "main" and self.win._view_stack.get_visible_child_name() == "focus":
+                self.win.timer_view.refresh_tick(dark)
         self.update_tray()
 
     def update_tray(self) -> None:
@@ -985,6 +1141,10 @@ class UnravelApplication(Adw.Application):
         threading.Thread(target=worker, daemon=True).start()
 
     def _apply_stats(self, data: dict[str, Any]) -> None:
+        if self._stats_end_iso is None:
+            self._cache["server_url"] = self.config.normalized_server_url()
+            self._cache["stats"] = data
+            self._persist_cache_async()
         if self.win:
             self.win.stats_view.set_data(data)
 
@@ -1065,6 +1225,8 @@ class UnravelApplication(Adw.Application):
                 self.api.timer_action(self.engine.session_id, {"action": "heartbeat"})
             except Exception:
                 pass
+        if self.api is not None:
+            self.api.close()
         if self._tick_source is not None:
             GLib.source_remove(self._tick_source)
             self._tick_source = None

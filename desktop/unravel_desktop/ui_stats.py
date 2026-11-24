@@ -1,4 +1,4 @@
-"""Read-only 2-week Statistics view with Cairo 14-day Rhythm Chart & Day Detail dialog."""
+"""Read-only 2-week Statistics view with interactive Cairo 14-day Rhythm Chart & Day Detail dialog."""
 
 from __future__ import annotations
 
@@ -79,14 +79,20 @@ def _rounded_rect(cr: cairo.Context, x: float, y: float, w: float, h: float, r: 
 
 
 class StatsRhythmChart(Gtk.DrawingArea):
-    """Calm 14-day Cairo completion bar chart — click any bar to inspect that day."""
+    """Interactive 14-day Cairo completion chart with Unravel gradients & hover inspection."""
 
-    def __init__(self, on_click_day: Callable[[int], None]) -> None:
+    def __init__(
+        self,
+        on_click_day: Callable[[int], None],
+        on_hover_day: Callable[[int | None], None],
+    ) -> None:
         super().__init__()
         self._on_click_day = on_click_day
+        self._on_hover_day = on_hover_day
         self._bars: list[dict[str, Any]] = []
         self._dark = False
-        self.set_content_height(136)
+        self._hover_idx: int | None = None
+        self.set_content_height(156)
         self.set_hexpand(True)
         self.set_draw_func(self._draw)
 
@@ -94,73 +100,138 @@ class StatsRhythmChart(Gtk.DrawingArea):
         click.connect("released", self._on_released)
         self.add_controller(click)
 
+        motion = Gtk.EventControllerMotion()
+        motion.connect("motion", self._on_motion)
+        motion.connect("leave", self._on_leave)
+        self.add_controller(motion)
+
     def set_bars(self, bars: list[dict[str, Any]], dark: bool) -> None:
         self._bars = bars
         self._dark = dark
         self.queue_draw()
 
-    def _on_released(self, _gesture, _n_press: int, x: float, _y: float) -> None:
+    def _index_for_x(self, x: float) -> int | None:
         if not self._bars:
-            return
+            return None
         w = max(1, self.get_width())
-        pad_x = 12.0
+        pad_x = 14.0
         usable = max(1.0, w - pad_x * 2)
         idx = int(((x - pad_x) / usable) * len(self._bars))
         if 0 <= idx < len(self._bars):
+            return idx
+        return None
+
+    def _on_released(self, _gesture, _n_press: int, x: float, _y: float) -> None:
+        idx = self._index_for_x(x)
+        if idx is not None:
             self._on_click_day(idx)
+
+    def _on_motion(self, _ctrl, x: float, _y: float) -> None:
+        idx = self._index_for_x(x)
+        if idx != self._hover_idx:
+            self._hover_idx = idx
+            self._on_hover_day(idx)
+            self.queue_draw()
+
+    def _on_leave(self, _ctrl) -> None:
+        if self._hover_idx is not None:
+            self._hover_idx = None
+            self._on_hover_day(None)
+            self.queue_draw()
 
     def _draw(self, _area: Gtk.DrawingArea, cr: cairo.Context, width: int, height: int) -> None:
         if not self._bars:
             return
         n = len(self._bars)
-        pad_x = 12.0
-        top_pad = 12.0
-        bottom_pad = 24.0
-        chart_h = max(20.0, height - top_pad - bottom_pad)
+        pad_x = 14.0
+        top_pad = 16.0
+        bottom_pad = 32.0
+        chart_h = max(24.0, height - top_pad - bottom_pad)
         slot_w = (width - pad_x * 2) / n
-        bar_w = max(8.0, min(26.0, slot_w * 0.56))
+        bar_w = max(10.0, min(28.0, slot_w * 0.54))
 
-        track_col = (1.0, 1.0, 1.0, 0.08) if self._dark else (0.06, 0.09, 0.16, 0.07)
-        muted_col = (0.64, 0.70, 0.79, 0.9) if self._dark else (0.39, 0.45, 0.54, 0.9)
-        today_col = (0.20, 0.86, 0.62, 1.0) if self._dark else (0.05, 0.58, 0.52, 1.0)
-        fill_top = (0.20, 0.83, 0.76, 0.95) if self._dark else (0.06, 0.60, 0.54, 0.95)
-        fill_bot = (0.14, 0.58, 0.66, 0.78) if self._dark else (0.07, 0.44, 0.47, 0.78)
+        if self._dark:
+            grid_col = (0.667, 0.729, 1.0, 0.12)
+            track_col = (0.545, 0.627, 0.922, 0.12)
+            hover_col = (0.667, 0.729, 1.0, 0.08)
+            muted_col = (0.698, 0.753, 0.863, 0.85)
+            today_top = (0.259, 0.851, 0.722, 1.0)    # aurora mint #42d9b8
+            today_bot = (0.212, 0.322, 0.914, 0.88)
+            fill_top = (0.655, 0.722, 1.0, 0.96)      # periwinkle #a7b8ff
+            fill_bot = (0.212, 0.322, 0.914, 0.80)    # twilight cobalt #3652e9
+        else:
+            grid_col = (0.588, 0.345, 0.627, 0.12)
+            track_col = (0.588, 0.345, 0.627, 0.10)
+            hover_col = (0.761, 0.239, 0.510, 0.07)
+            muted_col = (0.365, 0.314, 0.455, 0.86)
+            today_top = (0.761, 0.239, 0.510, 1.0)    # candy pink #c23d82
+            today_bot = (0.290, 0.373, 0.769, 0.88)   # indigo #4a5fc4
+            fill_top = (0.835, 0.345, 0.600, 0.92)
+            fill_bot = (0.263, 0.400, 0.769, 0.78)
 
-        cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-        cr.set_font_size(10.5)
+        # Subtle horizontal 50% and 100% dashed reference lines
+        cr.save()
+        cr.set_line_width(1.0)
+        cr.set_dash([3.0, 4.0])
+        cr.set_source_rgba(*grid_col)
+        for frac in (0.0, 0.5):
+            y = top_pad + chart_h * frac
+            cr.move_to(pad_x, y)
+            cr.line_to(width - pad_x, y)
+            cr.stroke()
+        cr.restore()
 
         for idx, b in enumerate(self._bars):
             cx = pad_x + slot_w * idx + slot_w / 2.0
             bx = cx - bar_w / 2.0
+            is_today = bool(b.get("is_today"))
+            is_hover = self._hover_idx == idx
 
-            # Full-height soft track
+            # Soft column highlight on hover
+            if is_hover:
+                _rounded_rect(cr, pad_x + slot_w * idx + 2, 4, slot_w - 4, height - 6, 12)
+                cr.set_source_rgba(*hover_col)
+                cr.fill()
+
+            # Recessed rounded pill track
             _rounded_rect(cr, bx, top_pad, bar_w, chart_h, bar_w / 2.0)
             cr.set_source_rgba(*track_col)
             cr.fill()
 
-            # Completion fill
+            # Gradient completion bar
             pct = b.get("pct")
             if isinstance(pct, (int, float)) and pct > 0:
-                fh = max(bar_w * 0.6, chart_h * min(1.0, pct / 100.0))
+                fh = max(bar_w * 0.7, chart_h * min(1.0, pct / 100.0))
                 fy = top_pad + chart_h - fh
                 _rounded_rect(cr, bx, fy, bar_w, fh, bar_w / 2.0)
                 grad = cairo.LinearGradient(bx, fy, bx, top_pad + chart_h)
-                grad.add_color_stop_rgba(0.0, *(today_col if b.get("is_today") else fill_top))
-                grad.add_color_stop_rgba(1.0, *fill_bot)
+                grad.add_color_stop_rgba(0.0, *(today_top if is_today else fill_top))
+                grad.add_color_stop_rgba(1.0, *(today_bot if is_today else fill_bot))
                 cr.set_source(grad)
                 cr.fill()
 
-            # Subtle dot if today
-            if b.get("is_today"):
-                cr.arc(cx, top_pad - 5.5, 2.5, 0, 2 * math.pi)
-                cr.set_source_rgba(*today_col)
+            # Glowing dot above Today
+            if is_today:
+                cr.arc(cx, top_pad - 7.5, 3.0, 0, 2 * math.pi)
+                cr.set_source_rgba(*today_top)
                 cr.fill()
 
-            # Day number label beneath
+            # Weekday initial + date number beneath
+            wk = str(b.get("weekday", ""))
+            if wk:
+                cr.select_font_face("Lato", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD if is_today else cairo.FONT_WEIGHT_NORMAL)
+                cr.set_font_size(9.5)
+                w_ext = cr.text_extents(wk)
+                cr.set_source_rgba(*(today_top if is_today else muted_col))
+                cr.move_to(cx - w_ext.width / 2.0 - w_ext.x_bearing, height - 17.5)
+                cr.show_text(wk)
+
             lbl = str(b.get("day_num", ""))
+            cr.select_font_face("Lato", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD if (is_today or is_hover) else cairo.FONT_WEIGHT_NORMAL)
+            cr.set_font_size(10.5)
             ext = cr.text_extents(lbl)
-            cr.set_source_rgba(*(today_col if b.get("is_today") else muted_col))
-            cr.move_to(cx - ext.width / 2.0 - ext.x_bearing, height - 6.0)
+            cr.set_source_rgba(*(today_top if is_today else muted_col))
+            cr.move_to(cx - ext.width / 2.0 - ext.x_bearing, height - 4.5)
             cr.show_text(lbl)
 
 
@@ -175,8 +246,8 @@ class DayDetailDialog(Adw.Dialog):
     ) -> None:
         super().__init__()
         self.set_title(day.get("fullLabel") or day.get("shortLabel") or "Day details")
-        self.set_content_width(480)
-        self.set_content_height(600)
+        self.set_content_width(500)
+        self.set_content_height(620)
 
         summary = compute_day_summary(day, selected_ids)
 
@@ -187,10 +258,10 @@ class DayDetailDialog(Adw.Dialog):
         scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
 
         body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
-        body.set_margin_top(14)
+        body.set_margin_top(16)
         body.set_margin_bottom(24)
-        body.set_margin_start(18)
-        body.set_margin_end(18)
+        body.set_margin_start(20)
+        body.set_margin_end(20)
 
         head_card = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
         head_card.add_css_class("unravel-card")
@@ -212,7 +283,7 @@ class DayDetailDialog(Adw.Dialog):
         sec_title.add_css_class("unravel-section-kicker")
         body.append(sec_title)
 
-        list_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        list_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=7)
         shown = 0
         for item in catalog:
             iid = item["id"]
@@ -233,6 +304,7 @@ class DayDetailDialog(Adw.Dialog):
             col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
             col.set_hexpand(True)
             title = Gtk.Label(label=item["title"], xalign=0)
+            title.add_css_class("unravel-row-title")
             title.set_wrap(True)
             col.append(title)
             sub_parts = [item.get("scheduleLabel", "")]
@@ -245,7 +317,7 @@ class DayDetailDialog(Adw.Dialog):
                 sub_parts.append(p_lbl)
             sub = Gtk.Label(label=" · ".join(p for p in sub_parts if p), xalign=0)
             sub.add_css_class("caption")
-            sub.add_css_class("dim-label")
+            sub.add_css_class("unravel-muted")
             col.append(sub)
             row.append(col)
 
@@ -253,13 +325,13 @@ class DayDetailDialog(Adw.Dialog):
             t_lbl = Gtk.Label(label=str(time_str))
             t_lbl.add_css_class("caption")
             t_lbl.add_css_class("unravel-mono")
-            t_lbl.add_css_class("dim-label")
+            t_lbl.add_css_class("unravel-muted")
             row.append(t_lbl)
             list_box.append(row)
 
         if shown == 0:
             empty = Gtk.Label(label="No active selected items on this day.", xalign=0)
-            empty.add_css_class("dim-label")
+            empty.add_css_class("unravel-muted")
             list_box.append(empty)
         body.append(list_box)
 
@@ -270,19 +342,21 @@ class DayDetailDialog(Adw.Dialog):
             s_head.add_css_class("unravel-section-kicker")
             body.append(s_head)
 
-            s_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+            s_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=7)
             for s in sessions:
                 row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
                 row.add_css_class("unravel-soft-card")
-                left = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
+                left = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
                 left.set_hexpand(True)
-                left.append(Gtk.Label(label=s.get("title") or "Focus session", xalign=0))
+                s_title = Gtk.Label(label=s.get("title") or "Focus session", xalign=0)
+                s_title.add_css_class("unravel-row-title")
+                left.append(s_title)
                 meta = f"{s.get('mode', 'FOCUS')}"
                 if s.get("timeLabel"):
                     meta += f" · {s['timeLabel']}"
                 m_lbl = Gtk.Label(label=meta, xalign=0)
                 m_lbl.add_css_class("caption")
-                m_lbl.add_css_class("dim-label")
+                m_lbl.add_css_class("unravel-muted")
                 left.append(m_lbl)
                 row.append(left)
 
@@ -294,7 +368,7 @@ class DayDetailDialog(Adw.Dialog):
             if recovery_s > 0:
                 rec_lbl = Gtk.Label(label=f"Recovery rest: {format_duration(recovery_s)}", xalign=0)
                 rec_lbl.add_css_class("caption")
-                rec_lbl.add_css_class("dim-label")
+                rec_lbl.add_css_class("unravel-muted")
                 s_box.append(rec_lbl)
             body.append(s_box)
 
@@ -314,7 +388,7 @@ class DayDetailDialog(Adw.Dialog):
                 if val:
                     h = Gtk.Label(label=heading, xalign=0)
                     h.add_css_class("caption")
-                    h.add_css_class("dim-label")
+                    h.add_css_class("unravel-muted")
                     t = Gtk.Label(label=str(val), xalign=0)
                     t.set_wrap(True)
                     es_card.append(h)
@@ -335,15 +409,14 @@ class DayDetailDialog(Adw.Dialog):
 
 
 def _mini_metric(label: str, value: str, sub: str) -> Gtk.Box:
-    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-    l1 = Gtk.Label(label=label, xalign=0)
-    l1.add_css_class("caption")
-    l1.add_css_class("dim-label")
+    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
+    l1 = Gtk.Label(label=label.upper(), xalign=0)
+    l1.add_css_class("unravel-section-kicker")
     l2 = Gtk.Label(label=value, xalign=0)
     l2.add_css_class("unravel-stat-num")
     l3 = Gtk.Label(label=sub, xalign=0)
     l3.add_css_class("caption")
-    l3.add_css_class("dim-label")
+    l3.add_css_class("unravel-muted")
     box.append(l1)
     box.append(l2)
     box.append(l3)
@@ -351,7 +424,7 @@ def _mini_metric(label: str, value: str, sub: str) -> Gtk.Box:
 
 
 class StatsView(Gtk.Box):
-    """Read-only 2-week Statistics dashboard with 14-day Rhythm Chart & Day Details."""
+    """Read-only 2-week Statistics dashboard with interactive 14-day Rhythm Chart & Day Details."""
 
     def __init__(
         self,
@@ -366,39 +439,41 @@ class StatsView(Gtk.Box):
         self._on_excluded_changed = on_excluded_changed
         self._data: dict[str, Any] | None = None
         self._dark = False
-        self._rendered_days: list[dict[str, Any]] = []
+        self._rendered_days: list[tuple[dict[str, Any], dict[str, Any]]] = []
 
         scroll = Gtk.ScrolledWindow()
         scroll.set_vexpand(True)
         scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
 
         clamp = Adw.Clamp()
-        clamp.set_maximum_size(760)
-        clamp.set_margin_top(16)
-        clamp.set_margin_bottom(24)
-        clamp.set_margin_start(18)
-        clamp.set_margin_end(18)
+        clamp.set_maximum_size(820)
+        clamp.set_margin_top(18)
+        clamp.set_margin_bottom(28)
+        clamp.set_margin_start(22)
+        clamp.set_margin_end(22)
 
-        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
 
-        # Navigation & filter strip
-        nav = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        # Navigation & filter strip inside a sleek glass pill bar
+        nav = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         self._prev_btn = Gtk.Button.new_from_icon_name("go-previous-symbolic")
-        self._prev_btn.add_css_class("circular")
+        self._prev_btn.add_css_class("flat")
+        self._prev_btn.add_css_class("unravel-header-btn")
         self._prev_btn.set_tooltip_text("Previous 2 weeks")
         self._prev_btn.connect("clicked", self._go_prev)
 
         self._range_lbl = Gtk.Label(label="Last 2 weeks")
-        self._range_lbl.add_css_class("title-3")
+        self._range_lbl.add_css_class("unravel-today-heading")
         self._range_lbl.set_hexpand(True)
 
         self._next_btn = Gtk.Button.new_from_icon_name("go-next-symbolic")
-        self._next_btn.add_css_class("circular")
+        self._next_btn.add_css_class("flat")
+        self._next_btn.add_css_class("unravel-header-btn")
         self._next_btn.set_tooltip_text("Next 2 weeks")
         self._next_btn.connect("clicked", self._go_next)
 
         self._filter_btn = Gtk.MenuButton(label="Filter")
-        self._filter_btn.add_css_class("pill")
+        self._filter_btn.add_css_class("unravel-filter-menu")
         self._filter_pop = Gtk.Popover()
         self._filter_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         self._filter_box.set_margin_top(10)
@@ -414,7 +489,8 @@ class StatsView(Gtk.Box):
         self._filter_btn.set_popover(self._filter_pop)
 
         refresh_btn = Gtk.Button.new_from_icon_name("view-refresh-symbolic")
-        refresh_btn.add_css_class("circular")
+        refresh_btn.add_css_class("flat")
+        refresh_btn.add_css_class("unravel-header-btn")
         refresh_btn.set_tooltip_text("Refresh statistics")
         refresh_btn.connect("clicked", lambda _b: self._on_load_window(self._current_end()))
 
@@ -426,21 +502,32 @@ class StatsView(Gtk.Box):
         root.append(nav)
 
         self._status_lbl = Gtk.Label(label="Loading statistics…")
-        self._status_lbl.add_css_class("dim-label")
+        self._status_lbl.add_css_class("unravel-muted")
         root.append(self._status_lbl)
 
-        # 4 summary KPI cards (responsive 2x2 or 4-across)
-        self._cards_grid = Gtk.Grid(column_spacing=10, row_spacing=10)
+        # 4 summary KPI glass cards
+        self._cards_grid = Gtk.Grid(column_spacing=12, row_spacing=12)
         self._cards_grid.set_column_homogeneous(True)
         root.append(self._cards_grid)
 
-        # 14-day Cairo Rhythm Chart card
-        chart_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        # 14-day Cairo Rhythm Chart glass card with live hover readout
+        chart_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         chart_card.add_css_class("unravel-card")
-        chart_hdr = Gtk.Label(label="14-DAY RHYTHM · CLICK ANY BAR FOR DETAILS", xalign=0)
+        chart_top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        chart_hdr = Gtk.Label(label="14-DAY RHYTHM", xalign=0)
         chart_hdr.add_css_class("unravel-section-kicker")
-        self._chart = StatsRhythmChart(on_click_day=self._on_chart_day_clicked)
-        chart_card.append(chart_hdr)
+        chart_hdr.set_hexpand(True)
+        self._hover_lbl = Gtk.Label(label="Hover or click any bar for details", xalign=1)
+        self._hover_lbl.add_css_class("caption")
+        self._hover_lbl.add_css_class("unravel-muted")
+        chart_top.append(chart_hdr)
+        chart_top.append(self._hover_lbl)
+
+        self._chart = StatsRhythmChart(
+            on_click_day=self._on_chart_day_clicked,
+            on_hover_day=self._on_chart_day_hovered,
+        )
+        chart_card.append(chart_top)
         chart_card.append(self._chart)
         root.append(chart_card)
 
@@ -448,7 +535,7 @@ class StatsView(Gtk.Box):
         days_head.add_css_class("unravel-section-kicker")
         root.append(days_head)
 
-        self._days_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        self._days_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=7)
         root.append(self._days_box)
 
         clamp.set_child(root)
@@ -520,8 +607,18 @@ class StatsView(Gtk.Box):
     def _on_chart_day_clicked(self, idx: int) -> None:
         if not self._data or idx < 0 or idx >= len(self._rendered_days):
             return
-        day = self._rendered_days[idx]
+        day, _s = self._rendered_days[idx]
         self._open_day_detail(None, day, self._data.get("items") or [], self._selected_ids())
+
+    def _on_chart_day_hovered(self, idx: int | None) -> None:
+        if idx is None or idx < 0 or idx >= len(self._rendered_days):
+            self._hover_lbl.set_text("Hover or click any bar for details")
+            return
+        day, s = self._rendered_days[idx]
+        label = day.get("shortLabel") or ""
+        pct = f"{s['pct']}%" if s["pct"] is not None else "—"
+        prod = format_duration(s["total_productive_seconds"]) if s["total_productive_seconds"] > 0 else "0m"
+        self._hover_lbl.set_text(f"{label} · {pct} ({s['done']}/{s['total']}) · {prod}")
 
     def _render(self) -> None:
         if not self._data:
@@ -532,7 +629,6 @@ class StatsView(Gtk.Box):
 
         catalog = data.get("items") or []
         days = data.get("days") or []
-        self._rendered_days = days
         selected = self._selected_ids()
 
         win_done = 0
@@ -547,11 +643,14 @@ class StatsView(Gtk.Box):
         for day in days:
             s = compute_day_summary(day, selected)
             day_summaries.append((day, s))
+            short = str(day.get("shortLabel") or "")
+            wk = short[0] if short else ""
             chart_bars.append(
                 {
                     "pct": s["pct"],
                     "is_today": bool(day.get("isToday")),
                     "day_num": day.get("dayNumber", ""),
+                    "weekday": wk,
                 }
             )
             win_done += s["done"]
@@ -563,6 +662,7 @@ class StatsView(Gtk.Box):
                 today_day = day
                 today_sum = s
 
+        self._rendered_days = day_summaries
         self._chart.set_bars(chart_bars, self._dark)
 
         while (child := self._cards_grid.get_first_child()) is not None:
@@ -572,25 +672,25 @@ class StatsView(Gtk.Box):
         avg_prod = round(win_prod / active_days) if active_days > 0 else 0
 
         c1 = _mini_metric("2-week completion", win_pct, f"{win_done} / {win_total} active")
-        c1.add_css_class("unravel-card")
+        c1.add_css_class("unravel-hero-card")
         c2 = _mini_metric(
             "Productive time",
             format_duration(win_prod) if win_prod > 0 else "0m",
             f"Avg {format_duration(avg_prod)} / active day" if avg_prod > 0 else "No time logged yet",
         )
-        c2.add_css_class("unravel-card")
+        c2.add_css_class("unravel-hero-card")
         c3 = _mini_metric(
             "Today",
             f"{today_sum['done']}/{today_sum['total']}" if today_sum else "—",
             format_duration(today_sum["total_productive_seconds"]) if today_sum and today_sum["total_productive_seconds"] > 0 else "0m logged today",
         )
-        c3.add_css_class("unravel-card")
+        c3.add_css_class("unravel-hero-card")
         c4 = _mini_metric(
             "First habit today",
             (today_sum["first_habit_time"] or "—") if today_sum else "—",
             "Earliest check-off" if today_day else "Latest window",
         )
-        c4.add_css_class("unravel-card")
+        c4.add_css_class("unravel-hero-card")
 
         self._cards_grid.attach(c1, 0, 0, 1, 1)
         self._cards_grid.attach(c2, 1, 0, 1, 1)
@@ -614,6 +714,7 @@ class StatsView(Gtk.Box):
                 label=f"{day.get('shortLabel', '')}{' · Today' if day.get('isToday') else ''}",
                 xalign=0,
             )
+            date_lbl.add_css_class("unravel-row-title")
             date_lbl.set_width_chars(16)
             row.append(date_lbl)
 
@@ -634,14 +735,14 @@ class StatsView(Gtk.Box):
             dur_lbl = Gtk.Label(label=dur_str, xalign=1)
             dur_lbl.add_css_class("unravel-mono")
             dur_lbl.add_css_class("caption")
-            dur_lbl.add_css_class("dim-label")
+            dur_lbl.add_css_class("unravel-muted")
             dur_lbl.set_width_chars(7)
             row.append(dur_lbl)
 
             first_lbl = Gtk.Label(label=s["first_habit_time"] or "", xalign=1)
             first_lbl.add_css_class("unravel-mono")
             first_lbl.add_css_class("caption")
-            first_lbl.add_css_class("dim-label")
+            first_lbl.add_css_class("unravel-muted")
             first_lbl.set_width_chars(5)
             row.append(first_lbl)
 

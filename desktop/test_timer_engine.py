@@ -10,6 +10,7 @@ from pathlib import Path
 
 from unravel_desktop.api import UnravelApi
 from unravel_desktop.auth_flow import generate_pkce_pair
+from unravel_desktop.config import load_cache, save_cache
 from unravel_desktop.timer_engine import (
     TimerConfig,
     TimerEngine,
@@ -187,6 +188,14 @@ class AuthStatsQueueTests(unittest.TestCase):
         self.assertEqual(habit.type, "HABIT")
         self.assertIsNone(habit.estimated_seconds)
         self.assertEqual(habit.default_mode, "FLOW")
+
+    def test_local_cache_roundtrip(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "cache.json"
+            self.assertEqual(load_cache(p), {})
+            save_cache({"server_url": "https://example.com", "day": {"completedCount": 2}}, p)
+            loaded = load_cache(p)
+            self.assertEqual(loaded["day"]["completedCount"], 2)
 
 
 if __name__ == "__main__":

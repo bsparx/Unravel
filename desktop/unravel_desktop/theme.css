@@ -1,219 +1,609 @@
-/* Unravel Desktop — Serene Cotton Candy (Light) & The Night (Dark) themes */
+/* Unravel Desktop — Lightweight Cotton Candy (Light) & The Night (Dark) Glass Atelier
+ *
+ * Designed for locked 60-144 FPS in GTK4:
+ * - Zero box-shadow blur passes inside scrollable lists
+ * - Zero animated box-shadow hover transitions
+ * - Crisp glass borders & specular inset highlights over GPU-cached AtmosphereBackdrop
+ */
 
-/* ---------------- Light ("Cotton candy") ---------------- */
-window.unravel-window.unravel-light {
-  background-color: #f8f6fa;
-  background-image:
-    radial-gradient(ellipse at 12% 8%, alpha(#f5b8d4, 0.34) 0%, transparent 52%),
-    radial-gradient(ellipse at 88% 12%, alpha(#b8ddf8, 0.32) 0%, transparent 54%),
-    radial-gradient(ellipse at 72% 94%, alpha(#a7eadb, 0.30) 0%, transparent 56%);
+/* ---------------- Base window & typography ---------------- */
+
+window.unravel-window {
+  font-family: "Lato", "Ubuntu Sans", sans-serif;
+  font-size: 14px;
+  background-color: transparent;
+  background-image: none;
 }
 
+window.unravel-window.unravel-light {
+  color: #33284a;
+}
+
+window.unravel-window.unravel-dark {
+  color: #eef1ff;
+}
+
+window.unravel-window scrolledwindow,
+window.unravel-window viewport,
+window.unravel-window stack,
+window.unravel-window toastoverlay {
+  background-color: transparent;
+  background-image: none;
+}
+
+.unravel-display {
+  font-family: "Noto Serif", "Linux Libertine Display O", "Gentium Book Basic", Georgia, serif;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+}
+
+.unravel-wordmark {
+  font-family: "Noto Serif", "Linux Libertine Display O", "Gentium Book Basic", Georgia, serif;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.unravel-today-heading {
+  font-family: "Noto Serif", "Linux Libertine Display O", "Gentium Book Basic", Georgia, serif;
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.018em;
+}
+
+.unravel-welcome-title {
+  font-family: "Noto Serif", "Linux Libertine Display O", "Gentium Book Basic", Georgia, serif;
+  font-size: 27px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+window.unravel-light .unravel-muted {
+  color: #5d5074;
+}
+
+window.unravel-dark .unravel-muted {
+  color: #b2c0dc;
+}
+
+/* ---------------- Header bar & pill navigation ---------------- */
+
+headerbar.unravel-header {
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
+  min-height: 52px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+headerbar.unravel-header:backdrop {
+  opacity: 1;
+}
+
+window.unravel-light headerbar.unravel-header {
+  border-bottom: 1px solid rgba(150, 88, 160, 0.14);
+}
+
+window.unravel-dark headerbar.unravel-header {
+  border-bottom: 1px solid rgba(170, 186, 255, 0.14);
+}
+
+.unravel-nav-bar {
+  border-radius: 999px;
+  padding: 3px;
+}
+
+window.unravel-light .unravel-nav-bar {
+  background-color: rgba(255, 255, 255, 0.68);
+  border: 1px solid rgba(150, 88, 160, 0.20);
+}
+
+window.unravel-dark .unravel-nav-bar {
+  background-color: rgba(10, 20, 48, 0.68);
+  border: 1px solid rgba(170, 186, 255, 0.22);
+}
+
+button.unravel-nav-btn {
+  border-radius: 999px;
+  padding: 5px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  background: transparent;
+  box-shadow: none;
+}
+
+window.unravel-light button.unravel-nav-btn {
+  color: #5d5074;
+}
+
+window.unravel-light button.unravel-nav-btn:hover {
+  color: #33284a;
+  background-color: rgba(255, 255, 255, 0.60);
+}
+
+window.unravel-light button.unravel-nav-btn:checked {
+  background-image: linear-gradient(135deg, #c23d82 0%, #d45598 100%);
+  color: #ffffff;
+}
+
+window.unravel-dark button.unravel-nav-btn {
+  color: #b2c0dc;
+}
+
+window.unravel-dark button.unravel-nav-btn:hover {
+  color: #eef1ff;
+  background-color: rgba(57, 82, 165, 0.28);
+}
+
+window.unravel-dark button.unravel-nav-btn:checked {
+  background-image: linear-gradient(135deg, #3652e9 0%, #556cf7 100%);
+  color: #ffffff;
+}
+
+button.unravel-header-btn {
+  border-radius: 999px;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
+}
+
+window.unravel-light button.unravel-header-btn {
+  background-color: rgba(255, 255, 255, 0.60);
+  border: 1px solid rgba(150, 88, 160, 0.18);
+  color: #4a3b68;
+}
+
+window.unravel-light button.unravel-header-btn:hover {
+  background-color: rgba(255, 255, 255, 0.92);
+  border-color: rgba(194, 61, 130, 0.36);
+  color: #c23d82;
+}
+
+window.unravel-dark button.unravel-header-btn {
+  background-color: rgba(16, 30, 66, 0.62);
+  border: 1px solid rgba(170, 186, 255, 0.20);
+  color: #c9d5f4;
+}
+
+window.unravel-dark button.unravel-header-btn:hover {
+  background-color: rgba(34, 54, 112, 0.78);
+  border-color: rgba(170, 186, 255, 0.40);
+  color: #ffffff;
+}
+
+button.unravel-header-btn:disabled {
+  opacity: 0.58;
+}
+
+menubutton.unravel-filter-menu > button {
+  border-radius: 999px;
+  padding: 6px 15px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+window.unravel-light menubutton.unravel-filter-menu > button {
+  background-color: rgba(255, 255, 255, 0.68);
+  border: 1px solid rgba(150, 88, 160, 0.20);
+  color: #33284a;
+}
+
+window.unravel-light menubutton.unravel-filter-menu > button:hover {
+  background-color: rgba(255, 255, 255, 0.94);
+  border-color: rgba(194, 61, 130, 0.36);
+}
+
+window.unravel-dark menubutton.unravel-filter-menu > button {
+  background-color: rgba(16, 30, 66, 0.66);
+  border: 1px solid rgba(170, 186, 255, 0.22);
+  color: #eef1ff;
+}
+
+window.unravel-dark menubutton.unravel-filter-menu > button:hover {
+  background-color: rgba(34, 54, 112, 0.80);
+  border-color: rgba(170, 186, 255, 0.42);
+}
+
+/* ---------------- Frosted Glass Surfaces (fast, zero heavy blur) ---------------- */
+
 window.unravel-light .unravel-card {
-  background-color: rgba(255, 255, 255, 0.84);
-  border: 1px solid rgba(15, 23, 42, 0.075);
+  background-color: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(150, 88, 160, 0.20);
+  border-top-color: rgba(255, 255, 255, 0.95);
+  border-radius: 26px;
+  padding: 18px 22px;
+  box-shadow: 0 10px 22px -12px rgba(194, 61, 130, 0.16);
+}
+
+window.unravel-dark .unravel-card {
+  background-color: rgba(10, 20, 48, 0.74);
+  border: 1px solid rgba(170, 186, 255, 0.22);
+  border-top-color: rgba(210, 222, 255, 0.30);
+  border-radius: 26px;
+  padding: 18px 22px;
+  box-shadow: 0 12px 24px -12px rgba(0, 0, 0, 0.42);
+}
+
+window.unravel-light .unravel-hero-card {
+  background-color: rgba(255, 255, 255, 0.76);
+  border: 1px solid rgba(150, 88, 160, 0.20);
+  border-top-color: rgba(255, 255, 255, 0.95);
   border-radius: 22px;
-  padding: 18px 20px;
-  box-shadow: 0 14px 36px -20px rgba(15, 23, 42, 0.16);
+  padding: 16px 18px;
+}
+
+window.unravel-dark .unravel-hero-card {
+  background-color: rgba(10, 20, 48, 0.74);
+  border: 1px solid rgba(170, 186, 255, 0.22);
+  border-top-color: rgba(210, 222, 255, 0.28);
+  border-radius: 22px;
+  padding: 16px 18px;
 }
 
 window.unravel-light .unravel-soft-card {
-  background-color: rgba(255, 255, 255, 0.66);
-  border: 1px solid rgba(15, 23, 42, 0.065);
-  border-radius: 16px;
+  background-color: rgba(255, 255, 255, 0.64);
+  border: 1px solid rgba(150, 88, 160, 0.16);
+  border-radius: 18px;
+  padding: 12px 15px;
+}
+
+window.unravel-dark .unravel-soft-card {
+  background-color: rgba(14, 26, 58, 0.62);
+  border: 1px solid rgba(139, 160, 235, 0.18);
+  border-radius: 18px;
+  padding: 12px 15px;
+}
+
+/* ---------------- Vertical studio divider ---------------- */
+
+window.unravel-light separator.unravel-divider {
+  background-color: rgba(150, 88, 160, 0.14);
+}
+
+window.unravel-dark separator.unravel-divider {
+  background-color: rgba(170, 186, 255, 0.14);
+}
+
+/* ---------------- Mode Switcher Bar ---------------- */
+
+window.unravel-light .unravel-mode-bar {
+  background-color: rgba(150, 88, 160, 0.08);
+  border: 1px solid rgba(150, 88, 160, 0.14);
+  border-radius: 15px;
+  padding: 3px;
+}
+
+window.unravel-dark .unravel-mode-bar {
+  background-color: rgba(25, 43, 82, 0.56);
+  border: 1px solid rgba(139, 160, 235, 0.18);
+  border-radius: 15px;
+  padding: 3px;
+}
+
+button.unravel-mode-btn {
+  border-radius: 12px;
+  padding: 6px 13px;
+  font-size: 13px;
+  font-weight: 600;
+  background: transparent;
+  box-shadow: none;
+}
+
+window.unravel-light button.unravel-mode-btn {
+  color: #5d5074;
+}
+
+window.unravel-dark button.unravel-mode-btn {
+  color: #b2c0dc;
+}
+
+window.unravel-light button.unravel-mode-btn:checked {
+  background-color: #4366c4;
+  color: #ffffff;
+}
+
+window.unravel-dark button.unravel-mode-btn:checked {
+  background-color: #4965db;
+  color: #ffffff;
+}
+
+window.unravel-light button.unravel-mode-btn.unravel-mode-flow:checked {
+  background-color: #187565;
+  color: #ffffff;
+}
+
+window.unravel-dark button.unravel-mode-btn.unravel-mode-flow:checked {
+  background-color: #1e967d;
+  color: #ffffff;
+}
+
+window.unravel-light button.unravel-mode-btn.unravel-mode-basic:checked {
+  background-color: #c23d82;
+  color: #ffffff;
+}
+
+window.unravel-dark button.unravel-mode-btn.unravel-mode-basic:checked {
+  background-color: #3652e9;
+  color: #ffffff;
+}
+
+window.unravel-light button.unravel-mode-btn.unravel-mode-rest:checked {
+  background-color: #66748f;
+  color: #ffffff;
+}
+
+window.unravel-dark button.unravel-mode-btn.unravel-mode-rest:checked {
+  background-color: #5b698a;
+  color: #ffffff;
+}
+
+/* ---------------- Primary & Secondary Tactile Buttons ---------------- */
+
+button.unravel-primary-btn {
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.01em;
+  color: #ffffff;
+}
+
+window.unravel-light button.unravel-primary-btn {
+  background-image: linear-gradient(135deg, #b83378 0%, #cc468b 55%, #de5d9e 100%);
+  border: 1px solid rgba(255, 255, 255, 0.30);
+  box-shadow: 0 6px 16px -6px rgba(194, 61, 130, 0.50);
+}
+
+window.unravel-light button.unravel-primary-btn:hover {
+  background-image: linear-gradient(135deg, #c43b82 0%, #d85297 55%, #ea69ab 100%);
+}
+
+window.unravel-dark button.unravel-primary-btn {
+  background-image: linear-gradient(135deg, #3652e9 0%, #4e65f5 55%, #6a7cff 100%);
+  border: 1px solid rgba(196, 208, 255, 0.24);
+  box-shadow: 0 6px 18px -6px rgba(54, 82, 233, 0.56);
+}
+
+window.unravel-dark button.unravel-primary-btn:hover {
+  background-image: linear-gradient(135deg, #435ff2 0%, #5c72ff 55%, #7a8aff 100%);
+}
+
+button.unravel-ghost-pill {
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+window.unravel-light button.unravel-ghost-pill {
+  background-color: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(150, 88, 160, 0.22);
+  color: #33284a;
+}
+
+window.unravel-light button.unravel-ghost-pill:hover {
+  background-color: rgba(255, 255, 255, 0.96);
+  border-color: rgba(194, 61, 130, 0.36);
+}
+
+window.unravel-dark button.unravel-ghost-pill {
+  background-color: rgba(25, 43, 82, 0.68);
+  border: 1px solid rgba(139, 160, 235, 0.24);
+  color: #eef1ff;
+}
+
+window.unravel-dark button.unravel-ghost-pill:hover {
+  background-color: rgba(42, 66, 122, 0.84);
+  border-color: rgba(170, 186, 255, 0.42);
+}
+
+/* ---------------- Active Task Pill beneath Timer Ring ---------------- */
+
+window.unravel-light .unravel-active-task-pill {
+  background-color: rgba(222, 231, 251, 0.78);
+  border: 1px solid rgba(67, 102, 196, 0.32);
+  border-radius: 18px;
   padding: 10px 14px;
 }
 
+window.unravel-dark .unravel-active-task-pill {
+  background-color: rgba(54, 82, 233, 0.20);
+  border: 1px solid rgba(138, 162, 240, 0.38);
+  border-radius: 18px;
+  padding: 10px 14px;
+}
+
+/* ---------------- Today (/day) Filter Pills & Task Rows (zero shadow blur) ---------------- */
+
+button.unravel-filter-pill {
+  border-radius: 999px;
+  padding: 5px 13px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+window.unravel-light button.unravel-filter-pill {
+  background-color: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(150, 88, 160, 0.16);
+  color: #5d5074;
+}
+
+window.unravel-light button.unravel-filter-pill:hover {
+  background-color: rgba(255, 255, 255, 0.88);
+}
+
+window.unravel-light button.unravel-filter-pill:checked {
+  background-color: rgba(194, 61, 130, 0.14);
+  border-color: rgba(194, 61, 130, 0.42);
+  color: #a12d6a;
+}
+
+window.unravel-dark button.unravel-filter-pill {
+  background-color: rgba(16, 28, 62, 0.58);
+  border: 1px solid rgba(139, 160, 235, 0.18);
+  color: #b2c0dc;
+}
+
+window.unravel-dark button.unravel-filter-pill:hover {
+  background-color: rgba(28, 46, 94, 0.76);
+}
+
+window.unravel-dark button.unravel-filter-pill:checked {
+  background-color: rgba(54, 82, 233, 0.32);
+  border-color: rgba(138, 162, 240, 0.56);
+  color: #d6e1ff;
+}
+
 window.unravel-light .unravel-day-row {
-  background-color: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(15, 23, 42, 0.065);
-  border-radius: 16px;
-  padding: 10px 12px;
-  transition: background-color 140ms ease, border-color 140ms ease;
+  background-color: rgba(255, 255, 255, 0.76);
+  border: 1px solid rgba(150, 88, 160, 0.16);
+  border-radius: 18px;
+  padding: 11px 13px;
 }
 
 window.unravel-light .unravel-day-row:hover {
   background-color: rgba(255, 255, 255, 0.94);
-  border-color: rgba(15, 118, 110, 0.22);
+  border-color: rgba(194, 61, 130, 0.34);
 }
 
 window.unravel-light .unravel-day-row-selected {
-  background-color: rgba(240, 253, 250, 0.94);
-  border: 1.5px solid rgba(13, 148, 136, 0.58);
-  box-shadow: 0 8px 22px -14px rgba(13, 148, 136, 0.32);
-}
-
-window.unravel-light .unravel-active-task-pill {
-  background-color: rgba(13, 148, 136, 0.10);
-  border: 1px solid rgba(13, 148, 136, 0.28);
-  border-radius: 16px;
-  padding: 8px 12px;
-}
-
-window.unravel-light .unravel-mode-bar {
-  background-color: rgba(15, 23, 42, 0.055);
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  border-radius: 14px;
-  padding: 3px;
-}
-
-/* ---------------- Dark ("The night") ---------------- */
-window.unravel-window.unravel-dark {
-  background-color: #0c1019;
-  background-image:
-    radial-gradient(ellipse at 14% 10%, alpha(#134e4a, 0.28) 0%, transparent 52%),
-    radial-gradient(ellipse at 86% 14%, alpha(#312e81, 0.26) 0%, transparent 55%),
-    radial-gradient(ellipse at 50% 96%, alpha(#1e3a5f, 0.22) 0%, transparent 56%);
-}
-
-window.unravel-dark .unravel-card {
-  background-color: rgba(20, 26, 39, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.085);
-  border-radius: 22px;
-  padding: 18px 20px;
-  box-shadow: 0 18px 42px -18px rgba(0, 0, 0, 0.55);
-}
-
-window.unravel-dark .unravel-soft-card {
-  background-color: rgba(255, 255, 255, 0.045);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 16px;
-  padding: 10px 14px;
+  background-color: rgba(235, 241, 255, 0.96);
+  border: 1.5px solid rgba(67, 102, 196, 0.64);
 }
 
 window.unravel-dark .unravel-day-row {
-  background-color: rgba(255, 255, 255, 0.042);
-  border: 1px solid rgba(255, 255, 255, 0.065);
-  border-radius: 16px;
-  padding: 10px 12px;
-  transition: background-color 140ms ease, border-color 140ms ease;
+  background-color: rgba(12, 24, 56, 0.66);
+  border: 1px solid rgba(139, 160, 235, 0.18);
+  border-radius: 18px;
+  padding: 11px 13px;
 }
 
 window.unravel-dark .unravel-day-row:hover {
-  background-color: rgba(255, 255, 255, 0.075);
-  border-color: rgba(45, 212, 191, 0.26);
+  background-color: rgba(20, 38, 82, 0.82);
+  border-color: rgba(170, 186, 255, 0.38);
 }
 
 window.unravel-dark .unravel-day-row-selected {
-  background-color: rgba(13, 148, 136, 0.16);
-  border: 1.5px solid rgba(45, 212, 191, 0.55);
-  box-shadow: 0 10px 26px -14px rgba(20, 184, 166, 0.35);
+  background-color: rgba(54, 82, 233, 0.26);
+  border: 1.5px solid rgba(138, 162, 240, 0.70);
 }
 
-window.unravel-dark .unravel-active-task-pill {
-  background-color: rgba(45, 212, 191, 0.12);
-  border: 1px solid rgba(45, 212, 191, 0.28);
-  border-radius: 16px;
-  padding: 8px 12px;
-}
-
-window.unravel-dark .unravel-mode-bar {
-  background-color: rgba(255, 255, 255, 0.055);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 14px;
-  padding: 3px;
-}
-
-/* ---------------- Shared serene controls & typography ---------------- */
-
-headerbar.unravel-header {
-  background: transparent;
-  box-shadow: none;
-  border-bottom: 1px solid alpha(@window_fg_color, 0.06);
-}
-
-button.unravel-mode-btn {
-  border-radius: 11px;
-  padding: 6px 12px;
-  font-size: 13px;
-  font-weight: 500;
-  background: transparent;
-  box-shadow: none;
-}
-
-button.unravel-mode-btn:checked {
-  background-color: #0d9488;
-  color: #ffffff;
-  font-weight: 600;
-  box-shadow: 0 3px 10px -4px rgba(13, 148, 136, 0.55);
-}
-
-button.unravel-mode-btn.unravel-mode-flow:checked {
-  background-color: #059669;
-  color: #ffffff;
-}
-
-button.unravel-mode-btn.unravel-mode-rest:checked {
-  background-color: #6366f1;
-  color: #ffffff;
-}
-
-button.unravel-primary-btn {
-  background-image: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
-  color: #ffffff;
-  border-radius: 999px;
-  font-weight: 600;
+.unravel-row-title {
   font-size: 14px;
-  box-shadow: 0 8px 22px -8px rgba(13, 148, 136, 0.55);
+  font-weight: 600;
 }
 
-button.unravel-primary-btn:hover {
-  background-image: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%);
-}
-
+/* Tactile circular checkbox */
 button.unravel-check-btn {
   min-width: 26px;
   min-height: 26px;
   padding: 0;
   border-radius: 999px;
-  border: 1.5px solid alpha(@window_fg_color, 0.28);
   background: transparent;
   font-size: 13px;
   font-weight: 700;
-  transition: background-color 140ms ease, border-color 140ms ease;
 }
 
-button.unravel-check-btn:hover {
-  border-color: #0d9488;
-  background-color: alpha(#0d9488, 0.14);
-  color: #0d9488;
+window.unravel-light button.unravel-check-btn {
+  border: 1.75px solid rgba(150, 88, 160, 0.42);
+  color: #c23d82;
 }
 
-button.unravel-check-btn-done {
-  border-color: #0d9488;
-  background-color: #0d9488;
+window.unravel-light button.unravel-check-btn:hover {
+  border-color: #c23d82;
+  background-color: rgba(194, 61, 130, 0.14);
+}
+
+window.unravel-light button.unravel-check-btn-done {
+  border-color: #187565;
+  background-color: #187565;
   color: #ffffff;
 }
 
+window.unravel-dark button.unravel-check-btn {
+  border: 1.75px solid rgba(170, 186, 255, 0.38);
+  color: #8aa2f0;
+}
+
+window.unravel-dark button.unravel-check-btn:hover {
+  border-color: #42d9b8;
+  background-color: rgba(66, 217, 184, 0.16);
+  color: #42d9b8;
+}
+
+window.unravel-dark button.unravel-check-btn-done {
+  border-color: #2bc2a1;
+  background-color: #2bc2a1;
+  color: #061c19;
+}
+
+/* One-click Play button on each row */
 button.unravel-row-play {
-  min-width: 30px;
-  min-height: 30px;
+  min-width: 32px;
+  min-height: 32px;
   padding: 0;
   border-radius: 999px;
-  background-color: alpha(#0d9488, 0.11);
-  color: #0d9488;
+}
+
+window.unravel-light button.unravel-row-play {
+  background-color: rgba(194, 61, 130, 0.12);
+  color: #c23d82;
+}
+
+window.unravel-light button.unravel-row-play:hover {
+  background-image: linear-gradient(135deg, #c23d82 0%, #dc589c 100%);
+  color: #ffffff;
 }
 
 window.unravel-dark button.unravel-row-play {
-  background-color: alpha(#2dd4bf, 0.14);
-  color: #5eead4;
+  background-color: rgba(138, 162, 240, 0.16);
+  color: #a7b8ff;
 }
 
-button.unravel-row-play:hover {
-  background-color: #0d9488;
+window.unravel-dark button.unravel-row-play:hover {
+  background-image: linear-gradient(135deg, #3652e9 0%, #5b72ff 100%);
   color: #ffffff;
 }
 
+/* ---------------- Cadence Presets & Semantic Chips ---------------- */
+
 button.unravel-preset-btn {
   border-radius: 999px;
-  padding: 5px 12px;
+  padding: 5px 13px;
   font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
-button.unravel-preset-active {
-  background-color: #0d9488;
+window.unravel-light button.unravel-preset-btn {
+  background-color: rgba(255, 255, 255, 0.68);
+  border: 1px solid rgba(150, 88, 160, 0.16);
+  color: #4a3b68;
+}
+
+window.unravel-light button.unravel-preset-btn:hover {
+  background-color: rgba(255, 255, 255, 0.94);
+}
+
+window.unravel-light button.unravel-preset-active {
+  background-color: #c23d82;
+  border-color: #c23d82;
+  color: #ffffff;
+}
+
+window.unravel-dark button.unravel-preset-btn {
+  background-color: rgba(25, 43, 82, 0.56);
+  border: 1px solid rgba(139, 160, 235, 0.18);
+  color: #c6d4f2;
+}
+
+window.unravel-dark button.unravel-preset-btn:hover {
+  background-color: rgba(38, 60, 110, 0.76);
+}
+
+window.unravel-dark button.unravel-preset-active {
+  background-color: #3652e9;
+  border-color: #5b76ff;
   color: #ffffff;
 }
 
@@ -221,144 +611,366 @@ button.unravel-preset-active {
   border-radius: 999px;
   padding: 4px 12px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
-.unravel-flow-chip {
-  background-color: alpha(#10b981, 0.16);
-  color: #0f766e;
+window.unravel-light .unravel-focus-chip {
+  background-color: #dee7fb;
+  color: #3652a8;
+}
+
+window.unravel-dark .unravel-focus-chip {
+  background-color: rgba(138, 162, 240, 0.20);
+  color: #b4c6ff;
+}
+
+window.unravel-light .unravel-flow-chip {
+  background-color: #dbf4ee;
+  color: #187565;
 }
 
 window.unravel-dark .unravel-flow-chip {
-  background-color: alpha(#34d399, 0.18);
-  color: #6ee7b7;
+  background-color: rgba(66, 217, 184, 0.18);
+  color: #5ce8c9;
 }
 
-.unravel-rest-chip {
-  background-color: alpha(#6366f1, 0.16);
-  color: #4f46e5;
+window.unravel-light .unravel-rest-chip {
+  background-color: #e2e7f0;
+  color: #4f5c75;
 }
 
 window.unravel-dark .unravel-rest-chip {
-  background-color: alpha(#818cf8, 0.20);
-  color: #a5b4fc;
+  background-color: rgba(147, 160, 189, 0.20);
+  color: #c1cce4;
 }
 
-.unravel-overrun-chip {
-  background-color: alpha(#ef4444, 0.16);
-  color: #dc2626;
+window.unravel-light .unravel-overrun-chip {
+  background-color: rgba(184, 52, 77, 0.15);
+  color: #b8344d;
 }
 
 window.unravel-dark .unravel-overrun-chip {
-  background-color: alpha(#f87171, 0.20);
-  color: #fca5a5;
+  background-color: rgba(255, 124, 145, 0.20);
+  color: #ff99aa;
 }
+
+/* ---------------- Section Kickers & Row Badges ---------------- */
 
 .unravel-section-kicker {
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  opacity: 0.65;
+  letter-spacing: 0.10em;
+  opacity: 0.72;
 }
 
 .unravel-badge {
   border-radius: 999px;
-  padding: 1px 8px;
+  padding: 2px 8px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
-.unravel-badge-overdue {
-  background-color: alpha(#ef4444, 0.14);
-  color: #dc2626;
+window.unravel-light .unravel-badge-overdue {
+  background-color: rgba(184, 52, 77, 0.13);
+  color: #b8344d;
 }
 
 window.unravel-dark .unravel-badge-overdue {
-  color: #fca5a5;
+  background-color: rgba(255, 124, 145, 0.18);
+  color: #ff99aa;
 }
 
-.unravel-badge-p1 {
-  background-color: alpha(#ef4444, 0.13);
-  color: #dc2626;
+window.unravel-light .unravel-badge-p1 {
+  background-color: rgba(184, 52, 77, 0.13);
+  color: #b8344d;
 }
 
 window.unravel-dark .unravel-badge-p1 {
-  color: #fca5a5;
+  background-color: rgba(255, 124, 145, 0.18);
+  color: #ff99aa;
 }
 
-.unravel-badge-p2 {
-  background-color: alpha(#f59e0b, 0.16);
-  color: #b45309;
+window.unravel-light .unravel-badge-p2 {
+  background-color: rgba(185, 138, 63, 0.18);
+  color: #8f631d;
 }
 
 window.unravel-dark .unravel-badge-p2 {
-  color: #fcd34d;
+  background-color: rgba(255, 209, 125, 0.18);
+  color: #ffd992;
 }
 
-.unravel-badge-habit {
-  background-color: alpha(#6366f1, 0.14);
-  color: #4f46e5;
+window.unravel-light .unravel-badge-habit {
+  background-color: rgba(194, 61, 130, 0.13);
+  color: #a12d6a;
 }
 
 window.unravel-dark .unravel-badge-habit {
-  color: #a5b4fc;
+  background-color: rgba(201, 166, 242, 0.18);
+  color: #d6bcfa;
 }
 
-.unravel-badge-selected {
-  background-color: alpha(#0d9488, 0.16);
-  color: #0f766e;
+window.unravel-light .unravel-badge-selected {
+  background-color: #dee7fb;
+  color: #3652a8;
 }
 
 window.unravel-dark .unravel-badge-selected {
-  background-color: alpha(#2dd4bf, 0.22);
-  color: #5eead4;
+  background-color: rgba(138, 162, 240, 0.24);
+  color: #bdd0ff;
 }
 
-.unravel-badge-meta {
-  background-color: alpha(@window_fg_color, 0.07);
+window.unravel-light .unravel-badge-meta {
+  background-color: rgba(150, 88, 160, 0.09);
+  color: #5d5074;
   font-variant-numeric: tabular-nums;
 }
 
+window.unravel-dark .unravel-badge-meta {
+  background-color: rgba(139, 160, 235, 0.14);
+  color: #b2c0dc;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------- Web-only Practices (Mind / Heart) ---------------- */
+
+window.unravel-light .unravel-practice-row {
+  background-color: rgba(255, 255, 255, 0.56);
+  border: 1px dashed rgba(150, 88, 160, 0.24);
+  border-radius: 18px;
+  padding: 11px 14px;
+}
+
+window.unravel-light .unravel-practice-row:hover {
+  background-color: rgba(255, 255, 255, 0.80);
+  border-color: rgba(194, 61, 130, 0.36);
+}
+
+window.unravel-dark .unravel-practice-row {
+  background-color: rgba(12, 24, 56, 0.46);
+  border: 1px dashed rgba(170, 186, 255, 0.24);
+  border-radius: 18px;
+  padding: 11px 14px;
+}
+
+window.unravel-dark .unravel-practice-row:hover {
+  background-color: rgba(20, 38, 82, 0.66);
+  border-color: rgba(170, 186, 255, 0.40);
+}
+
+.unravel-practice-glyph {
+  min-width: 26px;
+  min-height: 26px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+window.unravel-light .unravel-glyph-heart {
+  background-color: rgba(194, 61, 130, 0.13);
+  color: #b83378;
+}
+
+window.unravel-dark .unravel-glyph-heart {
+  background-color: rgba(255, 124, 145, 0.16);
+  color: #ff9eb0;
+}
+
+window.unravel-light .unravel-glyph-mind {
+  background-color: rgba(24, 117, 101, 0.13);
+  color: #187565;
+}
+
+window.unravel-dark .unravel-glyph-mind {
+  background-color: rgba(66, 217, 184, 0.16);
+  color: #5ce8c9;
+}
+
+window.unravel-light .unravel-glyph-close {
+  background-color: rgba(67, 102, 196, 0.13);
+  color: #4366c4;
+}
+
+window.unravel-dark .unravel-glyph-close {
+  background-color: rgba(138, 162, 240, 0.18);
+  color: #a7b8ff;
+}
+
+window.unravel-light .unravel-badge-mind {
+  background-color: rgba(24, 117, 101, 0.12);
+  color: #187565;
+}
+
+window.unravel-dark .unravel-badge-mind {
+  background-color: rgba(66, 217, 184, 0.16);
+  color: #5ce8c9;
+}
+
+window.unravel-light .unravel-badge-heart {
+  background-color: rgba(194, 61, 130, 0.12);
+  color: #a12d6a;
+}
+
+window.unravel-dark .unravel-badge-heart {
+  background-color: rgba(255, 124, 145, 0.16);
+  color: #ff9eb0;
+}
+
+button.unravel-link-pill {
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+window.unravel-light button.unravel-link-pill {
+  background-color: rgba(150, 88, 160, 0.08);
+  color: #5d5074;
+}
+
+window.unravel-light button.unravel-link-pill:hover {
+  background-color: rgba(194, 61, 130, 0.14);
+  color: #a12d6a;
+}
+
+window.unravel-dark button.unravel-link-pill {
+  background-color: rgba(139, 160, 235, 0.12);
+  color: #b2c0dc;
+}
+
+window.unravel-dark button.unravel-link-pill:hover {
+  background-color: rgba(138, 162, 240, 0.22);
+  color: #eef1ff;
+}
+
+/* ---------------- Typography Utilities & Statistics ---------------- */
+
 .unravel-stat-num {
-  font-size: 24px;
+  font-size: 25px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
 .unravel-mini-clock {
-  font-size: 26px;
+  font-size: 27px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
 .unravel-mono {
-  font-family: monospace;
+  font-family: "Cascadia Code", "Ubuntu Sans Mono", monospace;
   font-variant-numeric: tabular-nums;
 }
 
 .unravel-done-title {
   text-decoration: line-through;
-  opacity: 0.58;
+  opacity: 0.56;
 }
 
 .unravel-day-btn {
-  border-radius: 15px;
-  padding: 9px 13px;
+  border-radius: 16px;
+  padding: 10px 14px;
 }
 
-.unravel-day-today {
-  border: 1.5px solid alpha(#0d9488, 0.48);
+window.unravel-light .unravel-day-btn:hover {
+  background-color: rgba(255, 255, 255, 0.90);
+  border-color: rgba(194, 61, 130, 0.28);
 }
 
-.unravel-overrun-banner {
-  background-color: alpha(#ef4444, 0.11);
-  border: 1px solid alpha(#ef4444, 0.30);
+window.unravel-dark .unravel-day-btn:hover {
+  background-color: rgba(24, 42, 88, 0.80);
+  border-color: rgba(170, 186, 255, 0.34);
+}
+
+window.unravel-light .unravel-day-today {
+  border: 1.5px solid rgba(194, 61, 130, 0.50);
+  background-color: rgba(255, 245, 251, 0.84);
+}
+
+window.unravel-dark .unravel-day-today {
+  border: 1.5px solid rgba(66, 217, 184, 0.52);
+  background-color: rgba(17, 44, 52, 0.62);
+}
+
+window.unravel-window progressbar > trough {
+  min-height: 7px;
+  border-radius: 999px;
+}
+
+window.unravel-light progressbar > trough {
+  background-color: rgba(150, 88, 160, 0.14);
+}
+
+window.unravel-dark progressbar > trough {
+  background-color: rgba(139, 160, 235, 0.16);
+}
+
+window.unravel-light progressbar > trough > progress {
+  min-height: 7px;
+  border-radius: 999px;
+  background-image: linear-gradient(90deg, #c23d82 0%, #4a5fc4 100%);
+}
+
+window.unravel-dark progressbar > trough > progress {
+  min-height: 7px;
+  border-radius: 999px;
+  background-image: linear-gradient(90deg, #6a82f5 0%, #42d9b8 100%);
+}
+
+window.unravel-light .unravel-overrun-banner {
+  background-color: rgba(184, 52, 77, 0.10);
+  border: 1px solid rgba(184, 52, 77, 0.30);
   border-radius: 18px;
-  padding: 13px 15px;
+  padding: 14px 16px;
 }
 
-.unravel-empty-card {
-  border: 1px dashed alpha(@window_fg_color, 0.16);
+window.unravel-dark .unravel-overrun-banner {
+  background-color: rgba(255, 124, 145, 0.12);
+  border: 1px solid rgba(255, 124, 145, 0.34);
   border-radius: 18px;
-  padding: 24px 18px;
+  padding: 14px 16px;
+}
+
+window.unravel-light .unravel-empty-card {
+  background-color: rgba(255, 255, 255, 0.58);
+  border: 1.5px dashed rgba(150, 88, 160, 0.28);
+  border-radius: 22px;
+  padding: 28px 20px;
+}
+
+window.unravel-dark .unravel-empty-card {
+  background-color: rgba(16, 28, 62, 0.48);
+  border: 1.5px dashed rgba(170, 186, 255, 0.24);
+  border-radius: 22px;
+  padding: 28px 20px;
+}
+
+window.unravel-light entry,
+window.unravel-light passwordentry,
+window.unravel-light spinbutton {
+  background-color: rgba(255, 251, 254, 0.90);
+  border: 1px solid rgba(150, 88, 160, 0.28);
+  border-radius: 12px;
+}
+
+window.unravel-dark entry,
+window.unravel-dark passwordentry,
+window.unravel-dark spinbutton {
+  background-color: rgba(11, 22, 49, 0.88);
+  border: 1px solid rgba(139, 160, 235, 0.30);
+  border-radius: 12px;
+}
+
+window.unravel-window scrollbar slider {
+  min-width: 6px;
+  min-height: 6px;
+  border-radius: 999px;
+}
+
+window.unravel-light scrollbar slider {
+  background-color: rgba(150, 88, 160, 0.28);
+}
+
+window.unravel-dark scrollbar slider {
+  background-color: rgba(170, 186, 255, 0.24);
 }

@@ -50,13 +50,13 @@ class ConnectView(Gtk.Box):
         header = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         header.set_halign(Gtk.Align.CENTER)
         if icon_path.exists():
-            pic = Gtk.Picture.new_for_filename(str(icon_path))
-            pic.set_size_request(56, 56)
-            pic.set_halign(Gtk.Align.CENTER)
-            header.append(pic)
+            icon_img = Gtk.Image.new_from_file(str(icon_path))
+            icon_img.set_pixel_size(64)
+            icon_img.set_halign(Gtk.Align.CENTER)
+            header.append(icon_img)
 
         title = Gtk.Label(label="Welcome to Unravel")
-        title.add_css_class("title-1")
+        title.add_css_class("unravel-welcome-title")
         header.append(title)
 
         sub = Gtk.Label(
@@ -64,14 +64,14 @@ class ConnectView(Gtk.Box):
         )
         sub.set_wrap(True)
         sub.set_justify(Gtk.Justification.CENTER)
-        sub.add_css_class("dim-label")
+        sub.add_css_class("unravel-muted")
         header.append(sub)
         card.append(header)
 
         # Primary 1-click Clerk browser sign-in button
         self._signin_btn = Gtk.Button(label="Sign in with Unravel")
         self._signin_btn.add_css_class("unravel-primary-btn")
-        self._signin_btn.set_size_request(-1, 46)
+        self._signin_btn.set_size_request(-1, 48)
         self._signin_btn.connect("clicked", self._on_browser_signin)
         card.append(self._signin_btn)
 
