@@ -1,9 +1,11 @@
-"""Read-only 2-week Statistics view & Day Detail dialog synced with `/stats`."""
+"""Read-only 2-week Statistics view with Cairo 14-day Rhythm Chart & Day Detail dialog."""
 
 from __future__ import annotations
 
+import math
 from typing import Any, Callable
 
+import cairo
 import gi
 
 gi.require_version("Gtk", "4.0")
@@ -39,13 +41,10 @@ def compute_day_summary(day: dict[str, Any], selected_ids: set[str]) -> dict[str
         status = entry.get("status")
         if status == "inactive":
             continue
-        if status == "done":
+        if status in ("done", "bonus"):
             done += 1
             total += 1
         elif status in ("missed", "open"):
-            total += 1
-        elif status == "bonus":
-            done += 1
             total += 1
 
         if status in ("done", "bonus"):
@@ -69,6 +68,102 @@ def compute_day_summary(day: dict[str, Any], selected_ids: set[str]) -> dict[str
     }
 
 
+def _rounded_rect(cr: cairo.Context, x: float, y: float, w: float, h: float, r: float) -> None:
+    r = min(r, w / 2.0, h / 2.0)
+    cr.new_sub_path()
+    cr.arc(x + w - r, y + r, r, -math.pi / 2, 0)
+    cr.arc(x + w - r, y + h - r, r, 0, math.pi / 2)
+    cr.arc(x + r, y + h - r, r, math.pi / 2, math.pi)
+    cr.arc(x + r, y + r, r, math.pi, 3 * math.pi / 2)
+    cr.close_path()
+
+
+class StatsRhythmChart(Gtk.DrawingArea):
+    """Calm 14-day Cairo completion bar chart — click any bar to inspect that day."""
+
+    def __init__(self, on_click_day: Callable[[int], None]) -> None:
+        super().__init__()
+        self._on_click_day = on_click_day
+        self._bars: list[dict[str, Any]] = []
+        self._dark = False
+        self.set_content_height(136)
+        self.set_hexpand(True)
+        self.set_draw_func(self._draw)
+
+        click = Gtk.GestureClick()
+        click.connect("released", self._on_released)
+        self.add_controller(click)
+
+    def set_bars(self, bars: list[dict[str, Any]], dark: bool) -> None:
+        self._bars = bars
+        self._dark = dark
+        self.queue_draw()
+
+    def _on_released(self, _gesture, _n_press: int, x: float, _y: float) -> None:
+        if not self._bars:
+            return
+        w = max(1, self.get_width())
+        pad_x = 12.0
+        usable = max(1.0, w - pad_x * 2)
+        idx = int(((x - pad_x) / usable) * len(self._bars))
+        if 0 <= idx < len(self._bars):
+            self._on_click_day(idx)
+
+    def _draw(self, _area: Gtk.DrawingArea, cr: cairo.Context, width: int, height: int) -> None:
+        if not self._bars:
+            return
+        n = len(self._bars)
+        pad_x = 12.0
+        top_pad = 12.0
+        bottom_pad = 24.0
+        chart_h = max(20.0, height - top_pad - bottom_pad)
+        slot_w = (width - pad_x * 2) / n
+        bar_w = max(8.0, min(26.0, slot_w * 0.56))
+
+        track_col = (1.0, 1.0, 1.0, 0.08) if self._dark else (0.06, 0.09, 0.16, 0.07)
+        muted_col = (0.64, 0.70, 0.79, 0.9) if self._dark else (0.39, 0.45, 0.54, 0.9)
+        today_col = (0.20, 0.86, 0.62, 1.0) if self._dark else (0.05, 0.58, 0.52, 1.0)
+        fill_top = (0.20, 0.83, 0.76, 0.95) if self._dark else (0.06, 0.60, 0.54, 0.95)
+        fill_bot = (0.14, 0.58, 0.66, 0.78) if self._dark else (0.07, 0.44, 0.47, 0.78)
+
+        cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+        cr.set_font_size(10.5)
+
+        for idx, b in enumerate(self._bars):
+            cx = pad_x + slot_w * idx + slot_w / 2.0
+            bx = cx - bar_w / 2.0
+
+            # Full-height soft track
+            _rounded_rect(cr, bx, top_pad, bar_w, chart_h, bar_w / 2.0)
+            cr.set_source_rgba(*track_col)
+            cr.fill()
+
+            # Completion fill
+            pct = b.get("pct")
+            if isinstance(pct, (int, float)) and pct > 0:
+                fh = max(bar_w * 0.6, chart_h * min(1.0, pct / 100.0))
+                fy = top_pad + chart_h - fh
+                _rounded_rect(cr, bx, fy, bar_w, fh, bar_w / 2.0)
+                grad = cairo.LinearGradient(bx, fy, bx, top_pad + chart_h)
+                grad.add_color_stop_rgba(0.0, *(today_col if b.get("is_today") else fill_top))
+                grad.add_color_stop_rgba(1.0, *fill_bot)
+                cr.set_source(grad)
+                cr.fill()
+
+            # Subtle dot if today
+            if b.get("is_today"):
+                cr.arc(cx, top_pad - 5.5, 2.5, 0, 2 * math.pi)
+                cr.set_source_rgba(*today_col)
+                cr.fill()
+
+            # Day number label beneath
+            lbl = str(b.get("day_num", ""))
+            ext = cr.text_extents(lbl)
+            cr.set_source_rgba(*(today_col if b.get("is_today") else muted_col))
+            cr.move_to(cx - ext.width / 2.0 - ext.x_bearing, height - 6.0)
+            cr.show_text(lbl)
+
+
 class DayDetailDialog(Adw.Dialog):
     """Spacious read-only breakdown for a clicked day (timestamps, sessions, summary)."""
 
@@ -86,8 +181,7 @@ class DayDetailDialog(Adw.Dialog):
         summary = compute_day_summary(day, selected_ids)
 
         view = Adw.ToolbarView()
-        bar = Adw.HeaderBar()
-        view.add_top_bar(bar)
+        view.add_top_bar(Adw.HeaderBar())
 
         scroll = Gtk.ScrolledWindow()
         scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
@@ -98,7 +192,6 @@ class DayDetailDialog(Adw.Dialog):
         body.set_margin_start(18)
         body.set_margin_end(18)
 
-        # Headline strip
         head_card = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
         head_card.add_css_class("unravel-card")
         head_card.set_homogeneous(True)
@@ -114,11 +207,9 @@ class DayDetailDialog(Adw.Dialog):
         )
         body.append(head_card)
 
-        # Habits & Mind/Heart check-offs with exact local timestamps
         items_map: dict[str, dict[str, Any]] = day.get("items") or {}
         sec_title = Gtk.Label(label="HABITS & PRACTICES", xalign=0)
-        sec_title.add_css_class("caption")
-        sec_title.add_css_class("dim-label")
+        sec_title.add_css_class("unravel-section-kicker")
         body.append(sec_title)
 
         list_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
@@ -172,13 +263,11 @@ class DayDetailDialog(Adw.Dialog):
             list_box.append(empty)
         body.append(list_box)
 
-        # Focus sessions & recovery
         sessions: list[dict[str, Any]] = day.get("sessions") or []
         recovery_s = int(day.get("recoverySeconds") or 0)
         if sessions or recovery_s > 0:
             s_head = Gtk.Label(label="TIME LOGGED", xalign=0)
-            s_head.add_css_class("caption")
-            s_head.add_css_class("dim-label")
+            s_head.add_css_class("unravel-section-kicker")
             body.append(s_head)
 
             s_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
@@ -209,12 +298,10 @@ class DayDetailDialog(Adw.Dialog):
                 s_box.append(rec_lbl)
             body.append(s_box)
 
-        # Ending Summary report (if saved for this day)
         es = day.get("endingSummary")
         if isinstance(es, dict):
             es_head = Gtk.Label(label="ENDING SUMMARY", xalign=0)
-            es_head.add_css_class("caption")
-            es_head.add_css_class("dim-label")
+            es_head.add_css_class("unravel-section-kicker")
             body.append(es_head)
 
             es_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
@@ -264,7 +351,7 @@ def _mini_metric(label: str, value: str, sub: str) -> Gtk.Box:
 
 
 class StatsView(Gtk.Box):
-    """Read-only 2-week Statistics dashboard powered by `/api/desktop/stats`."""
+    """Read-only 2-week Statistics dashboard with 14-day Rhythm Chart & Day Details."""
 
     def __init__(
         self,
@@ -278,13 +365,15 @@ class StatsView(Gtk.Box):
         self._on_load_window = on_load_window
         self._on_excluded_changed = on_excluded_changed
         self._data: dict[str, Any] | None = None
+        self._dark = False
+        self._rendered_days: list[dict[str, Any]] = []
 
         scroll = Gtk.ScrolledWindow()
         scroll.set_vexpand(True)
         scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
 
         clamp = Adw.Clamp()
-        clamp.set_maximum_size(640)
+        clamp.set_maximum_size(760)
         clamp.set_margin_top(16)
         clamp.set_margin_bottom(24)
         clamp.set_margin_start(18)
@@ -292,7 +381,7 @@ class StatsView(Gtk.Box):
 
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
 
-        # Top navigation & filter bar
+        # Navigation & filter strip
         nav = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self._prev_btn = Gtk.Button.new_from_icon_name("go-previous-symbolic")
         self._prev_btn.add_css_class("circular")
@@ -300,7 +389,7 @@ class StatsView(Gtk.Box):
         self._prev_btn.connect("clicked", self._go_prev)
 
         self._range_lbl = Gtk.Label(label="Last 2 weeks")
-        self._range_lbl.add_css_class("heading")
+        self._range_lbl.add_css_class("title-3")
         self._range_lbl.set_hexpand(True)
 
         self._next_btn = Gtk.Button.new_from_icon_name("go-next-symbolic")
@@ -336,20 +425,27 @@ class StatsView(Gtk.Box):
         nav.append(refresh_btn)
         root.append(nav)
 
-        # Loading / status strip
         self._status_lbl = Gtk.Label(label="Loading statistics…")
         self._status_lbl.add_css_class("dim-label")
         root.append(self._status_lbl)
 
-        # 2x2 Summary cards grid
+        # 4 summary KPI cards (responsive 2x2 or 4-across)
         self._cards_grid = Gtk.Grid(column_spacing=10, row_spacing=10)
         self._cards_grid.set_column_homogeneous(True)
         root.append(self._cards_grid)
 
-        # 14-day breakdown list
-        days_head = Gtk.Label(label="DAILY BREAKDOWN · CLICK ANY DAY FOR CHECK-OFF TIMES", xalign=0)
-        days_head.add_css_class("caption")
-        days_head.add_css_class("dim-label")
+        # 14-day Cairo Rhythm Chart card
+        chart_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        chart_card.add_css_class("unravel-card")
+        chart_hdr = Gtk.Label(label="14-DAY RHYTHM · CLICK ANY BAR FOR DETAILS", xalign=0)
+        chart_hdr.add_css_class("unravel-section-kicker")
+        self._chart = StatsRhythmChart(on_click_day=self._on_chart_day_clicked)
+        chart_card.append(chart_hdr)
+        chart_card.append(self._chart)
+        root.append(chart_card)
+
+        days_head = Gtk.Label(label="DAILY BREAKDOWN", xalign=0)
+        days_head.add_css_class("unravel-section-kicker")
         root.append(days_head)
 
         self._days_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
@@ -358,6 +454,11 @@ class StatsView(Gtk.Box):
         clamp.set_child(root)
         scroll.set_child(clamp)
         self.append(scroll)
+
+    def set_dark(self, dark: bool) -> None:
+        if self._dark != dark:
+            self._dark = dark
+            self._render()
 
     def set_loading(self, text: str = "Refreshing statistics…") -> None:
         self._status_lbl.set_text(text)
@@ -416,6 +517,12 @@ class StatsView(Gtk.Box):
         self._on_excluded_changed(set(self._excluded))
         self._render()
 
+    def _on_chart_day_clicked(self, idx: int) -> None:
+        if not self._data or idx < 0 or idx >= len(self._rendered_days):
+            return
+        day = self._rendered_days[idx]
+        self._open_day_detail(None, day, self._data.get("items") or [], self._selected_ids())
+
     def _render(self) -> None:
         if not self._data:
             return
@@ -425,9 +532,9 @@ class StatsView(Gtk.Box):
 
         catalog = data.get("items") or []
         days = data.get("days") or []
+        self._rendered_days = days
         selected = self._selected_ids()
 
-        # Roll up window totals
         win_done = 0
         win_total = 0
         win_prod = 0
@@ -436,9 +543,17 @@ class StatsView(Gtk.Box):
         today_sum: dict[str, Any] | None = None
 
         day_summaries: list[tuple[dict[str, Any], dict[str, Any]]] = []
+        chart_bars: list[dict[str, Any]] = []
         for day in days:
             s = compute_day_summary(day, selected)
             day_summaries.append((day, s))
+            chart_bars.append(
+                {
+                    "pct": s["pct"],
+                    "is_today": bool(day.get("isToday")),
+                    "day_num": day.get("dayNumber", ""),
+                }
+            )
             win_done += s["done"]
             win_total += s["total"]
             win_prod += s["total_productive_seconds"]
@@ -448,7 +563,8 @@ class StatsView(Gtk.Box):
                 today_day = day
                 today_sum = s
 
-        # Clear and render 4 summary cards
+        self._chart.set_bars(chart_bars, self._dark)
+
         while (child := self._cards_grid.get_first_child()) is not None:
             self._cards_grid.remove(child)
 
@@ -478,10 +594,9 @@ class StatsView(Gtk.Box):
 
         self._cards_grid.attach(c1, 0, 0, 1, 1)
         self._cards_grid.attach(c2, 1, 0, 1, 1)
-        self._cards_grid.attach(c3, 0, 1, 1, 1)
-        self._cards_grid.attach(c4, 1, 1, 1, 1)
+        self._cards_grid.attach(c3, 2, 0, 1, 1)
+        self._cards_grid.attach(c4, 3, 0, 1, 1)
 
-        # Render 14 days (newest first so today is immediately at top)
         while (child := self._days_box.get_first_child()) is not None:
             self._days_box.remove(child)
 
@@ -499,10 +614,9 @@ class StatsView(Gtk.Box):
                 label=f"{day.get('shortLabel', '')}{' · Today' if day.get('isToday') else ''}",
                 xalign=0,
             )
-            date_lbl.set_width_chars(15)
+            date_lbl.set_width_chars(16)
             row.append(date_lbl)
 
-            # Progress bar
             bar = Gtk.ProgressBar()
             bar.set_fraction((s["pct"] / 100.0) if s["pct"] is not None else 0.0)
             bar.set_valign(Gtk.Align.CENTER)
@@ -536,7 +650,7 @@ class StatsView(Gtk.Box):
 
     def _open_day_detail(
         self,
-        _btn: Gtk.Button,
+        _btn: Gtk.Button | None,
         day: dict[str, Any],
         catalog: list[dict[str, Any]],
         selected: set[str],

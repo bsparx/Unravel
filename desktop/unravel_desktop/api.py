@@ -70,6 +70,23 @@ class UnravelApi:
         qs = f"?{urllib.parse.urlencode({'end': end_iso})}" if end_iso else ""
         return self._request("GET", f"/api/desktop/stats{qs}")
 
+    def get_day(self) -> dict[str, Any]:
+        return self._request("GET", "/api/desktop/day")
+
+    def toggle_task(
+        self,
+        task_id: str,
+        done: bool,
+        note: str | None = None,
+        minutes: int | None = None,
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = {"done": done}
+        if note is not None:
+            body["note"] = note
+        if minutes is not None:
+            body["minutes"] = minutes
+        return self._request("POST", f"/api/desktop/tasks/{urllib.parse.quote(task_id)}/toggle", body)
+
     def patch_settings(self, patch: dict[str, Any]) -> dict[str, Any]:
         return self._request("PATCH", "/api/desktop/settings", patch)
 

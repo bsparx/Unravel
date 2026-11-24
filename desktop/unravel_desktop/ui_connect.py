@@ -60,7 +60,7 @@ class ConnectView(Gtk.Box):
         header.append(title)
 
         sub = Gtk.Label(
-            label="Sign in with your Unravel account in your browser to sync your timer, settings, and statistics."
+            label="Sign in with your Unravel account in your browser to sync your timer, Today's open list, and statistics."
         )
         sub.set_wrap(True)
         sub.set_justify(Gtk.Justification.CENTER)
@@ -70,9 +70,8 @@ class ConnectView(Gtk.Box):
 
         # Primary 1-click Clerk browser sign-in button
         self._signin_btn = Gtk.Button(label="Sign in with Unravel")
-        self._signin_btn.add_css_class("suggested-action")
-        self._signin_btn.add_css_class("pill")
-        self._signin_btn.set_size_request(-1, 44)
+        self._signin_btn.add_css_class("unravel-primary-btn")
+        self._signin_btn.set_size_request(-1, 46)
         self._signin_btn.connect("clicked", self._on_browser_signin)
         card.append(self._signin_btn)
 

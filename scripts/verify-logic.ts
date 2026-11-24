@@ -46,6 +46,7 @@ import {
   desktopSettingsPatchSchema,
   desktopStartSessionSchema,
   desktopTimerActionSchema,
+  desktopToggleTaskSchema,
   extractBearerToken,
   generateDesktopAuthCode,
   generateDesktopToken,
@@ -5159,6 +5160,10 @@ check("desktop API zod schemas validate exchange, settings, start, and timer act
   assert.ok(desktopTimerActionSchema.safeParse({ action: "end", completedTask: true }).success);
   assert.ok(desktopTimerActionSchema.safeParse({ action: "adjust", minutes: 35 }).success);
   assert.equal(desktopTimerActionSchema.safeParse({ action: "extend", seconds: 99999 }).success, false);
+
+  assert.ok(desktopToggleTaskSchema.safeParse({ done: true }).success);
+  assert.ok(desktopToggleTaskSchema.safeParse({ done: true, note: "Felt focused", minutes: 20 }).success);
+  assert.equal(desktopToggleTaskSchema.safeParse({ done: "yes" }).success, false);
 });
 
 console.log(`\n${passed} checks passed.\n`);

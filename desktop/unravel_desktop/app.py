@@ -1,4 +1,9 @@
-"""Main GTK4 + Libadwaita application for Unravel Desktop on Ubuntu."""
+"""Main GTK4 + Libadwaita application for Unravel Desktop on Ubuntu.
+
+Unified serene Focus workspace (Timer Sanctuary + Today's `/day` open list
+side by side) plus 2-week Statistics, GNOME top-bar live clock, Mini Mode,
+and multi-user Clerk PKCE sign-in.
+"""
 
 from __future__ import annotations
 
@@ -25,14 +30,18 @@ from .config import AppConfig, load_config, save_config, sync_autostart
 from .notifications import DesktopAlerts
 from .timer_engine import (
     INTERVAL_LABELS,
-    AttachedTask,
     TimerConfig,
     TimerEngine,
     TimerSettings,
+    clamp_intervals,
+    clamp_target,
     format_duration,
+    has_intervals,
+    suggest_intervals,
 )
 from .tray import GnomeTopBarTray
 from .ui_connect import ConnectView
+from .ui_day import DayListView, FeedbackNoteDialog, day_item_to_attached
 from .ui_settings import SettingsDialog
 from .ui_stats import StatsView
 from .ui_timer import MiniTimerView, TimerView
@@ -43,17 +52,17 @@ ICON_PATH = ASSETS_DIR / "unravel.svg"
 CSS_PATH = PKG_DIR / "theme.css"
 
 HEARTBEAT_INTERVAL_SEC = 60.0
-STATS_AUTO_REFRESH_SEC = 300.0
+STATS_AUTO_REFRESH_SEC = 180.0
 
 
 class UnravelWindow(Adw.ApplicationWindow):
-    """Main Unravel Desktop window supporting Full View, Mini Mode, and Sign-In."""
+    """Spacious Focus studio (Timer + Today) & Statistics window + Compact Mini Mode."""
 
     def __init__(self, app: UnravelApplication) -> None:
         super().__init__(application=app, title=APP_NAME)
         self._app = app
         self.add_css_class("unravel-window")
-        self.set_default_size(640, 740)
+        self.set_default_size(940, 680)
 
         self._toast_overlay = Adw.ToastOverlay()
         self._root_stack = Gtk.Stack()
@@ -66,15 +75,24 @@ class UnravelWindow(Adw.ApplicationWindow):
             on_connected=app.on_connected,
         )
         connect_toolbar = Adw.ToolbarView()
-        connect_toolbar.add_top_bar(Adw.HeaderBar())
+        c_bar = Adw.HeaderBar()
+        c_bar.add_css_class("unravel-header")
+        connect_toolbar.add_top_bar(c_bar)
         connect_toolbar.set_content(self.connect_view)
         self._root_stack.add_named(connect_toolbar, "connect")
 
-        # 2. Full authenticated workspace (Timer + Statistics)
+        # 2. Main authenticated workspace (Focus [Timer + Today] & Statistics)
         main_toolbar = Adw.ToolbarView()
         header = Adw.HeaderBar()
+        header.add_css_class("unravel-header")
 
         self._view_stack = Adw.ViewStack()
+
+        # Side-by-side Focus studio: Timer Sanctuary on left, Today (/day) on right
+        focus_split = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        focus_split.set_hexpand(True)
+        focus_split.set_vexpand(True)
+
         self.timer_view = TimerView(
             app.engine,
             on_start=app.action_start,
@@ -88,22 +106,42 @@ class UnravelWindow(Adw.ApplicationWindow):
             on_discard=app.action_discard,
             on_adjust_minutes=app.action_adjust_minutes,
             on_reset=app.action_reset,
+            on_clear_task=app.action_clear_selected_task,
+            on_check_selected_task=app.action_check_selected_task,
             on_config_changed=app.refresh_ui,
         )
+        self.timer_view.set_size_request(430, -1)
+        self.timer_view.set_hexpand(True)
+
+        divider = Gtk.Separator(orientation=Gtk.Orientation.VERTICAL)
+        divider.set_margin_top(16)
+        divider.set_margin_bottom(16)
+
+        self.day_view = DayListView(
+            on_select_item=app.action_select_day_item,
+            on_start_timer_for_item=app.action_start_timer_for_day_item,
+            on_toggle_item=app.action_toggle_day_item,
+            on_refresh=app.refresh_day_async,
+        )
+        self.day_view.set_size_request(360, -1)
+        self.day_view.set_hexpand(True)
+
+        focus_split.append(self.timer_view)
+        focus_split.append(divider)
+        focus_split.append(self.day_view)
+
         self.stats_view = StatsView(
             excluded_ids=set(app.config.excluded_stats_items),
             on_load_window=app.load_stats,
             on_excluded_changed=app.on_stats_filter_changed,
         )
 
-        p1 = self._view_stack.add_titled_with_icon(
-            self.timer_view, "timer", "Timer", "alarm-symbolic"
+        self._view_stack.add_titled_with_icon(
+            focus_split, "focus", "Focus & Today", "alarm-symbolic"
         )
-        _ = p1
-        p2 = self._view_stack.add_titled_with_icon(
+        self._view_stack.add_titled_with_icon(
             self.stats_view, "stats", "Statistics", "view-list-symbolic"
         )
-        _ = p2
         self._view_stack.connect("notify::visible-child-name", self._on_tab_changed)
 
         switcher = Adw.ViewSwitcher()
@@ -128,6 +166,7 @@ class UnravelWindow(Adw.ApplicationWindow):
         # 3. Compact Mini Floating Timer page
         mini_toolbar = Adw.ToolbarView()
         mini_bar = Adw.HeaderBar()
+        mini_bar.add_css_class("unravel-header")
         mini_bar.set_show_end_title_buttons(True)
         mini_bar.set_title_widget(Gtk.Label(label="Unravel"))
         mini_toolbar.add_top_bar(mini_bar)
@@ -137,7 +176,7 @@ class UnravelWindow(Adw.ApplicationWindow):
             on_take_break=app.action_take_break,
             on_skip=app.action_skip_interval,
             on_extend=app.action_extend_break,
-            on_stop=lambda: app.action_stop(False),
+            on_stop=app.action_stop,
             on_expand=lambda: app.set_mini_mode(False),
         )
         mini_toolbar.set_content(self.mini_view)
@@ -146,14 +185,20 @@ class UnravelWindow(Adw.ApplicationWindow):
         self._toast_overlay.set_child(self._root_stack)
         self.set_content(self._toast_overlay)
 
-        # Space key toggles timer when on Timer view (except inside text inputs or break overruns)
         key_ctrl = Gtk.EventControllerKey()
         key_ctrl.connect("key-pressed", self._on_key_pressed)
         self.add_controller(key_ctrl)
 
-        # Focus-triggered soft refresh of stats
         self.connect("notify::is-active", self._on_focus_changed)
         self.connect("close-request", self._on_close_request)
+
+    def sync_theme_class(self, dark: bool) -> None:
+        if dark:
+            self.remove_css_class("unravel-light")
+            self.add_css_class("unravel-dark")
+        else:
+            self.remove_css_class("unravel-dark")
+            self.add_css_class("unravel-light")
 
     def toast(self, message: str) -> None:
         self._toast_overlay.add_toast(Adw.Toast.new(message))
@@ -161,16 +206,19 @@ class UnravelWindow(Adw.ApplicationWindow):
     def show_page(self, name: str) -> None:
         self._root_stack.set_visible_child_name(name)
         if name == "mini":
-            self.set_default_size(340, 146)
-            self.set_size_request(310, 136)
+            self.set_size_request(330, 128)
+            self.set_default_size(368, 138)
             self._try_x11_pin(True)
+        elif name == "connect":
+            self.set_size_request(440, 520)
+            self.set_default_size(520, 620)
+            self._try_x11_pin(False)
         else:
-            self.set_size_request(420, 520)
-            self.set_default_size(640, 740)
+            self.set_size_request(820, 580)
+            self.set_default_size(940, 680)
             self._try_x11_pin(False)
 
     def _try_x11_pin(self, pinned: bool) -> None:
-        # On Wayland the compositor governs Always-on-Top; on X11 wmctrl can toggle it.
         if not shutil.which("wmctrl"):
             return
         action = "add,above" if pinned else "remove,above"
@@ -189,10 +237,9 @@ class UnravelWindow(Adw.ApplicationWindow):
 
     def _on_focus_changed(self, _win, _pspec) -> None:
         if self.is_active() and self._app.api is not None:
-            self._app.maybe_refresh_stats(force=False)
+            self._app.maybe_refresh_day_and_stats(force=False)
 
     def _on_close_request(self, _win) -> bool:
-        # Hide to GNOME top bar tray instead of killing a running timer.
         if self._app.tray_active:
             self.set_visible(False)
             self._app.update_tray()
@@ -209,7 +256,7 @@ class UnravelWindow(Adw.ApplicationWindow):
         page = self._root_stack.get_visible_child_name()
         if page == "connect":
             return False
-        if page == "main" and self._view_stack.get_visible_child_name() != "timer":
+        if page == "main" and self._view_stack.get_visible_child_name() != "focus":
             return False
         focus = self.get_focus()
         if isinstance(focus, (Gtk.Entry, Gtk.PasswordEntry, Gtk.SpinButton, Gtk.TextView, Gtk.Button)):
@@ -221,7 +268,7 @@ class UnravelWindow(Adw.ApplicationWindow):
 
 
 class UnravelApplication(Adw.Application):
-    """Coordinates timer engine, API sync, GNOME top-bar tray, chimes, and alerts."""
+    """Coordinates Timer, Today `/day` list, Statistics, GNOME tray, chimes, and alerts."""
 
     def __init__(self, start_minimized: bool = False) -> None:
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
@@ -239,20 +286,26 @@ class UnravelApplication(Adw.Application):
         self.tray: GnomeTopBarTray | None = None
         self.tray_active = False
 
+        self._day_items_by_id: dict[str, dict[str, Any]] = {}
         self._last_heartbeat_at = 0.0
         self._last_stats_at = 0.0
+        self._last_day_at = 0.0
         self._stats_end_iso: str | None = None
         self._tick_source: int | None = None
         self._css_loaded = False
 
     def do_activate(self) -> None:
+        mgr = Adw.StyleManager.get_default()
         self._apply_theme(self.config.theme)
         if not self._css_loaded:
             self._load_css()
+            mgr.connect("notify::dark", self._on_system_dark_changed)
             self._css_loaded = True
 
         if self.win is None:
             self.win = UnravelWindow(self)
+            self.win.sync_theme_class(self._is_dark())
+            self.win.stats_view.set_dark(self._is_dark())
             self._start_tray()
             self._tick_source = GLib.timeout_add(1000, self._on_second_tick)
 
@@ -289,6 +342,17 @@ class UnravelApplication(Adw.Application):
             mgr.set_color_scheme(Adw.ColorScheme.FORCE_DARK)
         else:
             mgr.set_color_scheme(Adw.ColorScheme.DEFAULT)
+        if self.win:
+            dark = self._is_dark()
+            self.win.sync_theme_class(dark)
+            self.win.stats_view.set_dark(dark)
+
+    def _on_system_dark_changed(self, _mgr, _pspec) -> None:
+        if self.win:
+            dark = self._is_dark()
+            self.win.sync_theme_class(dark)
+            self.win.stats_view.set_dark(dark)
+        self.refresh_ui()
 
     def _is_dark(self) -> bool:
         return Adw.StyleManager.get_default().get_dark()
@@ -358,7 +422,7 @@ class UnravelApplication(Adw.Application):
         if api is None:
             return
         if self.win:
-            self.win.timer_view.set_sync_status("Syncing with Unravel…")
+            self.win.timer_view.set_sync_status("Syncing…")
 
         def worker() -> None:
             try:
@@ -381,18 +445,6 @@ class UnravelApplication(Adw.Application):
         settings = TimerSettings.from_api(data.get("settings") or {})
         self.engine.settings = settings
 
-        tasks = [
-            AttachedTask(
-                id=t["id"],
-                title=t["title"],
-                type=t["type"],
-                estimated_seconds=t.get("estimatedSeconds"),
-                default_mode=t.get("defaultMode"),
-                planned_intervals=t.get("plannedIntervals"),
-            )
-            for t in (data.get("tasks") or [])
-        ]
-
         active = data.get("activeSession")
         if active and self.engine.phase == "IDLE":
             self.engine.hydrate_from_server(active)
@@ -400,8 +452,13 @@ class UnravelApplication(Adw.Application):
         elif self.engine.phase == "IDLE":
             self.engine.config = TimerConfig.from_settings(settings, self.engine.config.mode)
 
+        day = data.get("day")
+        if isinstance(day, dict):
+            self._apply_day(day)
+        else:
+            self.refresh_day_async()
+
         if self.win:
-            self.win.timer_view.set_tasks(tasks)
             self.win.timer_view.sync_controls_from_engine()
             self.win.timer_view.set_sync_status("Synced")
         self.refresh_ui()
@@ -410,6 +467,170 @@ class UnravelApplication(Adw.Application):
     def _on_sync_error(self, message: str) -> None:
         if self.win:
             self.win.timer_view.set_sync_status(f"Offline ({message})")
+
+    # ---------------------------------------------------------------- Today (/day) actions
+
+    def _apply_day(self, day: dict[str, Any]) -> None:
+        self._last_day_at = time.time()
+        self._day_items_by_id = {}
+        for bucket in ("overdue", "dueToday", "habits", "undated", "completedToday"):
+            for item in day.get(bucket) or []:
+                self._day_items_by_id[str(item["id"])] = item
+
+        # If the selected task was completed externally while idle, clear selection cleanly.
+        if self.engine.phase == "IDLE" and self.engine.task:
+            found = self._day_items_by_id.get(self.engine.task.id)
+            if not found or found.get("done"):
+                self.engine.task = None
+
+        if self.win:
+            self.win.day_view.set_day(day)
+            self.win.day_view.set_selected_id(self.engine.task.id if self.engine.task else None)
+        self.refresh_ui()
+
+    def refresh_day_async(self) -> None:
+        api = self.api
+        if api is None:
+            return
+
+        def worker() -> None:
+            try:
+                day = api.get_day()
+                GLib.idle_add(self._apply_day, day)
+            except UnauthorizedError as err:
+                GLib.idle_add(self._handle_unauthorized, str(err))
+            except ApiError as err:
+                GLib.idle_add(lambda: self.win and self.win.day_view.set_error(str(err)))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _apply_task_to_idle_timer(self, item: dict[str, Any]) -> None:
+        attached = day_item_to_attached(item)
+        self.engine.task = attached
+        if attached.estimated_seconds and self.engine.config.mode != "RECOVERY":
+            mode = (
+                attached.default_mode
+                if attached.default_mode in ("POMODORO", "FLOW", "BASIC")
+                else self.engine.config.mode
+            )
+            target = clamp_target(attached.estimated_seconds)
+            intervals = (
+                clamp_intervals(attached.planned_intervals)
+                if attached.planned_intervals and has_intervals(mode)
+                else suggest_intervals(target, self.engine.config.focus_seconds)
+                if has_intervals(mode)
+                else 1
+            )
+            self.engine.configure(mode=mode, target_seconds=target, intervals=intervals)
+
+    def action_select_day_item(self, item: dict[str, Any]) -> None:
+        if self.engine.phase in ("RUNNING", "PAUSED"):
+            if self.win:
+                self.win.toast("Stop the running session before switching tasks")
+            return
+        if self.engine.phase == "ENDED":
+            self.engine.reset(
+                TimerConfig.from_settings(self.engine.settings, self.engine.config.mode), None
+            )
+
+        item_id = str(item["id"])
+        if self.engine.task and self.engine.task.id == item_id:
+            # Clicking the already-selected row toggles back to Free focus.
+            self.engine.task = None
+        else:
+            self._apply_task_to_idle_timer(item)
+
+        if self.win:
+            self.win.day_view.set_selected_id(self.engine.task.id if self.engine.task else None)
+            self.win.timer_view.sync_controls_from_engine()
+        self.refresh_ui()
+
+    def action_start_timer_for_day_item(self, item: dict[str, Any]) -> None:
+        if self.engine.phase in ("RUNNING", "PAUSED"):
+            if self.win:
+                self.win.toast("Stop or pause the current session first")
+            return
+        if self.engine.phase == "ENDED":
+            self.engine.reset(
+                TimerConfig.from_settings(self.engine.settings, self.engine.config.mode), None
+            )
+        if self.engine.config.mode == "RECOVERY":
+            self.engine.configure(
+                mode="FLOW",
+                target_seconds=self.engine.settings.focus_seconds,
+                intervals=1,
+            )
+        self._apply_task_to_idle_timer(item)
+        if self.win:
+            self.win.day_view.set_selected_id(str(item["id"]))
+            self.win.timer_view.sync_controls_from_engine()
+        self.action_start()
+
+    def action_clear_selected_task(self) -> None:
+        if self.engine.phase != "IDLE":
+            return
+        self.engine.task = None
+        if self.win:
+            self.win.day_view.set_selected_id(None)
+        self.refresh_ui()
+
+    def action_check_selected_task(self) -> None:
+        if not self.engine.task:
+            return
+        item = self._day_items_by_id.get(self.engine.task.id)
+        if not item:
+            return
+        if item.get("type") == "HABIT" and item.get("requiresFeedback") and self.win:
+            dlg = FeedbackNoteDialog(
+                title=str(item.get("title") or "Habit"),
+                prompt=item.get("feedbackPrompt"),
+                on_submit=lambda note, it=item: self.action_toggle_day_item(it, True, note),
+            )
+            dlg.present(self.win)
+            return
+        self.action_toggle_day_item(item, True, None)
+
+    def action_toggle_day_item(
+        self,
+        item: dict[str, Any],
+        done: bool,
+        note: str | None,
+    ) -> None:
+        api = self.api
+        if api is None:
+            return
+        item_id = str(item["id"])
+        title = str(item.get("title") or "Item")
+        if self.win:
+            self.win.day_view.set_pending(item_id, True)
+        if done:
+            self.sound.play("flow_baseline", self.engine.settings.sound_enabled)
+
+        def worker() -> None:
+            try:
+                res = api.toggle_task(item_id, done, note=note)
+                day = res.get("day")
+                if isinstance(day, dict):
+                    GLib.idle_add(self._after_toggle_success, day, title, done)
+                else:
+                    GLib.idle_add(self.refresh_day_async)
+            except UnauthorizedError as err:
+                GLib.idle_add(self._handle_unauthorized, str(err))
+            except ApiError as err:
+                GLib.idle_add(self._after_toggle_error, item_id, str(err))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _after_toggle_success(self, day: dict[str, Any], title: str, done: bool) -> None:
+        self._apply_day(day)
+        if self.win:
+            self.win.toast(f"Crossed off “{title}”" if done else f"Reopened “{title}”")
+        self.maybe_refresh_stats(force=True)
+
+    def _after_toggle_error(self, item_id: str, message: str) -> None:
+        if self.win:
+            self.win.day_view.set_pending(item_id, False)
+            self.win.toast(message)
 
     # ---------------------------------------------------------------- timer actions
 
@@ -553,6 +774,9 @@ class UnravelApplication(Adw.Application):
         def after_end(_res: dict) -> None:
             if self.win:
                 self.win.timer_view.set_sync_status("Session saved")
+                if completed_task and self.engine.task:
+                    self.win.toast(f"Session logged & crossed off “{self.engine.task.title}”")
+            self.refresh_day_async()
             self.maybe_refresh_stats(force=True)
 
         self._send_timer_mutation(
@@ -563,7 +787,10 @@ class UnravelApplication(Adw.Application):
     def action_discard(self) -> None:
         api = self.api
         sid = self.engine.session_id
-        self.engine.reset(TimerConfig.from_settings(self.engine.settings, self.engine.config.mode), self.engine.task)
+        self.engine.reset(
+            TimerConfig.from_settings(self.engine.settings, self.engine.config.mode),
+            self.engine.task,
+        )
         self.alerts.set_wake_lock(False)
         if self.win:
             self.win.timer_view.sync_controls_from_engine()
@@ -584,6 +811,7 @@ class UnravelApplication(Adw.Application):
             if res.get("ok"):
                 if self.win:
                     self.win.toast(f"Updated to {minutes}m")
+                self.refresh_day_async()
                 self.maybe_refresh_stats(force=True)
             elif self.win:
                 self.win.toast(res.get("error") or "Could not update time")
@@ -591,8 +819,18 @@ class UnravelApplication(Adw.Application):
         self._send_timer_mutation({"action": "adjust", "minutes": minutes}, on_done=after_adj)
 
     def action_reset(self) -> None:
-        self.engine.reset(TimerConfig.from_settings(self.engine.settings, self.engine.config.mode), self.engine.task)
+        # Keep selection only if task is still open in `/day`.
+        keep_task = self.engine.task
+        if keep_task:
+            found = self._day_items_by_id.get(keep_task.id)
+            if not found or found.get("done"):
+                keep_task = None
+        self.engine.reset(
+            TimerConfig.from_settings(self.engine.settings, self.engine.config.mode),
+            keep_task,
+        )
         if self.win:
+            self.win.day_view.set_selected_id(keep_task.id if keep_task else None)
             self.win.timer_view.sync_controls_from_engine()
         self.refresh_ui()
 
@@ -671,7 +909,7 @@ class UnravelApplication(Adw.Application):
             self.alerts.send("Session complete", f"{logged} of focus logged to Unravel.")
             self._send_timer_mutation(
                 {"action": "end", "completedTask": False, "reason": "TARGET_REACHED"},
-                on_done=lambda _r: self.maybe_refresh_stats(force=True),
+                on_done=lambda _r: (self.refresh_day_async(), self.maybe_refresh_stats(force=True)),
             )
 
     def refresh_ui(self) -> None:
@@ -709,7 +947,15 @@ class UnravelApplication(Adw.Application):
             can_break=eng.next_break_info() is not None,
         )
 
-    # ---------------------------------------------------------------- stats
+    # ---------------------------------------------------------------- stats & focus refresh
+
+    def maybe_refresh_day_and_stats(self, force: bool = False) -> None:
+        if self.api is None:
+            return
+        now = time.time()
+        if force or (now - self._last_day_at) >= 60.0:
+            self.refresh_day_async()
+        self.maybe_refresh_stats(force=force)
 
     def maybe_refresh_stats(self, force: bool = False) -> None:
         if self.api is None:
@@ -814,7 +1060,6 @@ class UnravelApplication(Adw.Application):
     # ---------------------------------------------------------------- quit
 
     def quit_cleanly(self) -> None:
-        # Flush one final synchronous heartbeat if a session is live so zero time is lost.
         if self.api and self.engine.session_id and self.engine.phase == "RUNNING":
             try:
                 self.api.timer_action(self.engine.session_id, {"action": "heartbeat"})

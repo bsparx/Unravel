@@ -20,6 +20,7 @@ from unravel_desktop.timer_engine import (
     format_duration,
     next_round_extension,
 )
+from unravel_desktop.ui_day import day_item_to_attached
 from unravel_desktop.ui_stats import compute_day_summary
 
 
@@ -154,6 +155,38 @@ class AuthStatsQueueTests(unittest.TestCase):
             self.assertEqual(len(items), 2)
             self.assertEqual(items[0]["body"]["action"], "heartbeat")
             self.assertEqual(items[1]["body"]["action"], "pause")
+
+    def test_day_item_to_attached_maps_todo_and_habit(self) -> None:
+        todo = day_item_to_attached(
+            {
+                "id": "t_1",
+                "type": "TODO",
+                "title": "Write architecture doc",
+                "estimatedSeconds": 2700,
+                "defaultMode": "POMODORO",
+                "plannedIntervals": 2,
+            }
+        )
+        self.assertEqual(todo.id, "t_1")
+        self.assertEqual(todo.type, "TODO")
+        self.assertEqual(todo.title, "Write architecture doc")
+        self.assertEqual(todo.estimated_seconds, 2700)
+        self.assertEqual(todo.default_mode, "POMODORO")
+        self.assertEqual(todo.planned_intervals, 2)
+
+        habit = day_item_to_attached(
+            {
+                "id": "h_1",
+                "type": "HABIT",
+                "title": "Morning reading",
+                "estimatedSeconds": None,
+                "defaultMode": "FLOW",
+                "plannedIntervals": None,
+            }
+        )
+        self.assertEqual(habit.type, "HABIT")
+        self.assertIsNone(habit.estimated_seconds)
+        self.assertEqual(habit.default_mode, "FLOW")
 
 
 if __name__ == "__main__":

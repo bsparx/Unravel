@@ -155,3 +155,9 @@ export const desktopTimerActionSchema = z.discriminatedUnion("action", [
     minutes: z.number().int().min(1).max(12 * 60),
   }),
 ]);
+
+export const desktopToggleTaskSchema = z.object({
+  done: z.boolean(),
+  note: z.string().trim().max(500).optional(),
+  minutes: z.number().int().min(1).max(12 * 60).optional(),
+});

@@ -1,4 +1,4 @@
-"""Full Timer screen & Compact Mini Floating Mode matching Unravel's `/timer`."""
+"""Serene Timer Sanctuary & Compact Mini Mode paired with Today's `/day` list."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gtk
+from gi.repository import Adw, Gtk, Pango
 
 from .ring_widget import TimerRingWidget
 from .timer_engine import (
@@ -17,7 +17,6 @@ from .timer_engine import (
     INTERVAL_LABELS,
     MODE_DESCRIPTIONS,
     MODE_LABELS,
-    AttachedTask,
     TimerEngine,
     TimerMode,
     arc_progress,
@@ -33,7 +32,7 @@ from .timer_engine import (
 
 
 class TimerView(Gtk.Box):
-    """Full Unravel timer: Pomodoro, Pomodoro Flow, Timer, Recovery + all controls."""
+    """Calm, uncluttered Unravel Timer sanctuary with full mode & cadence parity."""
 
     def __init__(
         self,
@@ -50,6 +49,8 @@ class TimerView(Gtk.Box):
         on_discard: Callable[[], None],
         on_adjust_minutes: Callable[[int], None],
         on_reset: Callable[[], None],
+        on_clear_task: Callable[[], None],
+        on_check_selected_task: Callable[[], None],
         on_config_changed: Callable[[], None],
     ) -> None:
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -66,9 +67,10 @@ class TimerView(Gtk.Box):
             "discard": on_discard,
             "adjust": on_adjust_minutes,
             "reset": on_reset,
+            "clear_task": on_clear_task,
+            "check_task": on_check_selected_task,
             "config": on_config_changed,
         }
-        self._tasks: list[AttachedTask] = []
         self._updating_controls = False
         self._last_work_mode: TimerMode = "FLOW"
         self._last_work_target = engine.config.target_seconds
@@ -79,15 +81,19 @@ class TimerView(Gtk.Box):
         scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
 
         clamp = Adw.Clamp()
-        clamp.set_maximum_size(560)
+        clamp.set_maximum_size(460)
         clamp.set_margin_top(16)
         clamp.set_margin_bottom(24)
         clamp.set_margin_start(18)
         clamp.set_margin_end(18)
 
-        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
 
-        # ---- Top cadence & status pill row
+        # ---- Main frosted glass timer card
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        card.add_css_class("unravel-card")
+
+        # Quiet header row inside card: sync status + cadence badge
         top_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self._sync_label = Gtk.Label(label="", xalign=0)
         self._sync_label.add_css_class("caption")
@@ -99,20 +105,32 @@ class TimerView(Gtk.Box):
         self._cadence_chip.add_css_class("unravel-pill-chip")
         self._cadence_chip.add_css_class("unravel-flow-chip")
         top_row.append(self._cadence_chip)
-        root.append(top_row)
+        card.append(top_row)
 
-        # ---- Active session / Idle view vs Ended summary view
-        self._main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        # ---- Active / Idle stack inside card
+        self._main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
 
-        # Mode switcher (only interactive when IDLE)
+        # Mode switcher pills (idle only)
         self._mode_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        mode_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
-        mode_bar.add_css_class("linked")
+        mode_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
+        mode_bar.add_css_class("unravel-mode-bar")
         mode_bar.set_halign(Gtk.Align.CENTER)
         self._mode_buttons: dict[str, Gtk.ToggleButton] = {}
         group_first: Gtk.ToggleButton | None = None
+        short_labels = {
+            "POMODORO": "Pomodoro",
+            "FLOW": "Flow",
+            "BASIC": "Timer",
+            "RECOVERY": "Recovery",
+        }
         for mode_id in ("POMODORO", "FLOW", "BASIC", "RECOVERY"):
-            btn = Gtk.ToggleButton(label=MODE_LABELS[mode_id])
+            btn = Gtk.ToggleButton(label=short_labels[mode_id])
+            btn.add_css_class("flat")
+            btn.add_css_class("unravel-mode-btn")
+            if mode_id == "FLOW":
+                btn.add_css_class("unravel-mode-flow")
+            elif mode_id == "RECOVERY":
+                btn.add_css_class("unravel-mode-rest")
             if group_first is None:
                 group_first = btn
             else:
@@ -130,45 +148,73 @@ class TimerView(Gtk.Box):
         self._mode_box.append(self._mode_desc)
         self._main_box.append(self._mode_box)
 
-        # Cairo ring
-        self._ring = TimerRingWidget(size=244, compact=False)
+        # Glowing Cairo ring
+        self._ring = TimerRingWidget(size=268, compact=False)
         self._main_box.append(self._ring)
 
-        # Attached task pill (when running/paused with task)
-        self._active_task_label = Gtk.Label()
-        self._active_task_label.add_css_class("caption")
-        self._active_task_label.add_css_class("dim-label")
-        self._active_task_label.set_visible(False)
-        self._main_box.append(self._active_task_label)
+        # Selected `/day` task pill right under the ring
+        self._task_pill = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self._task_pill.add_css_class("unravel-active-task-pill")
+        self._task_pill.set_visible(False)
 
-        # Break overrun banner (visible only during break overrun)
+        self._task_kind_badge = Gtk.Label(label="Quest")
+        self._task_kind_badge.add_css_class("unravel-badge")
+        self._task_kind_badge.add_css_class("unravel-badge-habit")
+        self._task_pill.append(self._task_kind_badge)
+
+        self._task_title_lbl = Gtk.Label(label="", xalign=0)
+        self._task_title_lbl.set_hexpand(True)
+        self._task_title_lbl.set_ellipsize(Pango.EllipsizeMode.END)
+        self._task_pill.append(self._task_title_lbl)
+
+        self._task_check_btn = Gtk.Button(label="✓")
+        self._task_check_btn.add_css_class("flat")
+        self._task_check_btn.add_css_class("unravel-check-btn")
+        self._task_check_btn.set_tooltip_text("Cross off this item")
+        self._task_check_btn.connect("clicked", lambda _b: self._cb["check_task"]())
+        self._task_pill.append(self._task_check_btn)
+
+        self._task_clear_btn = Gtk.Button.new_from_icon_name("window-close-symbolic")
+        self._task_clear_btn.add_css_class("flat")
+        self._task_clear_btn.add_css_class("circular")
+        self._task_clear_btn.set_tooltip_text("Clear selection (Free focus)")
+        self._task_clear_btn.connect("clicked", lambda _b: self._cb["clear_task"]())
+        self._task_pill.append(self._task_clear_btn)
+        self._main_box.append(self._task_pill)
+
+        self._free_hint_lbl = Gtk.Label(label="Free focus · select any item from Today →")
+        self._free_hint_lbl.add_css_class("caption")
+        self._free_hint_lbl.add_css_class("dim-label")
+        self._main_box.append(self._free_hint_lbl)
+
+        # Break overrun banner
         self._overrun_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         self._overrun_box.add_css_class("unravel-overrun-banner")
         self._overrun_box.set_visible(False)
-        self._overrun_title = Gtk.Label(label="Break ran past its mark")
-        self._overrun_title.add_css_class("heading")
+        overrun_title = Gtk.Label(label="Break ran past its mark")
+        overrun_title.add_css_class("heading")
         self._overrun_note_preview = Gtk.Label()
         self._overrun_note_preview.set_wrap(True)
         self._overrun_note_preview.add_css_class("caption")
         self._overrun_note_preview.add_css_class("dim-label")
         self._overrun_note_preview.set_visible(False)
-        overrun_btns = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        overrun_btns = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         overrun_btns.set_halign(Gtk.Align.CENTER)
-        ext_btn = Gtk.Button(label="+5 more minutes")
+        ext_btn = Gtk.Button(label="+5 more")
         ext_btn.add_css_class("pill")
         ext_btn.connect("clicked", lambda _b: self._cb["extend"](300))
         back_btn = Gtk.Button(label="Back to focus")
-        back_btn.add_css_class("suggested-action")
-        back_btn.add_css_class("pill")
+        back_btn.add_css_class("unravel-primary-btn")
+        back_btn.set_size_request(132, 36)
         back_btn.connect("clicked", lambda _b: self._cb["skip"]())
         overrun_btns.append(ext_btn)
         overrun_btns.append(back_btn)
-        self._overrun_box.append(self._overrun_title)
+        self._overrun_box.append(overrun_title)
         self._overrun_box.append(self._overrun_note_preview)
         self._overrun_box.append(overrun_btns)
         self._main_box.append(self._overrun_box)
 
-        # Break return note input (visible during breaks)
+        # Break return note card
         self._note_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         self._note_box.add_css_class("unravel-soft-card")
         self._note_box.set_visible(False)
@@ -179,7 +225,7 @@ class TimerView(Gtk.Box):
         self._note_entry = Gtk.Entry()
         self._note_entry.set_hexpand(True)
         self._note_entry.set_max_length(140)
-        self._note_entry.set_placeholder_text("e.g. Finishing the auth exchange tests…")
+        self._note_entry.set_placeholder_text("Jot your return cue…")
         self._note_entry.connect("activate", self._submit_note)
         note_save = Gtk.Button(label="Keep")
         note_save.add_css_class("pill")
@@ -190,14 +236,13 @@ class TimerView(Gtk.Box):
         self._note_box.append(note_row)
         self._main_box.append(self._note_box)
 
-        # Primary live controls row
+        # Primary live buttons
         ctrl_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         ctrl_row.set_halign(Gtk.Align.CENTER)
 
         self._primary_btn = Gtk.Button(label="Start")
-        self._primary_btn.add_css_class("suggested-action")
-        self._primary_btn.add_css_class("pill")
-        self._primary_btn.set_size_request(144, 44)
+        self._primary_btn.add_css_class("unravel-primary-btn")
+        self._primary_btn.set_size_request(152, 44)
         self._primary_btn.connect("clicked", self._on_primary_clicked)
         ctrl_row.append(self._primary_btn)
 
@@ -223,17 +268,17 @@ class TimerView(Gtk.Box):
         ctrl_row.append(self._stop_btn)
         self._main_box.append(ctrl_row)
 
-        # Secondary live action row (complete attached task, +5m break, discard)
+        # Secondary subtle links (Stop & cross off, +5m break, Discard)
         sec_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         sec_row.set_halign(Gtk.Align.CENTER)
 
-        self._complete_task_btn = Gtk.Button(label="Stop & mark done")
+        self._complete_task_btn = Gtk.Button(label="Stop & cross off")
         self._complete_task_btn.add_css_class("flat")
         self._complete_task_btn.set_visible(False)
         self._complete_task_btn.connect("clicked", lambda _b: self._cb["stop"](True))
         sec_row.append(self._complete_task_btn)
 
-        self._plus5_btn = Gtk.Button(label="+5 min break")
+        self._plus5_btn = Gtk.Button(label="+5m break")
         self._plus5_btn.add_css_class("flat")
         self._plus5_btn.set_visible(False)
         self._plus5_btn.connect("clicked", lambda _b: self._cb["extend"](300))
@@ -246,19 +291,57 @@ class TimerView(Gtk.Box):
         sec_row.append(self._discard_btn)
         self._main_box.append(sec_row)
 
-        # ---- Idle setup card (presets, custom cadence, attach task/habit)
-        self._setup_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        self._setup_card.add_css_class("unravel-card")
+        card.append(self._main_box)
 
-        # Cadence presets strip (rebuilt per mode)
+        # ---- Post-session summary inside card
+        self._summary_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        self._summary_box.set_visible(False)
+
+        sum_head = Gtk.Label(label="Session logged")
+        sum_head.add_css_class("title-2")
+        self._summary_detail = Gtk.Label()
+        self._summary_detail.set_wrap(True)
+        self._summary_detail.set_justify(Gtk.Justification.CENTER)
+        self._summary_detail.add_css_class("dim-label")
+
+        adj_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        adj_row.set_halign(Gtk.Align.CENTER)
+        adj_lbl = Gtk.Label(label="Adjust minutes:")
+        adj_lbl.add_css_class("caption")
+        self._adjust_spin = Gtk.SpinButton.new_with_range(1, 720, 1)
+        adj_btn = Gtk.Button(label="Update")
+        adj_btn.add_css_class("pill")
+        adj_btn.connect("clicked", lambda _b: self._cb["adjust"](int(self._adjust_spin.get_value())))
+        adj_row.append(adj_lbl)
+        adj_row.append(self._adjust_spin)
+        adj_row.append(adj_btn)
+
+        again_btn = Gtk.Button(label="Start another")
+        again_btn.add_css_class("unravel-primary-btn")
+        again_btn.set_halign(Gtk.Align.CENTER)
+        again_btn.set_size_request(180, 42)
+        again_btn.connect("clicked", lambda _b: self._cb["reset"]())
+
+        self._summary_box.append(sum_head)
+        self._summary_box.append(self._summary_detail)
+        self._summary_box.append(adj_row)
+        self._summary_box.append(again_btn)
+        card.append(self._summary_box)
+
+        root.append(card)
+
+        # ---- Quiet cadence preset card below (idle only)
+        self._setup_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        self._setup_card.add_css_class("unravel-soft-card")
+
         self._preset_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         self._preset_row.set_halign(Gtk.Align.CENTER)
         self._setup_card.append(self._preset_row)
 
-        # Fine-tune custom controls
-        self._custom_expander = Gtk.Expander(label="Customize focus, break & rounds")
-        custom_grid = Gtk.Grid(column_spacing=12, row_spacing=10)
+        self._custom_expander = Gtk.Expander(label="Custom focus, break & rounds")
+        custom_grid = Gtk.Grid(column_spacing=12, row_spacing=8)
         custom_grid.set_margin_top(10)
+        custom_grid.set_halign(Gtk.Align.CENTER)
 
         self._focus_spin = Gtk.SpinButton.new_with_range(1, 480, 1)
         self._focus_spin.connect("value-changed", self._on_custom_changed)
@@ -283,57 +366,7 @@ class TimerView(Gtk.Box):
         self._custom_expander.set_child(custom_grid)
         self._setup_card.append(self._custom_expander)
 
-        # Attach a task or habit from today
-        task_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        task_lbl = Gtk.Label(label="Working on", xalign=0)
-        task_lbl.add_css_class("caption")
-        task_lbl.add_css_class("dim-label")
-        self._task_dropdown = Gtk.DropDown.new_from_strings(["Free focus (no task)"])
-        self._task_dropdown.set_hexpand(True)
-        self._task_dropdown.connect("notify::selected", self._on_task_selected)
-        task_row.append(task_lbl)
-        task_row.append(self._task_dropdown)
-        self._setup_card.append(task_row)
-
-        self._main_box.append(self._setup_card)
-        root.append(self._main_box)
-
-        # ---- Post-session summary card (visible only when phase == ENDED)
-        self._summary_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
-        self._summary_box.add_css_class("unravel-card")
-        self._summary_box.set_visible(False)
-
-        sum_head = Gtk.Label(label="Session logged")
-        sum_head.add_css_class("title-2")
-        self._summary_detail = Gtk.Label()
-        self._summary_detail.set_wrap(True)
-        self._summary_detail.set_justify(Gtk.Justification.CENTER)
-        self._summary_detail.add_css_class("dim-label")
-
-        adj_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        adj_row.set_halign(Gtk.Align.CENTER)
-        adj_lbl = Gtk.Label(label="Adjust minutes:")
-        adj_lbl.add_css_class("caption")
-        self._adjust_spin = Gtk.SpinButton.new_with_range(1, 720, 1)
-        adj_btn = Gtk.Button(label="Update")
-        adj_btn.add_css_class("pill")
-        adj_btn.connect("clicked", lambda _b: self._cb["adjust"](int(self._adjust_spin.get_value())))
-        adj_row.append(adj_lbl)
-        adj_row.append(self._adjust_spin)
-        adj_row.append(adj_btn)
-
-        again_btn = Gtk.Button(label="Start another session")
-        again_btn.add_css_class("suggested-action")
-        again_btn.add_css_class("pill")
-        again_btn.set_halign(Gtk.Align.CENTER)
-        again_btn.set_size_request(200, 42)
-        again_btn.connect("clicked", lambda _b: self._cb["reset"]())
-
-        self._summary_box.append(sum_head)
-        self._summary_box.append(self._summary_detail)
-        self._summary_box.append(adj_row)
-        self._summary_box.append(again_btn)
-        root.append(self._summary_box)
+        root.append(self._setup_card)
 
         clamp.set_child(root)
         scroll.set_child(clamp)
@@ -344,22 +377,6 @@ class TimerView(Gtk.Box):
     def set_sync_status(self, text: str) -> None:
         self._sync_label.set_text(text)
 
-    def set_tasks(self, tasks: list[AttachedTask]) -> None:
-        self._tasks = tasks
-        self._updating_controls = True
-        labels = ["Free focus (no task)"] + [
-            f"{'[Habit] ' if t.type == 'HABIT' else ''}{t.title}" for t in tasks
-        ]
-        self._task_dropdown.set_model(Gtk.StringList.new(labels))
-        selected = 0
-        if self._engine.task:
-            for idx, t in enumerate(tasks, start=1):
-                if t.id == self._engine.task.id:
-                    selected = idx
-                    break
-        self._task_dropdown.set_selected(selected)
-        self._updating_controls = False
-
     def sync_controls_from_engine(self) -> None:
         self._updating_controls = True
         cfg = self._engine.config
@@ -368,17 +385,19 @@ class TimerView(Gtk.Box):
             btn.set_active(True)
         self._mode_desc.set_text(MODE_DESCRIPTIONS[cfg.mode])
 
-        # Rebuild preset chips for current mode
         while (child := self._preset_row.get_first_child()) is not None:
             self._preset_row.remove(child)
+
         if has_intervals(cfg.mode):
             for f_min, b_min, label, _hint in CADENCE_PRESETS:
                 p_btn = Gtk.Button(label=label)
-                p_btn.add_css_class("pill")
+                p_btn.add_css_class("flat")
+                p_btn.add_css_class("unravel-preset-btn")
                 if round(per_focus_seconds(cfg) / 60) == f_min and round(cfg.short_break_seconds / 60) == b_min:
-                    p_btn.add_css_class("suggested-action")
+                    p_btn.add_css_class("unravel-preset-active")
                 p_btn.connect("clicked", self._apply_cadence_preset, f_min, b_min)
                 self._preset_row.append(p_btn)
+            self._setup_card.set_visible(self._engine.phase == "IDLE")
             self._preset_row.set_visible(True)
             self._custom_expander.set_visible(True)
             self._break_lbl.set_visible(True)
@@ -391,11 +410,13 @@ class TimerView(Gtk.Box):
         elif cfg.mode == "BASIC":
             for mins in BASIC_MINUTE_PRESETS:
                 p_btn = Gtk.Button(label=f"{mins}m")
-                p_btn.add_css_class("pill")
+                p_btn.add_css_class("flat")
+                p_btn.add_css_class("unravel-preset-btn")
                 if round(cfg.target_seconds / 60) == mins:
-                    p_btn.add_css_class("suggested-action")
+                    p_btn.add_css_class("unravel-preset-active")
                 p_btn.connect("clicked", self._apply_basic_preset, mins)
                 self._preset_row.append(p_btn)
+            self._setup_card.set_visible(self._engine.phase == "IDLE")
             self._preset_row.set_visible(True)
             self._custom_expander.set_visible(True)
             self._break_lbl.set_visible(False)
@@ -404,9 +425,7 @@ class TimerView(Gtk.Box):
             self._rounds_spin.set_visible(False)
             self._focus_spin.set_value(max(1, round(cfg.target_seconds / 60)))
         else:
-            # RECOVERY: open-ended, no target controls
-            self._preset_row.set_visible(False)
-            self._custom_expander.set_visible(False)
+            self._setup_card.set_visible(False)
 
         self._updating_controls = False
 
@@ -444,6 +463,7 @@ class TimerView(Gtk.Box):
 
         if phase == "ENDED":
             self._main_box.set_visible(False)
+            self._setup_card.set_visible(False)
             self._summary_box.set_visible(True)
             logged = eng.focus_elapsed_seconds()
             flow_s = eng.total_flow_seconds()
@@ -453,30 +473,39 @@ class TimerView(Gtk.Box):
             if eng.task:
                 parts.append(eng.task.title)
             self._summary_detail.set_text(" · ".join(parts))
-            if self._adjust_spin.get_value() < 1 or not self._adjust_spin.has_focus():
+            if not self._adjust_spin.has_focus():
                 self._adjust_spin.set_value(max(1, round(logged / 60)))
             return
 
         self._main_box.set_visible(True)
         self._summary_box.set_visible(False)
         self._mode_box.set_visible(phase == "IDLE")
-        self._setup_card.set_visible(phase == "IDLE")
+        self._setup_card.set_visible(phase == "IDLE" and not recovery)
 
-        # Active task label
-        if phase != "IDLE" and eng.task:
-            self._active_task_label.set_text(f"Task: {eng.task.title}")
-            self._active_task_label.set_visible(True)
+        # Selected `/day` item banner under ring
+        if eng.task and not recovery:
+            self._task_pill.set_visible(True)
+            self._free_hint_lbl.set_visible(False)
+            self._task_kind_badge.set_text("Daily" if eng.task.type == "HABIT" else "Quest")
+            self._task_title_lbl.set_text(eng.task.title)
+            self._task_clear_btn.set_visible(phase == "IDLE")
+            self._task_check_btn.set_visible(phase == "IDLE")
         else:
-            self._active_task_label.set_visible(False)
+            self._task_pill.set_visible(False)
+            self._free_hint_lbl.set_visible(phase == "IDLE" and not recovery)
 
-        # Ring visuals
+        # Ring visuals + subtle round ticks
         target = eng.current_target_seconds()
         i_elapsed = eng.interval_elapsed_seconds()
+        ticks: list[float] = []
+        if interval_mode and len(focus_blocks) > 1 and not on_break and not overrunning:
+            ticks = [i / len(focus_blocks) for i in range(1, len(focus_blocks))]
+
         if recovery:
             tone = "rest"
             prog = 0.0
             eyebrow = "Recovery" if phase != "IDLE" else "Open-ended rest"
-            subline = "Paused" if phase == "PAUSED" else ""
+            subline = "Paused" if phase == "PAUSED" else "Stop whenever restored"
         elif overrunning:
             tone = "overrun"
             prog = overtime_progress(eng.overrun_seconds(), target)
@@ -510,9 +539,10 @@ class TimerView(Gtk.Box):
             subline=subline,
             dark=dark,
             pulse=(flowing or recovery) and phase == "RUNNING",
+            tick_fractions=ticks,
         )
 
-        # Break overrun & return note visibility
+        # Break overrun & return note
         self._overrun_box.set_visible(overrunning)
         if overrunning and eng.return_note:
             self._overrun_note_preview.set_text(f"Note: {eng.return_note}")
@@ -539,8 +569,7 @@ class TimerView(Gtk.Box):
         else:
             self._primary_btn.set_visible(not overrunning)
             self._primary_btn.set_label("Pause" if phase == "RUNNING" else "Resume")
-            can_break = eng.next_break_info() is not None
-            self._break_btn.set_visible(can_break)
+            self._break_btn.set_visible(eng.next_break_info() is not None)
             self._skip_btn.set_visible(on_break and not overrunning)
             self._stop_btn.set_visible(True)
             self._complete_task_btn.set_visible(eng.task is not None and not recovery)
@@ -616,35 +645,12 @@ class TimerView(Gtk.Box):
         self.sync_controls_from_engine()
         self._cb["config"]()
 
-    def _on_task_selected(self, dropdown: Gtk.DropDown, _pspec) -> None:
-        if self._updating_controls or self._engine.phase != "IDLE":
-            return
-        idx = dropdown.get_selected()
-        if idx == 0 or idx - 1 >= len(self._tasks):
-            self._engine.task = None
-            return
-        task = self._tasks[idx - 1]
-        self._engine.task = task
-        if task.estimated_seconds and self._engine.config.mode != "RECOVERY":
-            mode = task.default_mode if task.default_mode in ("POMODORO", "FLOW", "BASIC") else self._engine.config.mode
-            target = clamp_target(task.estimated_seconds)
-            intervals = (
-                clamp_intervals(task.planned_intervals)
-                if task.planned_intervals and has_intervals(mode)
-                else suggest_intervals(target, self._engine.config.focus_seconds)
-                if has_intervals(mode)
-                else 1
-            )
-            self._engine.configure(mode=mode, target_seconds=target, intervals=intervals)
-            self.sync_controls_from_engine()
-        self._cb["config"]()
-
     def _submit_note(self, _widget) -> None:
         self._cb["note"](self._note_entry.get_text())
 
 
 class MiniTimerView(Gtk.Box):
-    """Compact ~330×140 floating timer card for keeping in the corner while working."""
+    """Sleek frosted ~360×136 floating timer pill showing active `/day` task & controls."""
 
     def __init__(
         self,
@@ -654,21 +660,22 @@ class MiniTimerView(Gtk.Box):
         on_take_break: Callable[[], None],
         on_skip: Callable[[], None],
         on_extend: Callable[[int], None],
-        on_stop: Callable[[], None],
+        on_stop: Callable[[bool], None],
         on_expand: Callable[[], None],
     ) -> None:
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         self._engine = engine
-        self.set_margin_top(10)
+        self.set_margin_top(8)
         self.set_margin_bottom(10)
-        self.set_margin_start(14)
-        self.set_margin_end(14)
+        self.set_margin_start(12)
+        self.set_margin_end(12)
 
-        top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        top.set_valign(Gtk.Align.CENTER)
+        card = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        card.add_css_class("unravel-soft-card")
+        card.set_valign(Gtk.Align.CENTER)
 
-        self._ring = TimerRingWidget(size=54, compact=True)
-        top.append(self._ring)
+        self._ring = TimerRingWidget(size=50, compact=True)
+        card.append(self._ring)
 
         info = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
         info.set_hexpand(True)
@@ -677,16 +684,15 @@ class MiniTimerView(Gtk.Box):
         self._sub_lbl = Gtk.Label(label="Pomodoro Flow", xalign=0)
         self._sub_lbl.add_css_class("caption")
         self._sub_lbl.add_css_class("dim-label")
-        self._sub_lbl.set_ellipsize(3)  # PANGO_ELLIPSIZE_END
+        self._sub_lbl.set_ellipsize(Pango.EllipsizeMode.END)
         info.append(self._clock_lbl)
         info.append(self._sub_lbl)
-        top.append(info)
+        card.append(info)
 
-        # Compact icon controls
         btns = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
         self._play_btn = Gtk.Button.new_from_icon_name("media-playback-start-symbolic")
         self._play_btn.add_css_class("circular")
-        self._play_btn.add_css_class("suggested-action")
+        self._play_btn.add_css_class("unravel-primary-btn")
         self._play_btn.set_tooltip_text("Start / Pause / Resume")
         self._play_btn.connect("clicked", lambda _b: on_toggle())
         btns.append(self._play_btn)
@@ -706,23 +712,30 @@ class MiniTimerView(Gtk.Box):
         self._plus5_btn.connect("clicked", lambda _b: on_extend(300))
         btns.append(self._plus5_btn)
 
+        self._done_btn = Gtk.Button(label="✓")
+        self._done_btn.add_css_class("circular")
+        self._done_btn.set_tooltip_text("Stop & cross off task")
+        self._done_btn.set_visible(False)
+        self._done_btn.connect("clicked", lambda _b: on_stop(True))
+        btns.append(self._done_btn)
+
         self._stop_btn = Gtk.Button.new_from_icon_name("media-playback-stop-symbolic")
         self._stop_btn.add_css_class("circular")
         self._stop_btn.set_tooltip_text("Stop & log session")
-        self._stop_btn.connect("clicked", lambda _b: on_stop())
+        self._stop_btn.connect("clicked", lambda _b: on_stop(False))
         btns.append(self._stop_btn)
 
         expand_btn = Gtk.Button.new_from_icon_name("view-fullscreen-symbolic")
         expand_btn.add_css_class("circular")
         expand_btn.add_css_class("flat")
-        expand_btn.set_tooltip_text("Return to full view")
+        expand_btn.set_tooltip_text("Expand to full view")
         expand_btn.connect("clicked", lambda _b: on_expand())
         btns.append(expand_btn)
 
-        top.append(btns)
-        self.append(top)
+        card.append(btns)
+        self.append(card)
 
-        hint = Gtk.Label(label="Tip: Press Alt+Space → Always on Top to pin above other windows")
+        hint = Gtk.Label(label="Tip: Alt+Space → Always on Top pins this above other windows")
         hint.add_css_class("caption")
         hint.add_css_class("dim-label")
         hint.set_xalign(0)
@@ -745,7 +758,7 @@ class MiniTimerView(Gtk.Box):
         elif eng.config.mode == "RECOVERY":
             tone, prog, sub = "rest", 0.0, "Recovery"
         elif flowing:
-            tone, prog, sub = "flow", 1.0, f"Flowing · +{format_duration(eng.focus_flow_seconds())}"
+            tone, prog, sub = "flow", 1.0, f"Flowing · {eng.task.title if eng.task else '+' + format_duration(eng.focus_flow_seconds())}"
         else:
             tone = "flow" if eng.config.mode == "FLOW" else "focus"
             prog = 1.0 if phase == "IDLE" else arc_progress(i_elapsed, target)
@@ -762,4 +775,5 @@ class MiniTimerView(Gtk.Box):
         )
         self._break_btn.set_visible(on_break or eng.next_break_info() is not None)
         self._plus5_btn.set_visible(overrunning)
+        self._done_btn.set_visible(phase in ("RUNNING", "PAUSED") and eng.task is not None and eng.config.mode != "RECOVERY")
         self._stop_btn.set_visible(phase in ("RUNNING", "PAUSED"))

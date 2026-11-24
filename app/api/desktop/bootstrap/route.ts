@@ -1,15 +1,13 @@
 import { NextResponse } from "next/server";
 
 import { getActiveSession } from "@/app/(app)/timer/_lib/session-hydrate";
-import { todayLocal } from "@/lib/dates";
-import { prisma } from "@/lib/db";
 import { authenticateDesktopRequest } from "@/lib/desktop-auth";
-import { isDueOn } from "@/lib/recurrence";
+import { getDesktopDayPayload } from "@/lib/desktop-day";
 
 /**
  * Initial hydration payload for the Ubuntu desktop companion:
  * user info, all timer settings, active cross-device session (if any),
- * and today's attachable open todos + active habits.
+ * and today's full `/day` task & habit list.
  */
 export async function GET(request: Request) {
   const ctx = await authenticateDesktopRequest(request);
@@ -18,50 +16,25 @@ export async function GET(request: Request) {
   }
 
   const { user } = ctx;
-  const today = todayLocal(user.timezone);
-
-  const [activeSession, rawTasks] = await Promise.all([
+  const [activeSession, day] = await Promise.all([
     getActiveSession(user),
-    prisma.task.findMany({
-      where: {
-        userId: user.id,
-        archivedAt: null,
-        OR: [{ type: "HABIT" }, { type: "TODO", completedAt: null }],
-      },
-      orderBy: [{ type: "asc" }, { sortOrder: "asc" }, { createdAt: "desc" }],
-      take: 80,
-      select: {
-        id: true,
-        title: true,
-        type: true,
-        estimatedSeconds: true,
-        defaultMode: true,
-        plannedIntervals: true,
-        recurrence: {
-          select: {
-            daysOfWeek: true,
-            startDate: true,
-            endDate: true,
-          },
-        },
-      },
-    }),
+    getDesktopDayPayload(user),
   ]);
 
-  const tasks = rawTasks
-    .filter((t) => {
-      if (t.type === "TODO") return true;
-      if (!t.recurrence) return true;
-      return isDueOn(t.recurrence, today);
-    })
-    .map((t) => ({
-      id: t.id,
-      title: t.title,
-      type: t.type,
-      estimatedSeconds: t.estimatedSeconds,
-      defaultMode: t.defaultMode,
-      plannedIntervals: t.plannedIntervals,
-    }));
+  // Flat attachable list for backwards compatibility with any caller reading `tasks`.
+  const tasks = [
+    ...day.overdue,
+    ...day.dueToday,
+    ...day.habits,
+    ...day.undated,
+  ].map((item) => ({
+    id: item.id,
+    title: item.title,
+    type: item.type,
+    estimatedSeconds: item.estimatedSeconds,
+    defaultMode: item.defaultMode,
+    plannedIntervals: item.plannedIntervals,
+  }));
 
   return NextResponse.json({
     serverTimeMs: Date.now(),
@@ -83,6 +56,7 @@ export async function GET(request: Request) {
       returnAlertsEnabled: user.returnAlertsEnabled,
     },
     activeSession,
+    day,
     tasks,
   });
 }
