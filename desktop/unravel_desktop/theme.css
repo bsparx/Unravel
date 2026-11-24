@@ -1,0 +1,91 @@
+/* Serene Cotton Candy (light) & The Night (dark) styling layered onto Libadwaita */
+
+window.unravel-window {
+  background-image: linear-gradient(
+    145deg,
+    alpha(#f4b8d0, 0.20) 0%,
+    alpha(#c6dcf8, 0.16) 52%,
+    alpha(#b8ece0, 0.20) 100%
+  );
+}
+
+.unravel-card {
+  background-color: alpha(@card_bg_color, 0.84);
+  border: 1px solid alpha(@window_fg_color, 0.09);
+  border-radius: 18px;
+  padding: 14px 16px;
+}
+
+.unravel-soft-card {
+  background-color: alpha(@card_bg_color, 0.62);
+  border: 1px solid alpha(@window_fg_color, 0.07);
+  border-radius: 14px;
+  padding: 10px 14px;
+}
+
+.unravel-pill-chip {
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.unravel-flow-chip {
+  background-color: alpha(#10b981, 0.16);
+  color: #0f766e;
+}
+
+.unravel-rest-chip {
+  background-color: alpha(#6366f1, 0.16);
+  color: #4f46e5;
+}
+
+.unravel-overrun-chip {
+  background-color: alpha(#ef4444, 0.16);
+  color: #dc2626;
+}
+
+.unravel-stat-num {
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.unravel-mini-clock {
+  font-size: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.unravel-mono {
+  font-family: monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.unravel-bar-track {
+  background-color: alpha(@window_fg_color, 0.09);
+  border-radius: 999px;
+  min-height: 7px;
+}
+
+.unravel-bar-fill {
+  background-color: #0d9488;
+  border-radius: 999px;
+  min-height: 7px;
+}
+
+.unravel-day-btn {
+  border-radius: 14px;
+  padding: 8px 12px;
+}
+
+.unravel-day-today {
+  border: 1px solid alpha(#0d9488, 0.45);
+}
+
+.unravel-overrun-banner {
+  background-color: alpha(#ef4444, 0.12);
+  border: 1px solid alpha(#ef4444, 0.30);
+  border-radius: 16px;
+  padding: 12px 14px;
+}

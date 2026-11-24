@@ -440,6 +440,8 @@ model User {
   brainDumps          BrainDump[]
   recitationLogs      RecitationLog[]
   customRecitations   CustomRecitation[]
+  desktopApiTokens    DesktopApiToken[]
+  desktopAuthCodes    DesktopAuthCode[]
 }
 
 // ---------------------------------------------------------------- lists
@@ -1903,4 +1905,39 @@ enum ReadingUnit {
   PAGE
   /// Percent, for e-books.
   PERCENT
+}
+
+// ---------------------------------------------------------------- desktop companion
+
+/// A revocable personal access token for the Ubuntu desktop companion app.
+/// Only the SHA-256 hash is stored; the raw `unr_...` token is shown once
+/// during sign-in or manual creation and never persisted in plaintext.
+model DesktopApiToken {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label      String
+  tokenHash  String    @unique
+  prefix     String
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, revokedAt])
+}
+
+/// Short-lived (60s), single-use PKCE authorization code handed off from
+/// `/desktop/connect` to the desktop app's `127.0.0.1` loopback callback so
+/// long-lived tokens never appear in browser URLs or history.
+model DesktopAuthCode {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash      String   @unique
+  codeChallenge String
+  label         String
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+
+  @@index([expiresAt])
 }

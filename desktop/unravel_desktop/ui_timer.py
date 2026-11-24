@@ -1,0 +1,765 @@
+"""Full Timer screen & Compact Mini Floating Mode matching Unravel's `/timer`."""
+
+from __future__ import annotations
+
+from typing import Callable
+
+import gi
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Adw, Gtk
+
+from .ring_widget import TimerRingWidget
+from .timer_engine import (
+    BASIC_MINUTE_PRESETS,
+    CADENCE_PRESETS,
+    INTERVAL_LABELS,
+    MODE_DESCRIPTIONS,
+    MODE_LABELS,
+    AttachedTask,
+    TimerEngine,
+    TimerMode,
+    arc_progress,
+    clamp_break,
+    clamp_intervals,
+    clamp_target,
+    format_duration,
+    has_intervals,
+    overtime_progress,
+    per_focus_seconds,
+    suggest_intervals,
+)
+
+
+class TimerView(Gtk.Box):
+    """Full Unravel timer: Pomodoro, Pomodoro Flow, Timer, Recovery + all controls."""
+
+    def __init__(
+        self,
+        engine: TimerEngine,
+        *,
+        on_start: Callable[[], None],
+        on_pause: Callable[[], None],
+        on_resume: Callable[[], None],
+        on_take_break: Callable[[], None],
+        on_skip_interval: Callable[[], None],
+        on_extend_break: Callable[[int], None],
+        on_return_note: Callable[[str], None],
+        on_stop: Callable[[bool], None],
+        on_discard: Callable[[], None],
+        on_adjust_minutes: Callable[[int], None],
+        on_reset: Callable[[], None],
+        on_config_changed: Callable[[], None],
+    ) -> None:
+        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        self._engine = engine
+        self._cb = {
+            "start": on_start,
+            "pause": on_pause,
+            "resume": on_resume,
+            "take_break": on_take_break,
+            "skip": on_skip_interval,
+            "extend": on_extend_break,
+            "note": on_return_note,
+            "stop": on_stop,
+            "discard": on_discard,
+            "adjust": on_adjust_minutes,
+            "reset": on_reset,
+            "config": on_config_changed,
+        }
+        self._tasks: list[AttachedTask] = []
+        self._updating_controls = False
+        self._last_work_mode: TimerMode = "FLOW"
+        self._last_work_target = engine.config.target_seconds
+        self._last_work_intervals = engine.config.intervals
+
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_vexpand(True)
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+
+        clamp = Adw.Clamp()
+        clamp.set_maximum_size(560)
+        clamp.set_margin_top(16)
+        clamp.set_margin_bottom(24)
+        clamp.set_margin_start(18)
+        clamp.set_margin_end(18)
+
+        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+
+        # ---- Top cadence & status pill row
+        top_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self._sync_label = Gtk.Label(label="", xalign=0)
+        self._sync_label.add_css_class("caption")
+        self._sync_label.add_css_class("dim-label")
+        self._sync_label.set_hexpand(True)
+        top_row.append(self._sync_label)
+
+        self._cadence_chip = Gtk.Label(label="Pomodoro Flow · 25/5")
+        self._cadence_chip.add_css_class("unravel-pill-chip")
+        self._cadence_chip.add_css_class("unravel-flow-chip")
+        top_row.append(self._cadence_chip)
+        root.append(top_row)
+
+        # ---- Active session / Idle view vs Ended summary view
+        self._main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+
+        # Mode switcher (only interactive when IDLE)
+        self._mode_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        mode_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        mode_bar.add_css_class("linked")
+        mode_bar.set_halign(Gtk.Align.CENTER)
+        self._mode_buttons: dict[str, Gtk.ToggleButton] = {}
+        group_first: Gtk.ToggleButton | None = None
+        for mode_id in ("POMODORO", "FLOW", "BASIC", "RECOVERY"):
+            btn = Gtk.ToggleButton(label=MODE_LABELS[mode_id])
+            if group_first is None:
+                group_first = btn
+            else:
+                btn.set_group(group_first)
+            btn.connect("toggled", self._on_mode_toggled, mode_id)
+            mode_bar.append(btn)
+            self._mode_buttons[mode_id] = btn
+        self._mode_box.append(mode_bar)
+
+        self._mode_desc = Gtk.Label(label=MODE_DESCRIPTIONS[engine.config.mode])
+        self._mode_desc.set_wrap(True)
+        self._mode_desc.set_justify(Gtk.Justification.CENTER)
+        self._mode_desc.add_css_class("caption")
+        self._mode_desc.add_css_class("dim-label")
+        self._mode_box.append(self._mode_desc)
+        self._main_box.append(self._mode_box)
+
+        # Cairo ring
+        self._ring = TimerRingWidget(size=244, compact=False)
+        self._main_box.append(self._ring)
+
+        # Attached task pill (when running/paused with task)
+        self._active_task_label = Gtk.Label()
+        self._active_task_label.add_css_class("caption")
+        self._active_task_label.add_css_class("dim-label")
+        self._active_task_label.set_visible(False)
+        self._main_box.append(self._active_task_label)
+
+        # Break overrun banner (visible only during break overrun)
+        self._overrun_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        self._overrun_box.add_css_class("unravel-overrun-banner")
+        self._overrun_box.set_visible(False)
+        self._overrun_title = Gtk.Label(label="Break ran past its mark")
+        self._overrun_title.add_css_class("heading")
+        self._overrun_note_preview = Gtk.Label()
+        self._overrun_note_preview.set_wrap(True)
+        self._overrun_note_preview.add_css_class("caption")
+        self._overrun_note_preview.add_css_class("dim-label")
+        self._overrun_note_preview.set_visible(False)
+        overrun_btns = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        overrun_btns.set_halign(Gtk.Align.CENTER)
+        ext_btn = Gtk.Button(label="+5 more minutes")
+        ext_btn.add_css_class("pill")
+        ext_btn.connect("clicked", lambda _b: self._cb["extend"](300))
+        back_btn = Gtk.Button(label="Back to focus")
+        back_btn.add_css_class("suggested-action")
+        back_btn.add_css_class("pill")
+        back_btn.connect("clicked", lambda _b: self._cb["skip"]())
+        overrun_btns.append(ext_btn)
+        overrun_btns.append(back_btn)
+        self._overrun_box.append(self._overrun_title)
+        self._overrun_box.append(self._overrun_note_preview)
+        self._overrun_box.append(overrun_btns)
+        self._main_box.append(self._overrun_box)
+
+        # Break return note input (visible during breaks)
+        self._note_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        self._note_box.add_css_class("unravel-soft-card")
+        self._note_box.set_visible(False)
+        note_lbl = Gtk.Label(label="Where were you? (return cue for after this break)", xalign=0)
+        note_lbl.add_css_class("caption")
+        note_lbl.add_css_class("dim-label")
+        note_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self._note_entry = Gtk.Entry()
+        self._note_entry.set_hexpand(True)
+        self._note_entry.set_max_length(140)
+        self._note_entry.set_placeholder_text("e.g. Finishing the auth exchange tests…")
+        self._note_entry.connect("activate", self._submit_note)
+        note_save = Gtk.Button(label="Keep")
+        note_save.add_css_class("pill")
+        note_save.connect("clicked", self._submit_note)
+        note_row.append(self._note_entry)
+        note_row.append(note_save)
+        self._note_box.append(note_lbl)
+        self._note_box.append(note_row)
+        self._main_box.append(self._note_box)
+
+        # Primary live controls row
+        ctrl_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        ctrl_row.set_halign(Gtk.Align.CENTER)
+
+        self._primary_btn = Gtk.Button(label="Start")
+        self._primary_btn.add_css_class("suggested-action")
+        self._primary_btn.add_css_class("pill")
+        self._primary_btn.set_size_request(144, 44)
+        self._primary_btn.connect("clicked", self._on_primary_clicked)
+        ctrl_row.append(self._primary_btn)
+
+        self._break_btn = Gtk.Button(label="Take break")
+        self._break_btn.add_css_class("pill")
+        self._break_btn.set_size_request(-1, 44)
+        self._break_btn.set_visible(False)
+        self._break_btn.connect("clicked", lambda _b: self._cb["take_break"]())
+        ctrl_row.append(self._break_btn)
+
+        self._skip_btn = Gtk.Button(label="Skip break")
+        self._skip_btn.add_css_class("pill")
+        self._skip_btn.set_size_request(-1, 44)
+        self._skip_btn.set_visible(False)
+        self._skip_btn.connect("clicked", lambda _b: self._cb["skip"]())
+        ctrl_row.append(self._skip_btn)
+
+        self._stop_btn = Gtk.Button(label="Stop")
+        self._stop_btn.add_css_class("pill")
+        self._stop_btn.set_size_request(-1, 44)
+        self._stop_btn.set_visible(False)
+        self._stop_btn.connect("clicked", lambda _b: self._cb["stop"](False))
+        ctrl_row.append(self._stop_btn)
+        self._main_box.append(ctrl_row)
+
+        # Secondary live action row (complete attached task, +5m break, discard)
+        sec_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        sec_row.set_halign(Gtk.Align.CENTER)
+
+        self._complete_task_btn = Gtk.Button(label="Stop & mark done")
+        self._complete_task_btn.add_css_class("flat")
+        self._complete_task_btn.set_visible(False)
+        self._complete_task_btn.connect("clicked", lambda _b: self._cb["stop"](True))
+        sec_row.append(self._complete_task_btn)
+
+        self._plus5_btn = Gtk.Button(label="+5 min break")
+        self._plus5_btn.add_css_class("flat")
+        self._plus5_btn.set_visible(False)
+        self._plus5_btn.connect("clicked", lambda _b: self._cb["extend"](300))
+        sec_row.append(self._plus5_btn)
+
+        self._discard_btn = Gtk.Button(label="Discard")
+        self._discard_btn.add_css_class("flat")
+        self._discard_btn.set_visible(False)
+        self._discard_btn.connect("clicked", lambda _b: self._cb["discard"]())
+        sec_row.append(self._discard_btn)
+        self._main_box.append(sec_row)
+
+        # ---- Idle setup card (presets, custom cadence, attach task/habit)
+        self._setup_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        self._setup_card.add_css_class("unravel-card")
+
+        # Cadence presets strip (rebuilt per mode)
+        self._preset_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        self._preset_row.set_halign(Gtk.Align.CENTER)
+        self._setup_card.append(self._preset_row)
+
+        # Fine-tune custom controls
+        self._custom_expander = Gtk.Expander(label="Customize focus, break & rounds")
+        custom_grid = Gtk.Grid(column_spacing=12, row_spacing=10)
+        custom_grid.set_margin_top(10)
+
+        self._focus_spin = Gtk.SpinButton.new_with_range(1, 480, 1)
+        self._focus_spin.connect("value-changed", self._on_custom_changed)
+        self._break_spin = Gtk.SpinButton.new_with_range(1, 60, 1)
+        self._break_spin.connect("value-changed", self._on_custom_changed)
+        self._rounds_spin = Gtk.SpinButton.new_with_range(1, 12, 1)
+        self._rounds_spin.connect("value-changed", self._on_custom_changed)
+
+        self._focus_lbl = Gtk.Label(label="Focus (min)", xalign=0)
+        self._focus_lbl.add_css_class("caption")
+        self._break_lbl = Gtk.Label(label="Short break (min)", xalign=0)
+        self._break_lbl.add_css_class("caption")
+        self._rounds_lbl = Gtk.Label(label="Rounds", xalign=0)
+        self._rounds_lbl.add_css_class("caption")
+
+        custom_grid.attach(self._focus_lbl, 0, 0, 1, 1)
+        custom_grid.attach(self._focus_spin, 1, 0, 1, 1)
+        custom_grid.attach(self._break_lbl, 0, 1, 1, 1)
+        custom_grid.attach(self._break_spin, 1, 1, 1, 1)
+        custom_grid.attach(self._rounds_lbl, 0, 2, 1, 1)
+        custom_grid.attach(self._rounds_spin, 1, 2, 1, 1)
+        self._custom_expander.set_child(custom_grid)
+        self._setup_card.append(self._custom_expander)
+
+        # Attach a task or habit from today
+        task_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        task_lbl = Gtk.Label(label="Working on", xalign=0)
+        task_lbl.add_css_class("caption")
+        task_lbl.add_css_class("dim-label")
+        self._task_dropdown = Gtk.DropDown.new_from_strings(["Free focus (no task)"])
+        self._task_dropdown.set_hexpand(True)
+        self._task_dropdown.connect("notify::selected", self._on_task_selected)
+        task_row.append(task_lbl)
+        task_row.append(self._task_dropdown)
+        self._setup_card.append(task_row)
+
+        self._main_box.append(self._setup_card)
+        root.append(self._main_box)
+
+        # ---- Post-session summary card (visible only when phase == ENDED)
+        self._summary_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        self._summary_box.add_css_class("unravel-card")
+        self._summary_box.set_visible(False)
+
+        sum_head = Gtk.Label(label="Session logged")
+        sum_head.add_css_class("title-2")
+        self._summary_detail = Gtk.Label()
+        self._summary_detail.set_wrap(True)
+        self._summary_detail.set_justify(Gtk.Justification.CENTER)
+        self._summary_detail.add_css_class("dim-label")
+
+        adj_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        adj_row.set_halign(Gtk.Align.CENTER)
+        adj_lbl = Gtk.Label(label="Adjust minutes:")
+        adj_lbl.add_css_class("caption")
+        self._adjust_spin = Gtk.SpinButton.new_with_range(1, 720, 1)
+        adj_btn = Gtk.Button(label="Update")
+        adj_btn.add_css_class("pill")
+        adj_btn.connect("clicked", lambda _b: self._cb["adjust"](int(self._adjust_spin.get_value())))
+        adj_row.append(adj_lbl)
+        adj_row.append(self._adjust_spin)
+        adj_row.append(adj_btn)
+
+        again_btn = Gtk.Button(label="Start another session")
+        again_btn.add_css_class("suggested-action")
+        again_btn.add_css_class("pill")
+        again_btn.set_halign(Gtk.Align.CENTER)
+        again_btn.set_size_request(200, 42)
+        again_btn.connect("clicked", lambda _b: self._cb["reset"]())
+
+        self._summary_box.append(sum_head)
+        self._summary_box.append(self._summary_detail)
+        self._summary_box.append(adj_row)
+        self._summary_box.append(again_btn)
+        root.append(self._summary_box)
+
+        clamp.set_child(root)
+        scroll.set_child(clamp)
+        self.append(scroll)
+
+        self.sync_controls_from_engine()
+
+    def set_sync_status(self, text: str) -> None:
+        self._sync_label.set_text(text)
+
+    def set_tasks(self, tasks: list[AttachedTask]) -> None:
+        self._tasks = tasks
+        self._updating_controls = True
+        labels = ["Free focus (no task)"] + [
+            f"{'[Habit] ' if t.type == 'HABIT' else ''}{t.title}" for t in tasks
+        ]
+        self._task_dropdown.set_model(Gtk.StringList.new(labels))
+        selected = 0
+        if self._engine.task:
+            for idx, t in enumerate(tasks, start=1):
+                if t.id == self._engine.task.id:
+                    selected = idx
+                    break
+        self._task_dropdown.set_selected(selected)
+        self._updating_controls = False
+
+    def sync_controls_from_engine(self) -> None:
+        self._updating_controls = True
+        cfg = self._engine.config
+        btn = self._mode_buttons.get(cfg.mode)
+        if btn and not btn.get_active():
+            btn.set_active(True)
+        self._mode_desc.set_text(MODE_DESCRIPTIONS[cfg.mode])
+
+        # Rebuild preset chips for current mode
+        while (child := self._preset_row.get_first_child()) is not None:
+            self._preset_row.remove(child)
+        if has_intervals(cfg.mode):
+            for f_min, b_min, label, _hint in CADENCE_PRESETS:
+                p_btn = Gtk.Button(label=label)
+                p_btn.add_css_class("pill")
+                if round(per_focus_seconds(cfg) / 60) == f_min and round(cfg.short_break_seconds / 60) == b_min:
+                    p_btn.add_css_class("suggested-action")
+                p_btn.connect("clicked", self._apply_cadence_preset, f_min, b_min)
+                self._preset_row.append(p_btn)
+            self._preset_row.set_visible(True)
+            self._custom_expander.set_visible(True)
+            self._break_lbl.set_visible(True)
+            self._break_spin.set_visible(True)
+            self._rounds_lbl.set_visible(True)
+            self._rounds_spin.set_visible(True)
+            self._focus_spin.set_value(max(1, round(per_focus_seconds(cfg) / 60)))
+            self._break_spin.set_value(max(1, round(cfg.short_break_seconds / 60)))
+            self._rounds_spin.set_value(cfg.intervals)
+        elif cfg.mode == "BASIC":
+            for mins in BASIC_MINUTE_PRESETS:
+                p_btn = Gtk.Button(label=f"{mins}m")
+                p_btn.add_css_class("pill")
+                if round(cfg.target_seconds / 60) == mins:
+                    p_btn.add_css_class("suggested-action")
+                p_btn.connect("clicked", self._apply_basic_preset, mins)
+                self._preset_row.append(p_btn)
+            self._preset_row.set_visible(True)
+            self._custom_expander.set_visible(True)
+            self._break_lbl.set_visible(False)
+            self._break_spin.set_visible(False)
+            self._rounds_lbl.set_visible(False)
+            self._rounds_spin.set_visible(False)
+            self._focus_spin.set_value(max(1, round(cfg.target_seconds / 60)))
+        else:
+            # RECOVERY: open-ended, no target controls
+            self._preset_row.set_visible(False)
+            self._custom_expander.set_visible(False)
+
+        self._updating_controls = False
+
+    def refresh_tick(self, dark: bool) -> None:
+        eng = self._engine
+        cfg = eng.config
+        phase = eng.phase
+        plan = eng.plan()
+        cur = eng.current_interval()
+        on_break = eng.on_break()
+        flowing = eng.is_focus_flowing()
+        overrunning = eng.is_overrunning()
+        recovery = cfg.mode == "RECOVERY"
+        interval_mode = has_intervals(cfg.mode)
+        focus_blocks = [i for i in plan if i.kind == "FOCUS"]
+        focus_idx = sum(1 for i in plan[: eng.interval_index + 1] if i.kind == "FOCUS")
+
+        # Cadence chip
+        for css in ("unravel-flow-chip", "unravel-rest-chip", "unravel-overrun-chip"):
+            self._cadence_chip.remove_css_class(css)
+        if recovery:
+            chip_text = "Recovery"
+            self._cadence_chip.add_css_class("unravel-rest-chip")
+        elif interval_mode:
+            chip_text = f"{MODE_LABELS[cfg.mode]} · {round(per_focus_seconds(cfg) / 60)}/{round(cfg.short_break_seconds / 60)}"
+            if overrunning:
+                self._cadence_chip.add_css_class("unravel-overrun-chip")
+            elif on_break:
+                self._cadence_chip.add_css_class("unravel-rest-chip")
+            elif cfg.mode == "FLOW":
+                self._cadence_chip.add_css_class("unravel-flow-chip")
+        else:
+            chip_text = f"{MODE_LABELS[cfg.mode]} · {format_duration(cfg.target_seconds)}"
+        self._cadence_chip.set_text(chip_text)
+
+        if phase == "ENDED":
+            self._main_box.set_visible(False)
+            self._summary_box.set_visible(True)
+            logged = eng.focus_elapsed_seconds()
+            flow_s = eng.total_flow_seconds()
+            parts = [f"{format_duration(logged)} logged"]
+            if flow_s > 0:
+                parts.append(f"+{format_duration(flow_s)} in flow")
+            if eng.task:
+                parts.append(eng.task.title)
+            self._summary_detail.set_text(" · ".join(parts))
+            if self._adjust_spin.get_value() < 1 or not self._adjust_spin.has_focus():
+                self._adjust_spin.set_value(max(1, round(logged / 60)))
+            return
+
+        self._main_box.set_visible(True)
+        self._summary_box.set_visible(False)
+        self._mode_box.set_visible(phase == "IDLE")
+        self._setup_card.set_visible(phase == "IDLE")
+
+        # Active task label
+        if phase != "IDLE" and eng.task:
+            self._active_task_label.set_text(f"Task: {eng.task.title}")
+            self._active_task_label.set_visible(True)
+        else:
+            self._active_task_label.set_visible(False)
+
+        # Ring visuals
+        target = eng.current_target_seconds()
+        i_elapsed = eng.interval_elapsed_seconds()
+        if recovery:
+            tone = "rest"
+            prog = 0.0
+            eyebrow = "Recovery" if phase != "IDLE" else "Open-ended rest"
+            subline = "Paused" if phase == "PAUSED" else ""
+        elif overrunning:
+            tone = "overrun"
+            prog = overtime_progress(eng.overrun_seconds(), target)
+            eyebrow = f"{INTERVAL_LABELS[cur.kind]} overrun"
+            subline = "Choose below"
+        elif on_break:
+            tone = "rest"
+            prog = arc_progress(i_elapsed, target)
+            eyebrow = INTERVAL_LABELS[cur.kind]
+            subline = "Paused" if phase == "PAUSED" else f"Round {focus_idx} of {len(focus_blocks)}"
+        elif flowing:
+            tone = "flow"
+            prog = 1.0
+            eyebrow = "Flowing · baseline met"
+            subline = f"+{format_duration(eng.focus_flow_seconds())} past {format_duration(target)}"
+        else:
+            tone = "flow" if cfg.mode == "FLOW" else "focus"
+            prog = 1.0 if phase == "IDLE" else arc_progress(i_elapsed, target)
+            if phase == "IDLE":
+                eyebrow = f"{format_duration(per_focus_seconds(cfg))} baseline" if cfg.mode == "FLOW" else MODE_LABELS[cfg.mode]
+                subline = f"{cfg.intervals} rounds" if interval_mode and cfg.intervals > 1 else ""
+            else:
+                eyebrow = f"Round {focus_idx} of {len(focus_blocks)}" if len(focus_blocks) > 1 else INTERVAL_LABELS[cur.kind]
+                subline = "Paused" if phase == "PAUSED" else ""
+
+        self._ring.set_state(
+            progress=prog,
+            tone=tone,
+            readout=eng.readout(),
+            eyebrow=eyebrow,
+            subline=subline,
+            dark=dark,
+            pulse=(flowing or recovery) and phase == "RUNNING",
+        )
+
+        # Break overrun & return note visibility
+        self._overrun_box.set_visible(overrunning)
+        if overrunning and eng.return_note:
+            self._overrun_note_preview.set_text(f"Note: {eng.return_note}")
+            self._overrun_note_preview.set_visible(True)
+        else:
+            self._overrun_note_preview.set_visible(False)
+
+        self._note_box.set_visible(on_break and not overrunning)
+        if on_break and eng.return_note and not self._note_entry.has_focus() and not self._note_entry.get_text():
+            self._note_entry.set_text(eng.return_note)
+        elif not on_break and self._note_entry.get_text():
+            self._note_entry.set_text("")
+
+        # Buttons
+        if phase == "IDLE":
+            self._primary_btn.set_label("Start")
+            self._primary_btn.set_visible(True)
+            self._break_btn.set_visible(False)
+            self._skip_btn.set_visible(False)
+            self._stop_btn.set_visible(False)
+            self._complete_task_btn.set_visible(False)
+            self._plus5_btn.set_visible(False)
+            self._discard_btn.set_visible(False)
+        else:
+            self._primary_btn.set_visible(not overrunning)
+            self._primary_btn.set_label("Pause" if phase == "RUNNING" else "Resume")
+            can_break = eng.next_break_info() is not None
+            self._break_btn.set_visible(can_break)
+            self._skip_btn.set_visible(on_break and not overrunning)
+            self._stop_btn.set_visible(True)
+            self._complete_task_btn.set_visible(eng.task is not None and not recovery)
+            self._plus5_btn.set_visible(on_break and not overrunning)
+            self._discard_btn.set_visible(True)
+
+    # ---------------------------------------------------------------- handlers
+
+    def _on_primary_clicked(self, _btn: Gtk.Button) -> None:
+        if self._engine.phase == "IDLE":
+            self._cb["start"]()
+        elif self._engine.phase == "RUNNING":
+            self._cb["pause"]()
+        elif self._engine.phase == "PAUSED":
+            self._cb["resume"]()
+
+    def _on_mode_toggled(self, btn: Gtk.ToggleButton, mode_id: TimerMode) -> None:
+        if self._updating_controls or not btn.get_active():
+            return
+        cfg = self._engine.config
+        if mode_id == "RECOVERY":
+            if cfg.mode != "RECOVERY":
+                self._last_work_mode = cfg.mode
+                self._last_work_target = cfg.target_seconds
+                self._last_work_intervals = cfg.intervals
+            self._engine.configure(mode="RECOVERY", target_seconds=0, intervals=1)
+        else:
+            from_rec = cfg.mode == "RECOVERY"
+            target = self._last_work_target if from_rec else cfg.target_seconds
+            if not has_intervals(mode_id):
+                intervals = 1
+            elif from_rec:
+                intervals = self._last_work_intervals
+            elif has_intervals(cfg.mode):
+                intervals = cfg.intervals
+            else:
+                intervals = suggest_intervals(target, cfg.focus_seconds)
+            self._engine.configure(mode=mode_id, target_seconds=clamp_target(target), intervals=intervals)
+        self.sync_controls_from_engine()
+        self._cb["config"]()
+
+    def _apply_cadence_preset(self, _btn: Gtk.Button, focus_min: int, break_min: int) -> None:
+        rounds = self._engine.config.intervals
+        self._engine.configure(
+            focus_seconds=focus_min * 60,
+            target_seconds=clamp_target(focus_min * 60 * rounds),
+            short_break_seconds=clamp_break(break_min * 60),
+        )
+        self.sync_controls_from_engine()
+        self._cb["config"]()
+
+    def _apply_basic_preset(self, _btn: Gtk.Button, mins: int) -> None:
+        self._engine.configure(target_seconds=clamp_target(mins * 60), intervals=1)
+        self.sync_controls_from_engine()
+        self._cb["config"]()
+
+    def _on_custom_changed(self, _spin: Gtk.SpinButton) -> None:
+        if self._updating_controls:
+            return
+        cfg = self._engine.config
+        focus_s = clamp_target(int(self._focus_spin.get_value()) * 60)
+        if has_intervals(cfg.mode):
+            break_s = clamp_break(int(self._break_spin.get_value()) * 60)
+            rounds = clamp_intervals(int(self._rounds_spin.get_value()))
+            self._engine.configure(
+                focus_seconds=focus_s,
+                short_break_seconds=break_s,
+                intervals=rounds,
+                target_seconds=clamp_target(focus_s * rounds),
+            )
+        elif cfg.mode == "BASIC":
+            self._engine.configure(target_seconds=focus_s, intervals=1)
+        self.sync_controls_from_engine()
+        self._cb["config"]()
+
+    def _on_task_selected(self, dropdown: Gtk.DropDown, _pspec) -> None:
+        if self._updating_controls or self._engine.phase != "IDLE":
+            return
+        idx = dropdown.get_selected()
+        if idx == 0 or idx - 1 >= len(self._tasks):
+            self._engine.task = None
+            return
+        task = self._tasks[idx - 1]
+        self._engine.task = task
+        if task.estimated_seconds and self._engine.config.mode != "RECOVERY":
+            mode = task.default_mode if task.default_mode in ("POMODORO", "FLOW", "BASIC") else self._engine.config.mode
+            target = clamp_target(task.estimated_seconds)
+            intervals = (
+                clamp_intervals(task.planned_intervals)
+                if task.planned_intervals and has_intervals(mode)
+                else suggest_intervals(target, self._engine.config.focus_seconds)
+                if has_intervals(mode)
+                else 1
+            )
+            self._engine.configure(mode=mode, target_seconds=target, intervals=intervals)
+            self.sync_controls_from_engine()
+        self._cb["config"]()
+
+    def _submit_note(self, _widget) -> None:
+        self._cb["note"](self._note_entry.get_text())
+
+
+class MiniTimerView(Gtk.Box):
+    """Compact ~330×140 floating timer card for keeping in the corner while working."""
+
+    def __init__(
+        self,
+        engine: TimerEngine,
+        *,
+        on_toggle: Callable[[], None],
+        on_take_break: Callable[[], None],
+        on_skip: Callable[[], None],
+        on_extend: Callable[[int], None],
+        on_stop: Callable[[], None],
+        on_expand: Callable[[], None],
+    ) -> None:
+        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self._engine = engine
+        self.set_margin_top(10)
+        self.set_margin_bottom(10)
+        self.set_margin_start(14)
+        self.set_margin_end(14)
+
+        top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        top.set_valign(Gtk.Align.CENTER)
+
+        self._ring = TimerRingWidget(size=54, compact=True)
+        top.append(self._ring)
+
+        info = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
+        info.set_hexpand(True)
+        self._clock_lbl = Gtk.Label(label="25:00", xalign=0)
+        self._clock_lbl.add_css_class("unravel-mini-clock")
+        self._sub_lbl = Gtk.Label(label="Pomodoro Flow", xalign=0)
+        self._sub_lbl.add_css_class("caption")
+        self._sub_lbl.add_css_class("dim-label")
+        self._sub_lbl.set_ellipsize(3)  # PANGO_ELLIPSIZE_END
+        info.append(self._clock_lbl)
+        info.append(self._sub_lbl)
+        top.append(info)
+
+        # Compact icon controls
+        btns = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        self._play_btn = Gtk.Button.new_from_icon_name("media-playback-start-symbolic")
+        self._play_btn.add_css_class("circular")
+        self._play_btn.add_css_class("suggested-action")
+        self._play_btn.set_tooltip_text("Start / Pause / Resume")
+        self._play_btn.connect("clicked", lambda _b: on_toggle())
+        btns.append(self._play_btn)
+
+        self._break_btn = Gtk.Button.new_from_icon_name("media-skip-forward-symbolic")
+        self._break_btn.add_css_class("circular")
+        self._break_btn.set_tooltip_text("Take break / Next")
+        self._break_btn.connect(
+            "clicked",
+            lambda _b: on_skip() if self._engine.on_break() else on_take_break(),
+        )
+        btns.append(self._break_btn)
+
+        self._plus5_btn = Gtk.Button(label="+5m")
+        self._plus5_btn.add_css_class("pill")
+        self._plus5_btn.set_visible(False)
+        self._plus5_btn.connect("clicked", lambda _b: on_extend(300))
+        btns.append(self._plus5_btn)
+
+        self._stop_btn = Gtk.Button.new_from_icon_name("media-playback-stop-symbolic")
+        self._stop_btn.add_css_class("circular")
+        self._stop_btn.set_tooltip_text("Stop & log session")
+        self._stop_btn.connect("clicked", lambda _b: on_stop())
+        btns.append(self._stop_btn)
+
+        expand_btn = Gtk.Button.new_from_icon_name("view-fullscreen-symbolic")
+        expand_btn.add_css_class("circular")
+        expand_btn.add_css_class("flat")
+        expand_btn.set_tooltip_text("Return to full view")
+        expand_btn.connect("clicked", lambda _b: on_expand())
+        btns.append(expand_btn)
+
+        top.append(btns)
+        self.append(top)
+
+        hint = Gtk.Label(label="Tip: Press Alt+Space → Always on Top to pin above other windows")
+        hint.add_css_class("caption")
+        hint.add_css_class("dim-label")
+        hint.set_xalign(0)
+        self.append(hint)
+
+    def refresh_tick(self, dark: bool) -> None:
+        eng = self._engine
+        phase = eng.phase
+        on_break = eng.on_break()
+        flowing = eng.is_focus_flowing()
+        overrunning = eng.is_overrunning()
+        target = eng.current_target_seconds()
+        i_elapsed = eng.interval_elapsed_seconds()
+
+        self._clock_lbl.set_text(eng.readout())
+        if overrunning:
+            tone, prog, sub = "overrun", overtime_progress(eng.overrun_seconds(), target), "Break overrun"
+        elif on_break:
+            tone, prog, sub = "rest", arc_progress(i_elapsed, target), INTERVAL_LABELS[eng.current_interval().kind]
+        elif eng.config.mode == "RECOVERY":
+            tone, prog, sub = "rest", 0.0, "Recovery"
+        elif flowing:
+            tone, prog, sub = "flow", 1.0, f"Flowing · +{format_duration(eng.focus_flow_seconds())}"
+        else:
+            tone = "flow" if eng.config.mode == "FLOW" else "focus"
+            prog = 1.0 if phase == "IDLE" else arc_progress(i_elapsed, target)
+            sub = eng.task.title if eng.task else MODE_LABELS[eng.config.mode]
+            if phase == "PAUSED":
+                sub = f"Paused · {sub}"
+
+        self._sub_lbl.set_text(sub)
+        self._ring.set_state(progress=prog, tone=tone, readout="", dark=dark)
+
+        self._play_btn.set_visible(not overrunning)
+        self._play_btn.set_icon_name(
+            "media-playback-pause-symbolic" if phase == "RUNNING" else "media-playback-start-symbolic"
+        )
+        self._break_btn.set_visible(on_break or eng.next_break_info() is not None)
+        self._plus5_btn.set_visible(overrunning)
+        self._stop_btn.set_visible(phase in ("RUNNING", "PAUSED"))

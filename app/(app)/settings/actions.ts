@@ -6,7 +6,12 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isValidTimeZone } from "@/lib/dates";
 import {
+  generateDesktopToken,
+  sanitizeDeviceLabel,
+} from "@/lib/desktop-auth-utils";
+import {
   type ActionState,
+  cuid,
   fieldErrorsFrom,
   formValues,
   settingsSchema,
@@ -180,4 +185,44 @@ export async function resetAllProgress(): Promise<ResetResult> {
 
   revalidatePath("/", "layout");
   return { ok: true };
+}
+
+export async function createManualDesktopToken(
+  rawLabel: string,
+): Promise<
+  | { status: "success"; rawToken: string; label: string }
+  | { status: "error"; message: string }
+> {
+  const user = await requireUser();
+  const label = sanitizeDeviceLabel(rawLabel);
+  const { rawToken, tokenHash, prefix } = generateDesktopToken();
+
+  try {
+    await prisma.desktopApiToken.create({
+      data: {
+        userId: user.id,
+        label,
+        tokenHash,
+        prefix,
+      },
+    });
+  } catch {
+    return { status: "error", message: "Could not create a token right now." };
+  }
+
+  revalidatePath("/settings");
+  return { status: "success", rawToken, label };
+}
+
+export async function revokeDesktopToken(id: string): Promise<void> {
+  const user = await requireUser();
+  const parsed = cuid.safeParse(id);
+  if (!parsed.success) return;
+
+  await prisma.desktopApiToken.updateMany({
+    where: { id: parsed.data, userId: user.id, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+
+  revalidatePath("/settings");
 }

@@ -1,8 +1,10 @@
 import { requireUser } from "@/lib/auth";
 import { supportedTimeZones } from "@/lib/dates";
+import { prisma } from "@/lib/db";
 import { normalizeFastDays, normalizeWindow } from "@/lib/fasting";
 import { clampCount, templateOrDefault } from "@/lib/practices";
 
+import { DesktopTokensSection } from "./_components/desktop-tokens-section";
 import { SettingsForm } from "./_components/settings-form";
 import { ThemeToggle } from "./_components/theme-toggle";
 
@@ -10,6 +12,34 @@ export const metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
   const user = await requireUser();
+
+  const [desktopTokens] = await Promise.all([
+    prisma.desktopApiToken.findMany({
+      where: { userId: user.id, revokedAt: null },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        label: true,
+        prefix: true,
+        createdAt: true,
+        lastUsedAt: true,
+      },
+    }),
+  ]);
+
+  const dateFmt = new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    timeZone: user.timezone,
+  });
+  const dateTimeFmt = new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: user.timezone,
+  });
 
   const window = normalizeWindow(user.fastEatStart, user.fastEatEnd);
   const zones = supportedTimeZones();
@@ -68,6 +98,18 @@ export default async function SettingsPage() {
           fastDaysOfWeek: normalizeFastDays(user.fastDaysOfWeek),
         }}
       />
+
+      <div className="border-border/70 mt-12 border-t pt-10">
+        <DesktopTokensSection
+          tokens={desktopTokens.map((t) => ({
+            id: t.id,
+            label: t.label,
+            prefix: t.prefix,
+            createdLabel: dateFmt.format(t.createdAt),
+            lastUsedLabel: t.lastUsedAt ? dateTimeFmt.format(t.lastUsedAt) : null,
+          }))}
+        />
+      </div>
     </div>
   );
 }

@@ -39,6 +39,22 @@ import {
   recitationMatchesQuery,
   sessionItem,
 } from "@/lib/recitations";
+import {
+  DESKTOP_TOKEN_PREFIX,
+  computePkceChallenge,
+  desktopExchangeSchema,
+  desktopSettingsPatchSchema,
+  desktopStartSessionSchema,
+  desktopTimerActionSchema,
+  extractBearerToken,
+  generateDesktopAuthCode,
+  generateDesktopToken,
+  hashDesktopSecret,
+  isValidAuthNonce,
+  sanitizeDeviceLabel,
+  validateLoopbackPort,
+  verifyPkceChallenge,
+} from "@/lib/desktop-auth-utils";
 import { BISMILLAH, TEXTS } from "@/lib/recitation-texts";
 import { GUIDES, GUIDE_KEYS } from "@/lib/practice-guides";
 import {
@@ -5072,6 +5088,77 @@ check("close lists only still-open selected habits with deep links and parses mi
     }),
     2,
   );
+});
+
+console.log("\ndesktop companion — PKCE auth, tokens & API validation");
+
+check("desktop tokens, PKCE S256 verification, and loopback port guard behave securely", () => {
+  const tok = generateDesktopToken();
+  assert.ok(tok.rawToken.startsWith(DESKTOP_TOKEN_PREFIX));
+  assert.equal(tok.tokenHash, hashDesktopSecret(tok.rawToken));
+  assert.equal(tok.prefix, tok.rawToken.slice(0, 10));
+  assert.equal(extractBearerToken(`Bearer ${tok.rawToken}`), tok.rawToken);
+  assert.equal(extractBearerToken(`bearer ${tok.rawToken}`), tok.rawToken);
+  assert.equal(extractBearerToken("Bearer bad_short"), null);
+  assert.equal(extractBearerToken("Basic abcdef"), null);
+
+  const authCode = generateDesktopAuthCode();
+  assert.equal(authCode.codeHash, hashDesktopSecret(authCode.rawCode));
+
+  const verifier = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_";
+  const challenge = computePkceChallenge(verifier);
+  assert.equal(verifyPkceChallenge(verifier, challenge), true);
+  assert.equal(verifyPkceChallenge(`${verifier}x`, challenge), false);
+  assert.equal(verifyPkceChallenge("too-short", challenge), false);
+
+  assert.equal(validateLoopbackPort("43210"), 43210);
+  assert.equal(validateLoopbackPort("1024"), 1024);
+  assert.equal(validateLoopbackPort("65535"), 65535);
+  assert.equal(validateLoopbackPort("80"), null, "privileged ports rejected");
+  assert.equal(validateLoopbackPort("70000"), null, "out-of-range port rejected");
+  assert.equal(validateLoopbackPort("43210@evil.com"), null, "host injection rejected");
+
+  assert.equal(isValidAuthNonce(challenge), true);
+  assert.equal(isValidAuthNonce("short"), false);
+  assert.equal(isValidAuthNonce("bad/chars+here!"), false);
+  assert.equal(sanitizeDeviceLabel("  Ubuntu   Laptop  "), "Ubuntu Laptop");
+  assert.equal(sanitizeDeviceLabel("   "), "Ubuntu Desktop");
+});
+
+check("desktop API zod schemas validate exchange, settings, start, and timer actions", () => {
+  const verifier = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_";
+  assert.ok(desktopExchangeSchema.safeParse({ code: "1234567890abcdef", codeVerifier: verifier }).success);
+  assert.equal(desktopExchangeSchema.safeParse({ code: "short", codeVerifier: verifier }).success, false);
+
+  assert.ok(
+    desktopSettingsPatchSchema.safeParse({
+      pomodoroMinutes: 25,
+      shortBreakMinutes: 5,
+      longBreakMinutes: 15,
+      longBreakEvery: 4,
+      autoStartBreaks: true,
+      soundEnabled: false,
+    }).success,
+  );
+  assert.equal(desktopSettingsPatchSchema.safeParse({ unknownField: 1 }).success, false);
+
+  assert.ok(
+    desktopStartSessionSchema.safeParse({
+      clientKey: "client-key-1234",
+      mode: "FLOW",
+      targetSeconds: 1500,
+      intervals: 2,
+      shortBreakSeconds: 300,
+    }).success,
+  );
+
+  assert.ok(desktopTimerActionSchema.safeParse({ action: "pause" }).success);
+  assert.ok(desktopTimerActionSchema.safeParse({ action: "appendFlowRound" }).success);
+  assert.ok(desktopTimerActionSchema.safeParse({ action: "extend", seconds: 300 }).success);
+  assert.ok(desktopTimerActionSchema.safeParse({ action: "returnNote", note: "Finishing auth tests" }).success);
+  assert.ok(desktopTimerActionSchema.safeParse({ action: "end", completedTask: true }).success);
+  assert.ok(desktopTimerActionSchema.safeParse({ action: "adjust", minutes: 35 }).success);
+  assert.equal(desktopTimerActionSchema.safeParse({ action: "extend", seconds: 99999 }).success, false);
 });
 
 console.log(`\n${passed} checks passed.\n`);
