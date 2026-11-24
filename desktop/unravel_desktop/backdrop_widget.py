@@ -176,7 +176,7 @@ class AtmosphereBackdrop(Gtk.Picture):
         if tex is None:
             # Smooth pastel gradients upscale invisibly from 480x360 (~3ms once);
             # Night starfield renders at 980x710 (~20ms once) for razor-sharp stars.
-            surf = _render_night(980, 710) if dark else _render_cotton_candy(480, 360)
+            surf = _render_night(1120, 900) if dark else _render_cotton_candy(480, 360)
             tex = _surface_to_texture(surf)
             cls._textures[dark] = tex
         return tex

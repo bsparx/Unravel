@@ -85,17 +85,17 @@ class TimerView(Gtk.Box):
         scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
 
         clamp = Adw.Clamp()
-        clamp.set_maximum_size(500)
-        clamp.set_margin_top(16)
-        clamp.set_margin_bottom(22)
-        clamp.set_margin_start(22)
-        clamp.set_margin_end(22)
+        clamp.set_maximum_size(600)
+        clamp.set_margin_top(20)
+        clamp.set_margin_bottom(24)
+        clamp.set_margin_start(26)
+        clamp.set_margin_end(26)
 
-        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=11)
+        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
         root.set_valign(Gtk.Align.CENTER)
 
         # ---- Main frosted glass timer sanctuary card
-        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=13)
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
         card.add_css_class("unravel-card")
 
         # Quiet header strip inside card: sync status + semantic cadence pill
@@ -156,7 +156,7 @@ class TimerView(Gtk.Box):
         self._main_box.append(self._mode_box)
 
         # Watchmaker Cairo ring
-        self._ring = TimerRingWidget(size=254, compact=False)
+        self._ring = TimerRingWidget(size=312, compact=False)
         self._main_box.append(self._ring)
 
         # Selected `/day` task card right under the ring
@@ -249,19 +249,19 @@ class TimerView(Gtk.Box):
         self._main_box.append(self._note_box)
 
         # Primary live action controls
-        ctrl_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        ctrl_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         ctrl_row.set_halign(Gtk.Align.CENTER)
 
         self._primary_btn = Gtk.Button(label="Start focus")
         self._primary_btn.add_css_class("unravel-primary-btn")
-        self._primary_btn.set_size_request(164, 46)
+        self._primary_btn.set_size_request(196, 54)
         self._primary_btn.connect("clicked", self._on_primary_clicked)
         ctrl_row.append(self._primary_btn)
 
         self._break_btn = Gtk.Button(label="Take break")
         self._break_btn.add_css_class("flat")
         self._break_btn.add_css_class("unravel-ghost-pill")
-        self._break_btn.set_size_request(-1, 46)
+        self._break_btn.set_size_request(-1, 54)
         self._break_btn.set_visible(False)
         self._break_btn.connect("clicked", lambda _b: self._cb["take_break"]())
         ctrl_row.append(self._break_btn)
@@ -269,7 +269,7 @@ class TimerView(Gtk.Box):
         self._skip_btn = Gtk.Button(label="Skip break")
         self._skip_btn.add_css_class("flat")
         self._skip_btn.add_css_class("unravel-ghost-pill")
-        self._skip_btn.set_size_request(-1, 46)
+        self._skip_btn.set_size_request(-1, 54)
         self._skip_btn.set_visible(False)
         self._skip_btn.connect("clicked", lambda _b: self._cb["skip"]())
         ctrl_row.append(self._skip_btn)
@@ -277,30 +277,33 @@ class TimerView(Gtk.Box):
         self._stop_btn = Gtk.Button(label="Stop")
         self._stop_btn.add_css_class("flat")
         self._stop_btn.add_css_class("unravel-ghost-pill")
-        self._stop_btn.set_size_request(-1, 46)
+        self._stop_btn.set_size_request(-1, 54)
         self._stop_btn.set_visible(False)
         self._stop_btn.connect("clicked", lambda _b: self._cb["stop"](False))
         ctrl_row.append(self._stop_btn)
         self._main_box.append(ctrl_row)
 
         # Secondary quiet links (Stop & cross off, +5m break, Discard)
-        sec_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        sec_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         sec_row.set_halign(Gtk.Align.CENTER)
 
         self._complete_task_btn = Gtk.Button(label="✓ Stop & cross off")
         self._complete_task_btn.add_css_class("flat")
+        self._complete_task_btn.add_css_class("unravel-subtle-action")
         self._complete_task_btn.set_visible(False)
         self._complete_task_btn.connect("clicked", lambda _b: self._cb["stop"](True))
         sec_row.append(self._complete_task_btn)
 
         self._plus5_btn = Gtk.Button(label="+5m break")
         self._plus5_btn.add_css_class("flat")
+        self._plus5_btn.add_css_class("unravel-subtle-action")
         self._plus5_btn.set_visible(False)
         self._plus5_btn.connect("clicked", lambda _b: self._cb["extend"](300))
         sec_row.append(self._plus5_btn)
 
         self._discard_btn = Gtk.Button(label="Discard")
         self._discard_btn.add_css_class("flat")
+        self._discard_btn.add_css_class("unravel-subtle-action")
         self._discard_btn.set_visible(False)
         self._discard_btn.connect("clicked", lambda _b: self._cb["discard"]())
         sec_row.append(self._discard_btn)
@@ -711,7 +714,7 @@ class MiniTimerView(Gtk.Box):
         card.add_css_class("unravel-hero-card")
         card.set_valign(Gtk.Align.CENTER)
 
-        self._ring = TimerRingWidget(size=52, compact=True)
+        self._ring = TimerRingWidget(size=60, compact=True)
         card.append(self._ring)
 
         info = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)

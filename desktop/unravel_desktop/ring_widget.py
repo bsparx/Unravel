@@ -61,7 +61,7 @@ PALETTES = {
 class TimerRingWidget(Gtk.DrawingArea):
     """Cached watchmaker Time-Timer dial — ultra-low CPU on every live tick."""
 
-    def __init__(self, size: int = 242, compact: bool = False) -> None:
+    def __init__(self, size: int = 310, compact: bool = False) -> None:
         super().__init__()
         self._compact = compact
         self.set_content_width(size)
@@ -289,9 +289,9 @@ class TimerRingWidget(Gtk.DrawingArea):
 
 
 class DayProgressRing(Gtk.DrawingArea):
-    """Compact 54×54 Cairo completion donut inside the Today hero header."""
+    """Compact 66×66 Cairo completion donut inside the Today hero header."""
 
-    def __init__(self, size: int = 54) -> None:
+    def __init__(self, size: int = 66) -> None:
         super().__init__()
         self.set_content_width(size)
         self.set_content_height(size)
@@ -315,7 +315,7 @@ class DayProgressRing(Gtk.DrawingArea):
     def _draw(self, _area: Gtk.DrawingArea, cr: cairo.Context, width: int, height: int) -> None:
         cx, cy = width / 2.0, height / 2.0
         size = min(width, height)
-        stroke = 4.6
+        stroke = 5.6
         r = size / 2.0 - stroke - 1.5
         done = max(0, self._done)
         total = max(0, self._total)
@@ -345,7 +345,7 @@ class DayProgressRing(Gtk.DrawingArea):
 
         label = "✓" if (total > 0 and done >= total) else (f"{done}/{total}" if total > 0 else "—")
         cr.select_font_face("Lato", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
-        cr.set_font_size(14.0 if label == "✓" else 11.5)
+        cr.set_font_size(18.0 if label == "✓" else 14.5)
         ext = cr.text_extents(label)
         cr.set_source_rgba(*ink)
         cr.move_to(cx - ext.width / 2.0 - ext.x_bearing, cy + ext.height / 2.0 - 0.5)

@@ -140,20 +140,20 @@ class DayListView(Gtk.Box):
         scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
 
         clamp = Adw.Clamp()
-        clamp.set_maximum_size(680)
-        clamp.set_margin_top(18)
-        clamp.set_margin_bottom(28)
-        clamp.set_margin_start(22)
-        clamp.set_margin_end(22)
+        clamp.set_maximum_size(820)
+        clamp.set_margin_top(22)
+        clamp.set_margin_bottom(32)
+        clamp.set_margin_start(28)
+        clamp.set_margin_end(28)
 
-        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
 
         # ---- Top Today Hero Glass Card
-        hero = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
+        hero = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
         hero.add_css_class("unravel-hero-card")
         hero.set_valign(Gtk.Align.CENTER)
 
-        title_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
+        title_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         title_col.set_hexpand(True)
         self._date_lbl = Gtk.Label(label="TODAY", xalign=0)
         self._date_lbl.add_css_class("unravel-section-kicker")
@@ -167,7 +167,7 @@ class DayListView(Gtk.Box):
         title_col.append(self._summary_lbl)
         hero.append(title_col)
 
-        self._progress_ring = DayProgressRing(size=54)
+        self._progress_ring = DayProgressRing(size=66)
         hero.append(self._progress_ring)
 
         refresh_btn = Gtk.Button.new_from_icon_name("view-refresh-symbolic")
@@ -468,7 +468,7 @@ class DayListView(Gtk.Box):
         glyph_css = "unravel-glyph-heart" if group == "heart" else ("unravel-glyph-close" if group == "close" else "unravel-glyph-mind")
         badge_css = "unravel-badge-heart" if group == "heart" else ("unravel-badge-selected" if group == "close" else "unravel-badge-mind")
 
-        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
         row.add_css_class("unravel-practice-row")
         row.set_valign(Gtk.Align.CENTER)
 
@@ -538,7 +538,7 @@ class DayListView(Gtk.Box):
         selected = not done and self._selected_id == item_id
         busy = item_id in self._pending_ids
 
-        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=11)
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
         row.add_css_class("unravel-day-row")
         if selected:
             row.add_css_class("unravel-day-row-selected")

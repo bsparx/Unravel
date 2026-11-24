@@ -1,16 +1,14 @@
-/* Unravel Desktop — Lightweight Cotton Candy (Light) & The Night (Dark) Glass Atelier
+/* Unravel Desktop — Spacious, High-Legibility Cotton Candy & The Night Glass Atelier
  *
- * Designed for locked 60-144 FPS in GTK4:
- * - Zero box-shadow blur passes inside scrollable lists
- * - Zero animated box-shadow hover transitions
- * - Crisp glass borders & specular inset highlights over GPU-cached AtmosphereBackdrop
+ * Calibrated for crisp readability on QHD / 1440p desktop displays (scale=1)
+ * while staying lightweight (0ms GPU-cached backdrop, zero scrolling shadow blur).
  */
 
-/* ---------------- Base window & typography ---------------- */
+/* ---------------- Base window & comfortable desktop typography ---------------- */
 
 window.unravel-window {
   font-family: "Lato", "Ubuntu Sans", sans-serif;
-  font-size: 14px;
+  font-size: 16.5px;
   background-color: transparent;
   background-image: none;
 }
@@ -31,6 +29,16 @@ window.unravel-window toastoverlay {
   background-image: none;
 }
 
+window.unravel-window .caption {
+  font-size: 14px;
+}
+
+window.unravel-window expander > title {
+  font-size: 15px;
+  font-weight: 600;
+  padding: 6px 4px;
+}
+
 .unravel-display {
   font-family: "Noto Serif", "Linux Libertine Display O", "Gentium Book Basic", Georgia, serif;
   font-weight: 500;
@@ -39,21 +47,21 @@ window.unravel-window toastoverlay {
 
 .unravel-wordmark {
   font-family: "Noto Serif", "Linux Libertine Display O", "Gentium Book Basic", Georgia, serif;
-  font-size: 17px;
+  font-size: 21px;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.012em;
 }
 
 .unravel-today-heading {
   font-family: "Noto Serif", "Linux Libertine Display O", "Gentium Book Basic", Georgia, serif;
-  font-size: 24px;
+  font-size: 30px;
   font-weight: 500;
   letter-spacing: -0.018em;
 }
 
 .unravel-welcome-title {
   font-family: "Noto Serif", "Linux Libertine Display O", "Gentium Book Basic", Georgia, serif;
-  font-size: 27px;
+  font-size: 33px;
   font-weight: 500;
   letter-spacing: -0.02em;
 }
@@ -66,15 +74,15 @@ window.unravel-dark .unravel-muted {
   color: #b2c0dc;
 }
 
-/* ---------------- Header bar & pill navigation ---------------- */
+/* ---------------- Header bar & generous pill navigation ---------------- */
 
 headerbar.unravel-header {
   background-color: transparent;
   background-image: none;
   box-shadow: none;
-  min-height: 52px;
-  padding-left: 10px;
-  padding-right: 10px;
+  min-height: 64px;
+  padding-left: 14px;
+  padding-right: 14px;
 }
 
 headerbar.unravel-header:backdrop {
@@ -91,23 +99,23 @@ window.unravel-dark headerbar.unravel-header {
 
 .unravel-nav-bar {
   border-radius: 999px;
-  padding: 3px;
+  padding: 4px;
 }
 
 window.unravel-light .unravel-nav-bar {
-  background-color: rgba(255, 255, 255, 0.68);
+  background-color: rgba(255, 255, 255, 0.70);
   border: 1px solid rgba(150, 88, 160, 0.20);
 }
 
 window.unravel-dark .unravel-nav-bar {
-  background-color: rgba(10, 20, 48, 0.68);
+  background-color: rgba(10, 20, 48, 0.70);
   border: 1px solid rgba(170, 186, 255, 0.22);
 }
 
 button.unravel-nav-btn {
   border-radius: 999px;
-  padding: 5px 16px;
-  font-size: 13px;
+  padding: 8px 22px;
+  font-size: 15.5px;
   font-weight: 600;
   background: transparent;
   box-shadow: none;
@@ -119,7 +127,7 @@ window.unravel-light button.unravel-nav-btn {
 
 window.unravel-light button.unravel-nav-btn:hover {
   color: #33284a;
-  background-color: rgba(255, 255, 255, 0.60);
+  background-color: rgba(255, 255, 255, 0.62);
 }
 
 window.unravel-light button.unravel-nav-btn:checked {
@@ -143,25 +151,26 @@ window.unravel-dark button.unravel-nav-btn:checked {
 
 button.unravel-header-btn {
   border-radius: 999px;
-  min-width: 34px;
-  min-height: 34px;
+  min-width: 42px;
+  min-height: 42px;
   padding: 0;
+  -gtk-icon-size: 20px;
 }
 
 window.unravel-light button.unravel-header-btn {
-  background-color: rgba(255, 255, 255, 0.60);
+  background-color: rgba(255, 255, 255, 0.62);
   border: 1px solid rgba(150, 88, 160, 0.18);
   color: #4a3b68;
 }
 
 window.unravel-light button.unravel-header-btn:hover {
-  background-color: rgba(255, 255, 255, 0.92);
+  background-color: rgba(255, 255, 255, 0.94);
   border-color: rgba(194, 61, 130, 0.36);
   color: #c23d82;
 }
 
 window.unravel-dark button.unravel-header-btn {
-  background-color: rgba(16, 30, 66, 0.62);
+  background-color: rgba(16, 30, 66, 0.64);
   border: 1px solid rgba(170, 186, 255, 0.20);
   color: #c9d5f4;
 }
@@ -178,8 +187,8 @@ button.unravel-header-btn:disabled {
 
 menubutton.unravel-filter-menu > button {
   border-radius: 999px;
-  padding: 6px 15px;
-  font-size: 13px;
+  padding: 9px 20px;
+  font-size: 15px;
   font-weight: 600;
 }
 
@@ -205,14 +214,14 @@ window.unravel-dark menubutton.unravel-filter-menu > button:hover {
   border-color: rgba(170, 186, 255, 0.42);
 }
 
-/* ---------------- Frosted Glass Surfaces (fast, zero heavy blur) ---------------- */
+/* ---------------- Frosted Glass Surfaces ---------------- */
 
 window.unravel-light .unravel-card {
   background-color: rgba(255, 255, 255, 0.78);
   border: 1px solid rgba(150, 88, 160, 0.20);
   border-top-color: rgba(255, 255, 255, 0.95);
-  border-radius: 26px;
-  padding: 18px 22px;
+  border-radius: 28px;
+  padding: 22px 26px;
   box-shadow: 0 10px 22px -12px rgba(194, 61, 130, 0.16);
 }
 
@@ -220,8 +229,8 @@ window.unravel-dark .unravel-card {
   background-color: rgba(10, 20, 48, 0.74);
   border: 1px solid rgba(170, 186, 255, 0.22);
   border-top-color: rgba(210, 222, 255, 0.30);
-  border-radius: 26px;
-  padding: 18px 22px;
+  border-radius: 28px;
+  padding: 22px 26px;
   box-shadow: 0 12px 24px -12px rgba(0, 0, 0, 0.42);
 }
 
@@ -229,40 +238,30 @@ window.unravel-light .unravel-hero-card {
   background-color: rgba(255, 255, 255, 0.76);
   border: 1px solid rgba(150, 88, 160, 0.20);
   border-top-color: rgba(255, 255, 255, 0.95);
-  border-radius: 22px;
-  padding: 16px 18px;
+  border-radius: 24px;
+  padding: 18px 22px;
 }
 
 window.unravel-dark .unravel-hero-card {
   background-color: rgba(10, 20, 48, 0.74);
   border: 1px solid rgba(170, 186, 255, 0.22);
   border-top-color: rgba(210, 222, 255, 0.28);
-  border-radius: 22px;
-  padding: 16px 18px;
+  border-radius: 24px;
+  padding: 18px 22px;
 }
 
 window.unravel-light .unravel-soft-card {
-  background-color: rgba(255, 255, 255, 0.64);
+  background-color: rgba(255, 255, 255, 0.66);
   border: 1px solid rgba(150, 88, 160, 0.16);
-  border-radius: 18px;
-  padding: 12px 15px;
+  border-radius: 20px;
+  padding: 14px 18px;
 }
 
 window.unravel-dark .unravel-soft-card {
-  background-color: rgba(14, 26, 58, 0.62);
+  background-color: rgba(14, 26, 58, 0.64);
   border: 1px solid rgba(139, 160, 235, 0.18);
-  border-radius: 18px;
-  padding: 12px 15px;
-}
-
-/* ---------------- Vertical studio divider ---------------- */
-
-window.unravel-light separator.unravel-divider {
-  background-color: rgba(150, 88, 160, 0.14);
-}
-
-window.unravel-dark separator.unravel-divider {
-  background-color: rgba(170, 186, 255, 0.14);
+  border-radius: 20px;
+  padding: 14px 18px;
 }
 
 /* ---------------- Mode Switcher Bar ---------------- */
@@ -270,21 +269,21 @@ window.unravel-dark separator.unravel-divider {
 window.unravel-light .unravel-mode-bar {
   background-color: rgba(150, 88, 160, 0.08);
   border: 1px solid rgba(150, 88, 160, 0.14);
-  border-radius: 15px;
-  padding: 3px;
+  border-radius: 17px;
+  padding: 4px;
 }
 
 window.unravel-dark .unravel-mode-bar {
   background-color: rgba(25, 43, 82, 0.56);
   border: 1px solid rgba(139, 160, 235, 0.18);
-  border-radius: 15px;
-  padding: 3px;
+  border-radius: 17px;
+  padding: 4px;
 }
 
 button.unravel-mode-btn {
-  border-radius: 12px;
-  padding: 6px 13px;
-  font-size: 13px;
+  border-radius: 13px;
+  padding: 9px 18px;
+  font-size: 15px;
   font-weight: 600;
   background: transparent;
   box-shadow: none;
@@ -343,9 +342,10 @@ window.unravel-dark button.unravel-mode-btn.unravel-mode-rest:checked {
 button.unravel-primary-btn {
   border-radius: 999px;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 16.5px;
   letter-spacing: 0.01em;
   color: #ffffff;
+  padding: 0 24px;
 }
 
 window.unravel-light button.unravel-primary-btn {
@@ -370,8 +370,8 @@ window.unravel-dark button.unravel-primary-btn:hover {
 
 button.unravel-ghost-pill {
   border-radius: 999px;
-  padding: 8px 16px;
-  font-size: 13px;
+  padding: 10px 22px;
+  font-size: 15px;
   font-weight: 600;
 }
 
@@ -397,55 +397,62 @@ window.unravel-dark button.unravel-ghost-pill:hover {
   border-color: rgba(170, 186, 255, 0.42);
 }
 
+button.unravel-subtle-action {
+  font-size: 15px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 999px;
+}
+
 /* ---------------- Active Task Pill beneath Timer Ring ---------------- */
 
 window.unravel-light .unravel-active-task-pill {
   background-color: rgba(222, 231, 251, 0.78);
   border: 1px solid rgba(67, 102, 196, 0.32);
-  border-radius: 18px;
-  padding: 10px 14px;
+  border-radius: 20px;
+  padding: 12px 16px;
 }
 
 window.unravel-dark .unravel-active-task-pill {
   background-color: rgba(54, 82, 233, 0.20);
   border: 1px solid rgba(138, 162, 240, 0.38);
-  border-radius: 18px;
-  padding: 10px 14px;
+  border-radius: 20px;
+  padding: 12px 16px;
 }
 
-/* ---------------- Today (/day) Filter Pills & Task Rows (zero shadow blur) ---------------- */
+/* ---------------- Today (/day) Filter Pills & Task Rows ---------------- */
 
 button.unravel-filter-pill {
   border-radius: 999px;
-  padding: 5px 13px;
-  font-size: 12px;
+  padding: 8px 18px;
+  font-size: 14.5px;
   font-weight: 600;
 }
 
 window.unravel-light button.unravel-filter-pill {
-  background-color: rgba(255, 255, 255, 0.62);
+  background-color: rgba(255, 255, 255, 0.64);
   border: 1px solid rgba(150, 88, 160, 0.16);
   color: #5d5074;
 }
 
 window.unravel-light button.unravel-filter-pill:hover {
-  background-color: rgba(255, 255, 255, 0.88);
+  background-color: rgba(255, 255, 255, 0.90);
 }
 
 window.unravel-light button.unravel-filter-pill:checked {
-  background-color: rgba(194, 61, 130, 0.14);
-  border-color: rgba(194, 61, 130, 0.42);
+  background-color: rgba(194, 61, 130, 0.15);
+  border-color: rgba(194, 61, 130, 0.44);
   color: #a12d6a;
 }
 
 window.unravel-dark button.unravel-filter-pill {
-  background-color: rgba(16, 28, 62, 0.58);
+  background-color: rgba(16, 28, 62, 0.60);
   border: 1px solid rgba(139, 160, 235, 0.18);
   color: #b2c0dc;
 }
 
 window.unravel-dark button.unravel-filter-pill:hover {
-  background-color: rgba(28, 46, 94, 0.76);
+  background-color: rgba(28, 46, 94, 0.78);
 }
 
 window.unravel-dark button.unravel-filter-pill:checked {
@@ -457,8 +464,8 @@ window.unravel-dark button.unravel-filter-pill:checked {
 window.unravel-light .unravel-day-row {
   background-color: rgba(255, 255, 255, 0.76);
   border: 1px solid rgba(150, 88, 160, 0.16);
-  border-radius: 18px;
-  padding: 11px 13px;
+  border-radius: 20px;
+  padding: 14px 16px;
 }
 
 window.unravel-light .unravel-day-row:hover {
@@ -474,8 +481,8 @@ window.unravel-light .unravel-day-row-selected {
 window.unravel-dark .unravel-day-row {
   background-color: rgba(12, 24, 56, 0.66);
   border: 1px solid rgba(139, 160, 235, 0.18);
-  border-radius: 18px;
-  padding: 11px 13px;
+  border-radius: 20px;
+  padding: 14px 16px;
 }
 
 window.unravel-dark .unravel-day-row:hover {
@@ -489,23 +496,23 @@ window.unravel-dark .unravel-day-row-selected {
 }
 
 .unravel-row-title {
-  font-size: 14px;
+  font-size: 16.5px;
   font-weight: 600;
 }
 
 /* Tactile circular checkbox */
 button.unravel-check-btn {
-  min-width: 26px;
-  min-height: 26px;
+  min-width: 34px;
+  min-height: 34px;
   padding: 0;
   border-radius: 999px;
   background: transparent;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
 }
 
 window.unravel-light button.unravel-check-btn {
-  border: 1.75px solid rgba(150, 88, 160, 0.42);
+  border: 2px solid rgba(150, 88, 160, 0.42);
   color: #c23d82;
 }
 
@@ -521,7 +528,7 @@ window.unravel-light button.unravel-check-btn-done {
 }
 
 window.unravel-dark button.unravel-check-btn {
-  border: 1.75px solid rgba(170, 186, 255, 0.38);
+  border: 2px solid rgba(170, 186, 255, 0.38);
   color: #8aa2f0;
 }
 
@@ -539,10 +546,11 @@ window.unravel-dark button.unravel-check-btn-done {
 
 /* One-click Play button on each row */
 button.unravel-row-play {
-  min-width: 32px;
-  min-height: 32px;
+  min-width: 40px;
+  min-height: 40px;
   padding: 0;
   border-radius: 999px;
+  -gtk-icon-size: 18px;
 }
 
 window.unravel-light button.unravel-row-play {
@@ -569,8 +577,8 @@ window.unravel-dark button.unravel-row-play:hover {
 
 button.unravel-preset-btn {
   border-radius: 999px;
-  padding: 5px 13px;
-  font-size: 12px;
+  padding: 8px 18px;
+  font-size: 14.5px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -609,8 +617,8 @@ window.unravel-dark button.unravel-preset-active {
 
 .unravel-pill-chip {
   border-radius: 999px;
-  padding: 4px 12px;
-  font-size: 12px;
+  padding: 6px 15px;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -657,16 +665,16 @@ window.unravel-dark .unravel-overrun-chip {
 /* ---------------- Section Kickers & Row Badges ---------------- */
 
 .unravel-section-kicker {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.10em;
-  opacity: 0.72;
+  letter-spacing: 0.09em;
+  opacity: 0.74;
 }
 
 .unravel-badge {
   border-radius: 999px;
-  padding: 2px 8px;
-  font-size: 11px;
+  padding: 3px 11px;
+  font-size: 13px;
   font-weight: 700;
 }
 
@@ -735,34 +743,34 @@ window.unravel-dark .unravel-badge-meta {
 /* ---------------- Web-only Practices (Mind / Heart) ---------------- */
 
 window.unravel-light .unravel-practice-row {
-  background-color: rgba(255, 255, 255, 0.56);
+  background-color: rgba(255, 255, 255, 0.58);
   border: 1px dashed rgba(150, 88, 160, 0.24);
-  border-radius: 18px;
-  padding: 11px 14px;
+  border-radius: 20px;
+  padding: 14px 16px;
 }
 
 window.unravel-light .unravel-practice-row:hover {
-  background-color: rgba(255, 255, 255, 0.80);
+  background-color: rgba(255, 255, 255, 0.82);
   border-color: rgba(194, 61, 130, 0.36);
 }
 
 window.unravel-dark .unravel-practice-row {
-  background-color: rgba(12, 24, 56, 0.46);
+  background-color: rgba(12, 24, 56, 0.48);
   border: 1px dashed rgba(170, 186, 255, 0.24);
-  border-radius: 18px;
-  padding: 11px 14px;
+  border-radius: 20px;
+  padding: 14px 16px;
 }
 
 window.unravel-dark .unravel-practice-row:hover {
-  background-color: rgba(20, 38, 82, 0.66);
+  background-color: rgba(20, 38, 82, 0.68);
   border-color: rgba(170, 186, 255, 0.40);
 }
 
 .unravel-practice-glyph {
-  min-width: 26px;
-  min-height: 26px;
+  min-width: 34px;
+  min-height: 34px;
   border-radius: 999px;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
 }
 
@@ -818,8 +826,8 @@ window.unravel-dark .unravel-badge-heart {
 
 button.unravel-link-pill {
   border-radius: 999px;
-  padding: 6px 14px;
-  font-size: 12.5px;
+  padding: 8px 18px;
+  font-size: 14.5px;
   font-weight: 600;
 }
 
@@ -846,13 +854,13 @@ window.unravel-dark button.unravel-link-pill:hover {
 /* ---------------- Typography Utilities & Statistics ---------------- */
 
 .unravel-stat-num {
-  font-size: 25px;
+  font-size: 31px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
 .unravel-mini-clock {
-  font-size: 27px;
+  font-size: 32px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -868,8 +876,8 @@ window.unravel-dark button.unravel-link-pill:hover {
 }
 
 .unravel-day-btn {
-  border-radius: 16px;
-  padding: 10px 14px;
+  border-radius: 18px;
+  padding: 13px 16px;
 }
 
 window.unravel-light .unravel-day-btn:hover {
@@ -893,7 +901,7 @@ window.unravel-dark .unravel-day-today {
 }
 
 window.unravel-window progressbar > trough {
-  min-height: 7px;
+  min-height: 9px;
   border-radius: 999px;
 }
 
@@ -906,13 +914,13 @@ window.unravel-dark progressbar > trough {
 }
 
 window.unravel-light progressbar > trough > progress {
-  min-height: 7px;
+  min-height: 9px;
   border-radius: 999px;
   background-image: linear-gradient(90deg, #c23d82 0%, #4a5fc4 100%);
 }
 
 window.unravel-dark progressbar > trough > progress {
-  min-height: 7px;
+  min-height: 9px;
   border-radius: 999px;
   background-image: linear-gradient(90deg, #6a82f5 0%, #42d9b8 100%);
 }
@@ -920,29 +928,29 @@ window.unravel-dark progressbar > trough > progress {
 window.unravel-light .unravel-overrun-banner {
   background-color: rgba(184, 52, 77, 0.10);
   border: 1px solid rgba(184, 52, 77, 0.30);
-  border-radius: 18px;
-  padding: 14px 16px;
+  border-radius: 20px;
+  padding: 16px 18px;
 }
 
 window.unravel-dark .unravel-overrun-banner {
   background-color: rgba(255, 124, 145, 0.12);
   border: 1px solid rgba(255, 124, 145, 0.34);
-  border-radius: 18px;
-  padding: 14px 16px;
+  border-radius: 20px;
+  padding: 16px 18px;
 }
 
 window.unravel-light .unravel-empty-card {
   background-color: rgba(255, 255, 255, 0.58);
   border: 1.5px dashed rgba(150, 88, 160, 0.28);
-  border-radius: 22px;
-  padding: 28px 20px;
+  border-radius: 24px;
+  padding: 32px 24px;
 }
 
 window.unravel-dark .unravel-empty-card {
   background-color: rgba(16, 28, 62, 0.48);
   border: 1.5px dashed rgba(170, 186, 255, 0.24);
-  border-radius: 22px;
-  padding: 28px 20px;
+  border-radius: 24px;
+  padding: 32px 24px;
 }
 
 window.unravel-light entry,
@@ -950,7 +958,9 @@ window.unravel-light passwordentry,
 window.unravel-light spinbutton {
   background-color: rgba(255, 251, 254, 0.90);
   border: 1px solid rgba(150, 88, 160, 0.28);
-  border-radius: 12px;
+  border-radius: 13px;
+  font-size: 15px;
+  padding: 6px 10px;
 }
 
 window.unravel-dark entry,
@@ -958,12 +968,14 @@ window.unravel-dark passwordentry,
 window.unravel-dark spinbutton {
   background-color: rgba(11, 22, 49, 0.88);
   border: 1px solid rgba(139, 160, 235, 0.30);
-  border-radius: 12px;
+  border-radius: 13px;
+  font-size: 15px;
+  padding: 6px 10px;
 }
 
 window.unravel-window scrollbar slider {
-  min-width: 6px;
-  min-height: 6px;
+  min-width: 7px;
+  min-height: 7px;
   border-radius: 999px;
 }
 

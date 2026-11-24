@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronDown, Feather, Lamp, MoonStar, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -21,7 +22,7 @@ import {
   type PracticePage,
 } from "@/lib/practices";
 
-import { deletePractice, setPracticeTemplate } from "../actions";
+import { deletePractice } from "../actions";
 import { CardTools, SkyEmpty } from "@/components/panel-shared";
 
 export type PracticeWriteMode = "new" | "edit" | "rewrite";
@@ -56,16 +57,19 @@ const PAGE_SIZE = 14;
 export function PracticePanel({
   kind,
   view,
+  choice,
+  onChoiceChange,
   onWrite,
 }: {
   kind: PracticeKind;
   view: PracticeView;
+  choice: TemplateChoice;
+  onChoiceChange: (next: TemplateChoice) => void;
   onWrite: (mode: PracticeWriteMode) => void;
 }) {
+  const router = useRouter();
   const copy = COPY[kind];
-  // Local so the chip answers at once; the server action follows.
-  const [choice, setChoice] = useState<TemplateChoice>({ template: view.template, count: view.count });
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
   const [shown, setShown] = useState(PAGE_SIZE);
   const [open, setOpen] = useState<string | null>(null);
 
@@ -84,26 +88,49 @@ export function PracticePanel({
   // Clicking the stepper from 3 to 10 is seven clicks; saving each one
   // queued seven round trips, and leaving the page mid-queue stored a
   // number in between. Saves are debounced so only where you stop is sent,
-  // and a save still waiting when the panel goes away is sent on the way out.
+  // and a save still waiting when the panel goes away is sent via keepalive.
   const saved = useRef<TemplateChoice>({ template: view.template, count: view.count });
   const queued = useRef<{ timer: ReturnType<typeof setTimeout>; next: TemplateChoice } | null>(null);
+  const requestSeq = useRef(0);
 
-  const save = (next: TemplateChoice) => {
+  useEffect(() => {
+    saved.current = { template: view.template, count: view.count };
+  }, [view.template, view.count]);
+
+  const save = async (next: TemplateChoice) => {
     queued.current = null;
-    const formData = new FormData();
-    formData.set("kind", kind);
-    formData.set("template", next.template);
-    formData.set("count", String(next.count));
-    startTransition(async () => {
-      try {
-        const state = await setPracticeTemplate(formData);
-        if (state.status === "error") throw new Error(state.message);
-        saved.current = next;
-      } catch {
-        setChoice(saved.current);
-        toast.error("Couldn't change the template. Try again.");
+    const seq = ++requestSeq.current;
+    setPending(true);
+    try {
+      const response = await fetch("/api/heart/template", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind, template: next.template, count: next.count }),
+        keepalive: true,
+      });
+      const state = (await response.json().catch(() => null)) as
+        | { status?: string; message?: string }
+        | null;
+
+      if (!response.ok || state?.status === "error") {
+        throw new Error(state?.message ?? "Couldn't change the template. Try again.");
       }
-    });
+
+      saved.current = next;
+      if (seq === requestSeq.current) {
+        router.refresh();
+      }
+    } catch (err) {
+      if (seq === requestSeq.current) {
+        onChoiceChange(saved.current);
+        const msg = err instanceof Error && err.message ? err.message : "Couldn't change the template. Try again.";
+        toast.error(msg);
+      }
+    } finally {
+      if (seq === requestSeq.current) {
+        setPending(false);
+      }
+    }
   };
 
   // Saved when the popover closes, too, and sent on the way out if the
@@ -112,7 +139,7 @@ export function PracticePanel({
     const waiting = queued.current;
     if (!waiting) return;
     clearTimeout(waiting.timer);
-    save(waiting.next);
+    void save(waiting.next);
   };
 
   useEffect(() => {
@@ -121,11 +148,12 @@ export function PracticePanel({
       if (!waiting) return;
       clearTimeout(waiting.timer);
       queued.current = null;
-      const formData = new FormData();
-      formData.set("kind", kind);
-      formData.set("template", waiting.next.template);
-      formData.set("count", String(waiting.next.count));
-      void setPracticeTemplate(formData);
+      void fetch("/api/heart/template", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind, template: waiting.next.template, count: waiting.next.count }),
+        keepalive: true,
+      });
     };
     globalThis.addEventListener("pagehide", leave);
     return () => {
@@ -135,9 +163,9 @@ export function PracticePanel({
   }, [kind]);
 
   const chooseTemplate = (next: TemplateChoice) => {
-    setChoice(next);
+    onChoiceChange(next);
     if (queued.current) clearTimeout(queued.current.timer);
-    queued.current = { timer: setTimeout(() => save(next), 450), next };
+    queued.current = { timer: setTimeout(() => void save(next), 350), next };
   };
 
   return (

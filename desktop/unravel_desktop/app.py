@@ -64,7 +64,7 @@ class UnravelWindow(Adw.ApplicationWindow):
         super().__init__(application=app, title=APP_NAME)
         self._app = app
         self.add_css_class("unravel-window")
-        self.set_default_size(780, 700)
+        self.set_default_size(960, 860)
 
         # Living Cairo atmosphere sits beneath the entire translucent glass UI
         self._overlay = Gtk.Overlay()
@@ -101,11 +101,11 @@ class UnravelWindow(Adw.ApplicationWindow):
         header.add_css_class("unravel-header")
 
         # Left brand mark
-        brand = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        brand = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         brand.set_valign(Gtk.Align.CENTER)
         if ICON_PATH.exists():
             brand_img = Gtk.Image.new_from_file(str(ICON_PATH))
-            brand_img.set_pixel_size(24)
+            brand_img.set_pixel_size(28)
             brand.append(brand_img)
         brand_lbl = Gtk.Label(label="Unravel")
         brand_lbl.add_css_class("unravel-wordmark")
@@ -265,16 +265,16 @@ class UnravelWindow(Adw.ApplicationWindow):
     def show_page(self, name: str) -> None:
         self._root_stack.set_visible_child_name(name)
         if name == "mini":
-            self.set_size_request(350, 146)
-            self.set_default_size(390, 152)
+            self.set_size_request(400, 168)
+            self.set_default_size(450, 178)
             self._try_x11_pin(True)
         elif name == "connect":
-            self.set_size_request(460, 560)
-            self.set_default_size(540, 640)
+            self.set_size_request(520, 620)
+            self.set_default_size(620, 720)
             self._try_x11_pin(False)
         else:
-            self.set_size_request(560, 580)
-            self.set_default_size(780, 700)
+            self.set_size_request(680, 680)
+            self.set_default_size(960, 860)
             self._try_x11_pin(False)
 
     def select_tab(self, tab_name: str) -> None:

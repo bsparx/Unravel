@@ -21,8 +21,6 @@ import {
 } from "@/lib/timer-service";
 import { adjustSessionSchema } from "@/lib/validation";
 
-export type { SessionSnapshot };
-
 export async function startSession(
   input: StartSessionInput,
 ): Promise<SessionSnapshot | null> {

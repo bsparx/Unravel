@@ -92,7 +92,7 @@ class StatsRhythmChart(Gtk.DrawingArea):
         self._bars: list[dict[str, Any]] = []
         self._dark = False
         self._hover_idx: int | None = None
-        self.set_content_height(156)
+        self.set_content_height(194)
         self.set_hexpand(True)
         self.set_draw_func(self._draw)
 
@@ -143,12 +143,12 @@ class StatsRhythmChart(Gtk.DrawingArea):
         if not self._bars:
             return
         n = len(self._bars)
-        pad_x = 14.0
-        top_pad = 16.0
-        bottom_pad = 32.0
-        chart_h = max(24.0, height - top_pad - bottom_pad)
+        pad_x = 16.0
+        top_pad = 18.0
+        bottom_pad = 38.0
+        chart_h = max(28.0, height - top_pad - bottom_pad)
         slot_w = (width - pad_x * 2) / n
-        bar_w = max(10.0, min(28.0, slot_w * 0.54))
+        bar_w = max(12.0, min(36.0, slot_w * 0.56))
 
         if self._dark:
             grid_col = (0.667, 0.729, 1.0, 0.12)
@@ -220,18 +220,18 @@ class StatsRhythmChart(Gtk.DrawingArea):
             wk = str(b.get("weekday", ""))
             if wk:
                 cr.select_font_face("Lato", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD if is_today else cairo.FONT_WEIGHT_NORMAL)
-                cr.set_font_size(9.5)
+                cr.set_font_size(11.5)
                 w_ext = cr.text_extents(wk)
                 cr.set_source_rgba(*(today_top if is_today else muted_col))
-                cr.move_to(cx - w_ext.width / 2.0 - w_ext.x_bearing, height - 17.5)
+                cr.move_to(cx - w_ext.width / 2.0 - w_ext.x_bearing, height - 21.0)
                 cr.show_text(wk)
 
             lbl = str(b.get("day_num", ""))
             cr.select_font_face("Lato", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD if (is_today or is_hover) else cairo.FONT_WEIGHT_NORMAL)
-            cr.set_font_size(10.5)
+            cr.set_font_size(12.5)
             ext = cr.text_extents(lbl)
             cr.set_source_rgba(*(today_top if is_today else muted_col))
-            cr.move_to(cx - ext.width / 2.0 - ext.x_bearing, height - 4.5)
+            cr.move_to(cx - ext.width / 2.0 - ext.x_bearing, height - 5.0)
             cr.show_text(lbl)
 
 
@@ -246,8 +246,8 @@ class DayDetailDialog(Adw.Dialog):
     ) -> None:
         super().__init__()
         self.set_title(day.get("fullLabel") or day.get("shortLabel") or "Day details")
-        self.set_content_width(500)
-        self.set_content_height(620)
+        self.set_content_width(600)
+        self.set_content_height(720)
 
         summary = compute_day_summary(day, selected_ids)
 
@@ -446,11 +446,11 @@ class StatsView(Gtk.Box):
         scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
 
         clamp = Adw.Clamp()
-        clamp.set_maximum_size(820)
-        clamp.set_margin_top(18)
-        clamp.set_margin_bottom(28)
-        clamp.set_margin_start(22)
-        clamp.set_margin_end(22)
+        clamp.set_maximum_size(920)
+        clamp.set_margin_top(22)
+        clamp.set_margin_bottom(32)
+        clamp.set_margin_start(28)
+        clamp.set_margin_end(28)
 
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
 

@@ -36,11 +36,11 @@ class ConnectView(Gtk.Box):
         scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
 
         clamp = Adw.Clamp()
-        clamp.set_maximum_size(440)
-        clamp.set_margin_top(32)
-        clamp.set_margin_bottom(32)
-        clamp.set_margin_start(20)
-        clamp.set_margin_end(20)
+        clamp.set_maximum_size(520)
+        clamp.set_margin_top(36)
+        clamp.set_margin_bottom(36)
+        clamp.set_margin_start(24)
+        clamp.set_margin_end(24)
 
         card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
         card.add_css_class("unravel-card")
@@ -71,7 +71,7 @@ class ConnectView(Gtk.Box):
         # Primary 1-click Clerk browser sign-in button
         self._signin_btn = Gtk.Button(label="Sign in with Unravel")
         self._signin_btn.add_css_class("unravel-primary-btn")
-        self._signin_btn.set_size_request(-1, 48)
+        self._signin_btn.set_size_request(-1, 54)
         self._signin_btn.connect("clicked", self._on_browser_signin)
         card.append(self._signin_btn)
 

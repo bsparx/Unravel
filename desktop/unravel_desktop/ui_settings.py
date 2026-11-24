@@ -29,8 +29,8 @@ class SettingsDialog(Adw.PreferencesDialog):
     ) -> None:
         super().__init__()
         self.set_title("Settings")
-        self.set_content_width(480)
-        self.set_content_height(600)
+        self.set_content_width(560)
+        self.set_content_height(680)
 
         self._on_save_timer = on_save_timer_settings
         self._on_change_theme = on_change_theme
