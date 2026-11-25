@@ -15,6 +15,8 @@ import {
   LEVELS,
   MEDITATIONS,
   MINUTE_CHOICES,
+  MINUTES_MAX,
+  MINUTES_MIN,
   PHRASE_MAX,
   formatTimer,
   howText,
@@ -254,6 +256,71 @@ function Chips<T extends number | string>({
   );
 }
 
+const isPreset = (minutes: number) => (MINUTE_CHOICES as readonly number[]).includes(minutes);
+
+/**
+ * The presets, then "Custom" for any whole number of minutes from 1 to 90.
+ * A length that isn't a preset (say 7, remembered from last time) opens on
+ * Custom. Typing commits only in-range numbers; leaving the field brings an
+ * out-of-range or empty value back into range.
+ */
+function MinutesControl({ value, onChange }: { value: number; onChange: (minutes: number) => void }) {
+  const [custom, setCustom] = useState(() => !isPreset(value));
+  const [draft, setDraft] = useState(String(value));
+  const parsed = Number(draft);
+  const inRange = draft.trim() !== "" && Number.isInteger(parsed) && parsed >= MINUTES_MIN && parsed <= MINUTES_MAX;
+
+  return (
+    <div className="space-y-2">
+      <Chips<number | "custom">
+        label="Minutes"
+        choices={[...MINUTE_CHOICES, "custom"]}
+        value={custom ? "custom" : value}
+        render={(choice) => (choice === "custom" ? "Custom" : String(choice))}
+        onChange={(choice) => {
+          if (choice === "custom") {
+            setCustom(true);
+            setDraft(String(value));
+            return;
+          }
+          setCustom(false);
+          onChange(choice);
+        }}
+      />
+      {custom && (
+        <div className="flex items-center gap-2">
+          <Input
+            type="number"
+            inputMode="numeric"
+            min={MINUTES_MIN}
+            max={MINUTES_MAX}
+            step={1}
+            autoFocus
+            aria-label={`Minutes, ${MINUTES_MIN} to ${MINUTES_MAX}`}
+            aria-invalid={!inRange}
+            value={draft}
+            onChange={(event) => {
+              const next = event.target.value;
+              setDraft(next);
+              const n = Number(next);
+              if (next.trim() !== "" && Number.isInteger(n) && n >= MINUTES_MIN && n <= MINUTES_MAX) onChange(n);
+            }}
+            onBlur={() => {
+              const n = inRange ? parsed : Math.min(MINUTES_MAX, Math.max(MINUTES_MIN, Math.round(parsed) || value));
+              setDraft(String(n));
+              onChange(n);
+            }}
+            className="w-20 tabular-nums"
+          />
+          <span className={cn("text-label", inRange ? "text-muted-foreground" : "text-destructive")}>
+            min · {MINUTES_MIN} to {MINUTES_MAX}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** The chosen meditation's settings, a tiny preview, and Begin. */
 function Setup({
   meditation,
@@ -310,7 +377,11 @@ function Setup({
               />
             )}
             {controls.minutes && (
-              <Chips label="Minutes" choices={MINUTE_CHOICES} value={options.minutes as (typeof MINUTE_CHOICES)[number]} render={String} onChange={(minutes) => onChange({ minutes })} />
+              <MinutesControl
+                key={meditation.id}
+                value={options.minutes ?? meditation.defaults.minutes ?? MINUTES_MIN}
+                onChange={(minutes) => onChange({ minutes })}
+              />
             )}
             {controls.bell && (
               <Chips

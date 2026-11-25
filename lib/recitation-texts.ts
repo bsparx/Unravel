@@ -19,6 +19,11 @@
  * - Hadith: the English of the sunnah.com collections, verbatim, with their
  *   gradings. Only Sahih: al-Bukhari, Muslim, or graded Sahih by al-Albani
  *   (the other graders are listed too).
+ * - Hisn al-Muslim on sunnah.com stands in where the hadith's own collection
+ *   isn't there (Ibn Mas'ud's du'a, from Ahmad, which it reports al-Albani
+ *   graded authentic) and for the morning wording of Muslim 2723. Its
+ *   decorative kashida (ـ) is removed; any other change is named in the
+ *   entry's TEXT_SOURCES.
  */
 
 export type Verse = {
@@ -608,6 +613,128 @@ export const TEXTS = {
       "tr": "Allahumma innaka ʿafuwwun tuhibbul-ʿafwa, faʿfu ʿanni.",
       "en": "O Allah, You are Forgiving and love forgiveness, so forgive me."
     }
+  ],
+  "pain-bismillah": [
+    {
+      "ar": "بِاسْمِ اللَّهِ",
+      "tr": "Bismillah",
+      "en": "in the name of Allah"
+    }
+  ],
+  "pain-refuge": [
+    {
+      "ar": "أَعُوذُ بِاللَّهِ وَقُدْرَتِهِ مِنْ شَرِّ مَا أَجِدُ وَأُحَاذِرُ",
+      "tr": "Aʿudhu billahi wa qudratihi min sharri ma ajidu wa uhadhiru",
+      "en": "I seek refuge with Allah and with His Power from the evil that I find and that I fear"
+    }
+  ],
+  "ruqyah-rabban-nas": [
+    {
+      "ar": "اللَّهُمَّ رَبَّ النَّاسِ أَذْهِبِ الْبَاسَ، اشْفِهِ وَأَنْتَ الشَّافِي، لاَ شِفَاءَ إِلاَّ شِفَاؤُكَ، شِفَاءً لاَ يُغَادِرُ سَقَمًا",
+      "tr": "Allāhumma rabba n-nāsi, adhhibi l-bās, ishfihi wa anta sh-shāfī, lā shifāʾa illā shifāʾuk, shifāʾan lā yughādiru saqamā.",
+      "en": "O Allah, the Lord of the people! Remove the trouble and heal the patient, for You are the Healer. No healing is of any avail but Yours; healing that will leave behind no ailment."
+    }
+  ],
+  "cure-for-the-sick": [
+    {
+      "ar": "أَسْأَلُ اللَّهَ الْعَظِيمَ رَبَّ الْعَرْشِ الْعَظِيمِ أَنْ يَشْفِيَكَ",
+      "tr": "Asʾalu llāha l-ʿaẓīma rabba l-ʿarshi l-ʿaẓīmi an yashfiyak.",
+      "en": "I ask Allah, the Mighty, the Lord of the mighty Throne, to cure you"
+    }
+  ],
+  "refuge-bad-illnesses": [
+    {
+      "ar": "اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْبَرَصِ وَالْجُنُونِ وَالْجُذَامِ وَمِنْ سَيِّئِ الأَسْقَامِ",
+      "tr": "Allāhumma innī aʿūdhu bika mina l-baraṣi wal-junūni wal-judhāmi wa min sayyiʾi l-asqām.",
+      "en": "O Allah, I seek refuge in Thee from leprosy, madness, elephantiasis, and evil diseases."
+    }
+  ],
+  "jibril-ruqyah": [
+    {
+      "ar": "بِاسْمِ اللَّهِ أَرْقِيكَ مِنْ كُلِّ شَىْءٍ يُؤْذِيكَ مِنْ شَرِّ كُلِّ نَفْسٍ أَوْ عَيْنِ حَاسِدٍ اللَّهُ يَشْفِيكَ بِاسْمِ اللَّهِ أَرْقِيكَ",
+      "tr": "Bismi llāhi arqīka min kulli shayʾin yuʾdhīka, min sharri kulli nafsin aw ʿayni ḥāsid, Allāhu yashfīk, bismi llāhi arqīk.",
+      "en": "In the name of Allah I exorcise you from everything and safeguard you from every evil that may harm you and from the eye of a jealous one. Allah would cure you and I invoke the name of Allah for you."
+    }
+  ],
+  "ibn-masud-worry": [
+    {
+      "ar": "اللّهُمَّ إِنِّي عَبْدُكَ ابْنُ عَبْدِكَ ابْنُ أَمَتِكَ نَاصِيَتِي بِيَدِكَ مَاضٍ فِيَّ حُكْمُكَ عَدْلٌ فِيَّ قَضَاؤكَ أَسْأَلُكَ بِكُلِّ اسْمٍ هُوَ لَكَ سَمَّيْتَ بِهِ نَفْسَكَ أَوْ أَنْزَلْتَهُ فِي كِتَابِكَ أَوْ عَلَّمْتَهُ أَحَداً مِنْ خَلْقِكَ أَوِ اسْتَأْثَرْتَ بِهِ فِي عِلْمِ الغَيْبِ عِنْدَكَ أَنْ تَجْعَلَ القُرْآنَ رَبِيعَ قَلْبِي وَنورَ صَدْرِي وجَلَاءَ حُزْنِي وذَهَابَ هَمِّي",
+      "tr": "Allāhumma innī ʿabduk, ibnu ʿabdik, ibnu amatik, nāsiyatī biyadik, māḍin fiyya ḥukmuk, ʿadlun fiyya qaḍāʾuk, asʾaluka bikullis-min huwa lak, sammayta bihi nafsak, aw anzaltahu fī kitābik, aw ʿallamtahu aḥadan min khalqik, awi-staʾtharta bihi fī ʿilmil-ghaybi ʿindak, an tajʿala l-Qurʾāna rabīʿa qalbī, wa nūra ṣadrī, wa jalāʾa ḥuznī, wa dhahāba hammī.",
+      "en": "O Allah, I am Your slave, and the son of Your male slave, and the son of your female slave. My forehead is in Your Hand (i.e. you have control over me). Your Judgment upon me is assured, and Your Decree concerning me is just. I ask You by every Name that You have named Yourself with, revealed in Your Book, taught any one of Your creation, or kept unto Yourself in the knowledge of the unseen that is with You, to make the Qur'an the spring of my heart, and the light of my chest, the banisher of my sadness, and the reliever of my distress."
+    }
+  ],
+  "hasbunallah": [
+    {
+      "ar": "حَسْبُنَا اللَّهُ وَنِعْمَ الْوَكِيلُ",
+      "tr": "Ḥasbunā llāhu wa niʿma l-wakīl.",
+      "en": "Allah is Sufficient for us, and He is the Best Disposer (of affairs, for us)."
+    }
+  ],
+  "allahu-rabbi-distress": [
+    {
+      "ar": "اللَّهُ اللَّهُ رَبِّي لاَ أُشْرِكُ بِهِ شَيْئًا",
+      "tr": "Allāhu Allāhu rabbī lā ushriku bihi shayʾā.",
+      "en": "Allah , Allah is my Lord, I do not associate anything as partner with Him."
+    }
+  ],
+  "qadarullah": [
+    {
+      "ar": "قَدَرُ اللَّهِ وَمَا شَاءَ فَعَلَ",
+      "tr": "Qadaru llāhi wa mā shāʾa faʿal.",
+      "en": "Allah did that what He had ordained to do"
+    }
+  ],
+  "amantu-billah": [
+    {
+      "ar": "آمَنْتُ بِاللَّهِ",
+      "tr": "Āmantu billāh.",
+      "en": "I affirm my faith in Allah."
+    }
+  ],
+  "anger-refuge": [
+    {
+      "ar": "أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ",
+      "tr": "Aʿūdhu billāhi mina sh-shayṭāni r-rajīm.",
+      "en": "I seek refuge with Allah from Satan, the outcast."
+    }
+  ],
+  "bedtime-entrusting": [
+    {
+      "ar": "اللَّهُمَّ أَسْلَمْتُ وَجْهِي إِلَيْكَ، وَفَوَّضْتُ أَمْرِي إِلَيْكَ، وَأَلْجَأْتُ ظَهْرِي إِلَيْكَ، رَغْبَةً وَرَهْبَةً إِلَيْكَ، لاَ مَلْجَأَ وَلاَ مَنْجَا مِنْكَ إِلاَّ إِلَيْكَ، اللَّهُمَّ آمَنْتُ بِكِتَابِكَ الَّذِي أَنْزَلْتَ، وَبِنَبِيِّكَ الَّذِي أَرْسَلْتَ",
+      "tr": "Allahumma aslamtu wajhi ilaika, wa fauwadtu ʿAmri ilaika, wa aljaʾtu Zahri ilaika raghbatan wa rahbatan ilaika. La Maljaʾa wa la manja minka illa ilaika. Allahumma amantu bikitabika-l-ladhi anzalta wa bina-biyika-l ladhi arsalta",
+      "en": "O Allah! I surrender to You and entrust all my affairs to You and depend upon You for Your Blessings both with hope and fear of You. There is no fleeing from You, and there is no place of protection and safety except with You O Allah! I believe in Your Book (the Qur'an) which You have revealed and in Your Prophet (Muhammad) whom You have sent"
+    }
+  ],
+  "leaving-home": [
+    {
+      "ar": "بِسْمِ اللَّهِ تَوَكَّلْتُ عَلَى اللَّهِ لاَ حَوْلَ وَلاَ قُوَّةَ إِلاَّ بِاللَّهِ",
+      "tr": "Bismi llāhi, tawakkaltu ʿalā llāh, lā ḥawla wa lā quwwata illā billāh.",
+      "en": "In the name of Allah, I trust in Allah; there is no might and no power but in Allah."
+    }
+  ],
+  "istikhara": [
+    {
+      "ar": "اللَّهُمَّ إِنِّي أَسْتَخِيرُكَ بِعِلْمِكَ وَأَسْتَقْدِرُكَ بِقُدْرَتِكَ، وَأَسْأَلُكَ مِنْ فَضْلِكَ الْعَظِيمِ، فَإِنَّكَ تَقْدِرُ وَلاَ أَقْدِرُ وَتَعْلَمُ وَلاَ أَعْلَمُ وَأَنْتَ عَلاَّمُ الْغُيُوبِ",
+      "tr": "Allāhumma innī astakhīruka bi-ʿilmika wa astaqdiruka bi-qudratika, wa asʾaluka min faḍlika l-ʿaẓīm, fa-innaka taqdiru wa lā aqdiru, wa taʿlamu wa lā aʿlamu, wa anta ʿallāmu l-ghuyūb.",
+      "en": "O Allah! I ask guidance from Your knowledge, And Power from Your Might and I ask for Your great blessings. You are capable and I am not. You know and I do not and You know the unseen."
+    },
+    {
+      "ar": "اللَّهُمَّ إِنْ كُنْتَ تَعْلَمُ أَنَّ هَذَا الأَمْرَ خَيْرٌ لِي فِي دِينِي وَمَعَاشِي وَعَاقِبَةِ أَمْرِي فَاقْدُرْهُ لِي وَيَسِّرْهُ لِي ثُمَّ بَارِكْ لِي فِيهِ",
+      "tr": "Allāhumma in kunta taʿlamu anna hādha l-amra khayrun lī fī dīnī wa maʿāshī wa ʿāqibati amrī, fa-qdurhu lī wa yassirhu lī thumma bārik lī fīh.",
+      "en": "O Allah! If You know that this job is good for my religion and my subsistence and in my Hereafter--Then You ordain it for me and make it easy for me to get, And then bless me in it."
+    },
+    {
+      "ar": "وَإِنْ كُنْتَ تَعْلَمُ أَنَّ هَذَا الأَمْرَ شَرٌّ لِي فِي دِينِي وَمَعَاشِي وَعَاقِبَةِ أَمْرِي فَاصْرِفْهُ عَنِّي وَاصْرِفْنِي عَنْهُ، وَاقْدُرْ لِي الْخَيْرَ حَيْثُ كَانَ ثُمَّ أَرْضِنِي بِهِ",
+      "tr": "Wa in kunta taʿlamu anna hādha l-amra sharrun lī fī dīnī wa maʿāshī wa ʿāqibati amrī, fa-ṣrifhu ʿannī wa-ṣrifnī ʿanhu, wa-qdur liya l-khayra ḥaythu kāna thumma arḍinī bih.",
+      "en": "And if You know that this job is harmful to me In my religion and subsistence and in the Hereafter--Then keep it away from me and let me be away from it. And ordain for me whatever is good for me, And make me satisfied with it."
+    }
+  ],
+  "morning-good-of-day": [
+    {
+      "ar": "أَصْبَحْنَا وَأَصْبَحَ الْمُلْكُ لِلَّهِ وَالْحَمْدُ لِلَّهِ، لاَ إِلَهَ إلاَّ اللَّهُ وَحْدَهُ لاَ شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ، رَبِّ أَسْأَلُكَ خَيْرَ مَا فِي هَذَا الْيَوْمِ وَخَيرَ مَا بَعْدَهُ، وَأَعُوذُ بِكَ مِنْ شَرِّ مَا فِي هَذَا الْيَوْمِ وَشَرِّ مَا بَعْدَهُ، رَبِّ أَعُوذُ بِكَ مِنَ الْكَسَلِ وَسُوءِ الْكِبَرِ، رَبِّ أَعُوذُ بِكَ مِنْ عَذَابٍ فِي النَّارِ وَعَذَابٍ فِي القَبْر",
+      "tr": "Aṣbaḥnā wa aṣbaḥal-mulku lillāh, walḥamdu lillāh, lā ilāha illallāhu waḥdahu lā sharīka lah, lahul-mulku wa lahul-ḥamd, wa huwa ʿalā kulli shayʾin Qadīr. Rabbi asʾaluka khayra mā fī hādha l-yawmi wa khayra mā baʿdahu wa aʿūdhu bika min sharri mā fī hātha l-yawmi wa sharri mā baʿdahu, Rabbi aʿūdhu bika minal-kasali, wa sūʾil-kibar, Rabbi aʿūdhu bika min ʿadhābin fin-nāri wa ʿadhābin fil-qabr.",
+      "en": "We have entered a new day and with it all dominion is Allah's. Praise is to Allah. None has the right to be worshipped but Allah alone, Who has no partner. To Allah belongs the dominion, and to Him is the praise and He is Able to do all things. My Lord, I ask You for the goodness of this day and of the days that come after it, and I seek refuge in You from the evil of this day and of the days that come after it. My Lord, I seek refuge in You from laziness and helpless old age. My Lord, I seek refuge in You from the punishment of Hell-fire, and from the punishment of the grave."
+    }
   ]
 } as const satisfies Record<string, readonly Verse[]>;
 
@@ -848,6 +975,86 @@ export const TEXT_SOURCES: Record<TextKey, TextSource> = {
     "arabic": "Sunan Ibn Majah 3850",
     "transliteration": "Sunan Ibn Majah 3850 (English)",
     "translation": "Sunan Ibn Majah 3850 (English)"
+  },
+  "pain-bismillah": {
+    "arabic": "Sahih Muslim 2202",
+    "transliteration": "Sahih Muslim 2202 (English)",
+    "translation": "Sahih Muslim 2202 (English)"
+  },
+  "pain-refuge": {
+    "arabic": "Sahih Muslim 2202",
+    "transliteration": "Sahih Muslim 2202 (English)",
+    "translation": "Sahih Muslim 2202 (English)"
+  },
+  "ruqyah-rabban-nas": {
+    "arabic": "Sahih al-Bukhari 5743",
+    "transliteration": "Transliterated from Sahih al-Bukhari 5743 (Arabic)",
+    "translation": "Sahih al-Bukhari 5743 (English)"
+  },
+  "cure-for-the-sick": {
+    "arabic": "Sunan Abi Dawud 3106",
+    "transliteration": "Transliterated from Sunan Abi Dawud 3106 (Arabic)",
+    "translation": "Sunan Abi Dawud 3106 (English)"
+  },
+  "refuge-bad-illnesses": {
+    "arabic": "Sunan Abi Dawud 1554",
+    "transliteration": "Transliterated from Sunan Abi Dawud 1554 (Arabic)",
+    "translation": "Sunan Abi Dawud 1554 (English)"
+  },
+  "jibril-ruqyah": {
+    "arabic": "Sahih Muslim 2186",
+    "transliteration": "Transliterated from Sahih Muslim 2186 (Arabic)",
+    "translation": "Sahih Muslim 2186 (English)"
+  },
+  "ibn-masud-worry": {
+    "arabic": "Hisn al-Muslim 120 (kashida removed; one vowel slip corrected, أِوْ to أَوْ)",
+    "transliteration": "Hisn al-Muslim 120 (English)",
+    "translation": "Hisn al-Muslim 120 (English)"
+  },
+  "hasbunallah": {
+    "arabic": "Sahih al-Bukhari 4563",
+    "transliteration": "Transliterated from Sahih al-Bukhari 4563 (Arabic)",
+    "translation": "Sahih al-Bukhari 4563 (English)"
+  },
+  "allahu-rabbi-distress": {
+    "arabic": "Sunan Abi Dawud 1525",
+    "transliteration": "Transliterated from Sunan Abi Dawud 1525 (Arabic)",
+    "translation": "Sunan Abi Dawud 1525 (English)"
+  },
+  "qadarullah": {
+    "arabic": "Sahih Muslim 2664",
+    "transliteration": "Transliterated from Sahih Muslim 2664 (Arabic)",
+    "translation": "Sahih Muslim 2664 (English)"
+  },
+  "amantu-billah": {
+    "arabic": "Sahih Muslim 134",
+    "transliteration": "Transliterated from Sahih Muslim 134 (Arabic)",
+    "translation": "Sahih Muslim 134 (English)"
+  },
+  "anger-refuge": {
+    "arabic": "Sahih al-Bukhari 6115",
+    "transliteration": "Transliterated from Sahih al-Bukhari 6115 (Arabic)",
+    "translation": "Sahih al-Bukhari 6115 (English)"
+  },
+  "bedtime-entrusting": {
+    "arabic": "Sahih al-Bukhari 247",
+    "transliteration": "Sahih al-Bukhari 247 (English)",
+    "translation": "Sahih al-Bukhari 247 (English)"
+  },
+  "leaving-home": {
+    "arabic": "Sunan Abi Dawud 5095",
+    "transliteration": "Transliterated from Sunan Abi Dawud 5095 (Arabic)",
+    "translation": "Sunan Abi Dawud 5095 (English)"
+  },
+  "istikhara": {
+    "arabic": "Sahih al-Bukhari 1166 (the narrator's \"or he said…\" alternatives left out)",
+    "transliteration": "Transliterated from Sahih al-Bukhari 1166 (Arabic)",
+    "translation": "Sahih al-Bukhari 1166 (English, the narrator's alternatives left out)"
+  },
+  "morning-good-of-day": {
+    "arabic": "Hisn al-Muslim 77, the morning wording of Sahih Muslim 2723 (kashida removed)",
+    "transliteration": "Hisn al-Muslim 77 (English)",
+    "translation": "Hisn al-Muslim 77 (English, footnote markers removed)"
   }
 };
 
@@ -1712,6 +1919,223 @@ export const HADITH = {
         {
           "by": "Zubair Ali Zai",
           "grade": "Daif"
+        }
+      ]
+    }
+  ],
+  "pain-hand-on-body": [
+    {
+      "ref": "Sahih Muslim 2202",
+      "url": "https://sunnah.com/muslim:2202",
+      "text": "Uthman b. Abu al-'As Al-Thaqafi reported that he made a complaint of pain to Allah's Messenger (ﷺ) that he felt in his body at the time he had become Muslim. Thereupon Allah's Messenger (ﷺ) said: Place your hand at the place where you feel pain in your body and say Bismillah (in the name of Allah) three times and seven times A'udhu billahi wa qudratihi min sharri ma ajidu wa uhadhiru (I seek refuge with Allah and with His Power from the evil that I find and that I fear).",
+      "grades": [
+        {
+          "by": "Sahih Muslim",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "ruqyah-rabban-nas": [
+    {
+      "ref": "Sahih al-Bukhari 5743",
+      "url": "https://sunnah.com/bukhari:5743",
+      "text": "Narrated `Aisha: The Prophet (ﷺ) used to treat some of his wives by passing his right hand over the place of ailment and used to say, \"O Allah, the Lord of the people! Remove the trouble and heal the patient, for You are the Healer. No healing is of any avail but Yours; healing that will leave behind no ailment.\"",
+      "grades": [
+        {
+          "by": "Sahih al-Bukhari",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "cure-for-the-sick": [
+    {
+      "ref": "Sunan Abi Dawud 3106",
+      "url": "https://sunnah.com/abudawud:3106",
+      "text": "Narrated Abdullah ibn Abbas: The Prophet (ﷺ) said: If anyone visits a sick whose time (of death) has not come, and says with him seven times: I ask Allah, the Mighty, the Lord of the mighty Throne, to cure you, Allah will cure him from that disease.",
+      "grades": [
+        {
+          "by": "Al-Albani",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "refuge-bad-illnesses": [
+    {
+      "ref": "Sunan Abi Dawud 1554",
+      "url": "https://sunnah.com/abudawud:1554",
+      "text": "Narrated Anas ibn Malik: The Prophet (ﷺ) used to say: \"O Allah, I seek refuge in Thee from leprosy, madness, elephantiasis, and evil diseases.\"",
+      "grades": [
+        {
+          "by": "Al-Albani",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "jibril-ruqyah": [
+    {
+      "ref": "Sahih Muslim 2186",
+      "url": "https://sunnah.com/muslim:2186",
+      "text": "Abu Sa'id reported that Gabriel came to Allah's Messenger (ﷺ) and said: Muhammad, have you fallen ill? Thereupon he said: Yes. He (Gabriel) said: \"In the name of Allah I exorcise you from everything and safeguard you from every evil that may harm you and from the eye of a jealous one. Allah would cure you and I invoke the name of Allah for you.\"",
+      "grades": [
+        {
+          "by": "Sahih Muslim",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "ibn-masud-worry": [
+    {
+      "ref": "Hisn al-Muslim 120",
+      "url": "https://sunnah.com/hisn:120",
+      "text": "O Allah, I am Your slave, and the son of Your male slave, and the son of your female slave. My forehead is in Your Hand (i.e. you have control over me). Your Judgment upon me is assured, and Your Decree concerning me is just. I ask You by every Name that You have named Yourself with, revealed in Your Book, taught any one of Your creation, or kept unto Yourself in the knowledge of the unseen that is with You, to make the Qur'an the spring of my heart, and the light of my chest, the banisher of my sadness, and the reliever of my distress. Reference: Ahmad 1/391, and Al-Albani graded it authentic.",
+      "grades": [
+        {
+          "by": "Al-Albani",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "hasbunallah": [
+    {
+      "ref": "Sahih al-Bukhari 4563",
+      "url": "https://sunnah.com/bukhari:4563",
+      "text": "Narrated Ibn `Abbas: 'Allah is Sufficient for us and He Is the Best Disposer of affairs,\" was said by Abraham when he was thrown into the fire; and it was said by Muhammad when they (i.e. hypocrites) said, \"A great army is gathering against you, therefore, fear them,\" but it only increased their faith and they said: \"Allah is Sufficient for us, and He is the Best Disposer (of affairs, for us).\" (3.173)",
+      "grades": [
+        {
+          "by": "Sahih al-Bukhari",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "allahu-rabbi-distress": [
+    {
+      "ref": "Sunan Abi Dawud 1525",
+      "url": "https://sunnah.com/abudawud:1525",
+      "text": "Narrated Asma' daughter of Umays: The Messenger of Allah (ﷺ) said to me: May I not teach you phrases which you utter in distress? (These are:) \"Allah , Allah is my Lord, I do not associate anything as partner with Him.\" Abu Dawud said: The narrator Hilal is a client of 'Umar b. 'Abd al-Aziz. The name of Ja'far, a narrator, is 'Abd Allah b. Ja'far.",
+      "grades": [
+        {
+          "by": "Al-Albani",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "qadarullah": [
+    {
+      "ref": "Sahih Muslim 2664",
+      "url": "https://sunnah.com/muslim:2664",
+      "text": "Abu Huraira reported Allah's Messenger (ﷺ) as saying: A strong believer is better and is more lovable to Allah than a weak believer, and there is good in everyone, (but) cherish that which gives you benefit (in the Hereafter) and seek help from Allah and do not lose heart, and if anything (in the form of trouble) comes to you, don't say: If I had not done that, it would not have happened so and so, but say: Allah did that what He had ordained to do and your\" if\" opens the (gate) for the Satan.",
+      "grades": [
+        {
+          "by": "Sahih Muslim",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "amantu-billah": [
+    {
+      "ref": "Sahih Muslim 134",
+      "url": "https://sunnah.com/muslim:134",
+      "text": "It is narrated on the authority of Abu Huraira that the Messenger of Allah (ﷺ) said: Men will continue to question one another till this is propounded: Allah created all things but who created Allah? He who found himself confronted with such a situation should say: I affirm my faith in Allah.",
+      "grades": [
+        {
+          "by": "Sahih Muslim",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "anger-refuge": [
+    {
+      "ref": "Sahih al-Bukhari 6115",
+      "url": "https://sunnah.com/bukhari:6115",
+      "text": "Narrated Sulaiman bin Sarad: Two men abused each other in front of the Prophet (ﷺ) while we were sitting with him. One of the two abused his companion furiously and his face became red. The Prophet (ﷺ) said, \"I know a word (sentence) the saying of which will cause him to relax if this man says it. Only if he said, \"I seek refuge with Allah from Satan, the outcast.' \" So they said to that (furious) man, 'Don't you hear what the Prophet (ﷺ) is saying?\" He said, \"I am not mad.\"",
+      "grades": [
+        {
+          "by": "Sahih al-Bukhari",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "bedtime-entrusting": [
+    {
+      "ref": "Sahih al-Bukhari 247",
+      "url": "https://sunnah.com/bukhari:247",
+      "text": "Narrated Al-Bara 'bin `Azib: The Prophet (ﷺ) said to me, \"Whenever you go to bed perform ablution like that for the prayer, lie or your right side and say, \"Allahumma aslamtu wajhi ilaika, wa fauwadtu `Amri ilaika, wa alja'tu Zahri ilaika raghbatan wa rahbatan ilaika. La Malja'a wa la manja minka illa ilaika. Allahumma amantu bikitabika-l-ladhi anzalta wa bina-biyika-l ladhi arsalta\" (O Allah! I surrender to You and entrust all my affairs to You and depend upon You for Your Blessings both with hope and fear of You. There is no fleeing from You, and there is no place of protection and safety except with You O Allah! I believe in Your Book (the Qur'an) which You have revealed and in Your Prophet (Muhammad) whom You have sent). Then if you die on that very night, you will die with faith (i.e. or the religion of Islam). Let the aforesaid words be your last utterance (before sleep).\" I repeated it before the Prophet (ﷺ) and when I reached \"Allahumma amantu bikitabika-l-ladhi anzalta (O Allah I believe in Your Book which You have revealed).\" I said, \"Wa-rasulika (and your Apostle).\" The Prophet (ﷺ) said, \"No, (but say): 'Wanabiyika-l-ladhi arsalta (Your Prophet whom You have sent), instead.\"",
+      "grades": [
+        {
+          "by": "Sahih al-Bukhari",
+          "grade": "Sahih"
+        }
+      ]
+    },
+    {
+      "ref": "Sahih al-Bukhari 6311",
+      "url": "https://sunnah.com/bukhari:6311",
+      "text": "Narrated Al-Bara bin `Azib: Allah's Messenger (ﷺ) said to me, \"When you want to go to bed, perform ablution as you do for prayer, then lie down on your right side and say: 'Allahumma aslamtu wajhi ilaika, wa fawwadtu 'amri ilaika wa alja'tu dhahri ilaika, raghbatan wa rahbatan ilaika, la malja'a wa la manja minka illa ilaika. Amantu bikitabik al-ladhi anzalta wa binabiyyika al-ladhi arsalta'. If you should die then (after reciting this) you will die on the religion of Islam (i.e., as a Muslim); so let these words be the last you say (before going to bed)\" While I was memorizing it, I said, \"Wa birasulika al-ladhi arsalta (in Your Apostle whom You have sent).' The Prophet (ﷺ) said, \"No, but say: Wa binabiyyika al-ladhi arsalta (in Your Prophet whom You have sent).",
+      "grades": [
+        {
+          "by": "Sahih al-Bukhari",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "leaving-home": [
+    {
+      "ref": "Sunan Abi Dawud 5095",
+      "url": "https://sunnah.com/abudawud:5095",
+      "text": "Narrated Anas ibn Malik: The Prophet (ﷺ) said: When a man goes out of his house and says: \"In the name of Allah, I trust in Allah; there is no might and no power but in Allah,\" the following will be said to him at that time: \"You are guided, defended and protected.\" The devils will go far from him and another devil will say: How can you deal with a man who has been guided, defended and protected?",
+      "grades": [
+        {
+          "by": "Al-Albani",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "istikhara": [
+    {
+      "ref": "Sahih al-Bukhari 1166",
+      "url": "https://sunnah.com/bukhari:1166",
+      "text": "Narrated Jabir bin `Abdullah: The Prophet (p.b.u.h) used to teach us the way of doing Istikhara (Istikhara means to ask Allah to guide one to the right sort of action concerning any job or a deed), in all matters as he taught us the Suras of the Qur'an. He said, \"If anyone of you thinks of doing any job he should offer a two rak`at prayer other than the compulsory ones and say (after the prayer): -- 'Allahumma inni astakhiruka bi'ilmika, Wa astaqdiruka bi-qudratika, Wa as'alaka min fadlika Al-`azlm Fa-innaka taqdiru Wala aqdiru, Wa ta'lamu Wala a'lamu, Wa anta 'allamu l-ghuyub. Allahumma, in kunta ta'lam anna hadha-lamra Khairun li fi dini wa ma'ashi wa'aqibati `Amri (or 'ajili `Amri wa'ajilihi) Faqdirhu wa yas-sirhu li thumma barik li Fihi, Wa in kunta ta'lamu anna hadha-lamra shar-run li fi dini wa ma'ashi wa'aqibati `Amri (or fi'ajili `Amri wa ajilihi) Fasrifhu anni was-rifni anhu. Waqdir li al-khaira haithu kana Thumma ardini bihi.' (O Allah! I ask guidance from Your knowledge, And Power from Your Might and I ask for Your great blessings. You are capable and I am not. You know and I do not and You know the unseen. O Allah! If You know that this job is good for my religion and my subsistence and in my Hereafter--(or said: If it is better for my present and later needs)--Then You ordain it for me and make it easy for me to get, And then bless me in it, and if You know that this job is harmful to me In my religion and subsistence and in the Hereafter--(or said: If it is worse for my present and later needs)--Then keep it away from me and let me be away from it. And ordain for me whatever is good for me, And make me satisfied with it). The Prophet (ﷺ) added that then the person should name (mention) his need.",
+      "grades": [
+        {
+          "by": "Sahih al-Bukhari",
+          "grade": "Sahih"
+        }
+      ]
+    },
+    {
+      "ref": "Sahih al-Bukhari 6382",
+      "url": "https://sunnah.com/bukhari:6382",
+      "text": "Narrated Jabir: The Prophet (ﷺ) used to teach us the Istikhara for each and every matter as he used to teach us the Suras from the Holy Qur'an. (He used to say), \"If anyone of you intends to do something, he should offer a two-rak`at prayer other than the obligatory prayer, and then say: 'Allahumma inni astakhiruka bi'ilmika, wa astaqdiruka biqudratika, wa as'aluka min fadlika-l-'azim, fa innaka taqdiru wala aqdiru, wa ta'lamu wala a'lamu, wa anta'allamu-l-ghuyub. Allahumma in kunta ta'lamu anna hadha-lamra khairun li fi dini wa ma'ashi wa 'aqibati `Amri (or said, fi 'ajili `Amri wa ajilihi) fa-qdurhu li, Wa in kunta ta'lamu anna ha-dha-l-amra sharrun li fi dini wa ma'ashi wa 'aqibati `Amri (or said, fi ajili `Amri wa ajilihi) fasrifhu 'anni was-rifni 'anhu wa aqdur li alkhaira haithu kana, thumma Raddani bihi,\" Then he should mention his matter (need).",
+      "grades": [
+        {
+          "by": "Sahih al-Bukhari",
+          "grade": "Sahih"
+        }
+      ]
+    }
+  ],
+  "morning-good-of-day": [
+    {
+      "ref": "Sahih Muslim 2723",
+      "url": "https://sunnah.com/muslim:2723b",
+      "text": "Abdullah reported that when it was evening Allah's Messenger (ﷺ) used to supplicate: \" We have entered upon evening and so, too, the whole Kingdom of Allah has entered upon evening. Praise is due to Allah. There is no god but Allah, the One having no partner with Him.\" He (the narrator) said: I think that he also uttered (in this supplication these words):\" His is tne Sovercignty and to Him is praise due and He is Potent over everything. My Lord, I beg of Thee good that lies in this night and good that follows it and I seek refuge in Thee from the evil that lies in this night and from the evil of that which follows it. My Lord, I seek refuge in Thee from sloth, from the evil of vanity. My Lord, I seek refuge in Thee from torment of the Hell-Fire and from torment of the grave.\" And when it was morning he said like this:\" We entered upon morning and the whole Kingdom of Allah enter ed upon morning.\"",
+      "grades": [
+        {
+          "by": "Sahih Muslim",
+          "grade": "Sahih"
         }
       ]
     }

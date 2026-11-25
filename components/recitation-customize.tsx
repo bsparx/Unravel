@@ -14,6 +14,7 @@ import {
   CUSTOM_PREFIX,
   RECITATIONS,
   RECITATION_GROUPS,
+  RECITATION_TOPICS,
   SET_MAX_ITEMS,
   TIME_LABEL,
   findRecitation,
@@ -21,11 +22,16 @@ import {
   recitationMatchesQuery,
   sessionItem,
   type RecitationGroup,
+  type RecitationTopic,
   type SetItem,
 } from "@/lib/recitations";
 import { cn } from "@/lib/utils";
 
 const clamp = (n: number) => Math.min(COUNT_MAX, Math.max(1, Math.round(n) || 1));
+
+const topicCounts = Object.fromEntries(
+  RECITATION_TOPICS.map((t) => [t.id, RECITATIONS.filter((item) => item.topics?.includes(t.id)).length]),
+) as Record<RecitationTopic, number>;
 
 type FilterTab = "all" | RecitationGroup | "own";
 
@@ -54,6 +60,7 @@ export default function RecitationCustomize({
   const [set, setSet] = useState<SetItem[]>(initial);
   const [query, setQuery] = useState("");
   const [activeGroup, setActiveGroup] = useState<FilterTab>("all");
+  const [activeTopic, setActiveTopic] = useState<RecitationTopic | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -106,13 +113,20 @@ export default function RecitationCustomize({
       : RECITATION_GROUPS.filter((g) => activeGroup === "all" || g.id === activeGroup)
           .map((group) => ({
             group,
-            list: RECITATIONS.filter((item) => item.group === group.id && recitationMatchesQuery(item, query)),
+            list: RECITATIONS.filter(
+              (item) =>
+                item.group === group.id &&
+                (!activeTopic || item.topics?.includes(activeTopic)) &&
+                recitationMatchesQuery(item, query),
+            ),
           }))
           .filter(({ list }) => list.length > 0);
 
   const needle = query.trim().toLowerCase();
+  const topicTitle = RECITATION_TOPICS.find((t) => t.id === activeTopic)?.title;
+  // Your own recitations carry no topic: a topic filter leaves them out.
   const visibleCustoms =
-    activeGroup === "all" || activeGroup === "own"
+    !activeTopic && (activeGroup === "all" || activeGroup === "own")
       ? customs.filter(
           (row) =>
             !needle ||
@@ -123,8 +137,10 @@ export default function RecitationCustomize({
         )
       : [];
 
-  const showOwnSection = activeGroup === "own" || (activeGroup === "all" && (!needle || visibleCustoms.length > 0));
-  const emptySearch = needle.length > 0 && visibleGroups.length === 0 && visibleCustoms.length === 0;
+  const showOwnSection =
+    !activeTopic && (activeGroup === "own" || (activeGroup === "all" && (!needle || visibleCustoms.length > 0)));
+  const emptySearch =
+    (needle.length > 0 || activeTopic !== null) && visibleGroups.length === 0 && visibleCustoms.length === 0;
 
   const save = async () => {
     setSaving(true);
@@ -343,7 +359,11 @@ export default function RecitationCustomize({
                       type="button"
                       role="tab"
                       aria-selected={selected}
-                      onClick={() => setActiveGroup(tab.id)}
+                      onClick={() => {
+                        setActiveGroup(tab.id);
+                        // Your own recitations carry no topic, so a topic would hide them all.
+                        if (tab.id === "own") setActiveTopic(null);
+                      }}
                       className={cn(
                         "focus-visible:ring-ring inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3.5 text-xs font-medium transition focus-visible:ring-2 focus-visible:outline-none",
                         selected
@@ -359,6 +379,36 @@ export default function RecitationCustomize({
                   );
                 })}
               </div>
+
+              <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter by need">
+                <span className="text-muted-foreground mr-1 text-micro font-medium tracking-wider uppercase">For</span>
+                {RECITATION_TOPICS.map((topic) => {
+                  const pressed = activeTopic === topic.id;
+                  return (
+                    <button
+                      key={topic.id}
+                      type="button"
+                      aria-pressed={pressed}
+                      onClick={() => {
+                        setActiveTopic(pressed ? null : topic.id);
+                        if (!pressed && activeGroup === "own") setActiveGroup("all");
+                      }}
+                      className={cn(
+                        "focus-visible:ring-ring inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3.5 text-xs font-medium transition focus-visible:ring-2 focus-visible:outline-none",
+                        pressed
+                          ? "border-primary/60 bg-primary/10 text-foreground"
+                          : "border-border/80 bg-card text-muted-foreground hover:border-border hover:text-foreground",
+                      )}
+                    >
+                      {topic.title}
+                      <span className={cn("font-mono text-[0.7rem] tabular-nums", pressed ? "opacity-80" : "opacity-65")}>
+                        {topicCounts[topic.id]}
+                      </span>
+                      {pressed && <X className="size-3" aria-hidden />}
+                    </button>
+                  );
+                })}
+              </div>
               {full && (
                 <p className="text-muted-foreground text-label">
                   A set holds up to {SET_MAX_ITEMS}. Remove one from your set to add another.
@@ -369,7 +419,9 @@ export default function RecitationCustomize({
             <div className="space-y-7 px-5 py-5 sm:px-7 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-8 lg:py-6 [scrollbar-width:thin]">
               {emptySearch ? (
                 <p className="text-muted-foreground border-border/80 rounded-2xl border border-dashed px-4 py-10 text-center text-label">
-                  No recitations match “{query.trim()}”.
+                  {needle
+                    ? `No recitations match “${query.trim()}”${topicTitle ? ` under ${topicTitle}` : ""}.`
+                    : `Nothing under ${topicTitle} in this category.`}
                 </p>
               ) : (
                 <>

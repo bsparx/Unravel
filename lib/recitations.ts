@@ -41,6 +41,9 @@ export type RecitationGroup = "quran" | "adhkar" | "dua" | "salawat";
 /** When its hadith places it. A tag, never a rule. */
 export type RecitationTime = "morning" | "evening" | "both" | "night" | "prayer" | "any";
 
+/** What a recitation's words ask for, to browse by need. */
+export type RecitationTopic = "health" | "anxiety" | "focus";
+
 export type RecitationPart = {
   /** Shown above the words when an item has more than one part: "Al-Ikhlas". */
   title?: string;
@@ -62,8 +65,10 @@ export type Recitation = {
   defaultCount: number;
   /** "Al-Baqarah 2:255", "Sahih al-Bukhari 6306". */
   ref: string;
-  /** How the app counts it, if that needs saying. */
+  /** How the app counts it, or when it's said, if that needs saying. */
   note?: string;
+  /** The needs its words speak to; none for most. */
+  topics?: readonly RecitationTopic[];
   parts: readonly RecitationPart[];
 };
 
@@ -247,6 +252,7 @@ export const RECITATIONS: readonly Recitation[] = [
     when: "both",
     defaultCount: 1,
     ref: "Sunan Ibn Majah 3871",
+    topics: ["health", "anxiety"],
     parts: one("afw-afiyah"),
   },
   {
@@ -275,6 +281,85 @@ export const RECITATIONS: readonly Recitation[] = [
       { title: "La ilaha illallah", count: 1, text: "tasbih-tahlil" },
     ],
   },
+  {
+    id: "morning-good-of-day",
+    title: "Morning: the good of this day, refuge from laziness",
+    arabicTitle: "",
+    group: "adhkar",
+    when: "morning",
+    defaultCount: 1,
+    ref: "Sahih Muslim 2723 · Hisn al-Muslim 77",
+    note: "In the evening the hadith says amsayna and “this night” in place of asbahna and “this day”.",
+    topics: ["focus"],
+    parts: one("morning-good-of-day"),
+  },
+  {
+    id: "hasbunallah",
+    title: "Hasbunallahu wa ni'mal-wakil",
+    arabicTitle: "",
+    group: "adhkar",
+    when: "any",
+    defaultCount: 1,
+    ref: "Sahih al-Bukhari 4563",
+    topics: ["anxiety"],
+    parts: one("hasbunallah"),
+  },
+  {
+    id: "allahu-rabbi-distress",
+    title: "Allah, Allah is my Lord: words for distress",
+    arabicTitle: "",
+    group: "adhkar",
+    when: "any",
+    defaultCount: 1,
+    ref: "Sunan Abi Dawud 1525",
+    topics: ["anxiety"],
+    parts: one("allahu-rabbi-distress"),
+  },
+  {
+    id: "qadarullah",
+    title: "When something goes wrong: Qadarullahi wa ma sha'a fa'al",
+    arabicTitle: "",
+    group: "adhkar",
+    when: "any",
+    defaultCount: 1,
+    ref: "Sahih Muslim 2664",
+    note: "Said when something befalls you, in place of “if only I had…”.",
+    topics: ["anxiety", "focus"],
+    parts: one("qadarullah"),
+  },
+  {
+    id: "amantu-billah",
+    title: "When whispers of doubt come: Amantu billah",
+    arabicTitle: "",
+    group: "adhkar",
+    when: "any",
+    defaultCount: 1,
+    ref: "Sahih Muslim 134",
+    topics: ["anxiety"],
+    parts: one("amantu-billah"),
+  },
+  {
+    id: "anger-refuge",
+    title: "When angry: A'udhu billahi minash-shaytanir-rajim",
+    arabicTitle: "",
+    group: "adhkar",
+    when: "any",
+    defaultCount: 1,
+    ref: "Sahih al-Bukhari 6115",
+    topics: ["anxiety"],
+    parts: one("anger-refuge"),
+  },
+  {
+    id: "leaving-home",
+    title: "Leaving home: Bismillah, tawakkaltu 'alallah",
+    arabicTitle: "",
+    group: "adhkar",
+    when: "any",
+    defaultCount: 1,
+    ref: "Sunan Abi Dawud 5095",
+    topics: ["anxiety"],
+    parts: one("leaving-home"),
+  },
 
   // ---------------------------------------------------------------- Prophetic du'as
   {
@@ -285,6 +370,7 @@ export const RECITATIONS: readonly Recitation[] = [
     when: "any",
     defaultCount: 1,
     ref: "Sahih Muslim 2722",
+    topics: ["focus"],
     parts: one("unbeneficial-knowledge"),
   },
   {
@@ -295,6 +381,7 @@ export const RECITATIONS: readonly Recitation[] = [
     when: "any",
     defaultCount: 1,
     ref: "Sahih al-Bukhari 6369",
+    topics: ["anxiety", "focus"],
     parts: one("worry-and-grief"),
   },
   {
@@ -385,6 +472,7 @@ export const RECITATIONS: readonly Recitation[] = [
     when: "any",
     defaultCount: 1,
     ref: "Sahih Muslim 2697",
+    topics: ["health"],
     parts: one("pardon-mercy-sustenance"),
   },
   {
@@ -465,6 +553,7 @@ export const RECITATIONS: readonly Recitation[] = [
     when: "any",
     defaultCount: 1,
     ref: "Sahih Muslim 2730 · Sahih al-Bukhari 6346",
+    topics: ["anxiety"],
     parts: one("dua-of-distress"),
   },
   {
@@ -475,6 +564,7 @@ export const RECITATIONS: readonly Recitation[] = [
     when: "any",
     defaultCount: 1,
     ref: "Jami' at-Tirmidhi 3505",
+    topics: ["anxiety"],
     parts: one("dua-of-yunus"),
   },
   {
@@ -485,6 +575,7 @@ export const RECITATIONS: readonly Recitation[] = [
     when: "morning",
     defaultCount: 1,
     ref: "Sunan Ibn Majah 925",
+    topics: ["focus"],
     parts: one("beneficial-knowledge-provision"),
   },
   {
@@ -506,6 +597,103 @@ export const RECITATIONS: readonly Recitation[] = [
     defaultCount: 1,
     ref: "Sunan Ibn Majah 3850",
     parts: one("asking-for-pardon"),
+  },
+  {
+    id: "ibn-masud-worry",
+    title: "Ibn Mas'ud's du'a for worry & sorrow",
+    arabicTitle: "",
+    group: "dua",
+    when: "any",
+    defaultCount: 1,
+    ref: "Musnad Ahmad 1/391 · Hisn al-Muslim 120",
+    topics: ["anxiety"],
+    parts: one("ibn-masud-worry"),
+  },
+  {
+    id: "bedtime-entrusting",
+    title: "Before sleep: entrusting your affairs to Allah",
+    arabicTitle: "",
+    group: "dua",
+    when: "night",
+    defaultCount: 1,
+    ref: "Sahih al-Bukhari 247, 6311",
+    note: "Lying on your right side, as the last words before sleep.",
+    topics: ["anxiety"],
+    parts: one("bedtime-entrusting"),
+  },
+  {
+    id: "istikhara",
+    title: "Istikhara: asking Allah's guidance in a decision",
+    arabicTitle: "",
+    group: "dua",
+    when: "prayer",
+    defaultCount: 1,
+    ref: "Sahih al-Bukhari 1166, 6382",
+    note: "After two voluntary rak'ahs. At “this matter”, name what you are deciding.",
+    topics: ["focus", "anxiety"],
+    parts: one("istikhara"),
+  },
+  {
+    id: "pain-hand-on-body",
+    title: "Placing your hand where it hurts",
+    arabicTitle: "",
+    group: "dua",
+    when: "any",
+    defaultCount: 1,
+    ref: "Sahih Muslim 2202",
+    note: "Hand on the place of pain: Bismillah three times, then the refuge seven times.",
+    topics: ["health"],
+    parts: [
+      { title: "Bismillah", count: 3, text: "pain-bismillah" },
+      { title: "A'udhu billahi wa qudratihi", count: 7, text: "pain-refuge" },
+    ],
+  },
+  {
+    id: "ruqyah-rabban-nas",
+    title: "The Prophet's ruqyah: Lord of mankind, remove the harm",
+    arabicTitle: "",
+    group: "dua",
+    when: "any",
+    defaultCount: 1,
+    ref: "Sahih al-Bukhari 5743",
+    note: "Said over someone who is ill, passing the right hand over the place of pain.",
+    topics: ["health"],
+    parts: one("ruqyah-rabban-nas"),
+  },
+  {
+    id: "cure-for-the-sick",
+    title: "Asking healing for someone who is ill",
+    arabicTitle: "",
+    group: "dua",
+    when: "any",
+    defaultCount: 7,
+    ref: "Sunan Abi Dawud 3106",
+    note: "Said seven times beside someone who is ill.",
+    topics: ["health"],
+    parts: one("cure-for-the-sick"),
+  },
+  {
+    id: "jibril-ruqyah",
+    title: "Jibril's ruqyah when the Prophet ﷺ was ill",
+    arabicTitle: "",
+    group: "dua",
+    when: "any",
+    defaultCount: 1,
+    ref: "Sahih Muslim 2186",
+    note: "Said over someone who is ill.",
+    topics: ["health"],
+    parts: one("jibril-ruqyah"),
+  },
+  {
+    id: "refuge-bad-illnesses",
+    title: "Refuge from leprosy, madness & evil diseases",
+    arabicTitle: "",
+    group: "dua",
+    when: "any",
+    defaultCount: 1,
+    ref: "Sunan Abi Dawud 1554",
+    topics: ["health"],
+    parts: one("refuge-bad-illnesses"),
   },
 
   // ---------------------------------------------------------------- salawat
@@ -538,6 +726,14 @@ export const RECITATION_GROUPS: readonly { id: RecitationGroup; title: string; s
   { id: "salawat", title: "Blessings on the Prophet ﷺ", shortTitle: "Blessings" },
 ];
 
+export const RECITATION_TOPICS: readonly { id: RecitationTopic; title: string }[] = [
+  { id: "health", title: "Health" },
+  { id: "anxiety", title: "Anxiety & worry" },
+  { id: "focus", title: "Focus & learning" },
+];
+
+const TOPIC_TITLE = new Map(RECITATION_TOPICS.map((t) => [t.id, t.title.toLowerCase()]));
+
 export const TIME_LABEL: Record<RecitationTime, string> = {
   morning: "Morning",
   evening: "Evening",
@@ -549,8 +745,8 @@ export const TIME_LABEL: Record<RecitationTime, string> = {
 
 /**
  * Does a catalogue entry match a search string? Checks title, reference, time
- * tag, and the actual Arabic, transliteration and verbatim English translation
- * so searching a phrase from any du'a finds it immediately.
+ * tag, topic, and the actual Arabic, transliteration and verbatim English
+ * translation so searching a phrase from any du'a finds it immediately.
  */
 export function recitationMatchesQuery(item: Recitation, query: string): boolean {
   const raw = query.trim();
@@ -560,7 +756,8 @@ export function recitationMatchesQuery(item: Recitation, query: string): boolean
     item.title.toLowerCase().includes(needle) ||
     item.arabicTitle.includes(raw) ||
     item.ref.toLowerCase().includes(needle) ||
-    TIME_LABEL[item.when].toLowerCase().includes(needle)
+    TIME_LABEL[item.when].toLowerCase().includes(needle) ||
+    (item.topics ?? []).some((topic) => TOPIC_TITLE.get(topic)?.includes(needle))
   ) {
     return true;
   }

@@ -64,6 +64,9 @@ export type Meditation = {
 export const N_MIN = 4;
 export const N_MAX = 8;
 export const MINUTE_CHOICES = [1, 3, 5, 10, 15, 20, 30] as const;
+/** Beyond the presets, any whole number of minutes in this range can be typed in. */
+export const MINUTES_MIN = 1;
+export const MINUTES_MAX = 90;
 export const DHIKR_TARGETS = [33, 99, 100, 1000] as const;
 export const BELL_CHOICES = [0, 2, 5, 10] as const;
 /** Longest sitting the log keeps. */
@@ -334,8 +337,7 @@ export function normalizeOptions(meditation: Meditation, raw: MeditationOptions 
   if (controls.n) out.n = clampN(merged.n, controls.n.min, controls.n.max, meditation.defaults.n);
   if (controls.out) out.out = clampN(merged.out, controls.out.min, controls.out.max, meditation.defaults.out);
   if (controls.minutes) {
-    const minutes = Math.round(Number(merged.minutes));
-    out.minutes = (MINUTE_CHOICES as readonly number[]).includes(minutes) ? minutes : meditation.defaults.minutes;
+    out.minutes = clampN(merged.minutes, MINUTES_MIN, MINUTES_MAX, meditation.defaults.minutes ?? 5);
   }
   if (controls.bell) {
     const bell = Math.round(Number(merged.bell));

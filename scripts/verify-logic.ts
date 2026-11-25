@@ -28,6 +28,7 @@ import { HEART_TABS, enabledHeartTabs } from "@/lib/heart-tabs";
 import {
   DEFAULT_SET,
   RECITATIONS,
+  RECITATION_TOPICS,
   REQUIRED_IDS,
   arabicDigits,
   findRecitation,
@@ -3759,7 +3760,16 @@ check("sessions round to whole breaths, and dhikr runs to its count", () => {
 check("options are normalised, and only exact ones are accepted", () => {
   const box = findMeditation("box")!;
   assert.deepEqual(normalizeOptions(box, {}), { n: 4, minutes: 5 });
-  assert.deepEqual(normalizeOptions(box, { n: 9, minutes: 7 }), { n: 8, minutes: 5 });
+  // Any whole number of minutes from 1 to 90, not just the presets.
+  assert.deepEqual(normalizeOptions(box, { n: 9, minutes: 7 }), { n: 8, minutes: 7 });
+  assert.equal(normalizeOptions(box, { minutes: 91 }).minutes, 90);
+  assert.equal(normalizeOptions(box, { minutes: 0 }).minutes, 1);
+  assert.equal(normalizeOptions(box, { minutes: Number.NaN }).minutes, 5, "junk falls back to the default");
+  assert.equal(optionsValid(box, { n: 4, minutes: 7 }), true);
+  assert.equal(optionsValid(box, { n: 4, minutes: 90 }), true);
+  assert.equal(optionsValid(box, { n: 4, minutes: 91 }), false, "past 90 is out of range");
+  assert.equal(optionsValid(box, { n: 4, minutes: 7.5 }), false, "whole minutes only");
+  assert.equal(plannedSeconds(findMeditation("body-scan")!, { minutes: 7 }), 420);
   assert.equal(optionsValid(box, { n: 6, minutes: 10 }), true);
   assert.equal(optionsValid(box, { n: 3, minutes: 10 }), false);
   assert.equal(optionsValid(box, { n: 9 }), false);
@@ -4149,7 +4159,9 @@ check("Sahih only: every recitation carries a graded hadith and a sunnah.com lin
     const list = hadithFor(item.id);
     assert.ok(list.length > 0, `${item.id} has a hadith`);
     for (const h of list) {
-      assert.match(h.url, /^https:\/\/sunnah\.com\/(bukhari|muslim|abudawud|tirmidhi|ibnmajah):\d+$/, h.ref);
+      // Hisn al-Muslim stands in for a collection sunnah.com doesn't carry (Ahmad);
+      // a letter picks one narration of a Muslim hadith (2723b).
+      assert.match(h.url, /^https:\/\/sunnah\.com\/(bukhari|muslim|abudawud|tirmidhi|ibnmajah|hisn):\d+[a-z]?$/, h.ref);
       assert.ok(h.text.length > 40, `${h.ref} is quoted`);
       assert.ok(
         h.grades.some((g) => /^Sahih/.test(g.grade) && /^(Sahih al-Bukhari|Sahih Muslim|Al-Albani)$/.test(g.by)),
@@ -4194,6 +4206,38 @@ check("Prophetic du'as from Sahih hadith are verbatim, clean UTF-8, and searchab
   const heart = findRecitation("steadfast-heart")!;
   assert.ok(recitationMatchesQuery(heart, "muqallibal-qulūb"), "search matches transliteration");
   assert.equal(recitationMatchesQuery(heart, "nonexistent phrase xyz"), false);
+});
+
+check("du'as for health, anxiety and focus: tagged, counted as their hadith say, findable by need", () => {
+  for (const topic of RECITATION_TOPICS) {
+    const tagged = RECITATIONS.filter((item) => item.topics?.includes(topic.id));
+    assert.ok(tagged.length >= 5, `${topic.title} has a handful to choose from`);
+  }
+  const topicIds = new Set(RECITATION_TOPICS.map((t) => t.id));
+  for (const item of RECITATIONS) {
+    for (const topic of item.topics ?? []) assert.ok(topicIds.has(topic), `${item.id}: ${topic} is a topic`);
+    assert.equal(new Set(item.topics ?? []).size, (item.topics ?? []).length, `${item.id}: no repeated topic`);
+  }
+
+  // Muslim 2202: hand on the pain, Bismillah three times, then the refuge seven.
+  const pain = sessionItem({ key: "pain-hand-on-body", count: 1 })!;
+  assert.deepEqual(pain.parts.map((p) => p.count), [3, 7]);
+  assert.equal(itemTotal(pain), 10);
+  assert.deepEqual(positionIn(pain, 3), { round: 1, part: 1, inPart: 0, done: false });
+  // Abu Dawud 3106: said seven times beside the sick.
+  assert.equal(findRecitation("cure-for-the-sick")?.defaultCount, 7);
+
+  // Ibn Mas'ud's du'a comes through Hisn al-Muslim, graded Sahih by al-Albani.
+  const ibnMasud = hadithFor("ibn-masud-worry");
+  assert.equal(ibnMasud[0]?.url, "https://sunnah.com/hisn:120");
+  assert.ok(ibnMasud[0]?.grades.some((g) => g.by === "Al-Albani" && g.grade === "Sahih"));
+  assert.ok(!TEXTS["ibn-masud-worry"][0].ar.includes("ـ"), "kashida is removed");
+
+  // Searching a need finds what's tagged with it, even when the words don't say it.
+  const distress = findRecitation("allahu-rabbi-distress")!;
+  assert.ok(recitationMatchesQuery(distress, "anxiety"));
+  assert.ok(recitationMatchesQuery(findRecitation("istikhara")!, "focus"));
+  assert.equal(recitationMatchesQuery(findRecitation("tahlil-10")!, "anxiety"), false);
 });
 
 check("the three Quls: three rounds of Ikhlas, Falaq and Nas is nine readings", () => {
