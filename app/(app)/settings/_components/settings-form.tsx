@@ -261,42 +261,6 @@ export function SettingsForm({
           </div>
         </section>
 
-        <section id="prayers" className="scroll-mt-8 space-y-4">
-          <div>
-            <h2 className="font-display text-title">Prayer reminders</h2>
-            <p className="text-muted-foreground text-label">
-              Shows Fajr, Zuhr, Asr, Maghrib and Isha as time windows on your
-              day and on the calendar. Times are fetched daily from the Aladhan
-              API for the city below — the windows move with sunrise and sunset
-              on their own.
-            </p>
-          </div>
-
-          <CheckboxField
-            id="prayerRemindersEnabled"
-            label="Show prayer windows"
-            hint="Each prayer appears once its window opens and stays visible until the next day's dawn — an unchecked prayer is one you haven't prayed yet. The day restarts at 4 AM."
-            defaultChecked={values.prayerRemindersEnabled}
-          />
-
-          <div className="space-y-2">
-            <Label htmlFor="prayerCity">City</Label>
-            <Input
-              id="prayerCity"
-              name="prayerCity"
-              type="text"
-              maxLength={80}
-              placeholder="Karachi"
-              defaultValue={values.prayerCity}
-            />
-            {error("prayerCity") && (
-              <p role="alert" className="text-destructive text-label">
-                {error("prayerCity")}
-              </p>
-            )}
-          </div>
-        </section>
-
         <section id="mind" className="scroll-mt-8 space-y-4">
           <div>
             <h2 className="font-display text-title flex items-center gap-1">
@@ -353,13 +317,43 @@ export function SettingsForm({
               Heart <InfoTip term="heart" />
             </h2>
             <p className="text-muted-foreground text-label">
-              Choose which practices appear on the Heart page. With all three
-              off, Heart leaves the sidebar. Your pages and recitation days are
-              kept when a practice is switched off.
+              Choose which practices appear on the Heart page. With all four
+              off, Heart leaves the sidebar. Your prayers, pages and recitation
+              days are kept when a practice is switched off.
             </p>
           </div>
 
           <div className="space-y-5">
+            <div id="prayers" className="scroll-mt-8 space-y-3">
+              <CheckboxField
+                id="prayerRemindersEnabled"
+                label="The five daily prayers"
+                hint="Fajr, Zuhr, Asr, Maghrib and Isha with their windows for your city, to mark as you pray them. Each day all five are prayed lights a town in the snow. The windows also show on the calendar."
+                defaultChecked={values.prayerRemindersEnabled}
+              />
+              <div className="space-y-2 sm:pl-7">
+                <Label htmlFor="prayerCity">Prayer city</Label>
+                <Input
+                  id="prayerCity"
+                  name="prayerCity"
+                  type="text"
+                  maxLength={80}
+                  placeholder="Karachi"
+                  defaultValue={values.prayerCity}
+                  className="max-w-xs"
+                />
+                <p className="text-muted-foreground text-label">
+                  Times come from the Aladhan API and move with sunrise and sunset on their own. Islamic fasting uses
+                  this city too.
+                </p>
+                {error("prayerCity") && (
+                  <p role="alert" className="text-destructive text-label">
+                    {error("prayerCity")}
+                  </p>
+                )}
+              </div>
+            </div>
+
             <div className="space-y-3">
               <CheckboxField
                 id="mindGratitudeEnabled"
@@ -478,7 +472,7 @@ export function SettingsForm({
                     </div>
                   ) : (
                     <p className="text-muted-foreground text-label">
-                      Fajr and Maghrib come from the city under Prayer reminders above, so
+                      Fajr and Maghrib come from the prayer city under Heart above, so
                       the fast follows the sun through the year.
                     </p>
                   )}

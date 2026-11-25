@@ -74,8 +74,13 @@ export const GLOSSARY = {
   },
   heart: {
     title: "Heart",
-    what: "Three daily practices for the heart, each switchable in Settings: a page of gratitude, a page of du'a, and a daily set of recitations from the Quran and the sunnah.",
-    why: "Thanks, asking and remembrance are the heart's side of the day. Kept together, they take a few quiet minutes in one place.",
+    what: "Four daily practices for the heart, each switchable in Settings: the five prayers in their times, a page of gratitude, a page of du'a, and a daily set of recitations from the Quran and the sunnah.",
+    why: "Prayer, thanks, asking and remembrance are the heart's side of the day. Kept together, they sit in one place.",
+  },
+  prayer: {
+    title: "The five prayers",
+    what: "Fajr, Zuhr, Asr, Maghrib and Isha, each with its window for your city. Mark each one as you pray it; one prayed after its window closes can still be marked, as late. The day counts once all five are marked, and turns over when Isha's window closes, half an hour before the next Fajr.",
+    why: "\"Prayer is light\" (Sahih Muslim 223). Five times a day, at set times, is what gives the day its shape; seeing them together makes the ones still to come easy to keep in mind.",
   },
   recitation: {
     title: "Daily recitation",
@@ -139,12 +144,12 @@ export const GLOSSARY = {
   },
   garden: {
     title: "The garden",
-    what: "A moonlit garden that grows one thing for each day you sit: wildflowers, a pond, a lantern, koi, and at the fourteenth the full moon on the water. A day without a sitting takes the newest thing away. Any sitting counts for its day, however short.",
+    what: "A moonlit garden that grows one thing for each day you sit: wildflowers, a pond, a lantern, koi, a teahouse, and at the sixtieth the full moon on the water. A day without a sitting takes the newest thing away. Any sitting counts for its day, however short.",
     why: "It rewards coming back, not piling up minutes. A missed day costs one thing, and the next day you sit brings it straight back.",
   },
   scene: {
     title: "The scene",
-    what: "Each practice has a place of its own with fourteen things to come into it. Every day you do the practice brings the next one; every scheduled day you miss takes the newest one away. Fourteen and it's whole. Today counts the moment it's done, and scheduled rest days hold steady without penalty.",
+    what: "Each practice is made into a place of its own: reading builds a library, gratitude a village, a brain dump lightens a balloon, disputing a thought clears a river. Sixty things come into it, one for every day you do the practice; every scheduled day you miss takes the newest one away. Sixty and it's whole. Today counts the moment it's done, and scheduled rest days hold steady without penalty.",
     why: "Consistency over everything else. There are no points and no totals, and nothing is banked: a missed scheduled day always costs one thing, and the next day you come back always earns it back. Every day you show up brings something, or keeps a whole scene whole.",
   },
   reading: {

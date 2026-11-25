@@ -2,6 +2,8 @@ import type { User } from "@/lib/generated/prisma/client";
 import { addDays, toISODate, todayLocal } from "@/lib/dates";
 import { prisma } from "@/lib/db";
 import type { HeartEnabled } from "@/lib/heart-tabs";
+import { fullPrayerDays } from "@/lib/prayer-math";
+import { getPrayerCycle, type PrayerCycleView } from "@/lib/prayers";
 import {
   clampCount,
   templateOrDefault,
@@ -57,8 +59,19 @@ export type RecitationView = {
   customs: CustomRecitationRow[];
 };
 
+export type PrayerHabitView = {
+  /**
+   * The five prayers in progress, with their windows and checks; null when
+   * the times can't be had. Its day is yesterday until Isha's window closes.
+   */
+  cycle: PrayerCycleView | null;
+  /** The town: a stage up for each day all five are prayed, down for each day without. */
+  tending: Tending;
+};
+
 export type HeartView = {
   enabled: HeartEnabled;
+  prayer: PrayerHabitView;
   gratitude: PracticeView;
   dua: PracticeView;
   recitation: RecitationView;
@@ -70,6 +83,8 @@ export type HeartView = {
  */
 export function heartEnabled(user: User): HeartEnabled {
   return {
+    // The prayer times moved here from the day page under the same switch.
+    prayer: user.prayerRemindersEnabled,
     gratitude: user.mindGratitudeEnabled,
     dua: user.mindDuaEnabled,
     recitation: user.heartRecitationEnabled,
@@ -96,7 +111,8 @@ export async function getHeart(user: User): Promise<HeartView> {
 
   // A scene is kept by every day since the practice began (lib/tending.ts),
   // so the days it was done are read all the way back: dates only.
-  const [pages, pageDays, recitedDays, customs] = await Promise.all([
+  const enabled = heartEnabled(user);
+  const [pages, pageDays, recitedDays, customs, cycle, prayerChecks] = await Promise.all([
     prisma.journalEntry.findMany({
       where: { userId: user.id, kind: { in: ["GRATITUDE", "DUA"] }, date: { gte: since } },
       orderBy: { date: "desc" },
@@ -115,6 +131,11 @@ export async function getHeart(user: User): Promise<HeartView> {
       orderBy: { createdAt: "asc" },
       select: { id: true, title: true, arabic: true, transliteration: true, translation: true },
     }),
+    enabled.prayer ? getPrayerCycle(user) : Promise.resolve(null),
+    // Every prayer ever marked, for the town: five rows a day at most.
+    enabled.prayer
+      ? prisma.prayerCheck.findMany({ where: { userId: user.id }, select: { date: true, prayer: true } })
+      : Promise.resolve([]),
   ]);
 
   // `date` is a calendar day stored at UTC midnight, so it's labelled in UTC.
@@ -166,8 +187,16 @@ export async function getHeart(user: User): Promise<HeartView> {
     return found ? [found] : [];
   });
 
+  // The prayer day is the cycle's: after midnight, until Isha closes, it's
+  // still yesterday, and yesterday is still open.
+  const prayerTodayISO = cycle?.dateISO ?? todayISO;
+
   return {
-    enabled: heartEnabled(user),
+    enabled,
+    prayer: {
+      cycle,
+      tending: tend(historySince(prayerTodayISO, fullPrayerDays(prayerChecks), label)),
+    },
     gratitude: practice("gratitude", user.gratitudeTemplate, user.gratitudeCount),
     dua: practice("dua", user.duaTemplate, user.duaCount),
     recitation: {

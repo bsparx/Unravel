@@ -30,6 +30,8 @@ import { READING_DEFAULT_MINUTES } from "@/lib/reading";
 export const WOOP_SECONDS = 10 * 60;
 export const DISPUTATION_SECONDS = 10 * 60;
 export const RECITATION_SECONDS = 5 * 60;
+/** Each of the five prayers, credited at five minutes. */
+export const PRAYER_SECONDS = 5 * 60;
 export const ENDING_SUMMARY_SECONDS = 5 * 60;
 export const ENDING_SUMMARY_TIME_HINT = "5m";
 
@@ -49,6 +51,7 @@ export const MIND_TIME_HINTS: Record<MindTab, string> = {
 };
 
 export const HEART_TIME_HINTS: Record<HeartTab, string> = {
+  prayer: "5m each",
   gratitude: "By template",
   dua: "By template",
   recitation: "5m",
@@ -68,6 +71,11 @@ export function woopPracticeSeconds(rehearsalCount: number): number {
 /** Disputation (ABCDE): 10 minutes static on any day one was written or revisited. */
 export function disputationPracticeSeconds(activityCount: number): number {
   return activityCount > 0 ? DISPUTATION_SECONDS : 0;
+}
+
+/** The five prayers: 5 minutes for each one marked that day. */
+export function prayerPracticeSeconds(prayed: number): number {
+  return Math.max(0, Math.min(5, prayed)) * PRAYER_SECONDS;
 }
 
 /** Daily recitation: 5 minutes static on any day the set was completed. */

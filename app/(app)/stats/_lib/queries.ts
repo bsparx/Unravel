@@ -24,6 +24,7 @@ import {
   disputationPracticeSeconds,
   journalPracticeDuration,
   meditationPracticeSeconds,
+  prayerPracticeSeconds,
   readingDayDuration,
   recitationPracticeSeconds,
   woopPracticeSeconds,
@@ -92,6 +93,7 @@ export async function getStatsRange(
     disputationRevisits,
     journalEntries,
     recitationLogs,
+    prayerChecks,
     endingSummaries,
   ] = await Promise.all([
     prisma.task.findMany({
@@ -227,6 +229,13 @@ export async function getStatsRange(
       ? prisma.recitationLog.findMany({
           where: { userId: user.id, date: { gte: from, lte: to } },
           select: { date: true, createdAt: true },
+        })
+      : Promise.resolve([]),
+
+    heart.prayer
+      ? prisma.prayerCheck.findMany({
+          where: { userId: user.id, date: { gte: from, lte: to } },
+          select: { date: true, prayer: true, checkedAt: true },
         })
       : Promise.resolve([]),
 
@@ -500,6 +509,16 @@ export async function getStatsRange(
     );
   }
 
+  // The five prayers: how many were marked each day, and when the first was.
+  const prayersByDay = new Map<string, { prayed: Set<string>; firstAt: Date | null }>();
+  for (const row of prayerChecks) {
+    const iso = toISODate(row.date);
+    const entry = prayersByDay.get(iso) ?? { prayed: new Set<string>(), firstAt: null };
+    entry.prayed.add(row.prayer);
+    entry.firstAt = pickEarliest(entry.firstAt, row.checkedAt, iso);
+    prayersByDay.set(iso, entry);
+  }
+
   const endingSummaryByDay = new Map<
     string,
     { report: EndingSummaryReport; createdAt: Date | null }
@@ -738,7 +757,17 @@ export async function getStatsRange(
       let firstAt: Date | null = null;
       let practiceSeconds = 0;
 
-      if (tab === "gratitude") {
+      if (tab === "prayer") {
+        const entry = prayersByDay.get(iso);
+        const prayed = entry?.prayed.size ?? 0;
+        // Kept once all five are marked; fewer still says how many.
+        if (prayed > 0) detail = `${prayed} of 5`;
+        if (prayed >= 5) {
+          done = true;
+          firstAt = entry?.firstAt ?? null;
+          practiceSeconds = prayerPracticeSeconds(prayed);
+        }
+      } else if (tab === "gratitude") {
         const entry = gratitudeByDay.get(iso);
         if (entry) {
           done = true;

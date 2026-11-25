@@ -74,12 +74,28 @@ import {
   meditationPracticeSeconds,
   readingDayDuration,
   readingEntryDuration,
+  prayerPracticeSeconds,
   recitationPracticeSeconds,
   woopPracticeSeconds,
 } from "@/lib/practice-time";
 import { SCENE_KEYS } from "@/lib/scenes";
-import { SCENES, sceneCaption, stageIdsAt } from "@/lib/scenes";
+import { SANDBAGS, SCENES, sceneCaption, stageIdsAt, type SceneKey } from "@/lib/scenes";
+import { createElement, type ComponentType } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { GardenScene } from "@/components/meditation/garden-scene";
+import { BalloonScene } from "@/components/scenes/balloon-scene";
+import { CourtyardScene } from "@/components/scenes/courtyard-scene";
+import { GroveScene } from "@/components/scenes/grove-scene";
+import { LibraryScene } from "@/components/scenes/library-scene";
+import { OasisScene } from "@/components/scenes/oasis-scene";
+import { OrchardScene } from "@/components/scenes/orchard-scene";
+import { RiverScene } from "@/components/scenes/river-scene";
+import type { SceneProps } from "@/components/scenes/scene-frame";
+import { SummitScene } from "@/components/scenes/summit-scene";
+import { TownScene } from "@/components/scenes/town-scene";
+import { VillageScene } from "@/components/scenes/village-scene";
 import {
+  STRIP_DAYS,
   TEND_DAYS,
   historySince,
   scheduledByWeekdays,
@@ -169,7 +185,7 @@ import {
   parseMissedNotes,
   trackableItemHref,
 } from "@/lib/ending-summary";
-import { ENDING_SUMMARY_ITEM_ID } from "@/lib/stats-summary";
+import { ENDING_SUMMARY_ITEM_ID, HEART_PRACTICE_LABELS } from "@/lib/stats-summary";
 
 import { activePalette, isEveningHour } from "@/lib/theme";
 import { subscriptionSchema } from "@/lib/validation";
@@ -247,6 +263,8 @@ import {
 } from "@/lib/exercise-routine";
 import { parseQuickAdd } from "@/lib/quick-parse";
 import {
+  PRAYERS,
+  fullPrayerDays,
   parseTimings,
   prayerWindows,
 } from "@/lib/prayer-math";
@@ -3789,31 +3807,36 @@ check("options are normalised, and only exact ones are accepted", () => {
 // Days, oldest first, ending today: "x" done, "." missed.
 const days = (pattern: string): TendDay[] =>
   [...pattern].map((c, i) => ({ dateISO: `d${i}`, label: `day ${i}`, done: c === "x" }));
+const kept = (n: number) => "x".repeat(n);
 
 check("a scene climbs a stage for each day kept and drops one for each day missed", () => {
-  assert.equal(tend(days("xxxxxxxxxxxxxxx")).level, TEND_DAYS, "fifteen kept: whole, and no further");
+  assert.equal(TEND_DAYS, 60, "two months kept makes a scene whole");
+  assert.equal(tend(days(kept(60))).level, TEND_DAYS, "sixty kept: whole");
+  assert.equal(tend(days(kept(75))).level, TEND_DAYS, "and no further");
+  assert.equal(tend(days(kept(30))).level, 30, "past the old fourteen, the climb goes on");
   assert.equal(tend(days("xxxxx..xxx")).level, 6, "five up, two down, three up");
   assert.equal(tend(days("...............")).level, 0);
   assert.equal(tend(days("..............x")).level, 1, "today counts the moment it's done");
   // Today still open isn't held against you.
-  const open = tend(days("xxxxxxxxxxxxxx."));
-  assert.equal(open.level, 14);
+  const open = tend(days(`${kept(60)}.`));
+  assert.equal(open.level, 60);
   assert.equal(open.today, false);
-  assert.equal(open.ifDone, 14, "doing today keeps it whole");
-  assert.equal(open.ifSkipped, 13, "skipping today costs the newest stage");
+  assert.equal(open.ifDone, 60, "doing today keeps it whole");
+  assert.equal(open.ifSkipped, 59, "skipping today costs the newest stage");
 });
 
 check("every missed day is made up by a day kept", () => {
-  const whole = "x".repeat(20);
-  assert.equal(tend(days(`${whole}.x`)).level, 14, "one miss, one day back: whole again");
-  assert.equal(tend(days(`${whole}...`)).level, 12, "two misses; today still open");
-  assert.equal(tend(days(`${whole}..xx`)).level, 14, "two misses, two days back");
+  const whole = kept(70);
+  assert.equal(tend(days(`${whole}.x`)).level, 60, "one miss, one day back: whole again");
+  assert.equal(tend(days(`${whole}...`)).level, 58, "two misses; today still open");
+  assert.equal(tend(days(`${whole}..xx`)).level, 60, "two misses, two days back");
   // Alternating holds steady rather than sliding away.
   assert.equal(tend(days(`xxxxxxxx${".x".repeat(10)}`)).level, 8);
   // A long break empties it, and it never goes below the base.
-  assert.equal(tend(days(`${whole}${".".repeat(30)}x`)).level, 1);
+  assert.equal(tend(days(`${whole}${".".repeat(30)}x`)).level, 31, "thirty misses take thirty stages");
+  assert.equal(tend(days(`${whole}${".".repeat(70)}x`)).level, 1);
   assert.equal(tendStep(0, false), 0);
-  assert.equal(tendStep(14, true), 14);
+  assert.equal(tendStep(TEND_DAYS, true), TEND_DAYS);
 });
 
 check("each day kept is progress, each miss costs exactly one", () => {
@@ -3825,7 +3848,7 @@ check("each day kept is progress, each miss costs exactly one", () => {
   }
 });
 
-check("history runs from the first day kept, and the strip is the last fourteen", () => {
+check("history runs from the first day kept, and the strip is the last two weeks", () => {
   const label = (date: Date) => date.toISOString().slice(5, 10);
   const run = historySince("2026-11-19", ["2026-10-01", "2026-11-18", "2026-12-01"], label);
   assert.equal(run[0].dateISO, "2026-10-01");
@@ -3834,19 +3857,19 @@ check("history runs from the first day kept, and the strip is the last fourteen"
   assert.equal(run.filter((day) => day.done).length, 2, "a day after today doesn't count");
   assert.equal(run[0].label, "", "only the days shown are labelled");
   assert.equal(run.at(-15)?.label, "11-05");
-  assert.equal(historySince("2026-11-19", [], label).length, TEND_DAYS + 1);
+  assert.equal(historySince("2026-11-19", [], label).length, STRIP_DAYS + 1);
   // A long-kept practice: forty days in a row, then today open.
-  const kept = Array.from({ length: 40 }, (_, i) => new Date(Date.UTC(2026, 9, 10 + i)).toISOString().slice(0, 10));
-  assert.equal(tend(historySince("2026-11-19", kept, label)).level, 14);
+  const forty = Array.from({ length: 40 }, (_, i) => new Date(Date.UTC(2026, 9, 10 + i)).toISOString().slice(0, 10));
+  assert.equal(tend(historySince("2026-11-19", forty, label)).level, 40, "every one of them counts");
   const t = tend(days("xx"));
   assert.equal(t.level, 2);
-  assert.equal(t.window.length, TEND_DAYS);
+  assert.equal(t.window.length, STRIP_DAYS);
 });
 
-check("every scene has fourteen named stages, and says what today brings", () => {
+check("every scene has sixty named stages, and says what today brings", () => {
   for (const tab of SCENE_KEYS) {
     const scene = SCENES[tab];
-    assert.equal(scene.stages.length, TEND_DAYS, `${tab} has fourteen stages`);
+    assert.equal(scene.stages.length, TEND_DAYS, `${tab} has sixty stages`);
     assert.equal(new Set(scene.stages.map((s) => s.id)).size, TEND_DAYS, `${tab} stage ids are unique`);
   }
   const garden = SCENES.meditate;
@@ -3854,11 +3877,45 @@ check("every scene has fourteen named stages, and says what today brings", () =>
   assert.deepEqual(stageIdsAt(garden, 0), []);
   assert.equal(sceneCaption(garden, tend(days("..............x"))).line, "Today brought wildflowers in the grass.");
   assert.equal(sceneCaption(garden, tend(days("..............."))).line, "Sit today to bring wildflowers in the grass.");
-  assert.equal(sceneCaption(garden, tend(days("xxxxxxxxxxxxxxx"))).title, "The garden is whole.");
-  assert.equal(sceneCaption(garden, tend(days("xxxxx..xx"))).title, "Stage 5 of 14");
-  assert.equal(sceneCaption(garden, tend(days("xxxxxxxxxxxxxx."))).line, "Sit today to keep the full moon on the water.");
-  assert.equal(sceneCaption(garden, tend(days("xxxxxxxxxxxxxxx"))).line, "Today kept the full moon on the water.");
+  assert.equal(sceneCaption(garden, tend(days(kept(61)))).title, "The garden is whole.");
+  assert.equal(sceneCaption(garden, tend(days(kept(14)))).title, "Stage 14 of 60", "fourteen is no longer whole");
+  assert.equal(sceneCaption(garden, tend(days("xxxxx..xx"))).title, "Stage 5 of 60");
+  assert.equal(sceneCaption(garden, tend(days(`${kept(60)}.`))).line, "Sit today to keep the full moon on the water.");
+  assert.equal(sceneCaption(garden, tend(days(kept(61)))).line, "Today kept the full moon on the water.");
+  // Each practice is its own place.
+  assert.equal(SCENES.reading.noun, "library");
+  assert.equal(SCENES.gratitude.noun, "village");
+  assert.equal(SCENES.disputations.noun, "river");
+  assert.equal(sceneCaption(SCENES.reading, tend(days(kept(61)))).title, "The library is complete.");
+  assert.equal(sceneCaption(SCENES.disputations, tend(days("x"))).line, "Today brought the tangle of branches, cleared.");
   assert.ok(MIND_TABS.includes("meditate"));
+});
+
+check("every stage of every scene is drawn, and only once it's due", () => {
+  // The same map the scene card uses, without the card's client-only parts.
+  const art: Record<SceneKey, ComponentType<SceneProps>> = {
+    prayer: TownScene,
+    meditate: GardenScene,
+    gratitude: VillageScene,
+    dua: CourtyardScene,
+    recitation: OasisScene,
+    braindump: BalloonScene,
+    reading: LibraryScene,
+    wishes: SummitScene,
+    disputations: RiverScene,
+    exercises: GroveScene,
+    fasting: OrchardScene,
+  };
+  for (const tab of SCENE_KEYS) {
+    const scene = SCENES[tab];
+    const whole = renderToStaticMarkup(createElement(art[tab], { level: TEND_DAYS }));
+    const missing = scene.stages.filter((stage) => !whole.includes(`data-stage="${stage.id}"`)).map((stage) => stage.id);
+    assert.deepEqual(missing, [], `${tab}: every stage is drawn at sixty`);
+    const bare = renderToStaticMarkup(createElement(art[tab], { level: 0 }));
+    const early = scene.stages.filter((stage) => bare.includes(`data-stage="${stage.id}"`)).map((stage) => stage.id);
+    assert.deepEqual(early, [], `${tab}: nothing shows before its day`);
+    assert.ok(!/NaN|undefined/.test(whole), `${tab}: no NaN or undefined in the drawing`);
+  }
 });
 
 console.log("\nreading — the shelf and the notebook");
@@ -4017,9 +4074,14 @@ check("the balloon rises with the days, and says so", () => {
   const balloon = SCENES.braindump;
   assert.equal(sceneCaption(balloon, tend(days("..............."))).line, "Empty your head today to bring the burner, lit.");
   assert.equal(sceneCaption(balloon, tend(days("..............x"))).line, "Today brought the burner, lit.");
-  assert.equal(sceneCaption(balloon, tend(days("xxxxxxxxxxxxxxx"))).title, "The balloon is in the open sky.");
-  assert.equal(sceneCaption(balloon, tend(days("xxxxxxxxxxxxxx."))).line, "Empty your head today to keep the sun on the balloon.");
-  assert.equal(sceneCaption(SCENES.meditate, tend(days("xxxxxxxxxxxxxxx"))).title, "The garden is whole.");
+  assert.equal(sceneCaption(balloon, tend(days(kept(61)))).title, "The balloon is in the open sky, every sandbag gone.");
+  assert.equal(sceneCaption(balloon, tend(days(`${kept(60)}.`))).line, "Empty your head today to keep the sun on the balloon.");
+  assert.equal(sceneCaption(SCENES.meditate, tend(days(kept(61)))).title, "The garden is whole.");
+  // Ballast: every sandbag the balloon carries is a stage that lets one go.
+  const bags = balloon.stages.filter((stage) => stage.id.startsWith("bag-"));
+  assert.equal(bags.length, SANDBAGS);
+  assert.equal(bags[0].name, "the first sandbag, let go");
+  assert.equal(bags.at(-1)?.name, "the last sandbag, let go");
   assert.ok(MIND_TABS.includes("braindump"));
 });
 
@@ -4112,16 +4174,45 @@ check("the overview links to the month it shows, and folds the long tail", () =>
 console.log("\nheart — gratitude, du'a and daily recitation");
 
 check("gratitude and du'a moved to Heart; Mind keeps the other five", () => {
-  assert.deepEqual([...HEART_TABS], ["gratitude", "dua", "recitation"]);
+  assert.deepEqual([...HEART_TABS], ["prayer", "gratitude", "dua", "recitation"]);
   assert.ok(!(MIND_TABS as readonly string[]).includes("gratitude"));
   assert.ok(!(MIND_TABS as readonly string[]).includes("dua"));
   assert.equal(MIND_TABS.length, 5);
-  assert.deepEqual(enabledHeartTabs({ gratitude: false, dua: true, recitation: true }), ["dua", "recitation"]);
-  // Every practice still has its scene — Heart (3), Mind (5), and Body (2).
-  assert.equal(new Set(SCENE_KEYS).size, 10);
+  assert.deepEqual(enabledHeartTabs({ prayer: false, gratitude: false, dua: true, recitation: true }), ["dua", "recitation"]);
+  assert.deepEqual(enabledHeartTabs({ prayer: true, gratitude: false, dua: false, recitation: false }), ["prayer"]);
+  // Every practice has its scene — Heart (4), Mind (5), and Body (2).
+  assert.equal(new Set(SCENE_KEYS).size, 11);
   assert.equal(SCENES.recitation.stages[0].id, "spring");
-  assert.equal(sceneCaption(SCENES.recitation, tend(days("xxxxxxxxxxxxxxx"))).title, "The oasis is in full light.");
+  assert.equal(sceneCaption(SCENES.recitation, tend(days(kept(61)))).title, "The oasis is in full light.");
   assert.equal(sceneCaption(SCENES.recitation, tend(days("..............."))).line, "Recite today's set to bring a spring welling up.");
+});
+
+check("the five prayers: a day counts once all five are marked, and lights the town", () => {
+  const d = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
+  const all = (iso: string) => PRAYERS.map((prayer) => ({ date: d(iso), prayer }));
+  const checks = [
+    ...all("2026-11-20"),
+    ...PRAYERS.slice(0, 4).map((prayer) => ({ date: d("2026-11-21"), prayer })),
+    ...all("2026-11-22"),
+    // A prayer marked twice is still one prayer.
+    { date: d("2026-11-22"), prayer: "FAJR" as const },
+    ...all("2026-11-19"),
+  ];
+  assert.deepEqual(fullPrayerDays(checks), ["2026-11-19", "2026-11-20", "2026-11-22"], "four of five isn't a kept day; oldest first");
+  assert.deepEqual(fullPrayerDays([]), []);
+  // It keeps the town like any scene: one stage a day.
+  const town = SCENES.prayer;
+  assert.equal(town.noun, "town");
+  assert.equal(town.stages.length, TEND_DAYS);
+  assert.equal(sceneCaption(town, tend(days("..............."))).line, "Pray all five today to bring a lamp at the masjid door.");
+  assert.equal(sceneCaption(town, tend(days("x"))).line, "Today brought a lamp at the masjid door.");
+  assert.equal(sceneCaption(town, tend(days(kept(61)))).title, "The whole town is lit.");
+  assert.equal(town.stages.at(-1)?.name, "the light of Fajr over the valley");
+  // Statistics: one item, five minutes a prayer.
+  assert.equal(HEART_PRACTICE_LABELS.prayer, "The five prayers");
+  assert.equal(prayerPracticeSeconds(5), 25 * 60);
+  assert.equal(prayerPracticeSeconds(3), 15 * 60);
+  assert.equal(prayerPracticeSeconds(9), 25 * 60, "never more than five");
 });
 
 check("every recitation has its words, in all three, and the three asked for are there", () => {
@@ -4762,7 +4853,8 @@ check("rest / off-schedule days hold a scene steady (0) while bonus days add +1"
   assert.equal(tendStep(4, true, false), 5, "doing a bonus day still adds +1");
   assert.equal(tendStep(4, false, true), 3, "missing a scheduled day costs -1");
   assert.equal(tendStep(4, true, true), 5, "keeping a scheduled day adds +1");
-  assert.equal(tendStep(14, true, false), 14, "capped at 14");
+  assert.equal(tendStep(TEND_DAYS, true, false), TEND_DAYS, "capped at sixty");
+  assert.equal(tendStep(14, true, false), 15, "fourteen is no longer the top");
 
   // Mon/Wed/Fri schedule (1, 3, 5) over 2+ weeks:
   // 2026-11-09 (Mon) .. 2026-11-22 (Sun — rest day!).
@@ -4787,7 +4879,7 @@ check("rest / off-schedule days hold a scene steady (0) while bonus days add +1"
 
   // Caption on a rest day reassures instead of nagging.
   const restCap = sceneCaption(SCENES.exercises, t);
-  assert.equal(restCap.title, "Stage 4 of 14");
+  assert.equal(restCap.title, "Stage 4 of 60");
   assert.match(restCap.line, /Rest day/);
 
   // Bonus workout on Sunday rest day raises level from 4 -> 5!
@@ -4801,7 +4893,7 @@ check("rest / off-schedule days hold a scene steady (0) while bonus days add +1"
   );
   assert.equal(withBonus.level, 5);
   assert.equal(withBonus.today, true);
-  assert.equal(sceneCaption(SCENES.exercises, withBonus).line, "Today brought a clear pool below.");
+  assert.equal(sceneCaption(SCENES.exercises, withBonus).line, "Today brought the waterfall, flowing.");
 });
 
 check("fasting schedule, done-day bucketing, and body scene settings validate cleanly", () => {

@@ -27,6 +27,25 @@ export const PRAYER_LABELS: Record<PrayerKind, string> = {
   ISHA: "Isha",
 };
 
+/**
+ * The days on which all five prayers were marked, as ISO dates, oldest first:
+ * the days that keep the prayer scene (lib/tending.ts). A prayer marked late
+ * still counts; a day with four is a day missed.
+ */
+export function fullPrayerDays(checks: readonly { date: Date; prayer: PrayerKind }[]): string[] {
+  const byDay = new Map<string, Set<PrayerKind>>();
+  for (const check of checks) {
+    const iso = check.date.toISOString().slice(0, 10);
+    const set = byDay.get(iso) ?? new Set<PrayerKind>();
+    set.add(check.prayer);
+    byDay.set(iso, set);
+  }
+  return [...byDay]
+    .filter(([, prayed]) => PRAYERS.every((prayer) => prayed.has(prayer)))
+    .map(([iso]) => iso)
+    .sort();
+}
+
 export const MINUTES_PER_DAY = 1440;
 /** Every window ends 30 minutes before the next prayer starts. */
 export const CUTOFF_MINUTES = 30;

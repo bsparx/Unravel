@@ -1,7 +1,7 @@
-import { SCENES } from "@/lib/scenes";
+import { SANDBAGS, SCENES } from "@/lib/scenes";
 import { cn } from "@/lib/utils";
 
-import { SceneSvg, round, scatter, stager, type SceneProps } from "./scene-frame";
+import { SceneSvg, riverPath, round, scatter, stager, type SceneProps } from "./scene-frame";
 
 const SCENE = SCENES.braindump;
 
@@ -136,48 +136,6 @@ function Balloon({
 
 // ---------------------------------------------------------------- the land
 
-/** A point on a Catmull-Rom curve through `points`, for the river. */
-function spline(points: readonly (readonly [number, number, number])[], perSegment: number) {
-  const out: [number, number, number][] = [];
-  for (let i = 0; i < points.length - 1; i++) {
-    const p0 = points[Math.max(0, i - 1)];
-    const p1 = points[i];
-    const p2 = points[i + 1];
-    const p3 = points[Math.min(points.length - 1, i + 2)];
-    for (let s = 0; s < perSegment; s++) {
-      const t = s / perSegment;
-      const t2 = t * t;
-      const t3 = t2 * t;
-      const at = (k: 0 | 1 | 2) =>
-        0.5 *
-        (2 * p1[k] +
-          (-p0[k] + p2[k]) * t +
-          (2 * p0[k] - 5 * p1[k] + 4 * p2[k] - p3[k]) * t2 +
-          (-p0[k] + 3 * p1[k] - 3 * p2[k] + p3[k]) * t3);
-      out.push([at(0), at(1), at(2)]);
-    }
-  }
-  out.push([...points[points.length - 1]]);
-  return out;
-}
-
-/** The river's banks: the centre line pushed out by half its width either side. */
-function riverPath(points: readonly (readonly [number, number, number])[]) {
-  const line = spline(points, 6);
-  const left: [number, number][] = [];
-  const right: [number, number][] = [];
-  line.forEach(([x, y, w], i) => {
-    const [ax, ay] = line[Math.max(0, i - 1)];
-    const [bx, by] = line[Math.min(line.length - 1, i + 1)];
-    const len = Math.hypot(bx - ax, by - ay) || 1;
-    const nx = -(by - ay) / len;
-    const ny = (bx - ax) / len;
-    left.push([round(x + nx * w * 0.5), round(y + ny * w * 0.5)]);
-    right.push([round(x - nx * w * 0.5), round(y - ny * w * 0.5)]);
-  });
-  return toPath([...left, ...right.reverse()]);
-}
-
 // It comes out of the hills, loops back on itself once, and widens as it nears.
 const RIVER_LINE = [
   [736, 437, 3],
@@ -307,20 +265,75 @@ function Windmill({ x, y }: { x: number; y: number }) {
 }
 
 // Where the main balloon stands at each level: on the grass, then a little
-// higher and further downwind for every day kept after it lifts.
+// higher and further downwind for every day kept after it lifts, smaller as
+// it climbs away.
 function mainPose(level: number) {
-  if (level < 3) return { x: level === 2 ? 588 : 566, y: 512 };
+  if (level < 3) return { x: level === 2 ? 588 : 566, y: 512, s: 0.8 };
   const up = level - 3;
-  return { x: 600 + up * 11, y: 468 - up * 18.5 };
+  // Highest at sixty, with the crown still inside the widest card's crop.
+  return { x: 600 + up * 4.4, y: 468 - up * 4.5, s: 0.8 - up * 0.004 };
 }
+
+/** Where each sandbag hangs off the basket, in the basket's own units. */
+const BAG_HOOKS: [number, number][] = [
+  [-22, -20],
+  [22, -20],
+  [-22, -6],
+  [22, -6],
+  [-30, -14],
+  [30, -14],
+  [-12, 10],
+  [12, 10],
+  [-30, 0],
+  [30, 0],
+  [0, 14],
+  [-22, 8],
+];
+
+/** Where each dropped sandbag lies in the meadow. */
+const BAG_GROUND: [number, number][] = [
+  [520, 548],
+  [548, 552],
+  [574, 546],
+  [604, 552],
+  [632, 547],
+  [660, 553],
+  [688, 548],
+  [536, 556],
+  [590, 557],
+  [646, 557],
+  [704, 554],
+  [718, 546],
+];
+
+function Sandbag({ x, y }: { x: number; y: number }) {
+  return (
+    <g>
+      <rect x={x - 4.5} y={y - 6} width={9} height={11} rx={3.5} fill="var(--balloon-sack)" />
+      <path d={`M${x - 3} ${y - 6} L${x} ${y - 9} L${x + 3} ${y - 6}`} stroke="var(--balloon-rope)" strokeWidth={1.2} fill="none" />
+    </g>
+  );
+}
+
+const MEADOW_KITE: [number, number] = [372, 392];
+const GEESE: [number, number][] = [
+  [300, 150],
+  [286, 158],
+  [272, 166],
+  [314, 158],
+  [328, 166],
+  [258, 174],
+];
 
 /**
  * The balloon at first light. A meadow before sunrise with the balloon slack
- * on the grass, and fourteen things that come as the morning does: the
- * burner lit, the balloon filled and aloft, then a little higher each kept
- * day over the river, the poplars, the sheep, the fields, a windmill and a
- * village, until it's in the open sky with the sun on it. A missed day sinks
- * it a little. Lighter each day: that's the dump.
+ * on the grass and weighed down with sandbags, and sixty things that come as
+ * the morning does: the burner lit, the balloon filled and aloft, then a
+ * sandbag let go every few days, each one landing in the meadow below, and
+ * the balloon a little higher each kept day over the river, the fields, a
+ * village and a lake, up through the cloud, until it's in the open sky with
+ * nothing left to carry and the sun on it. A missed day sinks it a little.
+ * Lighter each day: that's the dump.
  */
 export function BalloonScene({ level, fresh = [], className, label = true }: SceneProps) {
   const { has, stage } = stager(SCENE, level, fresh);
@@ -332,6 +345,7 @@ export function BalloonScene({ level, fresh = [], className, label = true }: Sce
     ? SCENE.stages.find((s) => s.id === balloonStage)?.name
     : "the balloon, still on the grass";
   const growing = fresh.some((id) => id === "burner" || id === "filled");
+  const bagsLeft = SANDBAGS - Array.from({ length: SANDBAGS }, (_, i) => `bag-${i + 1}`).filter(has).length;
 
   return (
     <SceneSvg
@@ -451,6 +465,42 @@ export function BalloonScene({ level, fresh = [], className, label = true }: Sce
         )),
       )}
 
+      {stage(
+        "mountains",
+        <g>
+          <path d="M520 352 L600 270 L650 312 L720 250 L800 320 L860 286 L940 352 Z" fill="var(--balloon-far)" opacity={0.7} />
+          <path d="M600 270 L618 288 L608 290 L594 278 Z M720 250 L742 272 L728 274 L712 262 Z M860 286 L874 300 L862 300 Z" fill="var(--balloon-cloud)" />
+        </g>,
+      )}
+      {stage(
+        "moon",
+        <g opacity={0.6}>
+          <circle cx={170} cy={92} r={18} fill="var(--balloon-cloud)" />
+          <circle cx={178} cy={88} r={16} fill="var(--balloon-sky-1)" opacity={0.7} />
+        </g>,
+      )}
+      {stage(
+        "geese",
+        GEESE.map(([gx, gy], i) => (
+          <path key={i} data-fx="glide" d={`M${gx - 6} ${gy - 2} Q${gx - 3} ${gy - 5} ${gx} ${gy} Q${gx + 3} ${gy - 5} ${gx + 6} ${gy - 2}`} stroke="var(--balloon-bird)" strokeWidth={1.4} fill="none" strokeLinecap="round" />
+        )),
+      )}
+      {stage(
+        "swifts",
+        <g data-fx="glide" stroke="var(--balloon-bird)" strokeWidth={1.6} fill="none" strokeLinecap="round" style={{ animationDelay: "-3s" }}>
+          <path d="M520 70 q5 -4 10 0 q5 -4 10 0" />
+          <path d="M556 56 q4 -3 8 0 q4 -3 8 0" />
+          <path d="M590 74 q5 -4 10 0 q5 -4 10 0" />
+        </g>,
+      )}
+      {stage(
+        "hawk",
+        <g data-fx="glide" fill="var(--balloon-bird)" style={{ animationDelay: "-5s" }}>
+          <path d="M700 200 Q684 192 666 196 Q684 198 696 204 Q700 210 704 204 Q716 198 734 196 Q716 192 700 200 Z" />
+        </g>,
+      )}
+      {stage("sky-clear", <rect width="1200" height="200" fill="var(--balloon-sky-1)" opacity={0.25} />)}
+
       {/* The far hills, hazy with distance. */}
       <path
         d="M0 372 C120 344 240 336 360 350 S600 382 720 366 S960 330 1080 340 S1170 352 1200 348 L1200 560 L0 560 Z"
@@ -476,6 +526,34 @@ export function BalloonScene({ level, fresh = [], className, label = true }: Sce
         </>,
       )}
       {stage(
+        "forest",
+        <g fill="var(--balloon-poplar)" opacity={0.75}>
+          {Array.from({ length: 26 }, (_, i) => 600 + i * 12).map((tx, i) => (
+            <path key={tx} d={`M${tx} ${358 - (i % 3) * 3} l6 -16 l6 16 Z`} />
+          ))}
+        </g>,
+      )}
+      {stage(
+        "castle",
+        <g fill="var(--balloon-steeple)">
+          <rect x={430} y={330} width={50} height={22} />
+          {[430, 442, 454, 466, 478].map((cx) => (
+            <rect key={cx} x={cx} y={325} width={5} height={6} />
+          ))}
+          <rect x={424} y={312} width={14} height={40} />
+          <rect x={474} y={316} width={12} height={36} />
+          <path d="M422 312 L431 298 L440 312 Z M472 316 L480 304 L488 316 Z" fill="var(--balloon-roof-2)" />
+        </g>,
+      )}
+      {stage(
+        "smoke",
+        <g fill="var(--balloon-cloud)" opacity={0.7}>
+          {[180, 296].map((sx) =>
+            [0, 1, 2].map((i) => <ellipse key={`${sx}-${i}`} data-fx="smoke" cx={sx + i * 5} cy={322 - i * 9} rx={3 + i * 2} ry={2 + i * 1.5} style={{ animationDelay: `${i * -1.5}s` }} />),
+          )}
+        </g>,
+      )}
+      {stage(
         "cloud",
         <g data-fx="drift" filter="url(#balloon-soft)" fill="var(--balloon-cloud)" opacity={0.55}>
           <ellipse cx={120} cy={318} rx={150} ry={11} />
@@ -492,6 +570,20 @@ export function BalloonScene({ level, fresh = [], className, label = true }: Sce
         fill="var(--balloon-mid-far)"
       />
       {stage("windmill", <Windmill x={992} y={368} />)}
+      {stage(
+        "lake",
+        <g>
+          <ellipse cx={170} cy={410} rx={80} ry={8} fill="url(#balloon-river)" />
+          <line x1={140} y1={409} x2={170} y2={408} stroke="var(--balloon-shine)" strokeWidth={1.4} data-fx="shimmer" />
+        </g>,
+      )}
+      {stage(
+        "sail",
+        <g data-fx="bob">
+          <path d="M196 408 L216 408 L212 412 L200 412 Z" fill="var(--balloon-basket)" />
+          <path d="M206 406 L206 388 L216 404 Z" fill="var(--balloon-sail)" />
+        </g>,
+      )}
 
       {/* The fields: hedgerows from the start, colour when it comes. */}
       <path
@@ -521,6 +613,87 @@ export function BalloonScene({ level, fresh = [], className, label = true }: Sce
           <path d="M0 470 C200 458 420 462 620 474 S1000 460 1200 466" fill="none" />
         </g>
       </g>
+
+      {stage(
+        "poppies",
+        <g fill="var(--balloon-poppy)">
+          {Array.from({ length: 30 }, (_, i) => i * 40 + 12).map((px, i) => (
+            <circle key={px} cx={px} cy={round(468 + Math.sin(i * 1.7) * 3)} r={2.2} />
+          ))}
+        </g>,
+      )}
+      {stage(
+        "haystacks",
+        <g>
+          {[
+            [404, 472],
+            [452, 466],
+            [1100, 452],
+            [1136, 458],
+          ].map(([hx, hy]) => (
+            <g key={hx}>
+              <path d={`M${hx - 12} ${hy} Q${hx} ${hy - 24} ${hx + 12} ${hy} Z`} fill="var(--balloon-field-2)" />
+              <path d={`M${hx - 8} ${hy - 6} Q${hx} ${hy - 14} ${hx + 8} ${hy - 6}`} stroke="var(--balloon-hedge)" strokeWidth={1} fill="none" opacity={0.5} />
+            </g>
+          ))}
+        </g>,
+      )}
+      {stage(
+        "lane",
+        <path d="M760 560 C780 520 820 500 880 480 S980 452 1060 440" stroke="var(--balloon-lane)" strokeWidth={6} fill="none" strokeLinecap="round" opacity={0.8} />,
+      )}
+      {stage(
+        "farm",
+        <g>
+          <rect x={760} y={448} width={40} height={22} fill="var(--balloon-house)" />
+          <path d="M756 450 L780 432 L804 450 Z" fill="var(--balloon-roof)" />
+          <rect x={804} y={454} width={24} height={16} fill="var(--balloon-house-2)" />
+          <path d="M802 456 L816 444 L830 456 Z" fill="var(--balloon-roof-2)" />
+          <rect x={776} y={458} width={6} height={6} fill="var(--balloon-window)" />
+        </g>,
+      )}
+      {stage(
+        "cows",
+        <g>
+          {[
+            [850, 484],
+            [878, 490],
+          ].map(([cx, cy]) => (
+            <g key={cx}>
+              <rect x={cx - 9} y={cy - 9} width={18} height={8} rx={3} fill="var(--balloon-wool)" />
+              <ellipse cx={cx - 2} cy={cy - 6} rx={3} ry={2} fill="var(--balloon-sheep-face)" />
+              <rect x={cx + 7} y={cy - 10} width={5} height={5} fill="var(--balloon-wool)" />
+              <path d={`M${cx - 7} ${cy - 1} l0 4 M${cx + 6} ${cy - 1} l0 4`} stroke="var(--balloon-sheep-face)" strokeWidth={1.6} />
+            </g>
+          ))}
+        </g>,
+      )}
+      {stage(
+        "cart",
+        <g>
+          <rect x={900} y={468} width={20} height={8} fill="var(--balloon-basket)" />
+          <circle cx={905} cy={477} r={4} fill="none" stroke="var(--balloon-basket-dark)" strokeWidth={1.6} />
+          <ellipse cx={930} cy={470} rx={7} ry={4} fill="var(--balloon-sheep-face)" />
+        </g>,
+      )}
+      {stage(
+        "orchard",
+        <g>
+          {[
+            [1040, 444],
+            [1066, 440],
+            [1092, 446],
+            [1118, 440],
+            [1144, 444],
+          ].map(([ox, oy]) => (
+            <g key={ox}>
+              <line x1={ox} y1={oy} x2={ox} y2={oy - 8} stroke="var(--balloon-trunk)" strokeWidth={2} />
+              <circle cx={ox} cy={oy - 12} r={7} fill="var(--balloon-poplar)" />
+              <circle cx={ox + 2} cy={oy - 14} r={1.6} fill="var(--balloon-poppy)" />
+            </g>
+          ))}
+        </g>,
+      )}
 
       {/* The near meadow. */}
       <path
@@ -552,6 +725,25 @@ export function BalloonScene({ level, fresh = [], className, label = true }: Sce
           ))}
         </>,
       )}
+      {!has("mist-lifts") && (
+        <g data-fx="drift" filter="url(#balloon-soft)" fill="var(--balloon-cloud)" opacity={0.6}>
+          <ellipse cx={420} cy={496} rx={220} ry={10} />
+          <ellipse cx={660} cy={450} rx={140} ry={7} />
+        </g>
+      )}
+      {stage(
+        "mist-lifts",
+        <g data-fx="drift" filter="url(#balloon-soft)" fill="var(--balloon-cloud)" opacity={0.3}>
+          <ellipse cx={420} cy={440} rx={160} ry={6} />
+        </g>,
+      )}
+      {stage(
+        "bridge",
+        <g>
+          <path d="M470 498 Q492 482 516 494 L516 502 Q492 492 470 506 Z" fill="var(--balloon-mill)" />
+          <path d="M484 502 Q492 494 502 500" stroke="var(--balloon-mill-shade)" strokeWidth={1.4} fill="none" />
+        </g>,
+      )}
       {stage(
         "poplars",
         POPLARS.map(([x, y, s]) => <Poplar key={x} x={x} y={y} s={s} />),
@@ -572,6 +764,37 @@ export function BalloonScene({ level, fresh = [], className, label = true }: Sce
       {stage(
         "sheep",
         SHEEP.map(([x, y, s, flip]) => <Sheep key={x} x={x} y={y} s={s} flip={flip} />),
+      )}
+      {stage(
+        "shepherd",
+        <g>
+          <path d="M1060 530 L1070 530 L1068 510 C1068 504 1062 504 1062 510 Z" fill="var(--balloon-two-1)" />
+          <circle cx={1065} cy={500} r={4} fill="var(--balloon-skin)" />
+          <line x1={1074} y1={530} x2={1078} y2={496} stroke="var(--balloon-basket-dark)" strokeWidth={1.6} />
+          <path d="M1078 496 q4 -4 2 -8" stroke="var(--balloon-basket-dark)" strokeWidth={1.6} fill="none" />
+          <ellipse cx={1044} cy={528} rx={7} ry={4} fill="var(--balloon-sheep-face)" />
+          <circle cx={1050} cy={523} r={3} fill="var(--balloon-sheep-face)" />
+        </g>,
+      )}
+      {stage(
+        "kite",
+        <g>
+          <path d={`M${MEADOW_KITE[0]} ${MEADOW_KITE[1]} Q340 470 352 538`} stroke="var(--balloon-rope)" strokeWidth={0.8} fill="none" />
+          <g data-fx="bob">
+            <path d={`M${MEADOW_KITE[0]} ${MEADOW_KITE[1] - 12} l9 12 l-9 14 l-9 -14 Z`} fill="var(--balloon-two-2)" />
+          </g>
+          <path d="M348 540 L356 540 L355 528 C355 524 349 524 349 528 Z" fill="var(--balloon-env-1)" />
+          <circle cx={352} cy={520} r={3} fill="var(--balloon-skin)" />
+        </g>,
+      )}
+      {BAG_GROUND.map(([gx, gy], i) => stage(`bag-${i + 1}`, <Sandbag x={gx} y={gy} />))}
+      {stage(
+        "third",
+        <g transform="translate(150 360) scale(0.3)">
+          <g data-fx="bob" style={{ animationDelay: "-4s" }}>
+            <Balloon colours={FAR[2]} flame />
+          </g>
+        </g>,
       )}
 
       {stage(
@@ -599,11 +822,57 @@ export function BalloonScene({ level, fresh = [], className, label = true }: Sce
         )),
       )}
 
+      {stage(
+        "cloud-sea",
+        <g filter="url(#balloon-soft)" fill="var(--balloon-cloud)">
+          <ellipse cx={160} cy={344} rx={220} ry={26} opacity={0.85} />
+          <ellipse cx={520} cy={352} rx={260} ry={22} opacity={0.8} />
+          <ellipse cx={880} cy={340} rx={240} ry={24} opacity={0.85} />
+          <ellipse cx={1150} cy={350} rx={160} ry={22} opacity={0.8} />
+        </g>,
+      )}
+      {stage(
+        "rays",
+        <g data-fx="rays" fill="var(--balloon-sun)" opacity={0.18}>
+          <path d="M1010 322 L700 560 L780 560 Z" />
+          <path d="M1010 322 L880 560 L950 560 Z" />
+          <path d="M1010 322 L1060 560 L1120 560 Z" />
+        </g>,
+      )}
+      {stage(
+        "far-balloons",
+        [
+          [360, 250, 0.16, 0],
+          [470, 226, 0.12, -1.5],
+          [1110, 220, 0.14, -3],
+        ].map(([fx, fy, fs, d], i) => (
+          <g key={i} transform={`translate(${fx} ${fy}) scale(${fs})`}>
+            <g data-fx="bob" style={{ animationDelay: `${d}s` }}>
+              <Balloon colours={FAR[(i + 1) % FAR.length]} detail={false} />
+            </g>
+          </g>
+        )),
+      )}
+      {stage(
+        "glory",
+        <g>
+          <ellipse cx={round(pose.x - 30)} cy={338} rx={30} ry={7} fill="none" stroke="url(#balloon-rim)" strokeWidth={5} opacity={0.8} />
+          <ellipse cx={round(pose.x - 30)} cy={338} rx={10} ry={4} fill="var(--balloon-shade)" opacity={0.35} />
+        </g>,
+      )}
+      {stage(
+        "breeze",
+        <g stroke="var(--balloon-cloud)" strokeWidth={1.6} fill="none" strokeLinecap="round" opacity={0.7} data-fx="drift">
+          <path d="M120 230 q40 -10 80 0 t80 0" />
+          <path d="M980 180 q30 -8 60 0 t60 0" />
+        </g>,
+      )}
+
       {/* The balloon: slack on the grass, filling, standing, then rising. */}
       <g
         className="balloon-rise"
         style={{
-          transform: `translate(${round(pose.x)}px, ${round(pose.y)}px) scale(0.8)`,
+          transform: `translate(${round(pose.x)}px, ${round(pose.y)}px) scale(${round(pose.s)})`,
         }}
       >
         <g data-stage={balloonStage ?? "base"} {...(growing ? { "data-grow": "" } : {})}>
@@ -645,12 +914,52 @@ export function BalloonScene({ level, fresh = [], className, label = true }: Sce
           )}
           {level >= 3 && (
             <g data-fx="bob">
-              <Balloon colours={MAIN} flame rim={sunlit} />
+              <Balloon colours={MAIN} flame={!has("quiet")} rim={sunlit || has("warmth")} />
+              {stage(
+                "crown",
+                <path d="M-40 -238 Q0 -262 40 -238 Q0 -250 -40 -238 Z" fill="var(--balloon-sun)" opacity={0.85} />,
+              )}
+              {stage(
+                "streamers",
+                <g data-fx="flutter">
+                  <path d="M-16 -30 q-14 6 -26 2 q-10 -2 -18 4" stroke="var(--balloon-two-1)" strokeWidth={2.4} fill="none" />
+                  <path d="M-16 -24 q-12 8 -24 6" stroke="var(--balloon-env-3)" strokeWidth={2.4} fill="none" />
+                </g>,
+              )}
+              {stage(
+                "flag",
+                <g>
+                  <line x1={16} y1={-32} x2={16} y2={-56} stroke="var(--balloon-rope)" strokeWidth={1.6} />
+                  <path data-fx="flutter" d="M16 -56 L34 -51 L16 -46 Z" fill="var(--balloon-two-2)" />
+                </g>,
+              )}
+              {stage(
+                "quiet",
+                <g>
+                  <circle cx={-4} cy={-38} r={4.5} fill="var(--balloon-skin)" />
+                  <path d="M-10 -32 L2 -32 L1 -40 L-9 -40 Z" fill="var(--balloon-two-1)" />
+                  <path d="M2 -36 L10 -46" stroke="var(--balloon-skin)" strokeWidth={2.4} strokeLinecap="round" />
+                </g>,
+              )}
             </g>
           )}
+          {level >= 1 &&
+            BAG_HOOKS.slice(0, bagsLeft).map(([bx, by], i) => (
+              <g key={i}>
+                <line x1={bx > 0 ? 15 : -15} y1={-28} x2={bx} y2={by - 6} stroke="var(--balloon-rope)" strokeWidth={1} />
+                <Sandbag x={bx} y={by} />
+              </g>
+            ))}
+          {level === 0 &&
+            BAG_HOOKS.map((_, i) => <Sandbag key={i} x={-30 - (i % 4) * 10} y={-5 - Math.floor(i / 4) * 9} />)}
         </g>
       </g>
 
+      {/* The burner and the filling are the balloon itself once it's up; they keep their names. */}
+      {level >= 3 && stage("burner", null)}
+      {level >= 3 && stage("filled", null)}
+      {stage("morning", <rect y={300} width="1200" height="260" fill="var(--balloon-sun)" opacity={0.06} pointerEvents="none" />)}
+      {stage("warmth", <rect width="1200" height="300" fill="var(--balloon-sun)" opacity={0.04} pointerEvents="none" />)}
       {sunlit && <rect width="1200" height="560" fill="var(--balloon-sun)" opacity={0.07} pointerEvents="none" />}
     </SceneSvg>
   );

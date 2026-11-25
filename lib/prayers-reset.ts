@@ -1,10 +1,12 @@
 /**
- * The daily prayer reset, run by the 4 AM Asia/Karachi cron.
+ * The daily prayer housekeeping, run by the 4 AM Asia/Karachi cron.
  *
- * Wipes every PrayerCheck older than the current day — "wipe everything daily"
- * was the choice: no history, each cycle starts clean at Fajr. PrayerDayTimes
- * rows older than a week are pruned so a date is refetched from Aladhan (and
- * therefore reflects the city's current schedule) on the next visit, while
+ * Prayer checks are kept: the five daily prayers are a Heart practice, and
+ * its scene is kept by every day all five were prayed (lib/heart-data.ts),
+ * so the history has to stay. (Checks used to be wiped each morning, back
+ * when they only lived on the day page.) What the job still does is prune
+ * PrayerDayTimes rows older than a week, so a date is refetched from Aladhan
+ * (and so reflects the city's current schedule) on the next visit, while
  * staying around long enough to serve as the offline fallback.
  */
 
@@ -12,15 +14,14 @@ import { prisma } from "@/lib/db";
 import { addDays, todayLocal } from "@/lib/dates";
 
 /**
- * Hobby plan: one cron run a day can only hit one zone's 4 AM. The reset
- * zones list is fixed here the same way `lib/habit-steps-reset.ts` fixes its
- * midnight zones — extend it when the plan can afford hourly runs.
+ * Hobby plan: one cron run a day can only hit one zone's 4 AM. The zones list
+ * is fixed here the same way `lib/habit-steps-reset.ts` fixes its midnight
+ * zones; extend it when the plan can afford hourly runs.
  */
 export const PRAYER_RESET_TIMEZONES = ["Asia/Karachi"] as const;
 
 export type PrayerResetResult = {
   timezone: string;
-  checksDeleted: number;
   cachePruned: number;
 };
 
@@ -30,20 +31,13 @@ export async function resetPrayers(): Promise<PrayerResetResult[]> {
   for (const timezone of PRAYER_RESET_TIMEZONES) {
     const today = todayLocal(timezone);
 
-    const { count: checksDeleted } = await prisma.prayerCheck.deleteMany({
-      where: {
-        user: { timezone },
-        date: { lt: today },
-      },
-    });
-
     const { count: cachePruned } = await prisma.prayerDayTimes.deleteMany({
       where: {
         date: { lt: addDays(today, -7) },
       },
     });
 
-    results.push({ timezone, checksDeleted, cachePruned });
+    results.push({ timezone, cachePruned });
   }
 
   return results;

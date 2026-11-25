@@ -1,7 +1,7 @@
 import type { User } from "@/lib/generated/prisma/client";
 import { addDays, diffInDays, toISODate, toLocalDate, todayLocal } from "@/lib/dates";
 import { prisma } from "@/lib/db";
-import { TEND_DAYS, historySince, tend, type Tending } from "@/lib/tending";
+import { STRIP_DAYS, historySince, tend, type Tending } from "@/lib/tending";
 import {
   endOf,
   pagesRead,
@@ -57,7 +57,7 @@ export type ReadingView = {
   days: ReadingDay[];
   todayISO: string;
   week: { pages: number; percent: number };
-  /** The nook: a stage up for each day you read, down for each day you don't. */
+  /** The library: a stage up for each day you read, down for each day you don't. */
   tending: Tending;
 };
 
@@ -158,7 +158,7 @@ const BOOK_SELECT = {
 export async function getReading(user: User): Promise<ReadingView> {
   const today = todayLocal(user.timezone);
   // Two weeks and today, for the dots and the week's pages.
-  const since = addDays(today, -TEND_DAYS);
+  const since = addDays(today, -STRIP_DAYS);
   const instantLabel = new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
     month: "short",
@@ -182,7 +182,7 @@ export async function getReading(user: User): Promise<ReadingView> {
       where: { userId: user.id, date: { gte: since } },
       select: { date: true, fromPage: true, toPage: true, book: { select: { unit: true } } },
     }),
-    // Every day ever read, for the nook: it's kept by all of them (lib/tending.ts).
+    // Every day ever read, for the library: it's kept by all of them (lib/tending.ts).
     prisma.readingLog.findMany({
       where: { userId: user.id },
       distinct: ["date"],
@@ -205,7 +205,7 @@ export async function getReading(user: User): Promise<ReadingView> {
   });
 
   const days = new Map<string, ReadingDay>();
-  for (let i = 0; i <= TEND_DAYS; i += 1) {
+  for (let i = 0; i <= STRIP_DAYS; i += 1) {
     const date = addDays(since, i);
     const iso = toISODate(date);
     days.set(iso, { dateISO: iso, label: dayLabel.format(date), pages: 0, percent: 0, read: false });

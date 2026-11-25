@@ -12,29 +12,32 @@ import { cn } from "@/lib/utils";
 import { BalloonScene } from "./balloon-scene";
 import { CourtyardScene } from "./courtyard-scene";
 import { GroveScene } from "./grove-scene";
-import { HarbourScene } from "./harbour-scene";
-import { NookScene } from "./nook-scene";
+import { LibraryScene } from "./library-scene";
 import { OasisScene } from "./oasis-scene";
 import { OrchardScene } from "./orchard-scene";
+import { RiverScene } from "./river-scene";
 import type { SceneProps } from "./scene-frame";
 import { SummitScene } from "./summit-scene";
-import { TerraceScene } from "./terrace-scene";
+import { TownScene } from "./town-scene";
+import { VillageScene } from "./village-scene";
 
 export const SCENE_ART: Record<SceneKey, ComponentType<SceneProps>> = {
+  prayer: TownScene,
   meditate: GardenScene,
-  gratitude: TerraceScene,
+  gratitude: VillageScene,
   dua: CourtyardScene,
   recitation: OasisScene,
   braindump: BalloonScene,
-  reading: NookScene,
+  reading: LibraryScene,
   wishes: SummitScene,
-  disputations: HarbourScene,
+  disputations: RiverScene,
   exercises: GroveScene,
   fasting: OrchardScene,
 };
 
 /** Each practice's own colour for a day kept, as on its tab. */
 const DAY_DOT: Record<SceneKey, string> = {
+  prayer: "bg-[var(--town-lamp)]",
   gratitude: "bg-[var(--thanks-lantern)]",
   dua: "bg-[var(--dua-accent)]",
   recitation: "bg-[var(--oasis-water)]",
@@ -49,7 +52,7 @@ const DAY_DOT: Record<SceneKey, string> = {
 
 /**
  * A practice's scene, at the top of its tab: the place itself, a line on
- * where it stands and what today does for it, and the last fourteen days.
+ * where it stands and what today does for it, and the last two weeks.
  * When a save brings a new stage, it grows in.
  *
  * `note` says what a day held ("12 min", "20 pages"), for the tooltips.
@@ -100,7 +103,7 @@ export function SceneCard({
   );
 }
 
-/** The last fourteen days, and today while it's still open. */
+/** The last two weeks, and today while it's still open. */
 function DayStrip({
   tab,
   tending,

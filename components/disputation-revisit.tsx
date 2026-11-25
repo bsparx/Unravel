@@ -14,7 +14,7 @@ import { ritualGhostClass, ritualPrimaryClass } from "./ritual-frame";
  * A disputation, reread. The old thought and what you carry instead, and one
  * question: how strongly does the old thought hold now? Rereading an argument
  * you've already won is how it stays won, and a day you do it keeps the
- * harbour as much as writing a new one.
+ * river as much as writing a new one.
  *
  * Presentational: the caller saves. `onDone` resolves true once stored.
  */

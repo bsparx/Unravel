@@ -11,7 +11,7 @@ import {
   type MeditationOptions,
 } from "@/lib/meditations";
 import { getReading, type ReadingView } from "@/lib/reading-data";
-import { TEND_DAYS, historySince, tend, type Tending } from "@/lib/tending";
+import { STRIP_DAYS, historySince, tend, type Tending } from "@/lib/tending";
 
 /** How far back the journal on each daily tab reaches. */
 const HISTORY_DAYS = 90;
@@ -94,7 +94,7 @@ export type MindView = {
   wishTending: Tending;
   /** Wishes rehearsed today. */
   rehearsedToday: string[];
-  /** The harbour: kept by the days one was written or revisited. */
+  /** The river: kept by the days one was written or revisited. */
   disputationTending: Tending;
 };
 
@@ -126,7 +126,7 @@ export async function getMind(user: User): Promise<MindView> {
   const since = addDays(today, -HISTORY_DAYS);
 
   // The strip under each scene shows two weeks and today.
-  const tendSince = addDays(today, -TEND_DAYS);
+  const tendSince = addDays(today, -STRIP_DAYS);
 
   // A scene is kept by every day since the practice began (lib/tending.ts),
   // so the days it was done are read all the way back: dates only.

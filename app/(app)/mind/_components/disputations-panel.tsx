@@ -14,7 +14,7 @@ import { CardTools, SkyEmpty } from "@/components/panel-shared";
 
 /**
  * Disputations are a record of arguments won, so they read top to bottom,
- * newest first, under the harbour that writing or revisiting one keeps. Each
+ * newest first, under the river that writing or revisiting one keeps clear. Each
  * shows the turn it made; the argument opens on request.
  */
 export function DisputationsPanel({

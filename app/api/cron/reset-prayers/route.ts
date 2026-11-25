@@ -4,8 +4,8 @@ import { resetPrayers } from "@/lib/prayers-reset";
 
 /**
  * Vercel Cron → /api/cron/reset-prayers, scheduled daily at 04:00 Asia/Karachi
- * (23:00 UTC — see vercel.json). Wipes yesterday's prayer checks and prunes
- * the timings cache.
+ * (23:00 UTC — see vercel.json). Prunes the timings cache; prayer checks are
+ * kept now, since the prayer scene on Heart is built from them.
  *
  * Guarded by CRON_SECRET, exactly like /api/cron/reset-steps: Vercel sends
  * `Authorization: Bearer ${CRON_SECRET}` on cron requests when the env var

@@ -3,21 +3,24 @@
  * one stage less for every scheduled day you miss, and held steady (0) on
  * scheduled rest / off-days.
  *
- * A scene has fourteen stages over its base. Each day you do the practice
+ * A scene has sixty stages over its base. Each day you do the practice
  * brings the next one; each scheduled day that passes without it takes the
  * newest one away. On a rest day (e.g. a non-training day in your exercise
  * routine or an off-schedule day for fasting), skipping never costs a stage,
- * while doing it anyway still rewards +1. It never goes past whole (fourteen)
+ * while doing it anyway still rewards +1. It never goes past whole (sixty)
  * or below the bare base. Nothing else counts: no points, no totals, no
- * minutes.
+ * minutes. The strip under a scene shows only the last two weeks.
  *
  * Today counts the moment it's done, but isn't held against you while it's
  * still open: a stage only goes once a whole scheduled day has passed without
  * it. So the scene never shrinks in the morning before you've had the chance.
  */
 
-/** How many stages a scene has over its base. */
-export const TEND_DAYS = 14;
+/** How many stages a scene has over its base: two months kept makes it whole. */
+export const TEND_DAYS = 60;
+
+/** How many days the strip under a scene shows, before today. */
+export const STRIP_DAYS = 14;
 
 export type TendDay = {
   dateISO: string;
@@ -33,14 +36,14 @@ export type TendDay = {
 };
 
 export type Tending = {
-  /** 0 to 14: how many stages the scene shows now. */
+  /** 0 to 60: how many stages the scene shows now. */
   level: number;
   /** Whether today is done. */
   today: boolean;
   /** Whether today is a scheduled day for this practice. */
   todayScheduled: boolean;
   /**
-   * The last fourteen days, oldest first, for the strip under the scene:
+   * The last two weeks, oldest first, for the strip under the scene:
    * ending today once it's done, ending yesterday until then.
    */
   window: TendDay[];
@@ -70,12 +73,12 @@ export function step(level: number, done: boolean, scheduled = true): number {
  * The scene's state from a run of days, oldest first, ending today. The run
  * should begin on or before the first day the practice was ever done: before
  * that the scene is bare, and a bare scene has nothing to lose, so earlier
- * days can't change the answer. Fewer than fifteen days are padded as misses
- * at the old end, so a new practice simply starts from nothing.
+ * days can't change the answer. Fewer than a strip and today are padded as
+ * misses at the old end, so a new practice simply starts from nothing.
  */
 export function tend(history: readonly TendDay[]): Tending {
   const days = [...history];
-  while (days.length < TEND_DAYS + 1) {
+  while (days.length < STRIP_DAYS + 1) {
     days.unshift({ dateISO: "", label: "", done: false });
   }
 
@@ -90,7 +93,7 @@ export function tend(history: readonly TendDay[]): Tending {
     level: todayDay.done ? ifDone : before,
     today: todayDay.done,
     todayScheduled,
-    window: todayDay.done ? days.slice(-TEND_DAYS) : days.slice(-(TEND_DAYS + 1), -1),
+    window: todayDay.done ? days.slice(-STRIP_DAYS) : days.slice(-(STRIP_DAYS + 1), -1),
     todayDay,
     before,
     ifDone,
@@ -133,7 +136,7 @@ export function historySince(
 
   const today = Date.parse(`${todayISO}T00:00:00.000Z`);
   const span = Math.max(
-    TEND_DAYS,
+    STRIP_DAYS,
     Math.round((today - Date.parse(`${first}T00:00:00.000Z`)) / DAY_MS),
   );
   return Array.from({ length: span + 1 }, (_, i) => {
@@ -142,7 +145,7 @@ export function historySince(
     const scheduled = isScheduled ? isScheduled(date, iso) : true;
     return {
       dateISO: iso,
-      label: span - i <= TEND_DAYS ? label(date) : "",
+      label: span - i <= STRIP_DAYS ? label(date) : "",
       done: done.has(iso),
       ...(scheduled ? {} : { scheduled: false }),
     };

@@ -24,6 +24,7 @@ import {
   undoRecitation,
 } from "../actions";
 import { PracticePanel, type PracticeWriteMode } from "./practice-panel";
+import { PrayerPanel } from "./prayer-panel";
 import { RecitationPanel } from "./recitation-panel";
 
 // The catalogue's words load only when you open it.
@@ -37,12 +38,14 @@ type Editing =
   | null;
 
 const LABELS: Record<HeartTab, string> = {
+  prayer: "Prayer",
   gratitude: "Gratitude",
   dua: "Du'a",
   recitation: "Recitation",
 };
 
 const DOT: Record<HeartTab, TabDot> = {
+  prayer: { colour: "bg-[var(--town-lamp)]", done: "All five prayed today", not: "Not all five prayed yet today", srDone: "(all five prayed today)", srNot: "(not all five prayed today)" },
   gratitude: { colour: "bg-[var(--thanks-lantern)]", done: "Today's page is written", not: "Not written yet today", srDone: "(written today)", srNot: "(not written today)" },
   dua: { colour: "bg-[var(--dua-accent)]", done: "Today's page is written", not: "Not written yet today", srDone: "(written today)", srNot: "(not written today)" },
   recitation: { colour: "bg-[var(--oasis-water)]", done: "Today's set is recited", not: "Not recited yet today", srDone: "(recited today)", srNot: "(not recited today)" },
@@ -54,9 +57,10 @@ function isStaleActionError(err: unknown): boolean {
 }
 
 /**
- * /heart: gratitude, du'a and the daily recitation. The two pages and their
- * rituals are exactly as they were on Mind; recitation brings its reader,
- * its set and the oasis.
+ * /heart: the five daily prayers, gratitude, du'a and the daily recitation.
+ * Prayer brings the times that used to sit on the day page and a town that
+ * lights up with them; the two pages and their rituals are exactly as they
+ * were on Mind; recitation brings its reader, its set and the oasis.
  */
 export function HeartBoard({ initialTab, view }: { initialTab: HeartTab; view: HeartView }) {
   const router = useRouter();
@@ -85,6 +89,7 @@ export function HeartBoard({ initialTab, view }: { initialTab: HeartTab; view: H
   };
 
   const doneToday: Record<HeartTab, boolean> = {
+    prayer: view.prayer.tending.today,
     gratitude: view.gratitude.tending.today,
     dua: view.dua.tending.today,
     recitation: view.recitation.tending.today,
@@ -194,6 +199,7 @@ export function HeartBoard({ initialTab, view }: { initialTab: HeartTab; view: H
       </div>
 
       <section id={`heart-${tab}`} role="tabpanel" aria-label={LABELS[tab]}>
+        {tab === "prayer" && <PrayerPanel view={view.prayer} />}
         {(tab === "gratitude" || tab === "dua") && (
           <PracticePanel
             // Keyed by tab only: keying by template remounted the panel on

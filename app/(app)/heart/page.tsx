@@ -12,9 +12,11 @@ import { HeartBoard } from "./_components/heart-board";
 export const metadata = { title: "Heart" };
 
 /**
- * Three daily practices for the heart, each switchable in Settings.
- * Gratitude and du'a are a page a day, written with a template you choose;
- * they moved here from /mind with every page, template and scene intact.
+ * Four daily practices for the heart, each switchable in Settings. The five
+ * prayers come with their times for your city and a town lit by the days
+ * all five are prayed. Gratitude and du'a are a page a day, written with a
+ * template you choose; they moved here from /mind with every page, template
+ * and scene intact.
  * Daily recitation is a set you build of Quran and remembrance, said in a
  * full-screen reader with a counter, and kept by an oasis.
  */
@@ -43,7 +45,7 @@ export default async function HeartPage({ searchParams }: PageProps<"/heart">) {
         <div className="border-border mx-auto max-w-md rounded-2xl border border-dashed px-6 py-14 text-center">
           <p className="font-display text-2xl">Heart is switched off</p>
           <p className="text-muted-foreground mt-2 text-body">
-            Gratitude, du&apos;a and daily recitation can each be turned on in Settings, in any mix.
+            The five prayers, gratitude, du&apos;a and daily recitation can each be turned on in Settings, in any mix.
           </p>
           <Button asChild className="mt-6 rounded-full">
             <Link href="/settings#heart">
@@ -61,6 +63,7 @@ export default async function HeartPage({ searchParams }: PageProps<"/heart">) {
 function intro(enabled: HeartEnabled): string {
   const pages = [enabled.gratitude && "what was good", enabled.dua && "what you're asking for"].filter(Boolean);
   return [
+    enabled.prayer ? "The five prayers, each in its window, lighting a town in the snow." : "",
     pages.length ? `A page a day for ${pages.join(" and ")}.` : "",
     enabled.recitation
       ? "A daily set of Quran, remembrance and Prophetic du'as, said with a counter, that grows an oasis."

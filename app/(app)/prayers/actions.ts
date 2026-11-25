@@ -37,6 +37,7 @@ export async function togglePrayer(formData: FormData): Promise<void> {
     await prisma.prayerCheck.createMany({ data: [where], skipDuplicates: true });
   }
 
-  revalidatePath("/day");
+  revalidatePath("/heart");
   revalidatePath("/calendar");
+  revalidatePath("/stats");
 }

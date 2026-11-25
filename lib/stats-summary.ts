@@ -187,6 +187,7 @@ export const MIND_PRACTICE_LABELS: Record<MindTab, string> = {
 };
 
 export const HEART_PRACTICE_LABELS: Record<HeartTab, string> = {
+  prayer: "The five prayers",
   gratitude: "Gratitude",
   dua: "Du'a",
   recitation: "Daily recitation",

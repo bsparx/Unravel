@@ -13,13 +13,11 @@ import {
   todayLocal,
 } from "@/lib/dates";
 import { getYesterdayEndingSummary } from "@/lib/ending-summary-data";
-import { getPrayerCycle } from "@/lib/prayers";
 import { getRenewingSoon } from "@/lib/subscriptions-data";
 import { getTodayView } from "@/lib/tasks";
 import { getBlocks } from "@/lib/time-blocks";
 
 import { DayList } from "./_components/day-list";
-import { PrayerSection } from "./_components/prayer-section";
 import { QuestHero } from "./_components/quest-hero";
 import { QuestLog } from "./_components/quest-log";
 import { RenewalsAlert } from "./_components/renewals-alert";
@@ -31,10 +29,9 @@ export default async function TodayPage() {
   // Every section only needs today's date, so the whole page loads in one
   // parallel round rather than one waterfall step per section.
   const today = todayLocal(user.timezone);
-  const [view, blocks, prayers, renewals, yesterdaySummary] = await Promise.all([
+  const [view, blocks, renewals, yesterdaySummary] = await Promise.all([
     getTodayView(user),
     getBlocks(user, today, 1),
-    user.prayerRemindersEnabled ? getPrayerCycle(user) : null,
     getRenewingSoon(user),
     getYesterdayEndingSummary(user),
   ]);
@@ -107,8 +104,6 @@ export default async function TodayPage() {
         timezone={user.timezone}
         dateISO={todayISO}
       />
-
-      {user.prayerRemindersEnabled && <PrayerSection view={prayers} />}
 
       <DayList
         view={view}

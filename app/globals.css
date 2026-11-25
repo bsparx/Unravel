@@ -1557,12 +1557,12 @@
 /* ---------------------------------------------------------------------------
    The Mind scenes.
 
-   Six places, one per practice, each kept by the last two weeks: a stage for
-   every day kept in the fourteen that count (lib/tending.ts). Each has a
-   light and a dark sky. Cotton candy sees the garden at lavender twilight,
-   the terrace at golden hour, the courtyard before dawn, the nook on a warm
-   evening, the summit at a candy dawn and the harbour on a pastel afternoon;
-   the night theme takes each one into the dark.
+   One place per practice, each the practice made into somewhere: a stage
+   for every day kept, sixty to whole (lib/tending.ts). Each has a light and a
+   dark sky. Cotton candy sees the garden at lavender twilight, the courtyard
+   before dawn and the summit at a candy dawn; the village, the library and
+   the river have their own blocks below. The night theme takes each one into
+   the dark.
 
    During a sitting the garden takes a --breath value (0 to 1) and the pond's
    ripples and the lanterns' glow swell and settle with it.
@@ -1596,6 +1596,8 @@
   --garden-wood: #8b5d6e;
   --garden-koi: #ff8a5c;
   --garden-koi-spot: #ffffff;
+  --garden-hydrangea: #9fb4f0;
+  --garden-koi-gold: #ffd36b;
   --garden-lily: #86c4a0;
   --garden-blossom: #ffc4dd;
   --garden-blossom-lit: #ffe6f1;
@@ -1604,47 +1606,6 @@
   --garden-vignette: #2a1d5c;
   /* The session's veil over the garden, so white type reads on it. */
   --garden-veil: rgba(48, 32, 96, 0.42);
-
-  --terrace-sky-1: #f7c6c9;
-  --terrace-sky-2: #fbd3b8;
-  --terrace-sky-3: #ffe4b0;
-  --terrace-sun: #ffcb6b;
-  --terrace-sun-show: 1;
-  --terrace-star: #fffbe8;
-  --terrace-hill-far: #e2a9b4;
-  --terrace-hill: #c98ea6;
-  --terrace-hedge: #6f9a78;
-  --terrace-hedge-lit: #a5c98e;
-  --terrace-olive: #8aa58e;
-  --terrace-olive-lit: #c3d6b4;
-  --terrace-bark: #7a5a4c;
-  --terrace-paper-1: #ff9e7a;
-  --terrace-paper-2: #ffd36e;
-  --terrace-house: #f6dccb;
-  --terrace-roof: #c46a5d;
-  --terrace-glass: #7a6f9e;
-  --terrace-lit: #ffe08f;
-  --terrace-wall: #ecc9b0;
-  --terrace-wall-cap: #f8e2cf;
-  --terrace-floor: #dc9f80;
-  --terrace-floor-line: rgba(140, 70, 50, 0.22);
-  --terrace-wood: #8c5d48;
-  --terrace-cord: #6e4a3e;
-  --terrace-lantern: #ff9640;
-  --terrace-lantern-core: #ffe7a8;
-  --terrace-cloth: #fff6ea;
-  --terrace-shadow: rgba(120, 60, 50, 0.2);
-  --terrace-pot: #cf7650;
-  --terrace-herb: #5c8f63;
-  --terrace-jasmine: #ffffff;
-  --terrace-teapot: #5f8fb4;
-  --terrace-cup: #f4efe7;
-  --terrace-steam: rgba(255, 255, 255, 0.75);
-  --terrace-bread: #d99a52;
-  --terrace-bread-score: #f5d29a;
-  --terrace-fig: #6d3a5e;
-  --terrace-candle: #fff3dc;
-  --terrace-cat: #5a4250;
 
   --court-sky-1: #8f86cf;
   --court-sky-2: #b5a8e0;
@@ -1676,48 +1637,11 @@
   --court-rug-2: #ffd27a;
   --court-jasmine: #ffffff;
   --court-leaf: #5f9073;
-
-  --nook-wall-1: #f6e2d3;
-  --nook-wall-2: #ecd0bf;
-  --nook-panel: #e2bfa9;
-  --nook-trim: #c99a80;
-  --nook-out-1: #b9a8e8;
-  --nook-out-2: #ffc7b0;
-  --nook-out-hill: #8b7bb8;
-  --nook-out-tree: #6a5d9a;
-  --nook-star: #ffffff;
-  --nook-moon: #fff6e0;
-  --nook-moon-shade: #e3d3c4;
-  --nook-curtain: #c97a7a;
-  --nook-stone: #d8c2b4;
-  --nook-hearth: #4d3a3a;
-  --nook-shelf: #8a5d45;
-  --nook-gilt: #f2d38c;
-  --nook-book-1: #b5534a;
-  --nook-book-2: #4f7a8c;
-  --nook-book-3: #d9a441;
-  --nook-book-4: #6f5a9a;
-  --nook-book-5: #5c8a5c;
-  --nook-wire: #6e4a3e;
-  --nook-light: #ffcc75;
-  --nook-paper: #fbf3e4;
-  --nook-pot: #c9714f;
-  --nook-leaf: #5c9065;
-  --nook-floor: #b9805d;
-  --nook-floor-line: rgba(90, 50, 30, 0.25);
-  --nook-fire: #ff8a3d;
-  --nook-fire-core: #ffd56b;
-  --nook-log: #5a3a2a;
-  --nook-rug: #c86b6b;
-  --nook-rug-2: #f6d28a;
-  --nook-cat: #4d3a42;
-  --nook-chair: #6f7fb0;
-  --nook-chair-lit: #8a99c8;
-  --nook-cup: #fbf5ec;
-  --nook-steam: rgba(255, 255, 255, 0.75);
-  --nook-lamp-pole: #4a3a33;
-  --nook-shade: #f2c28a;
-  --nook-dark: #3a2230;
+  --court-tile: #5f8fd0;
+  --court-rose: #e86a8a;
+  --court-orange: #ff9a3d;
+  --court-lemon: #ffe06b;
+  --court-cat: #6b5a8f;
 
   --summit-sky-1: #9b9be6;
   --summit-sky-2: #c9b4ee;
@@ -1747,32 +1671,12 @@
   --summit-stone-lit: #d8d0f0;
   --summit-flower: #ffd1e6;
   --summit-flower-2: #fff0a8;
+  --summit-ice: #d6ecff;
+  --summit-cloth: #4a3f80;
+  --summit-skin: #e8b996;
+  --summit-goat: #f4efe7;
+  --summit-water: #a9d4f0;
 
-  --harbour-storm-1: #8d93ad;
-  --harbour-storm-2: #b3b6c8;
-  --harbour-clear-1: #8fc4f2;
-  --harbour-clear-2: #c7e4fb;
-  --harbour-clear-3: #fde7ef;
-  --harbour-sun: #ffd36b;
-  --harbour-cloud: #9aa0b8;
-  --harbour-cloud-dark: #7c8199;
-  --harbour-cloud-white: #ffffff;
-  --harbour-gull: #3d4560;
-  --harbour-rock: #6f6a80;
-  --harbour-rock-shade: #575268;
-  --harbour-grass: #7fb886;
-  --harbour-tower: #f4f1f7;
-  --harbour-stripe: #d0505a;
-  --harbour-lantern-room: #4a4f66;
-  --harbour-lamp: #ffd36b;
-  --harbour-cottage: #ece6dc;
-  --harbour-smoke: rgba(255, 255, 255, 0.7);
-  --harbour-sea-1: #6f8fb8;
-  --harbour-sea-2: #4a6590;
-  --harbour-foam: #ffffff;
-  --harbour-boat: #6e4a3e;
-  --harbour-sail: #fff8ee;
-  --harbour-rain: #e6ecf7;
 }
 
 .dark {
@@ -1803,6 +1707,8 @@
   --garden-wood: #5c4046;
   --garden-koi: #ff9a6b;
   --garden-koi-spot: #fff4e6;
+  --garden-hydrangea: #5a6ac0;
+  --garden-koi-gold: #d0a040;
   --garden-lily: #2f6b56;
   --garden-blossom: #f3a6c8;
   --garden-blossom-lit: #ffd6e8;
@@ -1810,47 +1716,6 @@
   --garden-fore: #04071c;
   --garden-vignette: #000000;
   --garden-veil: rgba(4, 6, 24, 0.5);
-
-  --terrace-sky-1: #1c1a45;
-  --terrace-sky-2: #4a2d5e;
-  --terrace-sky-3: #c26a62;
-  --terrace-sun: #ff9a52;
-  --terrace-sun-show: 0.55;
-  --terrace-star: #fff4d6;
-  --terrace-hill-far: #3a2953;
-  --terrace-hill: #2a1f45;
-  --terrace-hedge: #1f3a33;
-  --terrace-hedge-lit: #35584a;
-  --terrace-olive: #3b5249;
-  --terrace-olive-lit: #5d7867;
-  --terrace-bark: #3a2a2c;
-  --terrace-paper-1: #ff8f6b;
-  --terrace-paper-2: #ffc85c;
-  --terrace-house: #4a3a52;
-  --terrace-roof: #6d3a48;
-  --terrace-glass: #1d1a3a;
-  --terrace-lit: #ffc867;
-  --terrace-wall: #57414f;
-  --terrace-wall-cap: #6b5262;
-  --terrace-floor: #4a3340;
-  --terrace-floor-line: rgba(0, 0, 0, 0.28);
-  --terrace-wood: #4f342c;
-  --terrace-cord: #2c1f22;
-  --terrace-lantern: #ffad55;
-  --terrace-lantern-core: #fff0b8;
-  --terrace-cloth: #e7d6c6;
-  --terrace-shadow: rgba(0, 0, 0, 0.3);
-  --terrace-pot: #a8553a;
-  --terrace-herb: #4d8060;
-  --terrace-jasmine: #f4f0ff;
-  --terrace-teapot: #5d7fa3;
-  --terrace-cup: #e8e0d4;
-  --terrace-steam: rgba(255, 255, 255, 0.45);
-  --terrace-bread: #c4843f;
-  --terrace-bread-score: #e9be7e;
-  --terrace-fig: #4c2742;
-  --terrace-candle: #f2e6d0;
-  --terrace-cat: #1c1320;
 
   --court-sky-1: #03061a;
   --court-sky-2: #0b1238;
@@ -1882,48 +1747,11 @@
   --court-rug-2: #e0b25c;
   --court-jasmine: #f4f0ff;
   --court-leaf: #3d6b55;
-
-  --nook-wall-1: #2b2233;
-  --nook-wall-2: #221b2b;
-  --nook-panel: #2f2436;
-  --nook-trim: #4a3644;
-  --nook-out-1: #060a24;
-  --nook-out-2: #1c2259;
-  --nook-out-hill: #0b1030;
-  --nook-out-tree: #070b24;
-  --nook-star: #ffffff;
-  --nook-moon: #f4efe0;
-  --nook-moon-shade: #c9c3b0;
-  --nook-curtain: #5a2f3f;
-  --nook-stone: #3d3240;
-  --nook-hearth: #120c12;
-  --nook-shelf: #5a3c2e;
-  --nook-gilt: #d9b46a;
-  --nook-book-1: #8f3f3a;
-  --nook-book-2: #3b6070;
-  --nook-book-3: #b58632;
-  --nook-book-4: #54457a;
-  --nook-book-5: #46704a;
-  --nook-wire: #2a1d22;
-  --nook-light: #ffc061;
-  --nook-paper: #e8dcc6;
-  --nook-pot: #9c5038;
-  --nook-leaf: #3e7050;
-  --nook-floor: #3e2a28;
-  --nook-floor-line: rgba(0, 0, 0, 0.3);
-  --nook-fire: #ff8a3d;
-  --nook-fire-core: #ffd56b;
-  --nook-log: #2a1a14;
-  --nook-rug: #7a3442;
-  --nook-rug-2: #c9a053;
-  --nook-cat: #120c12;
-  --nook-chair: #3c4670;
-  --nook-chair-lit: #4d5a88;
-  --nook-cup: #e8e0d4;
-  --nook-steam: rgba(255, 255, 255, 0.45);
-  --nook-lamp-pole: #1e1618;
-  --nook-shade: #e0a860;
-  --nook-dark: #05030a;
+  --court-tile: #3a64a8;
+  --court-rose: #b04a6a;
+  --court-orange: #d07a2a;
+  --court-lemon: #c9b04a;
+  --court-cat: #1e1a30;
 
   --summit-sky-1: #050a24;
   --summit-sky-2: #1a1a4d;
@@ -1953,32 +1781,470 @@
   --summit-stone-lit: #6a6da0;
   --summit-flower: #f3a6c8;
   --summit-flower-2: #ffe08a;
+  --summit-ice: #6a86b0;
+  --summit-cloth: #22204a;
+  --summit-skin: #b88a70;
+  --summit-goat: #a8a2b8;
+  --summit-water: #3a5a8a;
 
-  --harbour-storm-1: #141824;
-  --harbour-storm-2: #252b3c;
-  --harbour-clear-1: #1b3a6b;
-  --harbour-clear-2: #4f6fa0;
-  --harbour-clear-3: #f0a37a;
-  --harbour-sun: #ffb35c;
-  --harbour-cloud: #2d3446;
-  --harbour-cloud-dark: #1c2130;
-  --harbour-cloud-white: #e6e9f5;
-  --harbour-gull: #e6e9f5;
-  --harbour-rock: #262634;
-  --harbour-rock-shade: #1a1a26;
-  --harbour-grass: #3f7a52;
-  --harbour-tower: #d9d6e3;
-  --harbour-stripe: #b8434d;
-  --harbour-lantern-room: #1c1f2d;
-  --harbour-lamp: #ffd37a;
-  --harbour-cottage: #4a4552;
-  --harbour-smoke: rgba(220, 225, 240, 0.45);
-  --harbour-sea-1: #1c2c4d;
-  --harbour-sea-2: #0e1830;
-  --harbour-foam: #b9c6e6;
-  --harbour-boat: #3a2a26;
-  --harbour-sail: #e8e2d8;
-  --harbour-rain: #9fb0d0;
+}
+
+/* The hillside village (gratitude). Light: golden hour over pastel hills,
+   a sun low in the west. Dark: night, the sun become the moon, and the
+   village's windows and lanterns glowing. */
+:root {
+  --village-sky-1: #f7c6c9;
+  --village-sky-2: #fbd3b8;
+  --village-sky-3: #ffe4b0;
+  --village-sun: #ffcb6b;
+  --village-stars: 0;
+  --village-star: #fffbe8;
+  --village-far: #e2b3bd;
+  --village-hill: #b9c98f;
+  --village-near: #9cc283;
+  --village-lawn: #b8dc95;
+  --village-stream: #a8d8ec;
+  --village-stream-deep: #74b3d6;
+  --village-shine: #ffffff;
+  --village-wheat: #f3d27e;
+  --village-wheat-dark: #d6a556;
+  --village-wall: #fbe7d6;
+  --village-wall-2: #f4d2bd;
+  --village-stone: #e3cfc2;
+  --village-stone-dark: #b99f93;
+  --village-shade: #c98f84;
+  --village-roof: #d0706a;
+  --village-roof-2: #b46480;
+  --village-roof-3: #e08f5f;
+  --village-thatch: #d9a65e;
+  --village-dome: #8fb7c9;
+  --village-wood: #8c5d48;
+  --village-earth: #a8705a;
+  --village-path: #f3dfc4;
+  --village-window: #8a7fae;
+  --village-lit: #ffe08f;
+  --village-lamp: #ff9d4a;
+  --village-fire: #ff8a3d;
+  --village-fire-core: #ffe08a;
+  --village-smoke: rgba(255, 255, 255, 0.65);
+  --village-leaf: #6f9e74;
+  --village-leaf-lit: #a9cf8e;
+  --village-bark: #7a5a4c;
+  --village-fruit: #e0574f;
+  --village-flower-1: #ff8fb1;
+  --village-flower-2: #ffd36e;
+  --village-cloth-1: #6f7fb0;
+  --village-cloth-2: #c86b6b;
+  --village-cloth-3: #5c9a7a;
+  --village-cloth-light: #fff6ea;
+  --village-skin: #e8b996;
+  --village-hen: #fffaf2;
+  --village-goat: #efe6da;
+  --village-cow: #fdf6ee;
+  --village-cow-patch: #5a4250;
+  --village-donkey: #9a8a8f;
+  --village-cat: #5a4250;
+  --village-dove: #ffffff;
+  --village-bunting-1: #ff8a8a;
+  --village-bunting-2: #ffd36e;
+  --village-bunting-3: #8ec5e8;
+}
+
+.dark {
+  --village-sky-1: #141533;
+  --village-sky-2: #2a2350;
+  --village-sky-3: #4b3463;
+  --village-sun: #f3ead0;
+  --village-stars: 1;
+  --village-star: #fff6dc;
+  --village-far: #2c2548;
+  --village-hill: #26352f;
+  --village-near: #1f2c28;
+  --village-lawn: #2c3f34;
+  --village-stream: #34507a;
+  --village-stream-deep: #22385a;
+  --village-shine: #9fb8e0;
+  --village-wheat: #8a7442;
+  --village-wheat-dark: #6a5532;
+  --village-wall: #5a4a58;
+  --village-wall-2: #514252;
+  --village-stone: #4e4550;
+  --village-stone-dark: #3a323c;
+  --village-shade: #1a1420;
+  --village-roof: #6d3a48;
+  --village-roof-2: #5a3450;
+  --village-roof-3: #74443c;
+  --village-thatch: #6e5536;
+  --village-dome: #3e5a6a;
+  --village-wood: #4a3428;
+  --village-earth: #4a3428;
+  --village-path: #5a4c48;
+  --village-window: #2b2840;
+  --village-lit: #ffc867;
+  --village-lamp: #ffad55;
+  --village-fire: #ff8a3d;
+  --village-fire-core: #ffe08a;
+  --village-smoke: rgba(200, 200, 220, 0.25);
+  --village-leaf: #2f4a3c;
+  --village-leaf-lit: #43634f;
+  --village-bark: #3e2c28;
+  --village-fruit: #b0443e;
+  --village-flower-1: #c8628a;
+  --village-flower-2: #d6aa52;
+  --village-cloth-1: #4d5a88;
+  --village-cloth-2: #8a4a50;
+  --village-cloth-3: #3e6a56;
+  --village-cloth-light: #c9bfb0;
+  --village-skin: #b88a70;
+  --village-hen: #cfc6ba;
+  --village-goat: #b9ae9f;
+  --village-cow: #cfc4b8;
+  --village-cow-patch: #2a2228;
+  --village-donkey: #6e6268;
+  --village-cat: #241c24;
+  --village-dove: #d8d4e8;
+  --village-bunting-1: #c8626a;
+  --village-bunting-2: #d6aa52;
+  --village-bunting-3: #5f8fb4;
+}
+
+/* The river, running clear (disputations). Light: a grey storm sky that
+   lifts to a pastel afternoon over a clean river. Dark: rain clouds that
+   part on a moonlit night. */
+:root {
+  --river-sky-1: #8fc4f2;
+  --river-sky-2: #c7e4fb;
+  --river-sky-3: #fde7ef;
+  --river-storm-1: #8d93ad;
+  --river-storm-2: #b3b6c8;
+  --river-stars: 0;
+  --river-star: #ffffff;
+  --river-evening: #ffb38a;
+  --river-sun: #ffd36b;
+  --river-cloud: #8a90a8;
+  --river-cloud-white: #ffffff;
+  --river-rain: #e6ecf7;
+  --river-hill-far: #a9b6d6;
+  --river-hill: #93b78e;
+  --river-bank: #a89a86;
+  --river-bank-shade: #86786a;
+  --river-meadow: #9fcb86;
+  --river-meadow-lit: #c3e3a6;
+  --river-water: #86cbe6;
+  --river-water-deep: #4f97c4;
+  --river-murk: #7d6e50;
+  --river-shine: #ffffff;
+  --river-glint: #fff6c8;
+  --river-wood: #7a5a46;
+  --river-wood-dark: #56402f;
+  --river-junk: #6e6a70;
+  --river-junk-2: #8f8070;
+  --river-tire: #36323a;
+  --river-oil: #b38de0;
+  --river-weed: #56704a;
+  --river-reed: #6f9a6a;
+  --river-leaf: #5f9a6e;
+  --river-leaf-lit: #a3d18f;
+  --river-bark: #7a5a4c;
+  --river-apple: #e0574f;
+  --river-stone: #d4ccdc;
+  --river-stone-dark: #9a92a6;
+  --river-flower-1: #ff9fc0;
+  --river-flower-2: #ffd36e;
+  --river-flower-3: #c7a3ff;
+  --river-fish: #ff9a6a;
+  --river-bird: #3d4560;
+  --river-heron: #8a90a8;
+  --river-duck: #f4efe7;
+  --river-duck-head: #3f8a6a;
+  --river-swan: #ffffff;
+  --river-otter: #6a4a3a;
+  --river-deer: #b07a55;
+  --river-cloth-1: #6f7fb0;
+  --river-cloth-2: #e07a6a;
+  --river-cloth-3: #f0b84a;
+  --river-cloth-light: #fff6ea;
+  --river-skin: #e8b996;
+  --river-cottage: #f6ede4;
+  --river-roof: #c46a5d;
+  --river-window: #ffe08f;
+  --river-smoke: rgba(255, 255, 255, 0.7);
+  --river-mill: #e8dccd;
+  --river-lily: #6fae7a;
+  --river-lily-flower: #ffd1e6;
+  --river-dragonfly: #5ccad8;
+  --river-butterfly: #ffb3d1;
+  --river-kingfisher: #2f8fd0;
+  --river-kingfisher-breast: #ff9a4a;
+  --river-hill-glow: 0.35;
+}
+
+.dark {
+  --river-sky-1: #101d40;
+  --river-sky-2: #22346a;
+  --river-sky-3: #3d4a80;
+  --river-storm-1: #23252f;
+  --river-storm-2: #33353f;
+  --river-stars: 1;
+  --river-star: #f4f6ff;
+  --river-evening: #6a4a8a;
+  --river-sun: #f0ecd8;
+  --river-cloud: #2a2c36;
+  --river-cloud-white: #9aa4c4;
+  --river-rain: #8a96b4;
+  --river-hill-far: #1e2848;
+  --river-hill: #1f3330;
+  --river-bank: #3a342e;
+  --river-bank-shade: #2a2520;
+  --river-meadow: #25402f;
+  --river-meadow-lit: #33573f;
+  --river-water: #2f5f8a;
+  --river-water-deep: #1b3a5c;
+  --river-murk: #3a3226;
+  --river-shine: #b8cdf0;
+  --river-glint: #e8ecff;
+  --river-wood: #4a3628;
+  --river-wood-dark: #33241a;
+  --river-junk: #3e3b42;
+  --river-junk-2: #544a40;
+  --river-tire: #141216;
+  --river-oil: #6a4f8a;
+  --river-weed: #2a3a26;
+  --river-reed: #3a5a42;
+  --river-leaf: #2a4a38;
+  --river-leaf-lit: #3f6a4c;
+  --river-bark: #3e2c26;
+  --river-apple: #a8443e;
+  --river-stone: #565068;
+  --river-stone-dark: #3a3548;
+  --river-flower-1: #c06a8a;
+  --river-flower-2: #c9a052;
+  --river-flower-3: #8a6ac0;
+  --river-fish: #c0703e;
+  --river-bird: #c8cde0;
+  --river-heron: #6a7090;
+  --river-duck: #b8b2a8;
+  --river-duck-head: #2a5a46;
+  --river-swan: #d0d4e0;
+  --river-otter: #3e2c22;
+  --river-deer: #7a5640;
+  --river-cloth-1: #4d5a88;
+  --river-cloth-2: #9a4a48;
+  --river-cloth-3: #b08a3a;
+  --river-cloth-light: #c0b8aa;
+  --river-skin: #b88a70;
+  --river-cottage: #4a4452;
+  --river-roof: #6d3a48;
+  --river-window: #ffc867;
+  --river-smoke: rgba(200, 200, 220, 0.25);
+  --river-mill: #4a4450;
+  --river-lily: #2f5a3e;
+  --river-lily-flower: #c08aa8;
+  --river-dragonfly: #3a90a0;
+  --river-butterfly: #b07a98;
+  --river-kingfisher: #2a6aa0;
+  --river-kingfisher-breast: #c0703a;
+  --river-hill-glow: 0.1;
+}
+
+/* The growing library (reading). Light: a warm cream room with a pastel
+   sky in its window. Dark: night outside, the room lit by its lamps and
+   its fire. */
+:root {
+  --library-wall-1: #f6e2d3;
+  --library-wall-2: #efd2c1;
+  --library-ceiling: #ead0c4;
+  --library-panel: #e2bfa9;
+  --library-trim: #c99a80;
+  --library-floor: #c78f6c;
+  --library-floor-line: rgba(90, 50, 30, 0.22);
+  --library-shelf: #8a5d45;
+  --library-shelf-dark: #6e4634;
+  --library-gilt: #f2d38c;
+  --library-book-1: #c75b52;
+  --library-book-2: #4f7a8c;
+  --library-book-3: #d9a441;
+  --library-book-4: #6f5a9a;
+  --library-book-5: #5c8a5c;
+  --library-book-6: #d07a9a;
+  --library-out-1: #b9c8f2;
+  --library-out-2: #ffd7c4;
+  --library-out-hill: #9a8ac0;
+  --library-star: #ffffff;
+  --library-moon: #fff6e0;
+  --library-moon-shade: #e3d3c4;
+  --library-light: #ffcc75;
+  --library-shade: #f2c28a;
+  --library-chair: #6f7fb0;
+  --library-chair-lit: #8a99c8;
+  --library-rug: #c86b6b;
+  --library-rug-2: #f6d28a;
+  --library-cat: #4d3a42;
+  --library-cup: #fbf5ec;
+  --library-steam: rgba(255, 255, 255, 0.8);
+  --library-leaf: #5c9065;
+  --library-pot: #c9714f;
+  --library-fire: #ff8a3d;
+  --library-fire-core: #ffd56b;
+  --library-log: #5a3a2a;
+  --library-stone: #d8c2b4;
+  --library-hearth: #4d3a3a;
+  --library-brass: #c9a052;
+  --library-globe-sea: #7fb4d6;
+  --library-globe-land: #8fc08a;
+  --library-map: #f6e6c4;
+  --library-map-ink: #a8705a;
+  --library-paper: #fbf3e4;
+  --library-ink: #2f2a3a;
+  --library-green-lamp: #3f8a5e;
+  --library-marble: #efe8e2;
+  --library-glass: #cfe6f2;
+  --library-dome: #cfa8c0;
+  --library-stained-1: #e0708a;
+  --library-stained-2: #6fa3d8;
+  --library-stained-3: #f2c64a;
+  --library-skin: #e8b996;
+  --library-cloth: #5c8a5c;
+}
+
+.dark {
+  --library-wall-1: #2b2233;
+  --library-wall-2: #221b2b;
+  --library-ceiling: #1e1826;
+  --library-panel: #33263a;
+  --library-trim: #4a3540;
+  --library-floor: #3e2a28;
+  --library-floor-line: rgba(0, 0, 0, 0.3);
+  --library-shelf: #5a3c2e;
+  --library-shelf-dark: #3e2820;
+  --library-gilt: #c9a053;
+  --library-book-1: #8f3f3a;
+  --library-book-2: #3b6070;
+  --library-book-3: #b58632;
+  --library-book-4: #54457a;
+  --library-book-5: #46704a;
+  --library-book-6: #8a4a68;
+  --library-out-1: #060a24;
+  --library-out-2: #1c2259;
+  --library-out-hill: #0b1030;
+  --library-star: #ffffff;
+  --library-moon: #fff6e0;
+  --library-moon-shade: #c8b8a8;
+  --library-light: #ffc061;
+  --library-shade: #e0a860;
+  --library-chair: #3c4670;
+  --library-chair-lit: #4d5a88;
+  --library-rug: #7a3442;
+  --library-rug-2: #c9a053;
+  --library-cat: #1a1218;
+  --library-cup: #d8d0c4;
+  --library-steam: rgba(255, 255, 255, 0.4);
+  --library-leaf: #3a6a48;
+  --library-pot: #8a4a36;
+  --library-fire: #ff8a3d;
+  --library-fire-core: #ffd56b;
+  --library-log: #2a1a14;
+  --library-stone: #4a3e44;
+  --library-hearth: #120c10;
+  --library-brass: #a8843e;
+  --library-globe-sea: #3a6080;
+  --library-globe-land: #4a7048;
+  --library-map: #a89870;
+  --library-map-ink: #6a4a3a;
+  --library-paper: #d8ccb4;
+  --library-ink: #141018;
+  --library-green-lamp: #2f6a46;
+  --library-marble: #b8b0aa;
+  --library-glass: #5a7080;
+  --library-dome: #4a3550;
+  --library-stained-1: #b04a64;
+  --library-stained-2: #3a6aa0;
+  --library-stained-3: #c09a30;
+  --library-skin: #b88a70;
+  --library-cloth: #3e6a46;
+}
+
+/* The lamplit town (the five daily prayers). Light: blue hour over snow,
+   a pink horizon. Dark: deep night, the town lit by its lamps. Both end
+   at Fajr. */
+:root {
+  --town-sky-1: #7f8fd8;
+  --town-sky-2: #b0b2ea;
+  --town-sky-3: #f0c4d6;
+  --town-stars: 0.55;
+  --town-star: #ffffff;
+  --town-moon: #fff6e0;
+  --town-aurora-1: #8ff0d0;
+  --town-aurora-2: #b39cff;
+  --town-fajr: #ffd2a8;
+  --town-rose: #ffb3c8;
+  --town-blue: #6f8ad8;
+  --town-peak: #8d98cf;
+  --town-peak-shade: #7480bd;
+  --town-snowcap: #f6f8ff;
+  --town-far-hill: #aeb8e6;
+  --town-snow: #eef1ff;
+  --town-snow-shade: #c9cff0;
+  --town-snow-deep: #b0b8e2;
+  --town-ice: #d4e8ff;
+  --town-ice-edge: #9fb8e6;
+  --town-path: #cdd4f2;
+  --town-wall: #e8def4;
+  --town-wall-shade: #c4b8dc;
+  --town-dome: #8fa2e0;
+  --town-wood: #6e4a5a;
+  --town-window: #5a5a8a;
+  --town-lit: #ffd98a;
+  --town-lamp: #ffb35c;
+  --town-pine: #3f6a74;
+  --town-smoke: rgba(255, 255, 255, 0.6);
+  --town-cloth-1: #6f5aa8;
+  --town-cloth-2: #c8627a;
+  --town-cloth-3: #4f8a8a;
+  --town-skin: #e8b996;
+  --town-deer: #8a6a5a;
+  --town-fox: #e07a4a;
+  --town-owl: #7a6a8a;
+}
+
+.dark {
+  --town-sky-1: #070b26;
+  --town-sky-2: #141a46;
+  --town-sky-3: #2c2a5e;
+  --town-stars: 1;
+  --town-star: #ffffff;
+  --town-moon: #fff2d0;
+  --town-aurora-1: #4fd0a8;
+  --town-aurora-2: #8a6ad8;
+  --town-fajr: #c8906a;
+  --town-rose: #b87a98;
+  --town-blue: #2e3e80;
+  --town-peak: #2a2f5a;
+  --town-peak-shade: #20254a;
+  --town-snowcap: #c8d0f0;
+  --town-far-hill: #262c56;
+  --town-snow: #4a5280;
+  --town-snow-shade: #3a4170;
+  --town-snow-deep: #2e3560;
+  --town-ice: #5a76b0;
+  --town-ice-edge: #3e5590;
+  --town-path: #5c6494;
+  --town-wall: #4a4468;
+  --town-wall-shade: #3a3458;
+  --town-dome: #3e4a80;
+  --town-wood: #3e2c38;
+  --town-window: #1e1c38;
+  --town-lit: #ffc867;
+  --town-lamp: #ffad55;
+  --town-pine: #1e3a44;
+  --town-smoke: rgba(200, 200, 230, 0.25);
+  --town-cloth-1: #3e3470;
+  --town-cloth-2: #8a3e58;
+  --town-cloth-3: #2e5a5e;
+  --town-skin: #b88a70;
+  --town-deer: #5a4440;
+  --town-fox: #a8552e;
+  --town-owl: #4a3e58;
 }
 
 /* The balloon at first light (brain dump). Cotton candy sees it on a
@@ -2018,6 +2284,10 @@
   --balloon-steeple: #ece2fb;
   --balloon-mill: #efe6fb;
   --balloon-mill-shade: #c8b8e8;
+  --balloon-sack: #c9a878;
+  --balloon-skin: #e8b996;
+  --balloon-poppy: #ff6f6f;
+  --balloon-lane: #f6e6cf;
   --balloon-sail: #7f74b4;
   --balloon-wool: #fffaf7;
   --balloon-sheep-face: #4a3f5c;
@@ -2073,6 +2343,10 @@
   --balloon-steeple: #36315f;
   --balloon-mill: #2f2c58;
   --balloon-mill-shade: #24224a;
+  --balloon-sack: #7a6448;
+  --balloon-skin: #b88a70;
+  --balloon-poppy: #c04848;
+  --balloon-lane: #4a4466;
   --balloon-sail: #8b87c6;
   --balloon-wool: #cfc9e6;
   --balloon-sheep-face: #15122a;
@@ -2127,6 +2401,11 @@
   --oasis-palm-2: #3a6f48;
   --oasis-reed: #6c9a50;
   --oasis-date: #c25a2c;
+  --oasis-field: #8fc98a;
+  --oasis-fish: #ff9a6a;
+  --oasis-pomegranate: #d8435a;
+  --oasis-kingfisher: #2f8fd0;
+  --oasis-smoke: rgba(255, 255, 255, 0.65);
   --oasis-lantern: #ffc96e;
   --oasis-lantern-glass: #fff1cf;
   --oasis-lantern-metal: #6a4838;
@@ -2175,6 +2454,11 @@
   --oasis-palm-2: #1d403f;
   --oasis-reed: #2f5a4b;
   --oasis-date: #b25a3a;
+  --oasis-field: #3a6a4a;
+  --oasis-fish: #c0703e;
+  --oasis-pomegranate: #a8324a;
+  --oasis-kingfisher: #2a6aa0;
+  --oasis-smoke: rgba(200, 200, 220, 0.25);
   --oasis-lantern: #ffcf7a;
   --oasis-lantern-glass: #fff0c8;
   --oasis-lantern-metal: #2c2234;
@@ -2226,6 +2510,20 @@
   --grove-flower-1: #f07b95;
   --grove-flower-2: #ffcf63;
   --grove-butterfly: #ffbe6b;
+  --grove-fish: #ff9a6a;
+  --grove-deer: #b07a55;
+  --grove-fox: #d9773f;
+  --grove-heron: #8a90a8;
+  --grove-duck: #f4efe7;
+  --grove-cabin: #b98a64;
+  --grove-roof: #7a5240;
+  --grove-lamp: #ffcf6b;
+  --grove-bluebell: #7f8fe8;
+  --grove-smoke: rgba(255, 255, 255, 0.7);
+  --grove-kingfisher: #2f8fd0;
+  --grove-path: #e8d9b8;
+  --grove-meadow: #a8d98a;
+  --grove-blossom: #ffc6dc;
   --grove-bird: #3d5563;
   --grove-sun: #ffe8a8;
 
@@ -2254,6 +2552,27 @@
   --orchard-linen: #faf1e2;
   --orchard-clay: #c46e48;
   --orchard-date: #6a2f1d;
+  --orchard-olive: #8aa85a;
+  --orchard-olive-ripe: #4a3a5a;
+  --orchard-house: #e8d6c4;
+  --orchard-roof: #b4645a;
+  --orchard-window: #7a6f9e;
+  --orchard-cloth-1: #6f7fb0;
+  --orchard-cloth-2: #c86b6b;
+  --orchard-cloth-3: #5c9a7a;
+  --orchard-skin: #e8b996;
+  --orchard-goat: #efe6da;
+  --orchard-sheep: #fdf6ee;
+  --orchard-donkey: #9a8a8f;
+  --orchard-rose: #e86a8a;
+  --orchard-almond: #ffd6e6;
+  --orchard-pomegranate: #d8435a;
+  --orchard-cat: #5a4250;
+  --orchard-steam: rgba(255, 255, 255, 0.75);
+  --orchard-bread: #d99a52;
+  --orchard-rug: #b8456a;
+  --orchard-teapot: #5f8fb4;
+  --orchard-glass: #ffe2a8;
   --orchard-water: #b9e3ea;
   --orchard-lavender: #9b7cc2;
   --orchard-thyme: #789a6e;
@@ -2290,6 +2609,20 @@
   --grove-flower-1: #df7293;
   --grove-flower-2: #f0c265;
   --grove-butterfly: #ffd085;
+  --grove-fish: #c0703e;
+  --grove-deer: #7a5640;
+  --grove-fox: #a8552e;
+  --grove-heron: #6a7090;
+  --grove-duck: #b8b2a8;
+  --grove-cabin: #6a4e3a;
+  --grove-roof: #3e2a22;
+  --grove-lamp: #ffc061;
+  --grove-bluebell: #4a58a8;
+  --grove-smoke: rgba(200, 200, 220, 0.25);
+  --grove-kingfisher: #2a6aa0;
+  --grove-path: #4a4440;
+  --grove-meadow: #2f5a3a;
+  --grove-blossom: #a86a88;
   --grove-bird: #cde8ec;
   --grove-sun: #ffe09e;
 
@@ -2318,6 +2651,27 @@
   --orchard-linen: #c9bfd4;
   --orchard-clay: #9e5540;
   --orchard-date: #471d18;
+  --orchard-olive: #56703a;
+  --orchard-olive-ripe: #2a2034;
+  --orchard-house: #5a4a4e;
+  --orchard-roof: #6d3a40;
+  --orchard-window: #2b2840;
+  --orchard-cloth-1: #4d5a88;
+  --orchard-cloth-2: #8a4a50;
+  --orchard-cloth-3: #3e6a56;
+  --orchard-skin: #b88a70;
+  --orchard-goat: #a89e92;
+  --orchard-sheep: #c8beb2;
+  --orchard-donkey: #6e6268;
+  --orchard-rose: #a84a6a;
+  --orchard-almond: #b88aa0;
+  --orchard-pomegranate: #a8324a;
+  --orchard-cat: #1e1820;
+  --orchard-steam: rgba(220, 220, 230, 0.35);
+  --orchard-bread: #a8743a;
+  --orchard-rug: #7a2f4a;
+  --orchard-teapot: #3e6080;
+  --orchard-glass: #d0a860;
   --orchard-water: #7db4c7;
   --orchard-lavender: #886cb0;
   --orchard-thyme: #4e6b58;
@@ -2457,11 +2811,14 @@
   .mind-scene [data-fx="spin"] { animation: scene-spin 18s linear infinite; }
   /* A kept day lifts the balloon; a missed one lets it sink. */
   .balloon-scene .balloon-rise { transition: transform 2.6s cubic-bezier(0.33, 1, 0.68, 1); }
+  /* A sandbag let go falls from the basket and lands in the meadow. */
+  .balloon-scene [data-grow][data-stage^="bag-"] { animation: scene-drop 1.5s cubic-bezier(0.55, 0, 1, 0.45) both; }
   .mind-scene [data-fx="beam"] { animation: scene-beam 7s ease-in-out infinite; }
   .mind-scene [data-fx="smoke"] { animation: scene-smoke 5s ease-out infinite; }
   .mind-scene [data-fx="swell"] { animation: scene-swell 8s ease-in-out infinite alternate; }
   .mind-scene [data-fx="bob"] { animation: scene-bob 5s ease-in-out infinite; }
   .mind-scene [data-fx="rain"] { animation: scene-rain 0.7s linear infinite; }
+  .mind-scene [data-fx="snow"] { animation: scene-snow 9s linear infinite; }
   .mind-scene [data-fx="flash"] { animation: scene-flash 7s linear infinite; }
   .mind-scene:not(.garden-scene) [data-fx="glow"] { animation: scene-glow 5s ease-in-out infinite; }
   .mind-scene:not(.garden-scene) [data-fx="ripple"] { animation: scene-ripple 3s ease-out infinite; }
@@ -2595,6 +2952,16 @@
 }
 @keyframes scene-spin {
   to { transform: rotate(360deg); }
+}
+@keyframes scene-snow {
+  from { transform: translate(0, -20px); opacity: 0; }
+  10% { opacity: 0.9; }
+  to { transform: translate(14px, 110px); opacity: 0; }
+}
+@keyframes scene-drop {
+  from { transform: translateY(-260px); opacity: 0; }
+  12% { opacity: 1; }
+  to { transform: translateY(0); opacity: 1; }
 }
 @keyframes scene-grow {
   from { transform: scale(0.4); opacity: 0; }
